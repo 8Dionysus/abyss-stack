@@ -6,6 +6,9 @@ import os
 from pathlib import Path
 import re
 import stat
+import subprocess
+import sys
+import time
 from types import SimpleNamespace
 
 import pytest
@@ -468,6 +471,541 @@ def test_pytest_temp_cleanup_never_claims_success_for_same_parent_rename(
         for error in result.errors
     )
     handle.close()
+
+
+def test_pytest_temp_cleanup_file_swap_before_quarantine_preserves_both_objects(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    handle = run_pytest_lane._pytest_temp_directory(tmp_path)
+    target = handle.path / "owned.txt"
+    target.write_text("owned\n", encoding="utf-8")
+    victim = tmp_path / "unrelated.txt"
+    victim.write_text("unrelated\n", encoding="utf-8")
+    moved_owned = tmp_path / "owned-moved.txt"
+    original_rename = run_pytest_lane._rename_noreplace
+    swapped = False
+
+    def replace_before_atomic_move(
+        source_parent_fd: int,
+        source_name: str,
+        destination_parent_fd: int,
+        destination_name: str,
+    ) -> None:
+        nonlocal swapped
+        if (
+            source_parent_fd == handle.namespace_fd
+            and source_name == target.name
+            and not swapped
+        ):
+            os.rename(
+                target.name,
+                moved_owned.name,
+                src_dir_fd=handle.namespace_fd,
+                dst_dir_fd=handle.parent_fd,
+            )
+            os.rename(
+                victim.name,
+                target.name,
+                src_dir_fd=handle.parent_fd,
+                dst_dir_fd=handle.namespace_fd,
+            )
+            swapped = True
+        original_rename(
+            source_parent_fd,
+            source_name,
+            destination_parent_fd,
+            destination_name,
+        )
+
+    monkeypatch.setattr(
+        run_pytest_lane,
+        "_rename_noreplace",
+        replace_before_atomic_move,
+    )
+
+    result = run_pytest_lane.cleanup_pytest_temp_namespace(handle)
+
+    assert swapped is True
+    assert result.ok is False
+    assert moved_owned.read_text(encoding="utf-8") == "owned\n"
+    recovered = list(tmp_path.glob(f"{run_pytest_lane._RECOVERY_ENTRY_PREFIX}*"))
+    assert len(recovered) == 1
+    assert recovered[0].parent == tmp_path
+    assert recovered[0].read_text(encoding="utf-8") == "unrelated\n"
+    assert all(
+        path.parent == tmp_path
+        for path in recovered
+    )
+
+
+@pytest.mark.parametrize(
+    ("initial_kind", "replacement_kind"),
+    (("regular", "symlink"), ("symlink", "regular")),
+)
+def test_pytest_temp_cleanup_cross_type_swap_never_follows_or_deletes_candidate(
+    monkeypatch,
+    tmp_path: Path,
+    initial_kind: str,
+    replacement_kind: str,
+) -> None:
+    handle = run_pytest_lane._pytest_temp_directory(tmp_path)
+    target = handle.path / "owned-entry"
+    marker = tmp_path / f"{initial_kind}-target-marker"
+    marker.write_text("outside marker\n", encoding="utf-8")
+    if initial_kind == "regular":
+        target.write_text("owned regular\n", encoding="utf-8")
+    else:
+        target.symlink_to(marker)
+
+    replacement = tmp_path / f"replacement-{replacement_kind}"
+    if replacement_kind == "regular":
+        replacement.write_text("unrelated regular\n", encoding="utf-8")
+    else:
+        replacement.symlink_to(marker)
+    moved_initial = tmp_path / f"initial-{initial_kind}-moved"
+    original_rename = run_pytest_lane._rename_noreplace
+    swapped = False
+
+    def replace_type_before_atomic_move(
+        source_parent_fd: int,
+        source_name: str,
+        destination_parent_fd: int,
+        destination_name: str,
+    ) -> None:
+        nonlocal swapped
+        if (
+            source_parent_fd == handle.namespace_fd
+            and source_name == target.name
+            and not swapped
+        ):
+            os.rename(
+                target.name,
+                moved_initial.name,
+                src_dir_fd=handle.namespace_fd,
+                dst_dir_fd=handle.parent_fd,
+            )
+            os.rename(
+                replacement.name,
+                target.name,
+                src_dir_fd=handle.parent_fd,
+                dst_dir_fd=handle.namespace_fd,
+            )
+            swapped = True
+        original_rename(
+            source_parent_fd,
+            source_name,
+            destination_parent_fd,
+            destination_name,
+        )
+
+    monkeypatch.setattr(
+        run_pytest_lane,
+        "_rename_noreplace",
+        replace_type_before_atomic_move,
+    )
+
+    result = run_pytest_lane.cleanup_pytest_temp_namespace(handle)
+
+    assert swapped is True
+    assert result.ok is False
+    assert marker.read_text(encoding="utf-8") == "outside marker\n"
+    if initial_kind == "regular":
+        assert moved_initial.read_text(encoding="utf-8") == "owned regular\n"
+    else:
+        assert moved_initial.is_symlink()
+        assert moved_initial.readlink() == marker
+    recovered = list(tmp_path.glob(f"{run_pytest_lane._RECOVERY_ENTRY_PREFIX}*"))
+    assert len(recovered) == 1
+    if replacement_kind == "regular":
+        assert recovered[0].read_text(encoding="utf-8") == "unrelated regular\n"
+    else:
+        assert recovered[0].is_symlink()
+        assert recovered[0].readlink() == marker
+
+
+def test_pytest_temp_cleanup_child_directory_swap_before_rmdir_is_fail_closed(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    handle = run_pytest_lane._pytest_temp_directory(tmp_path)
+    child = handle.path / "owned-directory"
+    child.mkdir()
+    (child / "owned.txt").write_text("owned\n", encoding="utf-8")
+    original_delete = run_pytest_lane._delete_quarantined_entry
+    swapped = False
+    moved_owned = tmp_path / "owned-directory-moved"
+
+    def replace_before_directory_removal(entry, *, directory: bool) -> None:
+        nonlocal swapped
+        if (
+            directory
+            and entry.parent_fd == handle.namespace_fd
+            and not swapped
+        ):
+            os.rename(
+                entry.name,
+                moved_owned.name,
+                src_dir_fd=handle.namespace_fd,
+                dst_dir_fd=handle.parent_fd,
+            )
+            os.mkdir(entry.name, 0o700, dir_fd=handle.namespace_fd)
+            replacement_fd = os.open(
+                entry.name,
+                run_pytest_lane._directory_open_flags(),
+                dir_fd=handle.namespace_fd,
+            )
+            try:
+                marker_fd = os.open(
+                    "unrelated-marker",
+                    os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+                    0o600,
+                    dir_fd=replacement_fd,
+                )
+                os.write(marker_fd, b"preserve\n")
+                os.close(marker_fd)
+            finally:
+                os.close(replacement_fd)
+            swapped = True
+        original_delete(entry, directory=directory)
+
+    monkeypatch.setattr(
+        run_pytest_lane,
+        "_delete_quarantined_entry",
+        replace_before_directory_removal,
+    )
+
+    result = run_pytest_lane.cleanup_pytest_temp_namespace(handle)
+
+    assert swapped is True
+    assert result.ok is False
+    assert moved_owned.is_dir()
+    recovered = list(tmp_path.glob(f"{run_pytest_lane._RECOVERY_ENTRY_PREFIX}*"))
+    assert len(recovered) == 1
+    assert (recovered[0] / "unrelated-marker").read_text(encoding="utf-8") == (
+        "preserve\n"
+    )
+
+
+def test_pytest_temp_cleanup_outer_quarantine_swap_preserves_replacement(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    handle = run_pytest_lane._pytest_temp_directory(tmp_path)
+    (handle.path / "owned.txt").write_text("owned\n", encoding="utf-8")
+    original_rmdir = run_pytest_lane.os.rmdir
+    swapped = False
+
+    def replace_before_outer_rmdir(name, *, dir_fd=None):
+        nonlocal swapped
+        if (
+            dir_fd == handle.parent_fd
+            and name.startswith(run_pytest_lane._DELETION_ENTRY_PREFIX)
+            and not swapped
+        ):
+            os.rename(
+                name,
+                "owner-quarantine-moved",
+                src_dir_fd=handle.parent_fd,
+                dst_dir_fd=handle.parent_fd,
+            )
+            os.mkdir(name, 0o700, dir_fd=handle.parent_fd)
+            replacement_fd = os.open(
+                name,
+                run_pytest_lane._directory_open_flags(),
+                dir_fd=handle.parent_fd,
+            )
+            try:
+                marker_fd = os.open(
+                    "unrelated-marker",
+                    os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+                    0o600,
+                    dir_fd=replacement_fd,
+                )
+                os.write(marker_fd, b"preserve\n")
+                os.close(marker_fd)
+            finally:
+                os.close(replacement_fd)
+            swapped = True
+        return original_rmdir(name, dir_fd=dir_fd)
+
+    monkeypatch.setattr(run_pytest_lane.os, "rmdir", replace_before_outer_rmdir)
+
+    result = run_pytest_lane.cleanup_pytest_temp_namespace(handle)
+
+    assert swapped is True
+    assert result.ok is False
+    replacement = next(
+        path
+        for path in tmp_path.iterdir()
+        if path.name.startswith(run_pytest_lane._DELETION_ENTRY_PREFIX)
+    )
+    assert (replacement / "unrelated-marker").read_text(encoding="utf-8") == (
+        "preserve\n"
+    )
+
+
+def test_pytest_temp_cleanup_rollback_collision_preserves_recoverable_candidate(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    handle = run_pytest_lane._pytest_temp_directory(tmp_path)
+    target = handle.path / "owned.txt"
+    target.write_text("owned\n", encoding="utf-8")
+    expected = run_pytest_lane._ObjectIdentity.from_stat(target.stat())
+    victim = tmp_path / "rollback-victim.txt"
+    victim.write_text("victim\n", encoding="utf-8")
+    moved_owned = tmp_path / "owned-before-rollback"
+    original_open = run_pytest_lane._open_entry_identity
+    raced = False
+
+    def replace_quarantine_and_collide(parent_fd, name, identity):
+        nonlocal raced
+        if (
+            parent_fd == handle.namespace_fd
+            and name.startswith(run_pytest_lane._QUARANTINE_ENTRY_PREFIX)
+            and not raced
+        ):
+            os.rename(
+                name,
+                moved_owned.name,
+                src_dir_fd=handle.namespace_fd,
+                dst_dir_fd=handle.parent_fd,
+            )
+            os.rename(
+                victim.name,
+                name,
+                src_dir_fd=handle.parent_fd,
+                dst_dir_fd=handle.namespace_fd,
+            )
+            collision_fd = os.open(
+                target.name,
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+                0o600,
+                dir_fd=handle.namespace_fd,
+            )
+            try:
+                os.write(collision_fd, b"source collision\n")
+            finally:
+                os.close(collision_fd)
+            raced = True
+        return original_open(parent_fd, name, identity)
+
+    monkeypatch.setattr(
+        run_pytest_lane,
+        "_open_entry_identity",
+        replace_quarantine_and_collide,
+    )
+
+    with pytest.raises(run_pytest_lane.PytestTempNamespaceRaceError):
+        run_pytest_lane._quarantine_entry(
+            handle.namespace_fd,
+            target.name,
+            expected,
+            handle.namespace_fd,
+            destination_prefix=run_pytest_lane._QUARANTINE_ENTRY_PREFIX,
+        )
+
+    assert raced is True
+    assert moved_owned.read_text(encoding="utf-8") == "owned\n"
+    assert (target).read_text(encoding="utf-8") == "source collision\n"
+    recovered = list(
+        handle.path.glob(f"{run_pytest_lane._RECOVERY_ENTRY_PREFIX}*")
+    )
+    assert len(recovered) == 1
+    assert recovered[0].read_text(encoding="utf-8") == "victim\n"
+    handle.close()
+
+
+def test_pytest_temp_cleanup_quarantine_destination_collision_is_non_destructive(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    handle = run_pytest_lane._pytest_temp_directory(tmp_path)
+    (handle.path / "owned.txt").write_text("owned\n", encoding="utf-8")
+    occupied = tmp_path / "occupied-quarantine-name"
+    occupied.write_text("must survive\n", encoding="utf-8")
+    original_rename = run_pytest_lane._rename_noreplace
+    collisions = 0
+
+    def collide_once(source_parent_fd, source_name, destination_parent_fd, destination_name):
+        nonlocal collisions
+        if collisions == 0:
+            collisions += 1
+            raise FileExistsError(destination_name)
+        original_rename(
+            source_parent_fd,
+            source_name,
+            destination_parent_fd,
+            destination_name,
+        )
+
+    monkeypatch.setattr(run_pytest_lane, "_rename_noreplace", collide_once)
+
+    result = run_pytest_lane.cleanup_pytest_temp_namespace(handle)
+
+    assert result.ok is True
+    assert collisions == 1
+    assert occupied.read_text(encoding="utf-8") == "must survive\n"
+    assert not list(tmp_path.glob(f"{run_pytest_lane._QUARANTINE_NAME_PREFIX}*"))
+
+
+def test_pytest_temp_cleanup_destination_swap_after_quarantine_preserves_candidate(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    handle = run_pytest_lane._pytest_temp_directory(tmp_path)
+    (handle.path / "owned.txt").write_text("owned\n", encoding="utf-8")
+    victim = tmp_path / "victim.txt"
+    victim.write_text("victim\n", encoding="utf-8")
+    moved_owned = tmp_path / "owned-after-destination-swap"
+    original_open = run_pytest_lane._open_entry_identity
+    swapped = False
+
+    def replace_after_quarantine(parent_fd, name, expected):
+        nonlocal swapped
+        if (
+            parent_fd == handle.namespace_fd
+            and name.startswith(run_pytest_lane._QUARANTINE_ENTRY_PREFIX)
+            and not swapped
+        ):
+            descriptor = original_open(parent_fd, name, expected)
+            os.rename(
+                name,
+                moved_owned.name,
+                src_dir_fd=handle.namespace_fd,
+                dst_dir_fd=handle.parent_fd,
+            )
+            os.rename(
+                victim.name,
+                name,
+                src_dir_fd=handle.parent_fd,
+                dst_dir_fd=handle.namespace_fd,
+            )
+            swapped = True
+            return descriptor
+        return original_open(parent_fd, name, expected)
+
+    monkeypatch.setattr(run_pytest_lane, "_open_entry_identity", replace_after_quarantine)
+
+    result = run_pytest_lane.cleanup_pytest_temp_namespace(handle)
+
+    assert swapped is True
+    assert result.ok is False
+    assert moved_owned.read_text(encoding="utf-8") == "owned\n"
+    recovered = list(tmp_path.glob(f"{run_pytest_lane._RECOVERY_ENTRY_PREFIX}*"))
+    assert len(recovered) == 1
+    assert recovered[0].read_text(encoding="utf-8") == "victim\n"
+
+
+def test_pytest_temp_cleanup_partial_diagnostic_swap_preserves_candidate(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    handle = run_pytest_lane._pytest_temp_directory(tmp_path)
+    diagnostic = run_pytest_lane._cleanup_diagnostic_path(handle.path)
+    victim = tmp_path / "diagnostic-victim.txt"
+    victim.write_text("victim\n", encoding="utf-8")
+    original_write = run_pytest_lane.os.write
+    original_rename = run_pytest_lane._rename_noreplace
+    swapped = False
+
+    def incomplete_write(descriptor, content):
+        return 0
+
+    def replace_partial_diagnostic(source_parent_fd, source_name, destination_parent_fd, destination_name):
+        nonlocal swapped
+        if source_parent_fd == handle.parent_fd and source_name == diagnostic.name and not swapped:
+            os.rename(
+                diagnostic.name,
+                "partial-diagnostic-owned",
+                src_dir_fd=handle.parent_fd,
+                dst_dir_fd=handle.parent_fd,
+            )
+            os.rename(
+                victim.name,
+                diagnostic.name,
+                src_dir_fd=handle.parent_fd,
+                dst_dir_fd=handle.parent_fd,
+            )
+            swapped = True
+        original_rename(
+            source_parent_fd,
+            source_name,
+            destination_parent_fd,
+            destination_name,
+        )
+
+    monkeypatch.setattr(run_pytest_lane.os, "write", incomplete_write)
+    monkeypatch.setattr(
+        run_pytest_lane,
+        "_rename_noreplace",
+        replace_partial_diagnostic,
+    )
+
+    assert (
+        run_pytest_lane._write_cleanup_diagnostic(
+            handle,
+            [{"attempt": "1", "error_type": "OSError", "error": "failure"}],
+        )
+        is None
+    )
+
+    assert swapped is True
+    assert (tmp_path / "partial-diagnostic-owned").is_file()
+    assert diagnostic.read_text(encoding="utf-8") == "victim\n"
+    monkeypatch.setattr(run_pytest_lane.os, "write", original_write)
+    assert run_pytest_lane.cleanup_pytest_temp_namespace(handle).ok
+
+
+def test_pytest_temp_cleanup_drains_surviving_invocation_process_group(
+    tmp_path: Path,
+) -> None:
+    handle = run_pytest_lane._pytest_temp_directory(tmp_path)
+    (handle.path / "owned.txt").write_text("owned\n", encoding="utf-8")
+    ready = tmp_path / "mutator-ready"
+    done = tmp_path / "mutator-drained"
+    script = """
+import signal
+import sys
+import time
+from pathlib import Path
+
+namespace = Path(sys.argv[1])
+ready = Path(sys.argv[2])
+done = Path(sys.argv[3])
+
+def on_term(_signal, _frame):
+    (namespace / "mutation-attempted").write_text("contained\\n", encoding="utf-8")
+    done.touch()
+
+signal.signal(signal.SIGTERM, on_term)
+ready.touch()
+while True:
+    time.sleep(1)
+"""
+    process = subprocess.Popen(
+        [sys.executable, "-c", script, str(handle.path), str(ready), str(done)],
+        start_new_session=True,
+        close_fds=True,
+    )
+    try:
+        deadline = time.monotonic() + 5
+        while not ready.exists() and time.monotonic() < deadline:
+            time.sleep(0.01)
+        assert ready.is_file()
+        handle.register_owner_process_group(process.pid)
+
+        result = run_pytest_lane.cleanup_pytest_temp_namespace(handle)
+
+        assert result.ok is True
+        assert done.is_file()
+        assert process.poll() is not None
+        assert not list(tmp_path.glob(f"{run_pytest_lane.PYTEST_TEMP_PREFIX}*"))
+    finally:
+        if process.poll() is None:
+            process.kill()
+        process.wait()
 
 
 def test_pytest_temp_cleanup_preserves_original_name_replacement_after_rename(
@@ -988,11 +1526,14 @@ def test_pytest_lane_returns_visible_failure_when_cleanup_is_unrecoverable(
         "_remove_owned_namespace",
         fail_lane_cleanup,
     )
-    monkeypatch.setattr(
-        run_pytest_lane.subprocess,
-        "run",
-        lambda *_args, **_kwargs: SimpleNamespace(returncode=0),
-    )
+    class FakeProcess:
+        def __init__(self, *_args, **_kwargs) -> None:
+            pass
+
+        def wait(self) -> int:
+            return 0
+
+    monkeypatch.setattr(run_pytest_lane.subprocess, "Popen", FakeProcess)
 
     assert (
         run_pytest_lane.main(["--scheduler", "serial"])
@@ -1077,6 +1618,12 @@ def test_process_lane_allocates_and_cleans_collect_and_shard_basetemps(
     class FakeProcess:
         def __init__(self, command, *, env, **_kwargs):
             commands.append(list(command))
+            if run_pytest_lane.PARTITION_ASSIGNMENT_ENV not in env:
+                run_pytest_lane.write_manifest(
+                    Path(env[run_pytest_lane.PARTITION_BASELINE_ENV]),
+                    nodeids,
+                )
+                return
             assignment = run_pytest_lane.read_manifest(
                 Path(env[run_pytest_lane.PARTITION_ASSIGNMENT_ENV])
             )
@@ -1251,11 +1798,14 @@ def test_pytest_argument_files_are_rejected_without_reading_or_deleting_victim(
 def test_pytest_end_of_options_cannot_positionalize_owner_option(monkeypatch) -> None:
     commands: list[list[str]] = []
 
-    def fake_run(command, **_kwargs):
-        commands.append(list(command))
-        return SimpleNamespace(returncode=0)
+    class FakeProcess:
+        def __init__(self, command, **_kwargs) -> None:
+            commands.append(list(command))
 
-    monkeypatch.setattr(run_pytest_lane.subprocess, "run", fake_run)
+        def wait(self) -> int:
+            return 0
+
+    monkeypatch.setattr(run_pytest_lane.subprocess, "Popen", FakeProcess)
 
     assert run_pytest_lane.main(
         [
@@ -1374,13 +1924,19 @@ def test_pytest_addopts_keeps_ordinary_options_accepted(monkeypatch) -> None:
     commands: list[list[str]] = []
     environments: list[dict[str, str]] = []
 
-    def fake_run(command, **kwargs):
-        commands.append(list(command))
-        environments.append(kwargs["env"])
-        return SimpleNamespace(returncode=0)
+    class FakeProcess:
+        def __init__(self, command, **kwargs) -> None:
+            commands.append(list(command))
+            environments.append(kwargs["env"])
+
+        def wait(self) -> int:
+            return 0
+
+    def fake_popen(command, **kwargs):
+        return FakeProcess(command, **kwargs)
 
     monkeypatch.setenv(run_pytest_lane.PYTEST_ADDOPTS_ENV, "-p no:cacheprovider")
-    monkeypatch.setattr(run_pytest_lane.subprocess, "run", fake_run)
+    monkeypatch.setattr(run_pytest_lane.subprocess, "Popen", fake_popen)
 
     assert run_pytest_lane.main(["--scheduler", "serial"]) == 0
     assert len(commands) == 1

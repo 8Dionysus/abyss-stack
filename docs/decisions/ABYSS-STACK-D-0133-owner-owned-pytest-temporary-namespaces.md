@@ -37,6 +37,15 @@ wins, moving the owner's option earlier or later alone cannot establish the
 invariant. A direct `-o/--override-ini addopts=...` can also reintroduce an
 option stream after the owner's command construction.
 
+The cleanup boundary has a separate identity problem. A retained `O_PATH`
+descriptor, a prior `stat`, and an immediate recheck all describe the object
+that was observed, but `unlinkat`/`rmdir` still resolve a mutable directory
+entry at their later syscall. The old child-entry path therefore admitted a
+same-UID replacement between validation and destruction. The repair must bind
+each object before destruction and must state what happens when the platform
+cannot provide deletion by descriptor or when a mutator is outside the
+invocation's containment set.
+
 ## Options considered
 
 - Keep pytest's default numbered root and rely on its tombstone cleanup. This
@@ -62,6 +71,26 @@ option stream after the owner's command construction.
   would reintroduce a deletion race. The safe fallback is to clear only the
   retained inode through its descriptor and report the remaining link as a
   cleanup failure.
+- Atomically quarantine each candidate with Linux `renameat2(RENAME_NOREPLACE)`
+  and a fresh destination, open the moved destination with `O_PATH|O_NOFOLLOW`,
+  and compare device/inode/type before doing anything destructive. This binds
+  the object moved at the atomic instant, rejects destination collisions
+  without overwriting them, and restores an unexpected candidate with another
+  no-replace move or a fresh recovery name. A random name or `rename` without
+  destination exclusion and identity validation is not sufficient.
+- Drain the process groups created by this invocation before deleting a bound
+  quarantine slot. `start_new_session` gives each process shard an explicit
+  group; cleanup sends bounded `SIGTERM`/`SIGKILL`, reaps the leader, and fails
+  closed if the group survives. This is the authority boundary for the final
+  name-based `unlink`/`rmdir`, because Linux/Python exposes no unlink-by-fd
+  primitive. A same-UID process not owned by the invocation cannot be fenced
+  by this runner; a stronger process-isolation owner is required for that
+  contract.
+- Keep only retained-fd content reclamation and a visible failure when the
+  owner namespace has already escaped its parent or a race binding cannot be
+  recovered. This preserves data and avoids claiming that the retained inode
+  makes an arbitrary mutable name safe to delete, but it intentionally leaves
+  a tombstone for that failure case.
 - Move the owner `--basetemp` option within the generated command and allow
   pytest to expand all other sources. This leaves recursive `@file`, environment,
   config, and last-option behavior outside the runner's proof.
@@ -102,23 +131,44 @@ positional. Rejected input returns before any pytest subprocess or owner
 namespace is started.
 
 Cleanup is an explicit bounded retry lifecycle using an iterative post-order
-stack, fd-relative `listdir`, `O_PATH|O_NOFOLLOW` identity handles, no-follow
-identity checks, `unlink`, and `rmdir`. Child completion reopens its anchored
-`..` parent, verifies that parent identity, and removes the exact original
-child name without retaining one descriptor per ancestor. Symlink entries are
-removed as names and never traversed; a platform without the identity-handle
-primitive fails visibly rather than weakening the stat/delete boundary.
-The retained outer namespace descriptor is also the authority for link state:
-cleanup reports success only after `fstat` proves `st_nlink == 0`. If the
-original name is missing or replaced while the retained inode remains linked,
-cleanup performs at most a one-level, exact identity lookup in the retained
-original parent for classification. It never deletes a recovered name: the
-entry is opened no-follow and revalidated immediately, then the retained fd is
-used to clear only the owned contents. A same-parent rename, an inode moved
-outside the retained parent, a lookup/removal race, or an original-name
-replacement therefore leaves a visible failure while preserving the changed
-candidate or unrelated entries. There is no portable race-safe directory
-unlink-by-fd primitive to turn that classified name into a safe removal.
+stack, fd-relative `listdir`, `O_PATH|O_NOFOLLOW` identity handles, and Linux
+`renameat2(RENAME_NOREPLACE)` bindings. Before cleanup can destruct anything,
+registered invocation-owned process groups are drained; a surviving group
+raises a visible busy failure and no retry re-resolves its names. The outer
+namespace is atomically moved from its public name to a fresh quarantine name
+and identity-checked. Every child entry then follows the same boundary:
+regular files and symlinks are moved without following them, directories are
+moved and traversed through their retained fd, and each staged entry is moved
+again to a fresh deletion slot and identity-checked before its final
+`unlink`/`rmdir`. A no-replace destination collision never overwrites the
+occupant. If the object at a quarantine or deletion destination is unexpected,
+the candidate is moved back with no-replace semantics or published under a
+fresh `.recovered-*` name; no destructive helper runs and the retry loop stops.
+
+The final deletion slot is under the retained parent fd and is used only after
+the invocation-owned mutator set has been drained. That containment is the
+actual authority boundary for a syscall that still accepts a name. It is not a
+mathematical guarantee against an unrelated same-UID process that already has
+the parent or namespace fd: no available Linux/Python primitive can atomically
+unlink an object by its retained fd. If that unowned actor is in scope, the
+honest result is a stronger process-isolation owner handoff, not a claim of
+race safety. When the binding itself fails, the implementation leaves the
+candidate recoverable and reports failure; it never falls back to deleting a
+new object through the old name.
+
+The retained outer namespace descriptor remains the authority for link state:
+ordinary uncontended cleanup reports success only after `fstat` proves
+`st_nlink == 0`. If the original namespace name is missing or replaced while
+the retained inode remains linked, classification may inspect exact identity
+without deleting the recovered name; safe fd-only content reclamation may
+clear owned payloads, but the remaining link is a visible failure. A
+same-parent rename, an inode moved outside the retained parent, an ancestor
+swap, or an original-name replacement therefore preserves the changed
+candidate and cannot produce false success. Partial diagnostics are created
+with an exclusive no-follow open against the retained parent; if their write
+or close fails, only the just-created diagnostic identity is quarantined into
+the owner namespace and the same binding rules protect its cleanup. No
+recovery or cleanup retry re-stats a mutable candidate after a race result.
 Directory permission repair adds only owner
 read/write/search bits to a checked directory: it uses `fchmod` when an
 ordinary no-follow directory fd is available, a platform-provided
@@ -145,14 +195,18 @@ The route uses the upstream-supported basetemp boundary and the machine's
 existing runtime environment rather than encoding a host incident. A unique
 directory per process makes collection, serial execution, and shards mutually
 isolated. The immutable parent handle keeps ancestor rename/symlink replacement
-outside the authority boundary, while identity checks prevent a replaced name
-from being deleted. The explicit rejection of a user basetemp preserves the
-invariant even when callers provide extra pytest arguments. Rejecting pytest's
-recursive argument-file expansion is safer than cloning a version-sensitive
-parser, while clearing config `addopts` preserves ordinary target, nodeid, and
-plugin options. The diagnostic is
-written only for a namespace this invocation created, so a failed cleanup is
-classified without scanning or deleting legacy tombstones.
+outside the authority boundary. Atomic no-replace quarantine supplies the
+missing identity binding at each mutable pathname boundary, while the drained
+process-group set supplies the only available authority for the final
+name-based destruction. The explicit rejection of a user basetemp preserves
+the invariant even when callers provide extra pytest arguments. Rejecting
+pytest's recursive argument-file expansion is safer than cloning a
+version-sensitive parser, while clearing config `addopts` preserves ordinary
+target, nodeid, and plugin options. The diagnostic is written only for a
+namespace this invocation created, so a failed cleanup is classified without
+scanning or deleting legacy tombstones. The design keeps ordinary completed
+runs clean and makes every unsupported or uncontained destruction boundary
+visible instead of silently consuming unrelated data.
 
 ## Consequences
 
@@ -167,17 +221,27 @@ classified without scanning or deleting legacy tombstones.
   original name disappeared; exact same-parent renames and moved/replaced
   namespaces are classified from the retained parent and fail visibly when no
   race-safe directory unlink primitive exists.
+- Positive: regular-file, symlink, child-directory, outer-namespace,
+  deletion-slot, diagnostic, destination-collision, and rollback-collision
+  paths all use an atomic identity bind before destruction; unexpected
+  candidates remain at an original or recovery name and do not produce false
+  success.
+- Positive: invocation-owned subprocess groups are explicitly drained before
+  cleanup, so a surviving background mutator cannot continue racing the
+  deletion slots; a group that cannot be drained produces a visible cleanup
+  failure.
 - Positive: direct, environment, config, and parser-expanded argument paths
   cannot redirect the owner basetemp; rejected expansion syntax fails before
   pytest can touch a caller-owned path.
 - Tradeoff: the wrapper owns a small amount of process lifecycle bookkeeping,
   and direct pytest commands outside this canonical lane retain their normal
-  upstream behavior. The fd-relative contract is strongest on POSIX platforms
-  exposing the required no-follow operations; unsupported platforms fail
-  visibly instead of weakening ownership. A robust-deletion failure
-  intentionally leaves a classified owner diagnostic and fails the lane so the
-  state is visible. This canonical lane intentionally does not support pytest
-  `@file` arguments and owns the config `addopts` setting.
+  upstream behavior. The fd-relative/quarantine contract is strongest on
+  Linux with `renameat2`; unsupported platforms fail visibly instead of
+  weakening ownership. A robust-deletion failure intentionally leaves a
+  classified owner diagnostic and fails the lane so the state is visible. An
+  unregistered same-UID mutator remains outside the guarantee and needs
+  stronger process isolation. This canonical lane intentionally does not
+  support pytest `@file` arguments and owns the config `addopts` setting.
 - Follow-up: independent review must validate the source diff and select an
   owner-approved source-to-Configs deployment transaction.
 
@@ -190,9 +254,13 @@ classified without scanning or deleting legacy tombstones.
 
 ## Follow-up route
 
-The independent reviewer should confirm the uniqueness, link-state,
-same-parent rename, replacement, moved-parent, lookup-race, cleanup-success,
-and cleanup-failure-visibility tests, re-run the focused validation lane, and
-decide whether the broad documented `scripts/` Configs projection is safe for
-a separate deployment transaction. Runtime activation remains unclaimed until
-that route has a precise rollback artifact and an exact landed source ref.
+The independent reviewer should confirm the Linux/Python primitive comparison,
+the atomic binding and recovery invariants, process-group drain evidence, the
+file/symlink/directory/outer/diagnostic swap barriers, uncontended cleanup,
+link-state, same-parent rename, replacement, moved-parent, lookup-race,
+cleanup-success, and cleanup-failure-visibility tests. Re-run the focused and
+full validation lanes on Python 3.12 and the actual serial/process runner
+paths. The reviewer must also decide whether the documented unregistered
+same-UID impossibility boundary requires a stronger process-isolation owner;
+runtime activation remains unclaimed until that route has a precise rollback
+artifact and an exact landed source ref.

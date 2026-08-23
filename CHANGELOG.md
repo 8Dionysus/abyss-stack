@@ -9,6 +9,14 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Eliminate check-then-name-delete races in fd-anchored pytest cleanup:
+  Linux `renameat2(RENAME_NOREPLACE)` now binds outer namespaces, regular
+  files, symlinks, child directories, deletion slots, and partial diagnostics
+  before destruction; identity mismatches use no-replace recovery or fail
+  visibly without retrying a mutable candidate. Invocation-owned process
+  groups are drained before final name-based deletion, ordinary uncontended
+  runs still remove their namespaces, and the runner returns the cleanup
+  failure exit code instead of false success.
 - Close pytest argument-authority paths that could redirect the runner-owned
   basetemp: reject direct and recursive `@file` expansion, validate
   `PYTEST_ADDOPTS`, own config `addopts`, reject direct addopts overrides, and

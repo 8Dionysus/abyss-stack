@@ -6,12 +6,14 @@ from collections import Counter, deque
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
+import ctypes
 import errno
 import hashlib
 import json
 import os
 from pathlib import Path
 import shlex
+import signal
 import stat
 import subprocess
 import sys
@@ -30,6 +32,14 @@ _FD_RELATIVE_SUPPORT_FUNCTIONS = (
     os.rmdir,
 )
 _FD_SUPPORT_FUNCTIONS = (os.listdir,)
+_RENAME_NOREPLACE = 1
+_QUARANTINE_NAME_PREFIX = ".abyss-stack-pytest-quarantine-"
+_QUARANTINE_ENTRY_PREFIX = ".entry-"
+_DELETION_ENTRY_PREFIX = ".delete-"
+_RECOVERY_ENTRY_PREFIX = ".recovered-"
+_PROCESS_DRAIN_POLL_ATTEMPTS = 20
+_PROCESS_DRAIN_POLL_DELAY_SECONDS = 0.01
+_LIBC_RENAMEAT2: Any | None = None
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCHEDULER_ENV = "ABYSS_STACK_TEST_SCHEDULER"
 PROCESS_WORKER_LIMIT = 4
@@ -249,6 +259,23 @@ class _PytestTempNamespaceBinding:
 
 
 @dataclass(frozen=True)
+class _CleanupQuarantine:
+    parent_fd: int
+    parent_identity: _ObjectIdentity
+    name: str
+    identity: _ObjectIdentity
+
+
+@dataclass(frozen=True)
+class _QuarantinedEntry:
+    parent_fd: int
+    name: str
+    identity: _ObjectIdentity
+    descriptor: int
+    recovery_parent_fd: int | None = None
+
+
+@dataclass(frozen=True)
 class _NamespaceLinkState:
     link_count: int
     original_identity_matches: bool
@@ -291,6 +318,9 @@ class _PytestTempNamespaceHandle:
     binding: _PytestTempNamespaceBinding
     removed: bool = False
     _closed_fds: set[int] = field(default_factory=set)
+    _cleanup_quarantine: _CleanupQuarantine | None = None
+    _owner_process_groups: set[int] = field(default_factory=set)
+    _owner_processes_drained: bool = False
 
     @property
     def path(self) -> Path:
@@ -320,6 +350,18 @@ class _PytestTempNamespaceHandle:
     @property
     def namespace_identity(self) -> _ObjectIdentity:
         return self.binding.namespace_identity
+
+    @property
+    def cleanup_quarantine(self) -> _CleanupQuarantine | None:
+        return self._cleanup_quarantine
+
+    def register_owner_process_group(self, process_id: int) -> None:
+        if process_id <= 0 or not hasattr(os, "killpg"):
+            raise PytestTempNamespaceSupportError(
+                "cannot contain an invocation-owned process group on this platform"
+            )
+        self._owner_process_groups.add(process_id)
+        self._owner_processes_drained = False
 
     def close(self) -> tuple[str, ...]:
         errors: list[str] = []
@@ -351,12 +393,71 @@ class PytestTempNamespaceSupportError(OSError):
     """The platform cannot provide the required fd-relative no-follow ABI."""
 
 
+class PytestTempNamespaceBusyError(OSError):
+    """An invocation-owned mutator could not be contained before cleanup."""
+
+
+class PytestTempNamespaceRaceError(OSError):
+    """A quarantine binding changed; retries must preserve every candidate."""
+
+
 def _supports_dir_fd(function: Any) -> bool:
     return function in getattr(os, "supports_dir_fd", ())
 
 
 def _supports_fd(function: Any) -> bool:
     return function in getattr(os, "supports_fd", ())
+
+
+def _renameat2_function() -> Any:
+    global _LIBC_RENAMEAT2
+    if _LIBC_RENAMEAT2 is not None:
+        return _LIBC_RENAMEAT2
+    if not sys.platform.startswith("linux"):
+        raise PytestTempNamespaceSupportError(
+            "atomic no-replace quarantine requires Linux renameat2"
+        )
+    try:
+        libc = ctypes.CDLL(None, use_errno=True)
+        function = libc.renameat2
+    except (AttributeError, OSError) as exc:
+        raise PytestTempNamespaceSupportError(
+            "libc does not expose atomic no-replace renameat2"
+        ) from exc
+    function.argtypes = [
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_uint,
+    ]
+    function.restype = ctypes.c_int
+    _LIBC_RENAMEAT2 = function
+    return function
+
+
+def _rename_noreplace(
+    source_parent_fd: int,
+    source_name: str,
+    destination_parent_fd: int,
+    destination_name: str,
+) -> None:
+    function = _renameat2_function()
+    result = function(
+        source_parent_fd,
+        os.fsencode(source_name),
+        destination_parent_fd,
+        os.fsencode(destination_name),
+        _RENAME_NOREPLACE,
+    )
+    if result != 0:
+        error_number = ctypes.get_errno()
+        raise OSError(
+            error_number,
+            os.strerror(error_number),
+            source_name,
+            destination_name,
+        )
 
 
 def _require_fd_relative_support() -> None:
@@ -387,6 +488,53 @@ def _require_fd_relative_support() -> None:
             "fd-anchored pytest namespace lifecycle is unsupported: "
             + "; ".join(details)
         )
+    _renameat2_function()
+
+
+def _process_group_exists(process_group_id: int) -> bool:
+    try:
+        os.killpg(process_group_id, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def _reap_process_group_leader(process_group_id: int) -> None:
+    try:
+        os.waitpid(process_group_id, os.WNOHANG)
+    except (ChildProcessError, OSError):
+        pass
+
+
+def _drain_process_group(process_group_id: int) -> None:
+    if not hasattr(os, "killpg") or not hasattr(signal, "SIGTERM"):
+        raise PytestTempNamespaceBusyError(
+            "cannot contain an invocation-owned process group on this platform"
+        )
+    for termination_signal in (signal.SIGTERM, signal.SIGKILL):
+        try:
+            os.killpg(process_group_id, termination_signal)
+        except ProcessLookupError:
+            return
+        for _ in range(_PROCESS_DRAIN_POLL_ATTEMPTS):
+            _reap_process_group_leader(process_group_id)
+            if not _process_group_exists(process_group_id):
+                return
+            time.sleep(_PROCESS_DRAIN_POLL_DELAY_SECONDS)
+    if _process_group_exists(process_group_id):
+        raise PytestTempNamespaceBusyError(
+            f"invocation-owned process group {process_group_id} survived cleanup drain"
+        )
+
+
+def _drain_owner_processes(handle: _PytestTempNamespaceHandle) -> None:
+    if handle._owner_processes_drained:
+        return
+    for process_group_id in tuple(handle._owner_process_groups):
+        _drain_process_group(process_group_id)
+    handle._owner_processes_drained = True
 
 
 def _cloexec_flag() -> int:
@@ -485,6 +633,212 @@ def _new_namespace_name(parent_fd: int) -> str:
     )
 
 
+def _new_entry_name(parent_fd: int, prefix: str) -> str:
+    names = tempfile._get_candidate_names()
+    for _ in range(PYTEST_TEMP_NAME_ATTEMPTS):
+        name = f"{prefix}{next(names)}"
+        try:
+            _stat_entry(parent_fd, name)
+        except FileNotFoundError:
+            return name
+    raise FileExistsError(f"unable to allocate a unique {prefix!r} name")
+
+
+def _recover_quarantined_entry(
+    entry_parent_fd: int,
+    entry_name: str,
+    source_parent_fd: int,
+    source_name: str,
+    recovery_parent_fd: int | None = None,
+) -> str | None:
+    """Restore a raced candidate without replacing a newer source entry."""
+    if recovery_parent_fd is not None and recovery_parent_fd != source_parent_fd:
+        try:
+            recovery_name = _new_entry_name(
+                recovery_parent_fd,
+                _RECOVERY_ENTRY_PREFIX,
+            )
+            _rename_noreplace(
+                entry_parent_fd,
+                entry_name,
+                recovery_parent_fd,
+                recovery_name,
+            )
+        except OSError:
+            pass
+        else:
+            return recovery_name
+    try:
+        _rename_noreplace(
+            entry_parent_fd,
+            entry_name,
+            source_parent_fd,
+            source_name,
+        )
+        return source_name
+    except FileExistsError:
+        try:
+            recovery_name = _new_entry_name(
+                source_parent_fd,
+                _RECOVERY_ENTRY_PREFIX,
+            )
+            _rename_noreplace(
+                entry_parent_fd,
+                entry_name,
+                source_parent_fd,
+                recovery_name,
+            )
+        except OSError:
+            return None
+        return recovery_name
+    except OSError:
+        return None
+
+
+def _quarantine_entry(
+    source_parent_fd: int,
+    source_name: str,
+    expected: _ObjectIdentity,
+    destination_parent_fd: int,
+    *,
+    destination_prefix: str,
+    recovery_parent_fd: int | None = None,
+) -> _QuarantinedEntry:
+    """Atomically move one name, then bind the moved object by identity.
+
+    ``renameat2(RENAME_NOREPLACE)`` is the binding operation.  A destination
+    collision cannot overwrite anything, and a source replacement is moved
+    out of the way only long enough to be identity-checked and restored.  An
+    unexpected object is never sent to a destructive helper.
+    """
+    for _ in range(PYTEST_TEMP_NAME_ATTEMPTS):
+        destination_name = _new_entry_name(
+            destination_parent_fd,
+            destination_prefix,
+        )
+        try:
+            _rename_noreplace(
+                source_parent_fd,
+                source_name,
+                destination_parent_fd,
+                destination_name,
+            )
+        except FileExistsError:
+            continue
+        try:
+            descriptor = _open_entry_identity(
+                destination_parent_fd,
+                destination_name,
+                expected,
+            )
+        except BaseException as exc:
+            recovery_name = _recover_quarantined_entry(
+                destination_parent_fd,
+                destination_name,
+                source_parent_fd,
+                source_name,
+                recovery_parent_fd,
+            )
+            location = (
+                f" recovered_as={recovery_name!r}"
+                if recovery_name is not None
+                else " candidate_remains_at_quarantine_name"
+            )
+            raise PytestTempNamespaceRaceError(
+                "pytest cleanup quarantine identity changed for "
+                f"{source_name!r}; refusing to delete the candidate;{location}"
+            ) from exc
+        return _QuarantinedEntry(
+            parent_fd=destination_parent_fd,
+            name=destination_name,
+            identity=expected,
+            descriptor=descriptor,
+            recovery_parent_fd=recovery_parent_fd,
+        )
+    raise FileExistsError(
+        f"unable to allocate an uncontested quarantine name for {source_name!r}"
+    )
+
+
+def _close_entry_descriptor(entry: _QuarantinedEntry) -> None:
+    try:
+        os.close(entry.descriptor)
+    except OSError:
+        pass
+
+
+def _destroy_bound_entry(
+    entry: _QuarantinedEntry,
+    *,
+    directory: bool,
+) -> None:
+    """Destroy an identity-checked deletion slot under the owner boundary.
+
+    There is no Linux/Python unlink-by-fd primitive.  The preceding
+    ``renameat2(RENAME_NOREPLACE)`` is therefore the binding event; the final
+    name is usable only after invocation-owned mutators have been drained and
+    while its retained parent remains the authority boundary.  A post-delete
+    absence check turns an unexpected concurrent reappearance into visible
+    failure, never a retry against a new object.
+    """
+    try:
+        if directory:
+            os.rmdir(entry.name, dir_fd=entry.parent_fd)
+        else:
+            os.unlink(entry.name, dir_fd=entry.parent_fd)
+        try:
+            _assert_entry_absent(entry.parent_fd, entry.name)
+        except (OSError, ValueError) as exc:
+            raise PytestTempNamespaceRaceError(
+                "pytest cleanup deletion slot remained or changed after "
+                f"destruction: {entry.name!r}"
+            ) from exc
+    except PytestTempNamespaceRaceError:
+        raise
+    except (OSError, ValueError) as exc:
+        raise PytestTempNamespaceRaceError(
+            "pytest cleanup could not destroy its identity-bound deletion "
+            f"slot: {entry.name!r}"
+        ) from exc
+    finally:
+        _close_entry_descriptor(entry)
+
+
+def _delete_quarantined_entry(
+    entry: _QuarantinedEntry,
+    *,
+    directory: bool,
+) -> None:
+    """Stage then delete only a moved entry under its owner-contained parent FD.
+
+    The parent is either the retained namespace FD after the outer namespace
+    quarantine or the caller's own newly-created empty namespace during
+    creation rollback.  Staging the candidate again means a replacement of
+    the source quarantine name cannot become the final deletion target.  The
+    final slot is still subject to the documented owner-process containment
+    boundary because unlink/rmdir cannot consume a descriptor directly.
+    """
+    try:
+        deletion_slot = _quarantine_entry(
+            entry.parent_fd,
+            entry.name,
+            entry.identity,
+            entry.parent_fd,
+            destination_prefix=_DELETION_ENTRY_PREFIX,
+            recovery_parent_fd=entry.recovery_parent_fd,
+        )
+        _destroy_bound_entry(deletion_slot, directory=directory)
+    except PytestTempNamespaceRaceError:
+        raise
+    except (OSError, ValueError) as exc:
+        raise PytestTempNamespaceRaceError(
+            "pytest cleanup could not stage its quarantined entry for "
+            f"identity-bound destruction: {entry.name!r}"
+        ) from exc
+    finally:
+        _close_entry_descriptor(entry)
+
+
 def _create_namespace_in_candidate(
     candidate: Path | None,
 ) -> _PytestTempNamespaceHandle:
@@ -536,8 +890,14 @@ def _create_namespace_in_candidate(
                 pass
         if name is not None and created_identity is not None:
             try:
-                _require_entry(parent_fd, name, created_identity)
-                os.rmdir(name, dir_fd=parent_fd)
+                entry = _quarantine_entry(
+                    parent_fd,
+                    name,
+                    created_identity,
+                    parent_fd,
+                    destination_prefix=_QUARANTINE_ENTRY_PREFIX,
+                )
+                _delete_quarantined_entry(entry, directory=True)
             except OSError:
                 pass
         raise
@@ -798,6 +1158,8 @@ class _DirectoryWalkFrame:
     descriptor: int | None
     identity: _ObjectIdentity
     name: str | None
+    parent_fd: int | None
+    recovery_parent_fd: int | None
     entries: list[str]
     index: int = 0
 
@@ -820,7 +1182,12 @@ def _assert_walk_directory(
     return observed
 
 
-def _remove_directory_contents(directory_fd: int) -> None:
+def _remove_directory_contents(
+    directory_fd: int,
+    *,
+    quarantine_parent_fd: int,
+    recovery_parent_fd: int | None = None,
+) -> None:
     root_stat = os.fstat(directory_fd)
     root_identity = _ObjectIdentity.from_stat(root_stat)
     if not stat.S_ISDIR(root_stat.st_mode):
@@ -830,6 +1197,8 @@ def _remove_directory_contents(directory_fd: int) -> None:
             descriptor=directory_fd,
             identity=root_identity,
             name=None,
+            parent_fd=None,
+            recovery_parent_fd=None,
             entries=os.listdir(directory_fd),
         )
     ]
@@ -844,49 +1213,24 @@ def _remove_directory_contents(directory_fd: int) -> None:
                     raise OSError(
                         f"pytest cleanup lost directory fd for {finished.name!r}"
                     )
-                parent_frame = frames[-1]
-                recovered_parent_fd: int | None = None
-                try:
-                    _assert_walk_directory(
-                        finished,
-                        subject=f"directory {finished.name!r}",
+                _assert_walk_directory(
+                    finished,
+                    subject=f"directory {finished.name!r}",
+                )
+                if finished.parent_fd is None:
+                    raise OSError(
+                        f"pytest cleanup lost parent fd for {finished.name!r}"
                     )
-                    recovered_parent_fd = os.open(
-                        "..",
-                        _directory_open_flags(),
-                        dir_fd=finished.descriptor,
-                    )
-                    parent_stat = os.fstat(recovered_parent_fd)
-                    _require_identity(
-                        _ObjectIdentity.from_stat(parent_stat),
-                        parent_frame.identity,
-                        subject=f"parent of directory {finished.name!r}",
-                    )
-                    if parent_frame.descriptor is None:
-                        parent_frame.descriptor = recovered_parent_fd
-                        recovered_parent_fd = None
-                    parent_fd = parent_frame.descriptor
-                    if parent_fd is None:
-                        raise OSError(
-                            f"pytest cleanup lost parent fd for {finished.name!r}"
-                        )
-                    _assert_walk_directory(
-                        parent_frame,
-                        subject=f"parent of directory {finished.name!r}",
-                    )
-                    _require_entry(
-                        parent_fd,
-                        finished.name,
-                        finished.identity,
-                    )
-                    os.rmdir(finished.name, dir_fd=parent_fd)
-                    _assert_entry_absent(parent_fd, finished.name)
-                finally:
-                    try:
-                        if recovered_parent_fd is not None:
-                            os.close(recovered_parent_fd)
-                    finally:
-                        os.close(finished.descriptor)
+                _delete_quarantined_entry(
+                    _QuarantinedEntry(
+                        parent_fd=finished.parent_fd,
+                        name=finished.name,
+                        identity=finished.identity,
+                        descriptor=finished.descriptor,
+                        recovery_parent_fd=finished.recovery_parent_fd,
+                    ),
+                    directory=True,
+                )
                 continue
 
             if frame.descriptor is None:
@@ -899,37 +1243,57 @@ def _remove_directory_contents(directory_fd: int) -> None:
             frame.index += 1
             observed = _stat_entry(frame.descriptor, name)
             expected = _ObjectIdentity.from_stat(observed)
+            if stat.S_ISDIR(observed.st_mode) and not all(
+                observed.st_mode & bit
+                for bit in (stat.S_IRUSR, stat.S_IWUSR, stat.S_IXUSR)
+            ):
+                _make_owned_directory_writable(
+                    frame.descriptor,
+                    name,
+                    expected,
+                )
+                observed = _require_entry(frame.descriptor, name, expected)
+            quarantined = _quarantine_entry(
+                frame.descriptor,
+                name,
+                expected,
+                quarantine_parent_fd,
+                destination_prefix=_QUARANTINE_ENTRY_PREFIX,
+                recovery_parent_fd=recovery_parent_fd,
+            )
             if stat.S_ISDIR(observed.st_mode):
-                child_fd = _open_checked_directory(frame.descriptor, name, expected)
+                child_fd: int | None = None
                 try:
+                    child_fd = _open_checked_directory(
+                        quarantine_parent_fd,
+                        quarantined.name,
+                        expected,
+                    )
                     child_entries = os.listdir(child_fd)
-                    if frame.name is not None:
-                        os.close(frame.descriptor)
-                        frame.descriptor = None
                 except BaseException:
-                    try:
-                        os.close(child_fd)
-                    except OSError:
-                        pass
+                    if child_fd is not None:
+                        try:
+                            os.close(child_fd)
+                        except OSError:
+                            pass
+                    _close_entry_descriptor(quarantined)
                     raise
+                if child_fd is None:
+                    _close_entry_descriptor(quarantined)
+                    raise OSError("pytest cleanup lost quarantined directory fd")
+                _close_entry_descriptor(quarantined)
                 frames.append(
                     _DirectoryWalkFrame(
                         descriptor=child_fd,
                         identity=expected,
-                        name=name,
+                        name=quarantined.name,
+                        parent_fd=quarantine_parent_fd,
+                        recovery_parent_fd=quarantined.recovery_parent_fd,
                         entries=child_entries,
                     )
                 )
                 continue
-
-            entry_fd = _open_entry_identity(frame.descriptor, name, expected)
-            try:
-                _require_entry(frame.descriptor, name, expected)
-                os.unlink(name, dir_fd=frame.descriptor)
-                _assert_entry_absent(frame.descriptor, name)
-            finally:
-                if entry_fd is not None:
-                    os.close(entry_fd)
+            _delete_quarantined_entry(quarantined, directory=False)
     except BaseException:
         for frame in frames:
             if frame.name is None or frame.descriptor is None:
@@ -1029,38 +1393,119 @@ def _repair_namespace_permissions(
         )
 
 
+def _assert_cleanup_quarantine(handle: _PytestTempNamespaceHandle) -> None:
+    quarantine = handle.cleanup_quarantine
+    if quarantine is None:
+        raise OSError("pytest cleanup lost its namespace quarantine binding")
+    _assert_parent_anchor(handle)
+    _require_entry(
+        quarantine.parent_fd,
+        quarantine.name,
+        quarantine.identity,
+    )
+
+
+def _quarantine_outer_namespace(
+    handle: _PytestTempNamespaceHandle,
+) -> None:
+    if handle.cleanup_quarantine is not None:
+        _assert_cleanup_quarantine(handle)
+        return
+    moved = _quarantine_entry(
+        handle.parent_fd,
+        handle.name,
+        handle.namespace_identity,
+        handle.parent_fd,
+        destination_prefix=_QUARANTINE_NAME_PREFIX,
+    )
+    _close_entry_descriptor(moved)
+    handle._cleanup_quarantine = _CleanupQuarantine(
+        parent_fd=handle.parent_fd,
+        parent_identity=handle.parent_identity,
+        name=moved.name,
+        identity=moved.identity,
+    )
+
+
 def _clear_owned_namespace_contents(
     handle: _PytestTempNamespaceHandle,
 ) -> None:
     """Clear only the retained inode; never resolve its changed directory name."""
+    _drain_owner_processes(handle)
     _assert_parent_anchor(handle)
     root_stat = _assert_namespace_fd(handle)
     _repair_namespace_permissions(handle, root_stat)
-    _remove_directory_contents(handle.namespace_fd)
+    _remove_directory_contents(
+        handle.namespace_fd,
+        quarantine_parent_fd=handle.namespace_fd,
+        recovery_parent_fd=handle.parent_fd,
+    )
 
 
 def _remove_owned_namespace(handle: _PytestTempNamespaceHandle) -> None:
+    _drain_owner_processes(handle)
     _assert_parent_anchor(handle)
     root_stat = _assert_namespace_fd(handle)
-    _require_entry(handle.parent_fd, handle.name, handle.namespace_identity)
     if not stat.S_ISDIR(root_stat.st_mode):
         raise NotADirectoryError(handle.name)
+    if handle.cleanup_quarantine is None:
+        _require_entry(handle.parent_fd, handle.name, handle.namespace_identity)
+        _quarantine_outer_namespace(handle)
+    else:
+        _assert_cleanup_quarantine(handle)
     _repair_namespace_permissions(handle, root_stat)
-    _remove_directory_contents(handle.namespace_fd)
+    _remove_directory_contents(
+        handle.namespace_fd,
+        quarantine_parent_fd=handle.namespace_fd,
+        recovery_parent_fd=handle.parent_fd,
+    )
     _assert_namespace_fd(handle)
-    _require_entry(handle.parent_fd, handle.name, handle.namespace_identity)
-    os.rmdir(handle.name, dir_fd=handle.parent_fd)
-    _assert_entry_absent(handle.parent_fd, handle.name)
+    _assert_cleanup_quarantine(handle)
+    quarantine = handle.cleanup_quarantine
+    if quarantine is None:
+        raise OSError("pytest cleanup lost its namespace quarantine binding")
+    try:
+        quarantine_descriptor = _open_entry_identity(
+            quarantine.parent_fd,
+            quarantine.name,
+            quarantine.identity,
+        )
+        _delete_quarantined_entry(
+            _QuarantinedEntry(
+                parent_fd=quarantine.parent_fd,
+                name=quarantine.name,
+                identity=quarantine.identity,
+                descriptor=quarantine_descriptor,
+            ),
+            directory=True,
+        )
+    except (OSError, ValueError) as exc:
+        raise PytestTempNamespaceRaceError(
+            "pytest cleanup could not stage and remove the owner quarantine "
+            f"link without risking a changed object: {quarantine.name!r}"
+        ) from exc
     namespace_stat = _assert_namespace_fd(handle)
     if namespace_stat.st_nlink != 0:
         raise OSError(
-            "pytest cleanup removed the original namespace name but the "
+            "pytest cleanup removed the owner quarantine name but the "
             f"retained inode remains linked: st_nlink={namespace_stat.st_nlink}"
         )
     handle.removed = True
 
 
 def _namespace_still_owned(handle: _PytestTempNamespaceHandle) -> bool:
+    if handle.cleanup_quarantine is not None:
+        try:
+            _assert_cleanup_quarantine(handle)
+        except (OSError, ValueError):
+            namespace_stat = _assert_namespace_fd(handle)
+            if namespace_stat.st_nlink == 0:
+                handle.removed = True
+                return False
+            raise PytestTempNamespaceRaceError(
+                "pytest cleanup lost or changed its owner quarantine link"
+            )
+        return True
     state = _namespace_link_state(handle)
     if state.is_unlinked:
         handle.removed = True
@@ -1080,25 +1525,22 @@ def _unlink_created_diagnostic(
     expected: _ObjectIdentity,
 ) -> bool:
     try:
-        observed = _stat_entry(handle.parent_fd, name)
-    except FileNotFoundError:
-        return True
-    actual = _ObjectIdentity.from_stat(observed)
-    if actual != expected or not stat.S_ISREG(observed.st_mode):
-        print(
-            "[pytest-temp-cleanup-diagnostic-failed] "
-            f"refusing to remove changed diagnostic name={name!r}",
-            file=sys.stderr,
-            flush=True,
+        _drain_owner_processes(handle)
+        namespace_stat = _assert_namespace_fd(handle)
+        _repair_namespace_permissions(handle, namespace_stat)
+        quarantined = _quarantine_entry(
+            handle.parent_fd,
+            name,
+            expected,
+            handle.namespace_fd,
+            destination_prefix=_QUARANTINE_ENTRY_PREFIX,
         )
-        return False
-    try:
-        os.unlink(name, dir_fd=handle.parent_fd)
-        _assert_entry_absent(handle.parent_fd, name)
-    except OSError as exc:
+        _delete_quarantined_entry(quarantined, directory=False)
+    except (OSError, ValueError) as exc:
         print(
             "[pytest-temp-cleanup-diagnostic-failed] "
-            f"unable to remove partial diagnostic name={name!r} error={exc!r}",
+            f"refusing to remove changed partial diagnostic name={name!r} "
+            f"error={exc!r}",
             file=sys.stderr,
             flush=True,
         )
@@ -1211,6 +1653,11 @@ def cleanup_pytest_temp_namespace(
                     "error": str(exc),
                 }
             )
+            if isinstance(
+                exc,
+                (PytestTempNamespaceBusyError, PytestTempNamespaceRaceError),
+            ):
+                break
             try:
                 removed = not _namespace_still_owned(handle)
             except (OSError, ValueError) as state_error:
@@ -1221,6 +1668,11 @@ def cleanup_pytest_temp_namespace(
                         "error": str(state_error),
                     }
                 )
+                if isinstance(
+                    state_error,
+                    (PytestTempNamespaceBusyError, PytestTempNamespaceRaceError),
+                ):
+                    break
                 try:
                     _clear_owned_namespace_contents(handle)
                     after_clear = _assert_namespace_fd(handle)
@@ -1232,6 +1684,11 @@ def cleanup_pytest_temp_namespace(
                             "error": str(clear_error),
                         }
                     )
+                    if isinstance(
+                        clear_error,
+                        (PytestTempNamespaceBusyError, PytestTempNamespaceRaceError),
+                    ):
+                        break
                 else:
                     if after_clear.st_nlink == 0:
                         removed = True
@@ -1303,12 +1760,14 @@ def cleanup_pytest_temp_namespace(
 
 
 @contextmanager
-def owned_pytest_temp_namespace(parent: Path | None = None) -> Iterator[Path]:
-    """Yield pytest's child basetemp while retaining the owner directory handle."""
+def owned_pytest_temp_namespace_handle(
+    parent: Path | None = None,
+) -> Iterator[_PytestTempNamespaceHandle]:
+    """Yield one owner handle and close it through the cleanup lifecycle."""
     handle = _pytest_temp_directory(parent)
     body_failed = False
     try:
-        yield handle.basetemp_path
+        yield handle
     except BaseException:
         body_failed = True
         raise
@@ -1316,6 +1775,13 @@ def owned_pytest_temp_namespace(parent: Path | None = None) -> Iterator[Path]:
         cleanup = cleanup_pytest_temp_namespace(handle)
         if not cleanup.ok and not body_failed:
             raise PytestTempCleanupError(cleanup)
+
+
+@contextmanager
+def owned_pytest_temp_namespace(parent: Path | None = None) -> Iterator[Path]:
+    """Yield pytest's child basetemp while retaining the owner directory handle."""
+    with owned_pytest_temp_namespace_handle(parent) as handle:
+        yield handle.basetemp_path
 
 
 class PytestArgumentAuthorityError(ValueError):
@@ -1594,7 +2060,8 @@ def run_process_worksteal(*, extra_args: list[str]) -> int:
         baseline_path = temporary / "baseline.json"
         collect_log = temporary / "collect.log"
         try:
-            with owned_pytest_temp_namespace() as collect_basetemp:
+            with owned_pytest_temp_namespace_handle() as collect_namespace:
+                collect_basetemp = collect_namespace.basetemp_path
                 collect_command = _plugin_command(
                     selection_args=extra_args,
                     basetemp=collect_basetemp,
@@ -1602,7 +2069,7 @@ def run_process_worksteal(*, extra_args: list[str]) -> int:
                 )
                 collect_started = time.monotonic()
                 with collect_log.open("w", encoding="utf-8") as output:
-                    collected = subprocess.run(
+                    collect_process = subprocess.Popen(
                         collect_command,
                         cwd=REPO_ROOT,
                         env=_partition_environment(
@@ -1612,7 +2079,16 @@ def run_process_worksteal(*, extra_args: list[str]) -> int:
                         stdout=output,
                         stderr=subprocess.STDOUT,
                         text=True,
-                        check=False,
+                        close_fds=True,
+                        start_new_session=hasattr(os, "setsid"),
+                    )
+                    if hasattr(collect_process, "pid") and hasattr(os, "setsid"):
+                        collect_namespace.register_owner_process_group(
+                            collect_process.pid
+                        )
+                    collected = subprocess.CompletedProcess(
+                        collect_command,
+                        collect_process.wait(),
                     )
                 collect_elapsed = time.monotonic() - collect_started
         except PytestTempNamespaceCreationError as exc:
@@ -1690,7 +2166,12 @@ def run_process_worksteal(*, extra_args: list[str]) -> int:
                             stderr=subprocess.STDOUT,
                             text=True,
                             close_fds=True,
+                            start_new_session=hasattr(os, "setsid"),
                         )
+                        if hasattr(process, "pid") and hasattr(os, "setsid"):
+                            temporary_namespace.register_owner_process_group(
+                                process.pid
+                            )
                     except BaseException:
                         if output is not None:
                             output.close()
@@ -1797,6 +2278,8 @@ def run_process_worksteal(*, extra_args: list[str]) -> int:
             failed_shards,
             shard_count=len(assignments),
         )
+        if cleanup_failed:
+            return PYTEST_TEMP_CLEANUP_FAILURE_EXIT_CODE
         return 1 if failed else 0
 
 
@@ -1862,19 +2345,23 @@ def main(argv: list[str] | None = None) -> int:
     )
     if scheduler["effective"] == "serial":
         try:
-            with owned_pytest_temp_namespace() as basetemp:
+            with owned_pytest_temp_namespace_handle() as temporary_namespace:
+                basetemp = temporary_namespace.basetemp_path
                 command = build_pytest_command(
                     extra_args=extra_args,
                     basetemp=basetemp,
                 )
                 print(f"[run] tests: {subprocess.list2cmdline(command)}", flush=True)
-                completed = subprocess.run(
+                process = subprocess.Popen(
                     command,
                     cwd=REPO_ROOT,
                     env=_pytest_subprocess_environment(extra_args),
-                    check=False,
                     close_fds=True,
+                    start_new_session=hasattr(os, "setsid"),
                 )
+                if hasattr(process, "pid") and hasattr(os, "setsid"):
+                    temporary_namespace.register_owner_process_group(process.pid)
+                completed = subprocess.CompletedProcess(command, process.wait())
         except PytestTempNamespaceCreationError as exc:
             print(f"[error] {exc}", file=sys.stderr, flush=True)
             return PYTEST_TEMP_CREATION_FAILURE_EXIT_CODE
