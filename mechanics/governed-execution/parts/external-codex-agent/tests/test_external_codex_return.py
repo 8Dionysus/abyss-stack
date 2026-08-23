@@ -712,6 +712,24 @@ def test_run_pause_reserves_and_replays_without_second_transport_mutation(
     ):
         MODULE.run_pause(args)
 
+    missing_generated_at = json.loads(json.dumps(first))
+    missing_generated_at.pop("generated_at")
+    pause_path.write_bytes(MODULE._canonical_bytes(missing_generated_at) + b"\n")
+    with pytest.raises(
+        MODULE.ExternalCodexReturnError,
+        match="schema mismatch: missing generated_at",
+    ):
+        MODULE.run_pause(args)
+
+    missing_identity_source = json.loads(json.dumps(first))
+    missing_identity_source["goal_binding"].pop("identity_source")
+    pause_path.write_bytes(MODULE._canonical_bytes(missing_identity_source) + b"\n")
+    with pytest.raises(
+        MODULE.ExternalCodexReturnError,
+        match="Goal binding is incomplete",
+    ):
+        MODULE.run_pause(args)
+
     pause_path.write_bytes(MODULE._canonical_bytes(first) + b"\n")
     monkeypatch.setattr(
         MODULE,

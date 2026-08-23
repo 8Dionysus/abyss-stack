@@ -253,6 +253,40 @@ def test_observation_is_one_shot_and_cost_aware() -> None:
     assert result["wake"] is None
 
 
+def test_matching_transition_wins_over_cost_deferral() -> None:
+    value = observation(
+        [
+            _evidence(
+                "return-completed-over-budget",
+                "lifecycle_transition",
+                signal="transition",
+                from_state="returning",
+                to_state="terminal",
+            )
+        ],
+        estimated_ms=101,
+        budget_ms=100,
+    )
+
+    result = MODULE.observe_once(value)
+
+    assert result["classification"] == "progressing"
+    assert result["causal_basis"] == "matching_lifecycle_transition"
+    assert result["transition_evidence"]["matching_evidence_ids"] == [
+        "return-completed-over-budget"
+    ]
+    assert result["next_observation"] is None
+
+
+def test_timestamp_must_use_rfc3339_timezone_syntax() -> None:
+    value = observation(
+        [_evidence("bad-timestamp", "process", observed_at="2026-08-22T12:05:00+0000")]
+    )
+
+    with pytest.raises(MODULE.ResponsibilityMovementError, match="RFC3339"):
+        MODULE.observe_once(value)
+
+
 def test_not_due_does_not_turn_process_evidence_into_progress() -> None:
     value = observation(
         [_evidence("process-still-live", "process", details={"present": True})],

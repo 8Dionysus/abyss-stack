@@ -2204,6 +2204,30 @@ def _validate_pause_receipt(
     owner: dict[str, Any],
     owner_path: Path,
 ) -> dict[str, Any]:
+    required_fields = {
+        "schema_version",
+        "generated_at",
+        "owner_ref",
+        "owner_sha256",
+        "pause_receipt_ref",
+        "owner",
+        "transport",
+        "goal_status",
+        "goal_binding",
+        "lifecycle_method",
+        "lifecycle",
+        "actions",
+        "observed",
+        "paused",
+        "owner_acceptance",
+        "semantic_acceptance",
+    }
+    missing_fields = sorted(required_fields - set(receipt))
+    if missing_fields:
+        raise ExternalCodexReturnError(
+            "canonical Goal pause receipt schema mismatch: missing "
+            + ", ".join(missing_fields)
+        )
     if receipt.get("schema_version") != PAUSE_RECEIPT_SCHEMA_VERSION:
         raise ExternalCodexReturnError("canonical Goal pause receipt schema mismatch")
     if receipt.get("paused") is not True:
@@ -2262,6 +2286,8 @@ def _validate_pause_receipt(
         or goal_binding.get("thread_id") != owner["thread_id"]
         or goal_binding.get("before_status") != "active"
         or goal_binding.get("transition") != "active_to_paused"
+        or not isinstance(goal_binding.get("identity_source"), str)
+        or not goal_binding["identity_source"].strip()
     ):
         raise ExternalCodexReturnError(
             "canonical Goal pause receipt Goal binding is incomplete"

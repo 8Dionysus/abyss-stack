@@ -14,6 +14,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
@@ -68,6 +69,13 @@ class ResponsibilityMovementError(ValueError):
     """A malformed observation or an unsafe movement result."""
 
 
+_RFC3339_TIMESTAMP = re.compile(
+    r"^(?:\d{4}-\d{2}-\d{2})T"
+    r"(?:\d{2}:\d{2}:\d{2})(?:\.\d+)?"
+    r"(?:Z|[+-]\d{2}:\d{2})$"
+)
+
+
 def _canonical_bytes(value: object) -> bytes:
     return json.dumps(
         value,
@@ -109,6 +117,8 @@ def _validate_schema(value: object, path: Path, label: str) -> None:
 def _parse_time(value: object, label: str) -> datetime:
     if not isinstance(value, str) or not value:
         raise ResponsibilityMovementError(f"{label} must be an RFC3339 timestamp")
+    if _RFC3339_TIMESTAMP.fullmatch(value) is None:
+        raise ResponsibilityMovementError(f"{label} is not an RFC3339 timestamp")
     candidate = value[:-1] + "+00:00" if value.endswith("Z") else value
     try:
         parsed = datetime.fromisoformat(candidate)
@@ -383,16 +393,6 @@ def observe_once(value: Mapping[str, Any]) -> dict[str, Any]:
         if evidence["kind"] == "process"
     ]
 
-    if estimated_ms > budget_ms:
-        return _result(
-            observation,
-            classification="cost_deferred",
-            causal_basis="observation_cost_exceeds_budget",
-            matching_ids=[],
-            event=None,
-            wake=None,
-            next_observation=_next_observation(observation, "cost_budget"),
-        )
     if matching_ids:
         return _result(
             observation,
@@ -402,6 +402,16 @@ def observe_once(value: Mapping[str, Any]) -> dict[str, Any]:
             event=None,
             wake=None,
             next_observation=None,
+        )
+    if estimated_ms > budget_ms:
+        return _result(
+            observation,
+            classification="cost_deferred",
+            causal_basis="observation_cost_exceeds_budget",
+            matching_ids=[],
+            event=None,
+            wake=None,
+            next_observation=_next_observation(observation, "cost_budget"),
         )
     if now < due_at:
         return _result(
