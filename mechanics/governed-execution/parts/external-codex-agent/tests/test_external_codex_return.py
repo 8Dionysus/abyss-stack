@@ -730,6 +730,15 @@ def test_run_pause_reserves_and_replays_without_second_transport_mutation(
     ):
         MODULE.run_pause(args)
 
+    invalid_generated_at = json.loads(json.dumps(first))
+    invalid_generated_at["generated_at"] = 7
+    pause_path.write_bytes(MODULE._canonical_bytes(invalid_generated_at) + b"\n")
+    with pytest.raises(
+        MODULE.ExternalCodexReturnError,
+        match="schema mismatch",
+    ):
+        MODULE.run_pause(args)
+
     pause_path.write_bytes(MODULE._canonical_bytes(first) + b"\n")
     monkeypatch.setattr(
         MODULE,

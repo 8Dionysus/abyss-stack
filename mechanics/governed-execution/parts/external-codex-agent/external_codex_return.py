@@ -27,6 +27,8 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Callable, Sequence
 
+from jsonschema import Draft202012Validator
+
 
 SCHEMA_VERSION = "abyss_stack_external_codex_return_v1"
 RETURN_OWNER_SCHEMA_VERSION = "abyss_stack_external_codex_return_owner_v1"
@@ -40,6 +42,9 @@ PAUSE_RESERVATION_SCHEMA_VERSION = "abyss_stack_external_codex_pause_reservation
 PAUSE_RECEIPT_SCHEMA_VERSION = "abyss_stack_external_codex_pause_receipt_v1"
 PAUSE_TRANSITION_PROOF_SCHEMA_VERSION = (
     "abyss_stack_external_codex_atomic_goal_transition_v1"
+)
+PAUSE_RECEIPT_SCHEMA_PATH = (
+    Path(__file__).resolve().parent / "schemas" / "external-codex-pause-receipt.schema.json"
 )
 WEBSOCKET_ACCEPT_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 DEFAULT_TIMEOUT_SECONDS = 10.0
@@ -125,6 +130,23 @@ def _load_json_file(path: Path, label: str) -> tuple[dict[str, Any], bytes]:
     if not isinstance(value, dict):
         raise ExternalCodexReturnError(f"{label} must be a JSON object: {path}")
     return value, raw
+
+
+def _validate_pause_receipt_schema(receipt: dict[str, Any]) -> None:
+    try:
+        schema = json.loads(PAUSE_RECEIPT_SCHEMA_PATH.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ExternalCodexReturnError(
+            "canonical Goal pause receipt schema cannot be loaded"
+        ) from exc
+    errors = sorted(
+        Draft202012Validator(schema).iter_errors(receipt),
+        key=lambda error: error.json_path,
+    )
+    if errors:
+        raise ExternalCodexReturnError(
+            "canonical Goal pause receipt schema mismatch: " + errors[0].message
+        )
 
 
 def _nonempty_string(value: object, label: str) -> str:
@@ -2398,6 +2420,7 @@ def _validate_pause_receipt(
         raise ExternalCodexReturnError(
             "canonical Goal pause transition proof does not match its response"
         )
+    _validate_pause_receipt_schema(receipt)
     return receipt
 
 
