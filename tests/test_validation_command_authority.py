@@ -1183,8 +1183,10 @@ def test_pytest_addopts_expansion_is_validated_and_config_addopts_are_neutralize
             "--",
             "-c",
             str(config),
-            "tests/test_validation_command_authority.py::"
-            "test_manifest_loads_and_names_expected_lanes",
+            (
+                "tests/test_validation_command_authority.py::"
+                "test_manifest_loads_and_names_expected_lanes"
+            ),
         ]
     ) == 0
     assert marker.read_text(encoding="utf-8") == "must survive\n"
@@ -1213,8 +1215,10 @@ def test_pytest_config_argument_file_cannot_redirect_owner(
             "--",
             "-c",
             str(config),
-            "tests/test_validation_command_authority.py::"
-            "test_manifest_loads_and_names_expected_lanes",
+            (
+                "tests/test_validation_command_authority.py::"
+                "test_manifest_loads_and_names_expected_lanes"
+            ),
         ]
     ) == 0
     assert marker.read_text(encoding="utf-8") == "must survive\n"
