@@ -13,47 +13,26 @@
       "const": "abyss_stack_codex_capability_class_registry_v1"
     },
     "classes": {
-      "type": "array",
-      "minItems": 1,
-      "items": {"$ref": "#/$defs/classDefinition"},
-      "allOf": [
-        {
-          "contains": {
-            "properties": {
-              "capability_class": {"const": "session_continuity"},
-              "projection": {"const": "shared_link"},
-              "grantable": {"const": false}
-            },
-            "required": ["capability_class", "projection", "grantable"]
-          },
-          "minContains": 1,
-          "maxContains": 1
+      "type": "object",
+      "minProperties": 3,
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_]*$",
+        "not": {"const": "unknown"}
+      },
+      "required": ["session_continuity", "actor_tooling", "operator_control"],
+      "properties": {
+        "session_continuity": {
+          "$ref": "#/$defs/sessionContinuityDefinition"
         },
-        {
-          "contains": {
-            "properties": {
-              "capability_class": {"const": "actor_tooling"},
-              "projection": {"const": "shared_link"},
-              "grantable": {"const": false}
-            },
-            "required": ["capability_class", "projection", "grantable"]
-          },
-          "minContains": 1,
-          "maxContains": 1
+        "actor_tooling": {
+          "$ref": "#/$defs/actorToolingDefinition"
         },
-        {
-          "contains": {
-            "properties": {
-              "capability_class": {"const": "operator_control"},
-              "projection": {"const": "denied"},
-              "grantable": {"const": true}
-            },
-            "required": ["capability_class", "projection", "grantable"]
-          },
-          "minContains": 1,
-          "maxContains": 1
+        "operator_control": {
+          "$ref": "#/$defs/operatorControlDefinition"
         }
-      ]
+      },
+      "additionalProperties": {"$ref": "#/$defs/futureClassDefinition"}
     },
     "unknown": {"$ref": "#/$defs/unknownDefinition"}
   },
@@ -66,13 +45,8 @@
     "classDefinition": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["capability_class", "projection", "grantable", "entries"],
+      "required": ["projection", "grantable", "entries"],
       "properties": {
-        "capability_class": {
-          "type": "string",
-          "pattern": "^[a-z][a-z0-9_]*$",
-          "not": {"const": "unknown"}
-        },
         "projection": {"enum": ["shared_link", "denied"]},
         "grantable": {"type": "boolean"},
         "entries": {
@@ -80,70 +54,48 @@
           "uniqueItems": true,
           "items": {"$ref": "#/$defs/entryName"}
         }
-      },
+      }
+    },
+    "sessionContinuityDefinition": {
       "allOf": [
+        {"$ref": "#/$defs/classDefinition"},
         {
-          "if": {
-            "properties": {
-              "capability_class": {"const": "session_continuity"}
-            },
-            "required": ["capability_class"]
-          },
-          "then": {
-            "properties": {
-              "projection": {"const": "shared_link"},
-              "grantable": {"const": false}
-            }
+          "properties": {
+            "projection": {"const": "shared_link"},
+            "grantable": {"const": false}
           }
-        },
+        }
+      ]
+    },
+    "actorToolingDefinition": {
+      "allOf": [
+        {"$ref": "#/$defs/classDefinition"},
         {
-          "if": {
-            "properties": {
-              "capability_class": {"const": "actor_tooling"}
-            },
-            "required": ["capability_class"]
-          },
-          "then": {
-            "properties": {
-              "projection": {"const": "shared_link"},
-              "grantable": {"const": false}
-            }
+          "properties": {
+            "projection": {"const": "shared_link"},
+            "grantable": {"const": false}
           }
-        },
+        }
+      ]
+    },
+    "operatorControlDefinition": {
+      "allOf": [
+        {"$ref": "#/$defs/classDefinition"},
         {
-          "if": {
-            "properties": {
-              "capability_class": {"const": "operator_control"}
-            },
-            "required": ["capability_class"]
-          },
-          "then": {
-            "properties": {
-              "projection": {"const": "denied"},
-              "grantable": {"const": true}
-            }
+          "properties": {
+            "projection": {"const": "denied"},
+            "grantable": {"const": true}
           }
-        },
+        }
+      ]
+    },
+    "futureClassDefinition": {
+      "allOf": [
+        {"$ref": "#/$defs/classDefinition"},
         {
-          "if": {
-            "properties": {
-              "capability_class": {
-                "not": {
-                  "enum": [
-                    "session_continuity",
-                    "actor_tooling",
-                    "operator_control"
-                  ]
-                }
-              }
-            },
-            "required": ["capability_class"]
-          },
-          "then": {
-            "properties": {
-              "projection": {"const": "denied"},
-              "grantable": {"const": false}
-            }
+          "properties": {
+            "projection": {"const": "denied"},
+            "grantable": {"const": false}
           }
         }
       ]

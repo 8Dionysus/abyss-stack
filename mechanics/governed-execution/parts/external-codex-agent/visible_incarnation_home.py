@@ -34,7 +34,7 @@ from typing import Any, Sequence
 
 SCHEMA_VERSION = "abyss_stack_codex_incarnation_home_v2"
 CAPABILITY_PROJECTION_SCHEMA_VERSION = (
-    "abyss_stack_codex_capability_projection_v1"
+    "abyss_stack_codex_capability_projection_v2"
 )
 CAPABILITY_GRANT_SCHEMA_VERSION = "abyss_stack_codex_capability_grant_v1"
 CAPABILITY_CLASS_REGISTRY_SCHEMA_VERSION = (
@@ -369,22 +369,20 @@ def _load_capability_class_registry() -> tuple[
     if value.get("schema_version") != CAPABILITY_CLASS_REGISTRY_SCHEMA_VERSION:
         raise IncarnationHomeError("unsupported capability-class registry schema")
     classes = value.get("classes")
-    if not isinstance(classes, list) or not classes:
+    if not isinstance(classes, dict) or not classes:
         raise IncarnationHomeError("capability-class registry classes are invalid")
 
     definitions: dict[str, dict[str, Any]] = {}
     class_ids: set[str] = set()
-    for definition in classes:
-        if not isinstance(definition, dict) or set(definition) != {
-            "capability_class",
-            "projection",
-            "grantable",
-            "entries",
-        }:
+    for capability_class, definition in classes.items():
+        if (
+            not isinstance(capability_class, str)
+            or not isinstance(definition, dict)
+            or set(definition) != {"projection", "grantable", "entries"}
+        ):
             raise IncarnationHomeError(
                 "capability-class registry definition is not exact"
             )
-        capability_class = definition.get("capability_class")
         projection = definition.get("projection")
         grantable = definition.get("grantable")
         entries = definition.get("entries")
@@ -557,7 +555,6 @@ def _build_capability_projection(
     """Build the typed home projection; unknown entries are denied by default."""
 
     registry, definitions, unknown = _load_capability_class_registry()
-    grants: list[dict[str, Any]] = []
     grants_by_entry: dict[str, dict[str, Any]] = {}
     grant_ids: set[str] = set()
     for grant_path in capability_grants:
@@ -572,9 +569,8 @@ def _build_capability_projection(
             raise IncarnationHomeError("capability grants contain a duplicate identity")
         grants_by_entry[entry] = grant
         grant_ids.add(str(grant["grant_id"]))
-        grants.append(grant)
 
-    entries: list[dict[str, Any]] = []
+    entries: dict[str, dict[str, Any]] = {}
     for source in sorted(ambient_home.iterdir(), key=lambda item: item.name):
         if source.name in LOCAL_NAMES:
             continue
@@ -593,32 +589,34 @@ def _build_capability_projection(
                 "capability grant targets a non-grantable capability entry"
             )
         projected = grant is not None or classification["projection"] == "shared_link"
-        entries.append(
-            {
-                "name": source.name,
-                "capability_class": (
-                    "operator_control"
-                    if grant is not None
-                    else classification["capability_class"]
-                ),
-                "projection": "shared_link" if projected else "denied",
-                "grantable": classification["grantable"],
-                "grant_id": None if grant is None else grant["grant_id"],
-            }
-        )
-    entries.sort(key=lambda item: str(item["name"]))
-    entry_names = {str(entry["name"]) for entry in entries}
+        entries[source.name] = {
+            "capability_class": (
+                "operator_control"
+                if grant is not None
+                else classification["capability_class"]
+            ),
+            "projection": "shared_link" if projected else "denied",
+            "grantable": classification["grantable"],
+            "explicit_grant": (
+                None
+                if grant is None
+                else {
+                    key: value
+                    for key, value in grant.items()
+                    if key != "ambient_entry"
+                }
+            ),
+        }
+    entry_names = set(entries)
     if set(grants_by_entry) - entry_names:
         raise IncarnationHomeError(
             "capability grant targets an absent ambient capability entry"
         )
-    grants.sort(key=lambda item: str(item["ambient_entry"]))
     return {
         "schema_version": CAPABILITY_PROJECTION_SCHEMA_VERSION,
         "default_policy": "deny_ambient_operator_control",
         "capability_class_registry": registry,
         "entries": entries,
-        "explicit_grants": grants,
     }
 
 
@@ -4511,12 +4509,12 @@ def prepare_home(
         incarnation_coordinate=coordinate,
         capability_grants=capability_grants,
     )
-    projected_entries = [
-        entry
-        for entry in capability_projection["entries"]
+    projected_entries = {
+        name: entry
+        for name, entry in capability_projection["entries"].items()
         if entry["projection"] == "shared_link"
-    ]
-    shared_names = [str(entry["name"]) for entry in projected_entries]
+    }
+    shared_names = sorted(projected_entries)
 
     incarnation_root.mkdir(mode=0o700, exist_ok=True)
     codex_home.mkdir(mode=0o700, exist_ok=True)
@@ -4543,7 +4541,14 @@ def prepare_home(
     if incarnation_root.exists() and isinstance(
         existing.get("capability_projection"), dict
     ):
-        for entry in existing["capability_projection"].get("entries", []):
+        existing_entries = existing["capability_projection"].get("entries", {})
+        if isinstance(existing_entries, dict):
+            existing_entries_iter = existing_entries.values()
+        elif isinstance(existing_entries, list):
+            existing_entries_iter = existing_entries
+        else:
+            existing_entries_iter = ()
+        for entry in existing_entries_iter:
             if (
                 isinstance(entry, dict)
                 and entry.get("projection") == "shared_link"
@@ -4551,8 +4556,8 @@ def prepare_home(
             ):
                 previous_shared_names.add(entry["name"])
 
-    for entry in projected_entries:
-        source = ambient_home / str(entry["name"])
+    for name in shared_names:
+        source = ambient_home / name
         if source.is_symlink():
             raise IncarnationHomeError(
                 f"ambient capability entry may not be a symlink: {source}"
@@ -4568,9 +4573,7 @@ def prepare_home(
         else:
             target.symlink_to(source)
 
-    all_capability_names = {
-        str(entry["name"]) for entry in capability_projection["entries"]
-    }
+    all_capability_names = set(capability_projection["entries"])
     for name in sorted(
         (previous_shared_names | all_capability_names) - set(shared_names)
     ):
@@ -4687,6 +4690,14 @@ def _load_manifest_snapshot(
     ):
         raise IncarnationHomeError("scoped Codex config binding drift")
     capability_projection = manifest.get("capability_projection")
+    manifest_entries = (
+        capability_projection.get("entries")
+        if isinstance(capability_projection, dict)
+        else None
+    )
+    manifest_entry_values = (
+        manifest_entries.values() if isinstance(manifest_entries, dict) else ()
+    )
     expected_capability_projection = _build_capability_projection(
         ambient_home=ambient_home,
         ambient_home_identity=str(manifest.get("ambient_home_identity")),
@@ -4696,11 +4707,9 @@ def _load_manifest_snapshot(
         ),
         capability_grants=[
             Path(str(grant.get("path")))
-            for grant in (
-                capability_projection.get("explicit_grants", [])
-                if isinstance(capability_projection, dict)
-                else []
-            )
+            for entry in manifest_entry_values
+            if isinstance(entry, dict)
+            for grant in [entry.get("explicit_grant")]
             if isinstance(grant, dict) and isinstance(grant.get("path"), str)
         ],
     )
@@ -4722,8 +4731,8 @@ def _load_manifest_snapshot(
     ):
         raise IncarnationHomeError("shared-state manifest is invalid")
     expected_shared_names = sorted(
-        str(entry["name"])
-        for entry in expected_capability_projection["entries"]
+        name
+        for name, entry in expected_capability_projection["entries"].items()
         if entry["projection"] == "shared_link"
     )
     if sorted(shared_names) != expected_shared_names:

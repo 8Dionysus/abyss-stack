@@ -30,6 +30,15 @@ binds the capability identity, ambient path, subject, grant artifact bytes,
 and expiry window. Mutable contents inside a dynamic target endpoint are not
 promoted into grant authority.
 
+The authored registry represents `classes` as an object keyed by unique class
+ID. The generated projection represents `entries` as an object keyed by the
+exact ambient entry name. A shared operator-control value must contain the
+complete `explicit_grant` projection nested at that key; denied values contain
+`explicit_grant: null`. This removes the detached grant-ID/list shape that
+could describe a relation the runtime could not materialize. Runtime loading
+still re-reads and recomputes the grant artifact, so schema validity alone is
+not a grant-artifact, trust, or app-server-enforcement claim.
+
 For a visible responsibility holder, terminal lifecycle evidence is also
 runtime-owned. A `join_completed` or `wake_delivered` authorization binds the
 returned handoff, exact holder receipt, closure path, process identities, and

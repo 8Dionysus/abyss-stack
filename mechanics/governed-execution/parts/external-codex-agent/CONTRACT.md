@@ -783,7 +783,9 @@ containment route.
 `prepare` writes a v2 `incarnation-home.json` whose `$schema` points to
 `schemas/external-codex-incarnation-home.schema.json`. The manifest carries a
 model-neutral `capability_projection` with one typed entry for every non-local
-ambient-home entry. `session_continuity` and `actor_tooling` entries are
+ambient-home entry. The projection's `entries` value is an object keyed by the
+exact ambient entry name, and each value carries `capability_class`,
+`projection`, `grantable`, and an `explicit_grant` value. `session_continuity` and `actor_tooling` entries are
 projected as shared links by default. `operator_control` and `unknown` entries
 are denied by default, so the runtime does not admit ambient app-server,
 hooks, plugin, queue, browser, or other operator-control state merely because
@@ -808,9 +810,20 @@ refresh or mutation is detected. This is a runtime materialization and
 admission projection, not the semantic owner policy and not proof that the
 Codex app-server mutation itself enforces the grant.
 
+The explicit-grant relation is structural in the manifest: an operator-control
+entry may be `shared_link` only when its `explicit_grant` value is the complete
+grant projection object nested under that entry's ambient-name key. A denied
+entry has `explicit_grant: null`; there is no detached top-level
+`explicit_grants` collection or entry-local grant ID that can name a grant
+without carrying the relation. The loader still re-reads each referenced
+grant artifact and requires its subject, ambient entry, effect, expiry, and
+digest to reproduce the exact nested projection before materialization.
+
 The capability meaning consumed by the classifier is authored in
 `capability-classes.v1.json`, with an exact schema and digest recorded in the
-projection. Entries absent from that registry resolve to an explicit
+projection. Its `classes` value is an object whose keys are the unique authored
+class IDs; class identity is therefore part of the schema representation, not
+only a loader-side uniqueness check. Entries absent from that registry resolve to an explicit
 `unknown`/denied/grantable result; adding a future capability family therefore
 does not require executable endpoint special cases. The registry schema and
 loader require the canonical `session_continuity`, `actor_tooling`, and

@@ -58,6 +58,14 @@ behavior only; they do not prove installed-release parity, host
 trust/admission, a live visible canary, app-server effect enforcement, wake
 delivery, holder closure, owner acceptance, or Goal acceptance.
 
+The F4 residual regressions also prove that duplicate future class IDs cannot
+be represented in the registry schema because class IDs are object keys, and
+that a shared operator-control entry is schema-invalid without its nested
+`explicit_grant`. A forged grant projection with altered metadata may remain
+descriptive-schema-valid, but manifest loading recomputes the exact
+subject/entry/artifact relation and rejects it; this is the runtime admission
+boundary, not evidence of trust admission or app-server enforcement.
+
 The focused external-return tests also cover the separate Goal pause contour:
 an exact active owner-bound Goal is refused before `thread/goal/set` when the
 app-server adapter lacks an `atomic_goal_transition` method with a

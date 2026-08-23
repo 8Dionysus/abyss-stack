@@ -1,9 +1,8 @@
 {
   "$schema": "schemas/external-codex-capability-classes.schema.json",
   "schema_version": "abyss_stack_codex_capability_class_registry_v1",
-  "classes": [
-    {
-      "capability_class": "session_continuity",
+  "classes": {
+    "session_continuity": {
       "projection": "shared_link",
       "grantable": false,
       "entries": [
@@ -19,14 +18,12 @@
         "sessions"
       ]
     },
-    {
-      "capability_class": "actor_tooling",
+    "actor_tooling": {
       "projection": "shared_link",
       "grantable": false,
       "entries": ["skills"]
     },
-    {
-      "capability_class": "operator_control",
+    "operator_control": {
       "projection": "denied",
       "grantable": true,
       "entries": [
@@ -38,7 +35,7 @@
         "queues"
       ]
     }
-  ],
+  },
   "unknown": {
     "capability_class": "unknown",
     "projection": "denied",

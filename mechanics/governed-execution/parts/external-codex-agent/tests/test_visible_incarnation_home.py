@@ -200,10 +200,7 @@ def test_capability_projection_denies_ambient_operator_control_by_default(
         runtime_root=runtime_root,
     )
 
-    entries = {
-        str(entry["name"]): entry
-        for entry in manifest["capability_projection"]["entries"]
-    }
+    entries = manifest["capability_projection"]["entries"]
     for name in ("auth.json", "sessions", "skills"):
         assert entries[name]["projection"] == "shared_link"
         assert entries[name]["grantable"] is False
@@ -217,7 +214,9 @@ def test_capability_projection_denies_ambient_operator_control_by_default(
     assert entries["future-capability"]["projection"] == "denied"
     assert entries["future-capability"]["grantable"] is True
     assert manifest["shared_state_names"] == ["auth.json", "sessions", "skills"]
-    assert manifest["capability_projection"]["explicit_grants"] == []
+    assert all(
+        entry["explicit_grant"] is None for entry in entries.values()
+    )
 
 
 def test_capability_class_registry_is_authored_data_with_explicit_unknown(
@@ -226,7 +225,9 @@ def test_capability_class_registry_is_authored_data_with_explicit_unknown(
     registry = json.loads(
         (PART / MODULE.CAPABILITY_CLASS_REGISTRY_NAME).read_text(encoding="utf-8")
     )
-    registry["classes"][0]["entries"].append("custom-continuity")
+    registry["classes"]["session_continuity"]["entries"].append(
+        "custom-continuity"
+    )
     registry_path = tmp_path / MODULE.CAPABILITY_CLASS_REGISTRY_NAME
     registry_path.write_text(json.dumps(registry), encoding="utf-8")
     Draft202012Validator(
@@ -251,10 +252,7 @@ def test_capability_class_registry_is_authored_data_with_explicit_unknown(
         realization_path=_realization(tmp_path / "realization.json"),
         runtime_root=runtime_root,
     )
-    entries = {
-        str(entry["name"]): entry
-        for entry in manifest["capability_projection"]["entries"]
-    }
+    entries = manifest["capability_projection"]["entries"]
     assert entries["custom-continuity"]["capability_class"] == "session_continuity"
     assert entries["custom-continuity"]["projection"] == "shared_link"
     assert entries["future-capability"]["capability_class"] == "unknown"
@@ -265,17 +263,51 @@ def test_capability_class_registry_is_authored_data_with_explicit_unknown(
     ] == str(registry_path)
 
 
+def test_capability_class_ids_are_unique_structural_keys(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    registry = json.loads(
+        (PART / MODULE.CAPABILITY_CLASS_REGISTRY_NAME).read_text(encoding="utf-8")
+    )
+    schema = json.loads(
+        (PART / "schemas" / "external-codex-capability-classes.schema.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    legacy_array_registry = dict(registry)
+    legacy_array_registry["classes"] = list(registry["classes"].values())
+    assert list(Draft202012Validator(schema).iter_errors(legacy_array_registry))
+
+    registry["classes"]["future_semantic"] = {
+        "projection": "denied",
+        "grantable": False,
+        "entries": ["future-capability"],
+    }
+    registry["classes"]["future_semantic_next"] = {
+        "projection": "denied",
+        "grantable": False,
+        "entries": ["future-capability-next"],
+    }
+    Draft202012Validator(schema).validate(registry)
+    registry_path = tmp_path / MODULE.CAPABILITY_CLASS_REGISTRY_NAME
+    registry_path.write_text(json.dumps(registry), encoding="utf-8")
+    monkeypatch.setattr(MODULE, "CAPABILITY_CLASS_REGISTRY_PATH", registry_path)
+
+    _metadata, definitions, _unknown = MODULE._load_capability_class_registry()
+    assert definitions["future-capability"]["capability_class"] == "future_semantic"
+    assert (
+        definitions["future-capability-next"]["capability_class"]
+        == "future_semantic_next"
+    )
+
+
 def test_capability_class_registry_rejects_operator_control_policy_override(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     registry = json.loads(
         (PART / MODULE.CAPABILITY_CLASS_REGISTRY_NAME).read_text(encoding="utf-8")
     )
-    operator_control = next(
-        definition
-        for definition in registry["classes"]
-        if definition["capability_class"] == "operator_control"
-    )
+    operator_control = registry["classes"]["operator_control"]
     operator_control["projection"] = "shared_link"
     registry_path = tmp_path / MODULE.CAPABILITY_CLASS_REGISTRY_NAME
     registry_path.write_text(json.dumps(registry), encoding="utf-8")
@@ -299,14 +331,11 @@ def test_capability_class_registry_rejects_unsafe_future_authority_tuple(
     registry = json.loads(
         (PART / MODULE.CAPABILITY_CLASS_REGISTRY_NAME).read_text(encoding="utf-8")
     )
-    registry["classes"].append(
-        {
-            "capability_class": "future_semantic",
-            "projection": "shared_link",
-            "grantable": False,
-            "entries": ["future-capability"],
-        }
-    )
+    registry["classes"]["future_semantic"] = {
+        "projection": "shared_link",
+        "grantable": False,
+        "entries": ["future-capability"],
+    }
     registry_path = tmp_path / MODULE.CAPABILITY_CLASS_REGISTRY_NAME
     registry_path.write_text(json.dumps(registry), encoding="utf-8")
     schema = json.loads(
@@ -329,14 +358,11 @@ def test_safe_future_registry_class_produces_schema_valid_manifest(
     registry = json.loads(
         (PART / MODULE.CAPABILITY_CLASS_REGISTRY_NAME).read_text(encoding="utf-8")
     )
-    registry["classes"].append(
-        {
-            "capability_class": "future_semantic",
-            "projection": "denied",
-            "grantable": False,
-            "entries": ["future-capability"],
-        }
-    )
+    registry["classes"]["future_semantic"] = {
+        "projection": "denied",
+        "grantable": False,
+        "entries": ["future-capability"],
+    }
     registry_path = tmp_path / MODULE.CAPABILITY_CLASS_REGISTRY_NAME
     registry_path.write_text(json.dumps(registry), encoding="utf-8")
     registry_schema = json.loads(
@@ -365,17 +391,12 @@ def test_safe_future_registry_class_produces_schema_valid_manifest(
         )
     )
     Draft202012Validator(manifest_schema).validate(manifest)
-    entry = next(
-        item
-        for item in manifest["capability_projection"]["entries"]
-        if item["name"] == "future-capability"
-    )
+    entry = manifest["capability_projection"]["entries"]["future-capability"]
     assert entry == {
-        "name": "future-capability",
         "capability_class": "future_semantic",
         "projection": "denied",
         "grantable": False,
-        "grant_id": None,
+        "explicit_grant": None,
     }
 
 
@@ -412,15 +433,12 @@ def test_capability_projection_reuses_subject_grant_without_binding_endpoint_byt
     control_link = Path(manifest["codex_home"]) / "app-server-control"
     assert control_link.is_symlink()
     projection = manifest["capability_projection"]
-    assert projection["explicit_grants"][0]["grant_id"] == "grant:test/app-server-control"
-    granted_entry = next(
-        entry
-        for entry in projection["entries"]
-        if entry["name"] == "app-server-control"
-    )
+    granted_entry = projection["entries"]["app-server-control"]
     assert granted_entry["capability_class"] == "operator_control"
     assert granted_entry["grantable"] is True
-    assert granted_entry["grant_id"] == "grant:test/app-server-control"
+    assert granted_entry["explicit_grant"]["grant_id"] == (
+        "grant:test/app-server-control"
+    )
     manifest_path = Path(manifest["codex_home"]).parent / "incarnation-home.json"
     MODULE._load_manifest(manifest_path)
 
@@ -434,15 +452,63 @@ def test_capability_projection_reuses_subject_grant_without_binding_endpoint_byt
         runtime_root=runtime_root,
         capability_grants=[grant],
     )
-    assert second_manifest["capability_projection"]["explicit_grants"][0][
-        "grant_id"
-    ] == "grant:test/app-server-control"
+    assert second_manifest["capability_projection"]["entries"][
+        "app-server-control"
+    ]["explicit_grant"]["grant_id"] == "grant:test/app-server-control"
 
     stale_payload = json.loads(grant.read_text(encoding="utf-8"))
     stale_payload["expires_at"] = "2000-01-01T00:00:00Z"
     grant.write_text(json.dumps(stale_payload), encoding="utf-8")
     with pytest.raises(MODULE.IncarnationHomeError, match="stale or expired"):
         MODULE._load_manifest(Path(manifest["codex_home"]).parent / "incarnation-home.json")
+
+
+def test_manifest_schema_requires_explicit_grant_for_shared_operator_entry(
+    tmp_path: Path,
+) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    (ambient / "app-server-control").mkdir()
+    realization = _realization(tmp_path / "realization.json")
+    grant = _capability_grant(
+        tmp_path / "grant.json",
+        ambient=ambient,
+        realization=realization,
+        ambient_entry="app-server-control",
+    )
+    manifest = MODULE.prepare_home(
+        ambient_home=ambient,
+        realization_path=realization,
+        runtime_root=runtime_root,
+        capability_grants=[grant],
+    )
+    forged = json.loads(json.dumps(manifest))
+    forged["capability_projection"]["entries"]["app-server-control"][
+        "explicit_grant"
+    ] = None
+    manifest_schema = json.loads(
+        (PART / "schemas" / "external-codex-incarnation-home.schema.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert list(Draft202012Validator(manifest_schema).iter_errors(forged))
+
+    manifest_path = Path(manifest["codex_home"]).parent / "incarnation-home.json"
+    manifest_path.write_text(json.dumps(forged), encoding="utf-8")
+    with pytest.raises(MODULE.IncarnationHomeError, match="projection drift"):
+        MODULE._load_manifest(manifest_path)
+
+    forged = json.loads(json.dumps(manifest))
+    forged["capability_projection"]["entries"]["app-server-control"][
+        "explicit_grant"
+    ]["grant_id"] = "forged-without-grant"
+    assert not list(Draft202012Validator(manifest_schema).iter_errors(forged))
+    manifest_path.write_text(json.dumps(forged), encoding="utf-8")
+    with pytest.raises(MODULE.IncarnationHomeError, match="projection drift"):
+        MODULE._load_manifest(manifest_path)
 
 
 def test_capability_projection_rejects_replayed_grant_subject(

@@ -120,7 +120,11 @@ and replay only through their matching legacy wake reservation. A retry after a 
   artifact digest, and expiry match. The exact subject may reuse that grant
   until expiry; dynamic endpoint contents are not target-content-bound. This
   projection controls runtime materialization; it is not itself an app-server
-  mutation gate or owner-acceptance proof;
+  mutation gate or owner-acceptance proof. The registry uses an object keyed by
+  unique class ID, and the manifest uses an object keyed by ambient entry name;
+  a shared operator-control entry must carry its complete `explicit_grant`
+  object under that key. Denied entries carry `explicit_grant: null`, with no
+  detached grant list or grant-ID-only relation;
 - exposes the installed `aoa-external-codex-return` leaf for the final external
   return contour. The leaf receives an explicit return-owner binding and exact
   handoff/holder paths, uses a connectable local Codex app-server as a

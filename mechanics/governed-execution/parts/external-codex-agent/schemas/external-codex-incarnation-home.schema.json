@@ -61,40 +61,40 @@
         "schema_version",
         "default_policy",
         "capability_class_registry",
-        "entries",
-        "explicit_grants"
+        "entries"
       ],
       "properties": {
-        "schema_version": {"const": "abyss_stack_codex_capability_projection_v1"},
+        "schema_version": {"const": "abyss_stack_codex_capability_projection_v2"},
         "default_policy": {"const": "deny_ambient_operator_control"},
         "capability_class_registry": {
           "$ref": "#/$defs/capabilityClassRegistry"
         },
         "entries": {
-          "type": "array",
-          "uniqueItems": true,
-          "items": {"$ref": "#/$defs/capabilityEntry"}
-        },
-        "explicit_grants": {
-          "type": "array",
-          "uniqueItems": true,
-          "items": {"$ref": "#/$defs/grantProjection"}
+          "type": "object",
+          "propertyNames": {"$ref": "#/$defs/name"},
+          "additionalProperties": {"$ref": "#/$defs/capabilityEntry"}
         }
       }
     },
     "capabilityEntry": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "capability_class", "projection", "grantable", "grant_id"],
+      "required": [
+        "capability_class",
+        "projection",
+        "grantable",
+        "explicit_grant"
+      ],
       "properties": {
-        "name": {"$ref": "#/$defs/name"},
         "capability_class": {
           "type": "string",
           "pattern": "^[a-z][a-z0-9_]*$"
         },
         "projection": {"enum": ["shared_link", "denied"]},
         "grantable": {"type": "boolean"},
-        "grant_id": {"type": ["string", "null"]}
+        "explicit_grant": {
+          "type": ["object", "null"]
+        }
       },
       "allOf": [
         {
@@ -110,7 +110,7 @@
             "properties": {
               "projection": {"const": "shared_link"},
               "grantable": {"const": false},
-              "grant_id": {"type": "null"}
+              "explicit_grant": {"type": "null"}
             }
           }
         },
@@ -129,13 +129,13 @@
               {
                 "properties": {
                   "projection": {"const": "denied"},
-                  "grant_id": {"type": "null"}
+                  "explicit_grant": {"type": "null"}
                 }
               },
               {
                 "properties": {
                   "projection": {"const": "shared_link"},
-                  "grant_id": {"type": "string", "minLength": 1}
+                  "explicit_grant": {"$ref": "#/$defs/grantProjection"}
                 }
               }
             ]
@@ -152,7 +152,7 @@
             "properties": {
               "projection": {"const": "denied"},
               "grantable": {"const": true},
-              "grant_id": {"type": "null"}
+              "explicit_grant": {"type": "null"}
             }
           }
         },
@@ -176,7 +176,7 @@
             "properties": {
               "projection": {"const": "denied"},
               "grantable": {"const": false},
-              "grant_id": {"type": "null"}
+              "explicit_grant": {"type": "null"}
             }
           }
         }
@@ -201,7 +201,6 @@
         "grant_id",
         "capability_id",
         "capability_class",
-        "ambient_entry",
         "effect",
         "subject",
         "expires_at",
@@ -212,12 +211,15 @@
         "grant_id": {"type": "string", "minLength": 1},
         "capability_id": {"type": "string", "minLength": 1},
         "capability_class": {"const": "operator_control"},
-        "ambient_entry": {"$ref": "#/$defs/name"},
         "effect": {"const": "project_shared_link"},
         "subject": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["ambient_home_identity", "model_realization_id", "incarnation_coordinate"],
+          "required": [
+            "ambient_home_identity",
+            "model_realization_id",
+            "incarnation_coordinate"
+          ],
           "properties": {
             "ambient_home_identity": {"$ref": "#/$defs/digest"},
             "model_realization_id": {"type": "string", "minLength": 1},

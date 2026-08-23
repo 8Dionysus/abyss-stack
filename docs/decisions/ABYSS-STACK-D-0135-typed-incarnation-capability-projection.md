@@ -50,6 +50,16 @@ validates the projection again when loading the manifest and preserves the
 owner-authored capability-class registry plus grant path/digest as provenance
 and drift evidence.
 
+The representation makes the two relations structural. Registry `classes` is
+an object keyed by the unique authored class ID. Manifest `entries` is an
+object keyed by the exact ambient entry name, and a shared operator-control
+entry carries the complete `explicit_grant` projection nested under that key;
+denied entries carry `explicit_grant: null`. There is no detached
+`explicit_grants` list or grant-ID-only field. Loading still re-reads the
+referenced artifact and rejects metadata, subject, ambient-entry, expiry, or
+digest drift, so the schema describes the required relation while runtime
+recomputation remains the final materialization admission boundary.
+
 The visible holder retries the exact Kitty ancestry and dedicated-window
 identity handshake for a bounded interval before writing its non-replacing
 holder receipt. A timeout or missing identity fails closed; it cannot be
@@ -69,6 +79,10 @@ represents those future denied classes, while only the exact explicit grant
 relation can turn an operator-control entry into a shared link. Deny-by-default
 unknown and future entries avoid implicit authority while exact grants provide
 a typed future extension point.
+
+The map-key representation makes class and ambient-entry identity explicit to
+schema-only consumers and removes the two detached-list/duplicate-ID shapes
+identified by the fresh review.
 The grant is intentionally reusable by its exact subject until expiry; subject,
 path, grant-artifact digest, and expiry binding make copied, stale, or mutated
 grant artifacts fail closed, but mutable bytes inside a dynamic operator
