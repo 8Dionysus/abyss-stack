@@ -8582,7 +8582,11 @@ class ExternalCodexRuntime:
             permission_profile = _actor_codex_permission_profile(
                 actor_git_mask,
                 execution_root=execution_root,
-                readable_paths=(sanitized_config, executable),
+                readable_paths=(
+                    sanitized_config,
+                    executable,
+                    RUNTIME_PACKAGE_EXECUTION_ROOT,
+                ),
                 writable_paths=(preflight_root,),
             )
             nested_sandbox_probe = [
@@ -11778,7 +11782,11 @@ Runtime session identity: {state["session_id"]}
             actor_git_mask,
             sanitized_config_path=sanitized_config_path,
             execution_root=execution_root,
-            readable_paths=(*readable_paths, Path(executable)),
+            readable_paths=(
+                *readable_paths,
+                Path(executable),
+                RUNTIME_PACKAGE_EXECUTION_ROOT,
+            ),
             writable_paths=writable_paths,
             denied_paths=denied_paths,
             workspace_access=workspace_access,

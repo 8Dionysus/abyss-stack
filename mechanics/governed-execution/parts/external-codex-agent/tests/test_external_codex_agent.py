@@ -3852,6 +3852,10 @@ def test_preflight_exercises_masked_nested_codex_sandbox(
         and command[index + 1].startswith("permissions.aoa_external_actor=")
     )
     assert f'"{fixture["launch"]["codex_executable"]}"="read"' in permission_override
+    assert (
+        f'"{RUNTIME.RUNTIME_PACKAGE_EXECUTION_ROOT}"="read"'
+        in permission_override
+    )
     assert '":workspace_roots"="write"' in permission_override
     assert protected_mountpoints == (".agents", ".codex", ".git")
     assert actor_git_mask["masks"]
@@ -4186,6 +4190,10 @@ def test_preflight_and_separate_process_return_structured_result(
     )
     assert f'"{sanitized_config}"="read"' in permission_override
     assert f'"{fixture["launch"]["codex_executable"]}"="read"' in permission_override
+    assert (
+        f'"{RUNTIME.RUNTIME_PACKAGE_EXECUTION_ROOT}"="read"'
+        in permission_override
+    )
     assert '":workspace_roots"="read"' in permission_override
     assert str(execution_root) not in permission_override
     assert '":minimal"="read"' in permission_override
