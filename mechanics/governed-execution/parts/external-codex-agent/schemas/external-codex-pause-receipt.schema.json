@@ -1,0 +1,263 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://abyss.local/schemas/external-codex-pause-receipt.schema.json",
+  "title": "Abyss external Codex Goal pause receipt",
+  "type": "object",
+  "$defs": {
+    "mutation_dispatched": {
+      "type": "object",
+      "required": [
+        "attempt_id",
+        "issued_at",
+        "method",
+        "request_id",
+        "params",
+        "params_sha256",
+        "request_sha256"
+      ],
+      "properties": {
+        "attempt_id": {"type": "string", "minLength": 1},
+        "issued_at": {"type": "string", "minLength": 1},
+        "method": {"const": "thread/goal/set"},
+        "request_id": {"type": "integer", "minimum": 1},
+        "params": {
+          "type": "object",
+          "required": ["threadId", "status"],
+          "properties": {
+            "threadId": {"type": "string", "minLength": 1},
+            "status": {"const": "paused"}
+          }
+        },
+        "params_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "request_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      }
+    },
+    "recovery": {
+      "type": "object",
+      "required": [
+        "mode",
+        "mutation_response_available",
+        "reconciled_by",
+        "mutation_dispatched"
+      ],
+      "properties": {
+        "mode": {"const": "ambiguous_post_mutation"},
+        "mutation_response_available": {"const": false},
+        "reconciled_by": {"const": "thread/goal/get"},
+        "mutation_dispatched": {"$ref": "#/$defs/mutation_dispatched"}
+      }
+    },
+    "transition_proof": {
+      "type": "object",
+      "required": [
+        "schema_version",
+        "kind",
+        "method",
+        "thread_id",
+        "from_status",
+        "to_status",
+        "precondition_sha256",
+        "request_id",
+        "request_sha256",
+        "goal_response_sha256"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "abyss_stack_external_codex_atomic_goal_transition_v1"
+        },
+        "kind": {"const": "server_compare_and_set"},
+        "method": {"const": "thread/goal/set"},
+        "thread_id": {"type": "string", "minLength": 1},
+        "from_status": {"const": "active"},
+        "to_status": {"const": "paused"},
+        "precondition_sha256": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "request_id": {"type": "integer", "minimum": 1},
+        "request_sha256": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "goal_response_sha256": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "schema_version",
+    "generated_at",
+    "owner_ref",
+    "owner_sha256",
+    "pause_receipt_ref",
+    "owner",
+    "transport",
+    "goal_status",
+    "goal_binding",
+    "lifecycle_method",
+    "lifecycle",
+    "actions",
+    "observed",
+    "paused",
+    "owner_acceptance",
+    "semantic_acceptance"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "abyss_stack_external_codex_pause_receipt_v1"
+    },
+    "generated_at": {"type": "string", "minLength": 1},
+    "owner_ref": {"type": "string", "pattern": "^/"},
+    "owner_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "pause_receipt_ref": {"type": "string", "pattern": "^/"},
+    "owner": {
+      "type": "object",
+      "required": [
+        "owner_id",
+        "owner_repo",
+        "goal_id",
+        "thread_id",
+        "runtime",
+        "transport_posture",
+        "acceptance_posture"
+      ],
+      "properties": {
+        "owner_id": {"type": "string", "minLength": 1},
+        "owner_repo": {"type": "string", "minLength": 1},
+        "goal_id": {"type": "string", "minLength": 1},
+        "thread_id": {"type": "string", "minLength": 1},
+        "runtime": {"type": "string", "minLength": 1},
+        "transport_posture": {"type": "string", "minLength": 1},
+        "acceptance_posture": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    },
+    "transport": {
+      "type": "object",
+      "required": ["kind", "endpoint"],
+      "properties": {
+        "kind": {"const": "codex_app_server_websocket_unix"},
+        "endpoint": {"type": "string", "minLength": 1},
+        "resolution": {"type": "string", "minLength": 1}
+      }
+    },
+    "goal_status": {"const": "paused"},
+    "goal_binding": {
+      "type": "object",
+      "required": [
+        "goal_id",
+        "thread_id",
+        "before_status",
+        "transition",
+        "identity_source"
+      ],
+      "properties": {
+        "goal_id": {"type": "string", "minLength": 1},
+        "thread_id": {"type": "string", "minLength": 1},
+        "before_status": {"const": "active"},
+        "transition": {"const": "active_to_paused"},
+        "identity_source": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    },
+    "lifecycle_method": {"const": "thread/goal/set"},
+    "lifecycle": {
+      "type": "object",
+      "required": [
+        "accepted",
+        "initialize",
+        "goal_get",
+        "goal",
+        "goal_summary_sha256",
+        "goal_response_sha256",
+        "precondition",
+        "response_available",
+        "transition_proof",
+        "mutation_dispatched"
+      ],
+      "properties": {
+        "accepted": {"const": true},
+        "initialize": {"type": "object"},
+        "goal_get": {"type": "object"},
+        "goal": {"type": "object"},
+        "goal_summary_sha256": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "goal_response_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "precondition": {
+          "type": "object",
+          "required": [
+            "goal_status",
+            "goal_get",
+            "goal_get_response",
+            "goal_get_summary_sha256",
+            "goal_response_sha256"
+          ],
+          "properties": {
+            "goal_status": {"const": "active"},
+            "goal_get": {"type": "object"},
+            "goal_get_response": {"type": "object"},
+            "goal_get_summary_sha256": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "goal_response_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+          },
+          "additionalProperties": false
+        },
+        "response_available": {"type": "boolean"},
+        "transition_proof": {"$ref": "#/$defs/transition_proof"},
+        "mutation_dispatched": {"$ref": "#/$defs/mutation_dispatched"}
+      },
+      "additionalProperties": false
+    },
+    "recovery": {"$ref": "#/$defs/recovery"},
+    "actions": {
+      "type": "object",
+      "required": ["goal_lifecycle_set"],
+      "properties": {"goal_lifecycle_set": {"const": true}},
+      "additionalProperties": false
+    },
+    "observed": {
+      "type": "object",
+      "required": ["goal_lifecycle", "goal_status"],
+      "properties": {
+        "goal_lifecycle": {"const": "paused"},
+        "goal_status": {"const": "paused"}
+      },
+      "additionalProperties": false
+    },
+    "paused": {"const": true},
+    "owner_acceptance": {"const": "separate"},
+    "semantic_acceptance": {"const": "separate"}
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "lifecycle": {
+            "required": ["response_available"],
+            "properties": {"response_available": {"const": false}}
+          }
+        }
+      },
+      "then": {"required": ["recovery"]}
+    },
+    {
+      "if": {
+        "properties": {
+          "lifecycle": {
+            "required": ["response_available"],
+            "properties": {"response_available": {"const": true}}
+          }
+        }
+      },
+      "then": {"not": {"required": ["recovery"]}}
+    }
+  ]
+}

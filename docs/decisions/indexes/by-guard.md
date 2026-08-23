@@ -178,6 +178,10 @@
 
 - [ABYSS-STACK-D-0083 Tree of Sophia Foundation Laboratory Boundary](../ABYSS-STACK-D-0083-tree-of-sophia-foundation-laboratory-boundary.md) (`docs/decisions/ABYSS-STACK-D-0083-tree-of-sophia-foundation-laboratory-boundary.md`)
 
+## Goal identity binding
+
+- [ABYSS-STACK-D-0133 Owner-Bound External Goal Pause](../ABYSS-STACK-D-0133-owner-bound-external-goal-pause.md) (`docs/decisions/ABYSS-STACK-D-0133-owner-bound-external-goal-pause.md`)
+
 ## RPG runtime projection
 
 - [ABYSS-STACK-D-0061 Active Topology Language Validator Module](../ABYSS-STACK-D-0061-active-topology-language-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0061-active-topology-language-validator-module.md`)
@@ -252,6 +256,10 @@
 ## bounded context
 
 - [ABYSS-STACK-D-0079 KAG Query Application Port](../ABYSS-STACK-D-0079-kag-query-application-port.md) (`docs/decisions/ABYSS-STACK-D-0079-kag-query-application-port.md`)
+
+## bounded observation
+
+- [ABYSS-STACK-D-0134 Generic Responsibility-Movement Observation](../ABYSS-STACK-D-0134-generic-responsibility-movement-observation.md) (`docs/decisions/ABYSS-STACK-D-0134-generic-responsibility-movement-observation.md`)
 
 ## bounded recurrence
 
@@ -421,6 +429,10 @@
 - [ABYSS-STACK-D-0115 Preserve Writer Role Continuity for Report Repair](../ABYSS-STACK-D-0115-preserve-writer-role-continuity-for-report-repair.md) (`docs/decisions/ABYSS-STACK-D-0115-preserve-writer-role-continuity-for-report-repair.md`)
 - [ABYSS-STACK-D-0119 Preserve Actor Continuity Across Provider Capacity Loss](../ABYSS-STACK-D-0119-preserve-actor-continuity-across-provider-capacity-loss.md) (`docs/decisions/ABYSS-STACK-D-0119-preserve-actor-continuity-across-provider-capacity-loss.md`)
 - [ABYSS-STACK-D-0121 Close Nested Review Evidence Before Inference](../ABYSS-STACK-D-0121-close-nested-review-evidence-before-inference.md) (`docs/decisions/ABYSS-STACK-D-0121-close-nested-review-evidence-before-inference.md`)
+
+## evidence separation
+
+- [ABYSS-STACK-D-0133 Owner-Bound External Goal Pause](../ABYSS-STACK-D-0133-owner-bound-external-goal-pause.md) (`docs/decisions/ABYSS-STACK-D-0133-owner-bound-external-goal-pause.md`)
 
 ## exact admission
 
@@ -629,6 +641,11 @@
 ## legacy metadata containment
 
 - [ABYSS-STACK-D-0060 Inference Pilot Compatibility Validator Module](../ABYSS-STACK-D-0060-inference-pilot-compatibility-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0060-inference-pilot-compatibility-validator-module.md`)
+
+## lifecycle transition
+
+- [ABYSS-STACK-D-0133 Owner-Bound External Goal Pause](../ABYSS-STACK-D-0133-owner-bound-external-goal-pause.md) (`docs/decisions/ABYSS-STACK-D-0133-owner-bound-external-goal-pause.md`)
+- [ABYSS-STACK-D-0134 Generic Responsibility-Movement Observation](../ABYSS-STACK-D-0134-generic-responsibility-movement-observation.md) (`docs/decisions/ABYSS-STACK-D-0134-generic-responsibility-movement-observation.md`)
 
 ## loopback exposure
 
@@ -1062,6 +1079,10 @@
 ## tool-event rejection
 
 - [ABYSS-STACK-D-0123 Parent Passive Turns Disable Code Mode](../ABYSS-STACK-D-0123-parent-passive-code-mode-disable.md) (`docs/decisions/ABYSS-STACK-D-0123-parent-passive-code-mode-disable.md`)
+
+## typed wake
+
+- [ABYSS-STACK-D-0134 Generic Responsibility-Movement Observation](../ABYSS-STACK-D-0134-generic-responsibility-movement-observation.md) (`docs/decisions/ABYSS-STACK-D-0134-generic-responsibility-movement-observation.md`)
 
 ## unmodeled surface detection
 

@@ -47,6 +47,8 @@ RUNTIME_FILES = (
     "external_codex_mount_launcher.py",
     "external_codex_projection.py",
     "external_codex_return.py",
+    "external_codex_responsibility_movement.py",
+    "schema_validation.py",
     "external_codex_static_bootstrap.S",
     "external_codex_supervisor.py",
     "legacy-owner-admission-migrations.v1.json",
@@ -86,6 +88,7 @@ WRAPPER_SPECS = {
     "aoa-external-actor-bind": "bind-entrypoint.py",
     "aoa-external-codex-incarnation": "incarnation-entrypoint.py",
     "aoa-external-codex-return": "return-entrypoint.py",
+    "aoa-external-codex-stasis": "stasis-entrypoint.py",
     "aoa-external-codex-study": "study-entrypoint.py",
 }
 MANAGED_WRAPPER_NAMES = frozenset(WRAPPER_SPECS)
@@ -1721,6 +1724,9 @@ def release_manifest(files: Iterable[tuple[Path, Path]]) -> dict[str, object]:
         "bind-entrypoint.py": entrypoint_text("bind_external_actor_launch.py"),
         "incarnation-entrypoint.py": entrypoint_text("visible_incarnation_home.py"),
         "return-entrypoint.py": entrypoint_text("external_codex_return.py"),
+        "stasis-entrypoint.py": entrypoint_text(
+            "external_codex_responsibility_movement.py"
+        ),
         "study-entrypoint.py": entrypoint_text("prepare_landing_study.py"),
     }
     for path, text in entrypoints.items():
@@ -1828,6 +1834,10 @@ def materialize_release(
             ("bind-entrypoint.py", "bind_external_actor_launch.py"),
             ("incarnation-entrypoint.py", "visible_incarnation_home.py"),
             ("return-entrypoint.py", "external_codex_return.py"),
+            (
+                "stasis-entrypoint.py",
+                "external_codex_responsibility_movement.py",
+            ),
             ("study-entrypoint.py", "prepare_landing_study.py"),
         ):
             path = staging / name
@@ -1838,6 +1848,7 @@ def materialize_release(
             "bind-entrypoint.py",
             "incarnation-entrypoint.py",
             "return-entrypoint.py",
+            "stasis-entrypoint.py",
             "study-entrypoint.py",
         ):
             path = staging / WRAPPER_MATERIAL_ROOT / f"{entrypoint_name}.bootstrap.py"

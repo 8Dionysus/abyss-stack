@@ -84,6 +84,14 @@ def make_sources(tmp_path: Path) -> tuple[Path, Path, Path, Path]:
         "import aoa_sdk\nprint('return:' + aoa_sdk.MARKER)\n",
         encoding="utf-8",
     )
+    (part / "external_codex_responsibility_movement.py").write_text(
+        "import aoa_sdk\nprint('stasis:' + aoa_sdk.MARKER)\n",
+        encoding="utf-8",
+    )
+    (part / "schema_validation.py").write_text(
+        "PASS = True\n",
+        encoding="utf-8",
+    )
     (part / "external_codex_supervisor.py").write_text(
         "PASS = True\n", encoding="utf-8"
     )
@@ -741,6 +749,7 @@ def test_content_addressed_install_and_wrapper_use_exact_sdk(tmp_path: Path) -> 
     status = runtime_install.status(runtime_root, bin_dir)
     assert status["healthy"] is True
     assert status["artifact_admission"]["status"] == "not_recorded"
+    assert (release_root / "runtime/schema_validation.py").is_file()
     for relative in runtime_install.SDK_CONTRACT_FILES:
         assert (release_root / "sdk" / relative).is_file()
     for owner, relative in runtime_install.OWNER_CONTRACT_FILES:
@@ -850,6 +859,13 @@ def test_content_addressed_install_and_wrapper_use_exact_sdk(tmp_path: Path) -> 
         text=True,
     )
     assert actor_return.stdout == "return:exact-sdk\n"
+    stasis = subprocess.run(
+        [str(bin_dir / "aoa-external-codex-stasis")],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert stasis.stdout == "stasis:exact-sdk\n"
     study = subprocess.run(
         [str(bin_dir / "aoa-external-codex-study")],
         check=True,

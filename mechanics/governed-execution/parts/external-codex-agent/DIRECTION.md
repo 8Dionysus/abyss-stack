@@ -48,6 +48,20 @@ persists delivery evidence, and then composes the existing authorization and
 exact close primitives. This remains runtime transport evidence: acceptance,
 semantic re-entry, and owner meaning stay with their owners.
 
+The same source adapter exposes a separate owner-selected Goal pause action.
+After responsibility has moved to the external holder, it verifies the exact
+active Goal/thread binding and requires an `atomic_goal_transition` adapter
+method that performs a server-supported compare-and-set or version proof before
+producing an `active_to_paused` receipt. The installed
+public `ThreadGoalSetParams` app-server method currently has no such proof, so
+the canonical adapter refuses to mutate or certify that transition until a
+protocol adapter supplies the typed
+`abyss_stack_external_codex_atomic_goal_transition_v1` evidence. A completed
+pause receipt binds that proof to the active precondition, exact request, and
+returned Goal response. The action uses no TTY, PID, GDB, keystroke, turn,
+wake, or holder-close transport. The pause receipt is runtime evidence; it
+does not grant the runtime owner acceptance or semantic authority.
+
 ## Proof sequence
 
 1. Maintain source-local schema, owner-admission, binder, process, drift,

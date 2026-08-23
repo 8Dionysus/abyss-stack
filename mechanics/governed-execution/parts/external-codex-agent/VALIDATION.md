@@ -22,6 +22,8 @@ python -m py_compile \
   mechanics/governed-execution/parts/external-codex-agent/external_codex_mount_launcher.py \
   mechanics/governed-execution/parts/external-codex-agent/external_codex_supervisor.py \
   mechanics/governed-execution/parts/external-codex-agent/install_external_codex_runtime.py \
+  mechanics/governed-execution/parts/external-codex-agent/external_codex_return.py \
+  mechanics/governed-execution/parts/external-codex-agent/external_codex_responsibility_movement.py \
   mechanics/governed-execution/parts/external-codex-agent/prepare_landing_study.py \
   mechanics/governed-execution/parts/external-codex-agent/visible_incarnation_home.py
 
@@ -36,6 +38,42 @@ python scripts/validate_decision_records.py
 python scripts/generate_decision_indexes.py --check
 python scripts/validate_nested_agents.py
 ```
+
+The focused external-return tests also cover the separate Goal pause contour:
+an exact active owner-bound Goal is refused before `thread/goal/set` when the
+app-server adapter lacks an `atomic_goal_transition` method with a
+server-supported compare-and-set/version proof; the fixture adapter supplies
+that explicit atomic method and typed proof and verifies that the
+returned identity, status, request, precondition, and response digest are
+bound before a receipt is published. Non-active Goals are refused without a
+lifecycle mutation, and a completed pause receipt replays without a second
+app-server call. The suite also forces dispatch-marker, transition-proof, and
+receipt publication failure at their respective boundaries and verifies that
+a pre-send reservation fails closed while a matching post-send proof is
+reconciled through a read-only Goal read without a second `thread/goal/set`.
+Companion cases prove that an active observation after dispatch fails closed, a
+paused observation through a replacement app-server endpoint fails closed, a
+paused observation without the marker or proof fails closed, and incomplete or
+copied completed receipts fail closed. The fixture asserts that pause does not
+use turn delivery, terminal input, process identity, holder closure, or wake
+evidence. The reservation fixture validates the initial, prepared, pre-send,
+and post-send reservation states against the separate
+`abyss_stack_external_codex_pause_reservation_v1` schema, while completed
+evidence remains validated by the pause-receipt schema. The current public
+Codex app-server is therefore a known capability blocker for a live fresh
+`active_to_paused` canary; no source test double is a live canary claim.
+
+The responsibility-movement tests prove the required branch independently:
+the compiled obligation and exact handoff digest are carried through a
+one-shot observation; a live process plus the real
+`cannot_connect_to_codex_app_server` transport failure is classified as
+deadline stasis because no lifecycle transition was observed; the typed event
+and review wake bind the exact return owner and preserve the stop line. Adding
+the matching `returning -> terminal` transition changes the result to
+`progressing` and suppresses the wake, proving the causal dependency. Cost
+over-budget and pre-deadline cases schedule only one bounded observation, and
+hook-screen evidence is rejected by schema. No external canary, Goal
+acceptance, or host trust-admission success is claimed by this observer.
 
 The deterministic suite separates transport sentinels from unrelated semantic
 cases without exposing a runtime bypass. Fixtures selecting

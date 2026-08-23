@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 30258075,
+  "allowed_tracked_bytes": 37905915,
+  "approved_by": "repository-owner",
+  "base_ref": "4113863137b2322830d3b5941b802a5db6fb136b",
+  "changed_generated_bytes": 30258075,
+  "changed_generated_files": 356,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "44ea03f6065f09db279c97497535cff4e9c1a7dd85d9c39e5c0a2406e99cb393",
+  "reason": "owner-approved canonical pause lifecycle repair with self-contained validation, immutable packaging closure, verifiable recovery proof, and independently bound precondition evidence",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 37905915,
+  "tracked_bytes_max": 24117248
+}

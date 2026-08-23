@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 30148268,
+  "allowed_tracked_bytes": 37811207,
+  "approved_by": "repository-owner",
+  "base_ref": "4113863137b2322830d3b5941b802a5db6fb136b",
+  "changed_generated_bytes": 30148268,
+  "changed_generated_files": 354,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "549ce3ed039fc81c43fcff9c9eca321d1dbe3461d0ac2b02a2a2e928bd90b315",
+  "reason": "sha256:99d398ec8b9346c32acef06ce3f354a369e4bdb32f3acc06f3f5954e4c9b69d6 actor-stasis-detection: regenerate complete portable family after causal movement, pause replay, kind-signal, and request-digest hardening",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 37811207,
+  "tracked_bytes_max": 24117248
+}

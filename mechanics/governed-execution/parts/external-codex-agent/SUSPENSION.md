@@ -40,6 +40,72 @@ an interruption result, and preserves the event cursor and partial-usage gap.
 If an exact identity cannot be validated, stop and route the state to the
 runtime owner; do not broaden the target or retry with a stronger primitive.
 
+## Pause an exact Goal after responsibility transfer
+
+When responsibility has moved to an external holder and the master must pause
+its own Goal, use the owner-selected app-server lifecycle leaf:
+
+```bash
+aoa-external-codex-return pause \
+  --pause-owner /absolute/path/to/pause-owner.json \
+  --pause-receipt /absolute/path/to/pause-receipt.json
+```
+
+The pause owner must bind the exact Goal and thread. The leaf reads the current
+Goal first, refuses anything other than `active`, and requires the app-server
+adapter to provide an `atomic_goal_transition` method that performs a
+server-supported compare-and-set/version proof for the
+`thread/goal/set(status=paused)` mutation. The installed public
+`ThreadGoalSetParams` transport has no such precondition, so the canonical
+adapter fails closed before mutation and cannot certify `active_to_paused` on
+that server. A future protocol adapter may opt in only by returning the typed
+`abyss_stack_external_codex_atomic_goal_transition_v1` proof. The adapter owns
+any version-token request fields and the proof is checked against the exact
+request marker. A completed
+`abyss_stack_external_codex_pause_receipt_v1` must carry that proof, binding the
+active precondition, exact request ID and digest, thread, method, and returned
+Goal response digest.
+
+Its pre-mutation durable file uses the separate
+`abyss_stack_external_codex_pause_reservation_v1` schema; it does not claim to
+be a completed receipt. It does not inject terminal input, inspect or signal
+PIDs, use GDB, start or steer a turn, deliver a wake, or close any holder. A
+receipt proves only the runtime lifecycle transition; wake delivery, holder
+closure, semantic re-entry, and owner acceptance require their own later
+evidence. If a previously persisted atomic transition proof exists but receipt
+publication was lost, a retry may publish an `ambiguous_post_mutation`
+recovery receipt from a read-only `thread/goal/get` without issuing a second
+lifecycle set. A lost mutation response without that persisted proof is not
+recoverable as an exact pause receipt. Endpoint drift, missing proof,
+pre-send reservations, and incomplete dispatch evidence fail closed. A
+persisted receipt with `response_available=false` must retain its recovery
+evidence and its `pause_receipt_ref` must match the exact output path; a
+copied or incomplete receipt is not replayable.
+
+## Observe responsibility movement once
+
+When a return owner may be stalled, prepare one evidence snapshot and run the
+generic observer:
+
+```bash
+scripts/aoa-external-codex-stasis \
+  --observation /absolute/path/to/responsibility-observation.json \
+  --result /absolute/path/to/responsibility-movement.json
+```
+
+The snapshot must bind the exact holder and return owner, expected lifecycle
+transition, deadline, and observation cost. The command does not poll. It
+returns `not_due` or `cost_deferred` with one bounded next-observation hint,
+`progressing` only for an exact-holder, non-no-op transition, or a typed stasis
+event plus review wake when the deadline has passed without that transition. A
+live PID, terminal, session, hook screen, or unchanged worktree is not
+progress. The observer never kills or restarts an actor, declares domain
+failure, accepts a Goal, closes a holder, or disturbs an unrelated actor. The
+typed wake is a request for the canonical return owner to review; transport
+delivery and semantic acceptance remain separate receipts. Movement results
+are published non-replacing, so an observation cannot erase earlier causal
+evidence.
+
 For a parent continuation, inspect only its exact state root and re-entry ID:
 
 ```bash

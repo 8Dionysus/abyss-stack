@@ -116,6 +116,65 @@ Operations are:
   delivery into typed `wake_delivered` close authority;
 - `close --holder-receipt ... (--closure-authorization ... | --wake-receipt ...)
   --handoff ... --closure-receipt ...` closes only the exact bound holder.
+- `aoa-external-codex-return pause --pause-owner ... --pause-receipt ...` is the
+  canonical Goal lifecycle pause leaf. It validates a separate pause-owner
+  binding, reads the exact Goal identity first, requires the observed status to
+  be `active`, and requires an `atomic_goal_transition` adapter method that
+  performs a server-supported compare-and-set/version proof before calling
+  `thread/goal/set(status=paused)`. The installed public
+  `ThreadGoalSetParams` app-server method has no such precondition, so the
+  canonical adapter fails closed before mutation and cannot certify an
+  `active_to_paused` transition on that server. A future protocol adapter must
+  explicitly provide the typed
+  `abyss_stack_external_codex_atomic_goal_transition_v1` proof. That adapter
+  owns any version-token request fields; the runtime binds the resulting
+  request marker to the proof. The completed
+  `abyss_stack_external_codex_pause_receipt_v1` schema requires that proof and
+  binds the active precondition, exact request ID and digest, thread, method,
+  and returned Goal response digest.
+
+  The receipt is reserved before the app-server mutation and binds the owner
+  bytes, Goal/thread identities, transition proof, transport response digest,
+  and separate owner/semantic-acceptance markers. It does not read or start a
+  turn, deliver a handoff, authorize or close a holder, or claim semantic
+  acceptance. The reservation also stores the exact active precondition and
+  mutation reservation before the WebSocket request is sent, then records a
+  separate durable dispatch marker only after the request frame has been issued
+  by that attempt. These in-flight files use the separate
+  `abyss_stack_external_codex_pause_reservation_v1` contract; the completed
+  receipt is published only after the proof and paused Goal evidence are
+  complete. If a matching transition proof was durably persisted but response
+  or receipt publication was lost, a retry may observe the same bound Goal with
+  read-only `thread/goal/get` and emit an `ambiguous_post_mutation` recovery
+  receipt without repeating `thread/goal/set`. A lost mutation response without
+  that proof is not recoverable as an exact receipt. Endpoint drift, missing
+  proof, a pre-send reservation, or incomplete dispatch evidence fails closed;
+  copied or incomplete receipts are not replayable.
+- `aoa-external-codex-stasis --observation ... --result ...` performs exactly
+  one responsibility-movement observation. The observation binds the compiled
+  obligation, exact holder/return-owner identity, handoff, runtime state root,
+  transition deadline, cost budget, and immutable stop line. Its lifecycle
+  states are model-neutral (`accepted`, `session_started`, `turn_started`,
+  `progressing`, `waiting`, `returning`, and `terminal`). Only a matching
+  `lifecycle_transition` observed after the bound transition start can produce
+  `progressing`; each transition must bind an exact holder subject and must
+  move to a state different from its source. Process existence and
+  session/tool/artifact/resource/transport evidence are supporting or failure
+  evidence, never progress by themselves, and hook-screen evidence is not an
+  admitted input. If no matching transition exists before the deadline, the
+  result is `not_due`; a matching transition is `progressing` regardless of
+  deadline. When the one-shot estimate exceeds its declared budget it is
+  `cost_deferred`, each with at most one later observation coordinate.
+  A due missing transition produces
+  `abyss_stack_external_codex_stasis_event_v1` plus
+  `abyss_stack_external_codex_typed_wake_v1` targeted at the exact return owner.
+  The wake requests owner review through the canonical return transport and
+  carries no kill, restart, domain-failure, Goal-acceptance, or unrelated-actor
+  effect. It does not deliver the wake itself, close a holder, or claim the
+  external canary; those remain separate lifecycle evidence. Result paths are
+  non-replacing: a second observation cannot overwrite an earlier movement
+  receipt, and CLI observation/result symlinks are rejected before path
+  canonicalization.
 - `aoa-external-codex-return return --return-owner ... --handoff ...
   --holder-receipt ... --return-receipt ... --authorization ...
   --closure-receipt ...` is the canonical Codex return leaf. It validates the

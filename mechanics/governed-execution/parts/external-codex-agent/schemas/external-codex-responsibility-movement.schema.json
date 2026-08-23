@@ -1,0 +1,425 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://abyss.local/schemas/external-codex-responsibility-movement.schema.json",
+  "title": "Typed external Codex responsibility movement result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "observation_id",
+    "source_observation_digest",
+    "classification",
+    "one_shot",
+    "cost",
+    "transition_evidence",
+    "event",
+    "wake",
+    "next_observation",
+    "causal_basis",
+    "claim_limits",
+    "unrelated_actors",
+    "stop_line"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "abyss_stack_external_codex_responsibility_movement_v1"
+    },
+    "observation_id": {"type": "string", "minLength": 1},
+    "source_observation_digest": {"$ref": "#/$defs/digest"},
+    "classification": {
+      "enum": ["progressing", "not_due", "cost_deferred", "stasis"]
+    },
+    "one_shot": {"const": true},
+    "cost": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "estimated_ms",
+        "budget_ms",
+        "within_budget",
+        "observed_source_count"
+      ],
+      "properties": {
+        "estimated_ms": {"type": "integer", "minimum": 0},
+        "budget_ms": {"type": "integer", "minimum": 1},
+        "within_budget": {"type": "boolean"},
+        "observed_source_count": {"type": "integer", "minimum": 0}
+      }
+    },
+    "transition_evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "current_state",
+        "expected_to_states",
+        "matching_evidence_ids",
+        "process_existence_ignored",
+        "ignored_process_evidence_ids",
+        "hook_screen_match_used"
+      ],
+      "properties": {
+        "current_state": {"$ref": "#/$defs/state"},
+        "expected_to_states": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/state"}
+        },
+        "matching_evidence_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "process_existence_ignored": {"type": "boolean"},
+        "ignored_process_evidence_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "hook_screen_match_used": {"const": false}
+      }
+    },
+    "event": {
+      "anyOf": [
+        {"type": "null"},
+        {"$ref": "#/$defs/stasisEvent"}
+      ]
+    },
+    "wake": {
+      "anyOf": [
+        {"type": "null"},
+        {"$ref": "#/$defs/typedWake"}
+      ]
+    },
+    "next_observation": {
+      "anyOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["at", "reason", "one_shot", "polling", "max_observations"],
+          "properties": {
+            "at": {"type": "string", "format": "date-time"},
+            "reason": {"enum": ["cost_budget", "transition_deadline"]},
+            "one_shot": {"const": true},
+            "polling": {"const": false},
+            "max_observations": {"const": 1}
+          }
+        }
+      ]
+    },
+    "causal_basis": {
+      "enum": [
+        "matching_lifecycle_transition",
+        "deadline_not_reached",
+        "observation_cost_exceeds_budget",
+        "deadline_elapsed_without_matching_lifecycle_transition"
+      ]
+    },
+    "claim_limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["external_canary", "goal_acceptance", "host_trust_admission"],
+      "properties": {
+        "external_canary": {"const": "not_claimed"},
+        "goal_acceptance": {"const": "not_claimed"},
+        "host_trust_admission": {"const": "separate_preserved"}
+      }
+    },
+    "unrelated_actors": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["preserved", "automatic_kill", "automatic_restart"],
+      "properties": {
+        "preserved": {"const": true},
+        "automatic_kill": {"const": false},
+        "automatic_restart": {"const": false}
+      }
+    },
+    "stop_line": {
+      "const": "Return a reviewed implementation and causal proof to the exact master; do not auto-kill, auto-restart, declare domain failure, accept the Goal, or disturb unrelated actors."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {"classification": {"const": "progressing"}}
+      },
+      "then": {
+        "properties": {
+          "transition_evidence": {
+            "properties": {
+              "matching_evidence_ids": {"minItems": 1}
+            }
+          },
+          "event": {"type": "null"},
+          "wake": {"type": "null"},
+          "next_observation": {"type": "null"},
+          "causal_basis": {"const": "matching_lifecycle_transition"}
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {"classification": {"const": "not_due"}}
+      },
+      "then": {
+        "properties": {
+          "transition_evidence": {
+            "properties": {
+              "matching_evidence_ids": {"maxItems": 0}
+            }
+          },
+          "event": {"type": "null"},
+          "wake": {"type": "null"},
+          "next_observation": {
+            "type": "object",
+            "required": ["reason"],
+            "properties": {"reason": {"const": "transition_deadline"}}
+          },
+          "causal_basis": {"const": "deadline_not_reached"}
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {"classification": {"const": "cost_deferred"}}
+      },
+      "then": {
+        "properties": {
+          "transition_evidence": {
+            "properties": {
+              "matching_evidence_ids": {"maxItems": 0}
+            }
+          },
+          "event": {"type": "null"},
+          "wake": {"type": "null"},
+          "next_observation": {
+            "type": "object",
+            "required": ["reason"],
+            "properties": {"reason": {"const": "cost_budget"}}
+          },
+          "causal_basis": {"const": "observation_cost_exceeds_budget"}
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {"classification": {"const": "stasis"}}
+      },
+      "then": {
+        "properties": {
+          "transition_evidence": {
+            "properties": {
+              "matching_evidence_ids": {"maxItems": 0}
+            }
+          },
+          "event": {"$ref": "#/$defs/stasisEvent"},
+          "wake": {"$ref": "#/$defs/typedWake"},
+          "next_observation": {"type": "null"},
+          "causal_basis": {
+            "const": "deadline_elapsed_without_matching_lifecycle_transition"
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "state": {
+      "type": "string",
+      "enum": [
+        "accepted",
+        "session_started",
+        "turn_started",
+        "progressing",
+        "waiting",
+        "returning",
+        "terminal"
+      ]
+    },
+    "ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["object_id", "owner_repo", "schema_version", "digest"],
+      "properties": {
+        "object_id": {"type": "string", "minLength": 1},
+        "owner_repo": {"type": "string", "minLength": 1},
+        "schema_version": {"type": "string", "minLength": 1},
+        "digest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "fileRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "digest"],
+      "properties": {
+        "path": {"type": "string", "pattern": "^/", "minLength": 2},
+        "digest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "transition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "from_state",
+        "expected_to_states",
+        "transition_started_at",
+        "due_at"
+      ],
+      "properties": {
+        "from_state": {"$ref": "#/$defs/state"},
+        "expected_to_states": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/state"}
+        },
+        "transition_started_at": {"type": "string", "format": "date-time"},
+        "due_at": {"type": "string", "format": "date-time"}
+      }
+    },
+    "stasisEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "event_id",
+        "event_digest",
+        "classification",
+        "reason",
+        "holder_ref",
+        "return_owner_ref",
+        "handoff_ref",
+        "observed_at",
+        "transition",
+        "evidence_summary",
+        "source_observation_digest",
+        "uncertainty",
+        "stop_line"
+      ],
+      "properties": {
+        "schema_version": {"const": "abyss_stack_external_codex_stasis_event_v1"},
+        "event_id": {"type": "string", "minLength": 1},
+        "event_digest": {"$ref": "#/$defs/digest"},
+        "classification": {"const": "stasis"},
+        "reason": {"const": "missing_transition"},
+        "holder_ref": {"$ref": "#/$defs/ref"},
+        "return_owner_ref": {"$ref": "#/$defs/ref"},
+        "handoff_ref": {"$ref": "#/$defs/fileRef"},
+        "observed_at": {"type": "string", "format": "date-time"},
+        "transition": {"$ref": "#/$defs/transition"},
+        "evidence_summary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kinds",
+            "matching_lifecycle_transition",
+            "process_existence_ignored",
+            "ignored_process_evidence_ids",
+            "hook_screen_match_used"
+          ],
+          "properties": {
+            "kinds": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+            "matching_lifecycle_transition": {"const": false},
+            "process_existence_ignored": {"type": "boolean"},
+            "ignored_process_evidence_ids": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {"type": "string", "minLength": 1}
+            },
+            "hook_screen_match_used": {"const": false}
+          }
+        },
+        "source_observation_digest": {"$ref": "#/$defs/digest"},
+        "uncertainty": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "stop_line": {
+          "const": "Return a reviewed implementation and causal proof to the exact master; do not auto-kill, auto-restart, declare domain failure, accept the Goal, or disturb unrelated actors."
+        }
+      }
+    },
+    "typedWake": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "wake_id",
+        "action",
+        "holder_ref",
+        "return_owner_ref",
+        "trigger_ref",
+        "handoff_ref",
+        "state_root",
+        "runtime_reentry",
+        "effects",
+        "stop_line"
+      ],
+      "properties": {
+        "schema_version": {"const": "abyss_stack_external_codex_typed_wake_v1"},
+        "wake_id": {"type": "string", "minLength": 1},
+        "action": {"const": "review_return_owner"},
+        "holder_ref": {"$ref": "#/$defs/ref"},
+        "return_owner_ref": {"$ref": "#/$defs/ref"},
+        "trigger_ref": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["event_id", "event_digest"],
+          "properties": {
+            "event_id": {"type": "string", "minLength": 1},
+            "event_digest": {"$ref": "#/$defs/digest"}
+          }
+        },
+        "handoff_ref": {"$ref": "#/$defs/fileRef"},
+        "state_root": {"type": "string", "pattern": "^/", "minLength": 2},
+        "runtime_reentry": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "transport",
+            "mode",
+            "app_server_resolution",
+            "requires_current_master_binding",
+            "requires_owner_review"
+          ],
+          "properties": {
+            "transport": {"const": "canonical-aoa-external-codex-return"},
+            "mode": {"const": "bound_return"},
+            "app_server_resolution": {
+              "const": "resolve-current-local-codex-app-server"
+            },
+            "requires_current_master_binding": {"const": true},
+            "requires_owner_review": {"const": true}
+          }
+        },
+        "effects": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "auto_kill",
+            "auto_restart",
+            "declare_domain_failure",
+            "accept_goal",
+            "disturb_unrelated_actors"
+          ],
+          "properties": {
+            "auto_kill": {"const": false},
+            "auto_restart": {"const": false},
+            "declare_domain_failure": {"const": false},
+            "accept_goal": {"const": false},
+            "disturb_unrelated_actors": {"const": false}
+          }
+        },
+        "stop_line": {
+          "const": "Return a reviewed implementation and causal proof to the exact master; do not auto-kill, auto-restart, declare domain failure, accept the Goal, or disturb unrelated actors."
+        }
+      }
+    }
+  }
+}

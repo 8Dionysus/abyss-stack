@@ -55,6 +55,7 @@
         "scripts/aoa-down",
         "scripts/aoa-external-actor-bind",
         "scripts/aoa-external-codex-agent",
+        "scripts/aoa-external-codex-stasis",
         "scripts/aoa-external-codex-incarnation",
         "scripts/aoa-export-artifact-hook-candidate",
         "scripts/aoa-export-memo-candidate",

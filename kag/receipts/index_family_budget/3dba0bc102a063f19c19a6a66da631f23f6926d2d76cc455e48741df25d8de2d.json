@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 29724512,
+  "allowed_tracked_bytes": 37698046,
+  "approved_by": "repository-owner",
+  "base_ref": "4113863137b2322830d3b5941b802a5db6fb136b",
+  "changed_generated_bytes": 29724512,
+  "changed_generated_files": 340,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "3dba0bc102a063f19c19a6a66da631f23f6926d2d76cc455e48741df25d8de2d",
+  "reason": "sha256:99d398ec8b9346c32acef06ce3f354a369e4bdb32f3acc06f3f5954e4c9b69d6 actor-stasis-detection: regenerate the complete owner portable family for candidate e6463e36d49aafaf11553feee21ac926e620094b after the generic responsibility-movement detector, robust current app-server resolver, runtime packaging, schemas, validators, tests, and causal proof were added; generated output remains derived and source-authority-neutral.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 37698046,
+  "tracked_bytes_max": 24117248
+}
