@@ -27,9 +27,6 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Callable, Sequence
 
-from jsonschema import Draft202012Validator
-
-
 SCHEMA_VERSION = "abyss_stack_external_codex_return_v1"
 RETURN_OWNER_SCHEMA_VERSION = "abyss_stack_external_codex_return_owner_v1"
 LEGACY_RETURN_OWNER_SCHEMA_VERSION = "task_local_external_actor_return_owner_v1"
@@ -86,6 +83,24 @@ def _visible_module() -> Any:
 VISIBLE = _visible_module()
 
 
+def _schema_validation_module() -> Any:
+    module_name = "_aoa_external_codex_schema_validation"
+    module = sys.modules.get(module_name)
+    if module is not None:
+        return module
+    path = Path(__file__).with_name("schema_validation.py")
+    spec = importlib.util.spec_from_file_location(module_name, path)
+    if spec is None or spec.loader is None:
+        raise ExternalCodexReturnError("cannot load local schema validator")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+SCHEMA_VALIDATION = _schema_validation_module()
+
+
 def _canonical_bytes(value: object) -> bytes:
     return json.dumps(
         value,
@@ -134,18 +149,15 @@ def _load_json_file(path: Path, label: str) -> tuple[dict[str, Any], bytes]:
 
 def _validate_pause_receipt_schema(receipt: dict[str, Any]) -> None:
     try:
-        schema = json.loads(PAUSE_RECEIPT_SCHEMA_PATH.read_text(encoding="utf-8"))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        schema = SCHEMA_VALIDATION.load_schema(PAUSE_RECEIPT_SCHEMA_PATH)
+        error = SCHEMA_VALIDATION.first_error(receipt, schema)
+    except SCHEMA_VALIDATION.SchemaValidationError as exc:
         raise ExternalCodexReturnError(
             "canonical Goal pause receipt schema cannot be loaded"
         ) from exc
-    errors = sorted(
-        Draft202012Validator(schema).iter_errors(receipt),
-        key=lambda error: error.json_path,
-    )
-    if errors:
+    if error is not None:
         raise ExternalCodexReturnError(
-            "canonical Goal pause receipt schema mismatch: " + errors[0].message
+            "canonical Goal pause receipt schema mismatch: " + error
         )
 
 

@@ -208,7 +208,8 @@
         "response_available": {"type": "boolean"},
         "transition_proof": {"$ref": "#/$defs/transition_proof"},
         "mutation_dispatched": {"$ref": "#/$defs/mutation_dispatched"}
-      }
+      },
+      "additionalProperties": false
     },
     "recovery": {"$ref": "#/$defs/recovery"},
     "actions": {

@@ -12,16 +12,15 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import json
 import os
 import re
+import sys
 import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Mapping
-
-from jsonschema import Draft202012Validator
-
 
 PART_ROOT = Path(__file__).resolve().parent
 SCHEMA_ROOT = PART_ROOT / "schemas"
@@ -69,6 +68,24 @@ class ResponsibilityMovementError(ValueError):
     """A malformed observation or an unsafe movement result."""
 
 
+def _schema_validation_module() -> Any:
+    module_name = "_aoa_external_codex_schema_validation"
+    module = sys.modules.get(module_name)
+    if module is not None:
+        return module
+    path = PART_ROOT / "schema_validation.py"
+    spec = importlib.util.spec_from_file_location(module_name, path)
+    if spec is None or spec.loader is None:
+        raise ResponsibilityMovementError("cannot load local schema validator")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+SCHEMA_VALIDATION = _schema_validation_module()
+
+
 _RFC3339_TIMESTAMP = re.compile(
     r"^(?:\d{4}-\d{2}-\d{2})T"
     r"(?:\d{2}:\d{2}:\d{2})(?:\.\d+)?"
@@ -95,17 +112,16 @@ def _digest(value: object) -> str:
 
 def _read_schema(path: Path) -> dict[str, Any]:
     try:
-        value = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        return SCHEMA_VALIDATION.load_schema(path)
+    except SCHEMA_VALIDATION.SchemaValidationError as exc:
         raise ResponsibilityMovementError(f"cannot read schema: {path}") from exc
-    if not isinstance(value, dict):
-        raise ResponsibilityMovementError(f"schema is not an object: {path}")
-    return value
 
 
 def _schema_errors(value: object, path: Path) -> list[str]:
-    validator = Draft202012Validator(_read_schema(path))
-    return [error.message for error in sorted(validator.iter_errors(value), key=str)]
+    try:
+        return SCHEMA_VALIDATION.errors(value, _read_schema(path))
+    except SCHEMA_VALIDATION.SchemaValidationError as exc:
+        raise ResponsibilityMovementError(f"cannot validate schema: {path}") from exc
 
 
 def _validate_schema(value: object, path: Path, label: str) -> None:
