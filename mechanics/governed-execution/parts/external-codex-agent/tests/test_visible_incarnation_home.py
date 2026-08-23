@@ -209,7 +209,7 @@ def test_capability_projection_denies_ambient_operator_control_by_default(
         assert entries[name]["grantable"] is False
         assert (Path(manifest["codex_home"]) / name).is_symlink()
     for name in ("app-server-control", "app-server-daemon", "hooks.json"):
-        assert entries[name]["capability_class"] == "unknown"
+        assert entries[name]["capability_class"] == "operator_control"
         assert entries[name]["projection"] == "denied"
         assert entries[name]["grantable"] is True
         assert not (Path(manifest["codex_home"]) / name).exists()
@@ -220,7 +220,52 @@ def test_capability_projection_denies_ambient_operator_control_by_default(
     assert manifest["capability_projection"]["explicit_grants"] == []
 
 
-def test_capability_projection_accepts_one_exact_grant_and_rejects_stale_grant(
+def test_capability_class_registry_is_authored_data_with_explicit_unknown(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    registry = json.loads(
+        (PART / MODULE.CAPABILITY_CLASS_REGISTRY_NAME).read_text(encoding="utf-8")
+    )
+    registry["classes"][0]["entries"].append("custom-continuity")
+    registry_path = tmp_path / MODULE.CAPABILITY_CLASS_REGISTRY_NAME
+    registry_path.write_text(json.dumps(registry), encoding="utf-8")
+    Draft202012Validator(
+        json.loads(
+            (PART / "schemas" / "external-codex-capability-classes.schema.json").read_text(
+                encoding="utf-8"
+            )
+        )
+    ).validate(registry)
+    monkeypatch.setattr(MODULE, "CAPABILITY_CLASS_REGISTRY_PATH", registry_path)
+
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    (ambient / "custom-continuity").mkdir()
+    (ambient / "future-capability").write_text("{}", encoding="utf-8")
+
+    manifest = MODULE.prepare_home(
+        ambient_home=ambient,
+        realization_path=_realization(tmp_path / "realization.json"),
+        runtime_root=runtime_root,
+    )
+    entries = {
+        str(entry["name"]): entry
+        for entry in manifest["capability_projection"]["entries"]
+    }
+    assert entries["custom-continuity"]["capability_class"] == "session_continuity"
+    assert entries["custom-continuity"]["projection"] == "shared_link"
+    assert entries["future-capability"]["capability_class"] == "unknown"
+    assert entries["future-capability"]["projection"] == "denied"
+    assert entries["future-capability"]["grantable"] is True
+    assert manifest["capability_projection"]["capability_class_registry"][
+        "path"
+    ] == str(registry_path)
+
+
+def test_capability_projection_reuses_subject_grant_without_binding_endpoint_bytes(
     tmp_path: Path,
 ) -> None:
     ambient = tmp_path / "ambient"
@@ -262,7 +307,22 @@ def test_capability_projection_accepts_one_exact_grant_and_rejects_stale_grant(
     assert granted_entry["capability_class"] == "operator_control"
     assert granted_entry["grantable"] is True
     assert granted_entry["grant_id"] == "grant:test/app-server-control"
-    MODULE._load_manifest(Path(manifest["codex_home"]).parent / "incarnation-home.json")
+    manifest_path = Path(manifest["codex_home"]).parent / "incarnation-home.json"
+    MODULE._load_manifest(manifest_path)
+
+    (ambient / "app-server-control" / "dynamic-state.json").write_text(
+        "changed-endpoint-state", encoding="utf-8"
+    )
+    MODULE._load_manifest(manifest_path)
+    second_manifest = MODULE.prepare_home(
+        ambient_home=ambient,
+        realization_path=realization,
+        runtime_root=runtime_root,
+        capability_grants=[grant],
+    )
+    assert second_manifest["capability_projection"]["explicit_grants"][0][
+        "grant_id"
+    ] == "grant:test/app-server-control"
 
     stale_payload = json.loads(grant.read_text(encoding="utf-8"))
     stale_payload["expires_at"] = "2000-01-01T00:00:00Z"
@@ -308,6 +368,7 @@ def test_capability_projection_rejects_replayed_grant_subject(
     [
         "external-codex-incarnation-home.schema.json",
         "external-codex-capability-grant.schema.json",
+        "external-codex-capability-classes.schema.json",
     ],
 )
 def test_capability_projection_schemas_are_valid_json(schema_name: str) -> None:

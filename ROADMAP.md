@@ -239,10 +239,12 @@ The current direction is:
 - Current posture:
   a source-local candidate binds exact Luna/Sol realizations to one SDK
   incarnation and launches a separate persistent Codex process for bounded
-  landing-oriented work. Its v2 incarnation home now projects session
-  continuity and actor tooling explicitly, denies unknown/ambient operator
-  state by default, and waits for the causal visible-terminal binding before
-  receipt publication. Fake-process fixtures prove transport, drift
+  landing-oriented work. Its v2 incarnation home now consumes an
+  owner-authored capability-class registry, projects session continuity and
+  actor tooling explicitly, denies unknown/ambient operator state by default,
+  and admits reusable subject-bound grants only through a bounded expiry
+  window. Mutable dynamic endpoint contents are not grant-bound. It waits for
+  the causal visible-terminal binding before receipt publication. Fake-process fixtures prove transport, drift
   containment, exact-thread resume, projection, and separately bound review;
   they do not prove model fit, installed activation, live protection, or
   deployment.

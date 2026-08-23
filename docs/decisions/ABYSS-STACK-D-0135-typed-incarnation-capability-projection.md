@@ -43,7 +43,8 @@ operator control and project it only when its capability ID/effect,
 ambient-home identity, model realization, incarnation coordinate, regular-file
 digest, and future expiry all match the current incarnation. The runtime
 validates the projection again when loading the manifest and preserves the
-grant path/digest as provenance and drift evidence.
+owner-authored capability-class registry plus grant path/digest as provenance
+and drift evidence.
 
 The visible holder retries the exact Kitty ancestry and dedicated-window
 identity handshake for a bounded interval before writing its non-replacing
@@ -53,12 +54,18 @@ converted into a successful launch by a parent-only timeout extension.
 ## Rationale
 
 Semantic classes preserve ordinary work while preventing ambient operator
-control from becoming an implicit external-incarnation authority. Deny-by-
-default unknown entries avoid a growing endpoint blacklist while exact grants
-provide a typed future extension point. Subject, digest, and expiry binding
-make copied, stale, or replayed grants fail closed. The causal wait repairs the observed race at the
-receipt publication seam, where the payload process is the only source that
-can bind its own exact holder identity through the installed wrapper.
+control from becoming an implicit external-incarnation authority. The
+owner-authored registry supplies the class meaning and leaves entries absent
+from it as explicit `unknown`, so adding a future capability family does not
+grow executable endpoint special cases. Deny-by-default unknown entries avoid
+implicit authority while exact grants provide a typed future extension point.
+The grant is intentionally reusable by its exact subject until expiry; subject,
+path, grant-artifact digest, and expiry binding make copied, stale, or mutated
+grant artifacts fail closed, but mutable bytes inside a dynamic operator
+endpoint are not target-content-bound. The causal wait repairs the observed
+race at the receipt publication seam, where the payload process is the only
+source that can bind its own exact holder identity through the installed
+wrapper.
 
 ## Consequences
 
@@ -75,7 +82,9 @@ can bind its own exact holder identity through the installed wrapper.
 ## Source surfaces
 
 - `mechanics/governed-execution/parts/external-codex-agent/visible_incarnation_home.py`
+- `mechanics/governed-execution/parts/external-codex-agent/capability-classes.v1.json`
 - `mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-incarnation-home.schema.json`
+- `mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-capability-classes.schema.json`
 - `mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-capability-grant.schema.json`
 - `mechanics/governed-execution/parts/external-codex-agent/tests/test_visible_incarnation_home.py`
 - `mechanics/governed-execution/parts/external-codex-agent/CONTRACT.md`

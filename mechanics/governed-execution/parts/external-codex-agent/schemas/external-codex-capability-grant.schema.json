@@ -1,7 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/8Dionysus/abyss-stack/main/mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-capability-grant.schema.json",
-  "title": "One owner-authored exact ambient capability projection grant",
+  "title": "One reusable owner-authored ambient capability projection grant",
+  "description": "A subject-bound grant is reusable until expires_at. It binds the capability identity, ambient path, and grant artifact bytes; it does not bind mutable target endpoint contents.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -37,6 +38,10 @@
         "incarnation_coordinate": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
       }
     },
-    "expires_at": {"type": "string", "minLength": 1}
+    "expires_at": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The end of the reusable authorization window."
+    }
   }
 }

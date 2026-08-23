@@ -57,10 +57,19 @@
     "capabilityProjection": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["schema_version", "default_policy", "entries", "explicit_grants"],
+      "required": [
+        "schema_version",
+        "default_policy",
+        "capability_class_registry",
+        "entries",
+        "explicit_grants"
+      ],
       "properties": {
         "schema_version": {"const": "abyss_stack_codex_capability_projection_v1"},
         "default_policy": {"const": "deny_ambient_operator_control"},
+        "capability_class_registry": {
+          "$ref": "#/$defs/capabilityClassRegistry"
+        },
         "entries": {
           "type": "array",
           "uniqueItems": true,
@@ -85,6 +94,18 @@
         "projection": {"enum": ["shared_link", "denied"]},
         "grantable": {"type": "boolean"},
         "grant_id": {"type": ["string", "null"]}
+      }
+    },
+    "capabilityClassRegistry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "schema_version"],
+      "properties": {
+        "path": {"$ref": "#/$defs/absolutePath"},
+        "sha256": {"$ref": "#/$defs/digest"},
+        "schema_version": {
+          "const": "abyss_stack_codex_capability_class_registry_v1"
+        }
       }
     },
     "grantProjection": {

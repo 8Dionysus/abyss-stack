@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/8Dionysus/abyss-stack/main/mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-capability-classes.schema.json",
+  "title": "Owner-authored external Codex capability-class registry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "schema_version", "classes", "unknown"],
+  "properties": {
+    "$schema": {
+      "const": "schemas/external-codex-capability-classes.schema.json"
+    },
+    "schema_version": {
+      "const": "abyss_stack_codex_capability_class_registry_v1"
+    },
+    "classes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/classDefinition"}
+    },
+    "unknown": {"$ref": "#/$defs/unknownDefinition"}
+  },
+  "$defs": {
+    "entryName": {
+      "type": "string",
+      "pattern": "^(?!\\.\\.?$)[^/]+$",
+      "minLength": 1
+    },
+    "classDefinition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["capability_class", "projection", "grantable", "entries"],
+      "properties": {
+        "capability_class": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "not": {"const": "unknown"}
+        },
+        "projection": {"enum": ["shared_link", "denied"]},
+        "grantable": {"type": "boolean"},
+        "entries": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/entryName"}
+        }
+      }
+    },
+    "unknownDefinition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["capability_class", "projection", "grantable"],
+      "properties": {
+        "capability_class": {"const": "unknown"},
+        "projection": {"const": "denied"},
+        "grantable": {"const": true}
+      }
+    }
+  }
+}

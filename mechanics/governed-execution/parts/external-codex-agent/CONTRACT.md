@@ -796,12 +796,23 @@ An `--capability-grant` input is an exact
 `schemas/external-codex-capability-grant.schema.json` owner artifact for one
 operator-control entry. Admission requires the typed capability ID and
 effect, an exact ambient-home identity, model realization ID, incarnation
-coordinate, regular-file digest, and future expiry; duplicate, stale,
-replayed, absent-entry, malformed, or mismatched grants fail closed. The
-resulting manifest stores the grant path and digest so refresh or mutation is
-detected. This is a runtime materialization and admission projection, not the
-semantic owner policy and not proof that the Codex app-server mutation itself
-enforces the grant.
+coordinate, regular-file digest, and future expiry; duplicate-within-one-
+projection, stale, absent-entry, malformed, or mismatched grants fail closed.
+The grant is intentionally reusable by its exact subject until `expires_at`;
+this source slice has no stateful single-use or replay ledger. The grant binds
+the capability identity, ambient path, and grant artifact bytes. It does not
+bind mutable bytes inside a dynamic operator endpoint, so endpoint contents
+may change while the grant artifact, path, subject, and expiry remain valid.
+The resulting manifest stores the grant path and digest so grant-artifact
+refresh or mutation is detected. This is a runtime materialization and
+admission projection, not the semantic owner policy and not proof that the
+Codex app-server mutation itself enforces the grant.
+
+The capability meaning consumed by the classifier is authored in
+`capability-classes.v1.json`, with an exact schema and digest recorded in the
+projection. Entries absent from that registry resolve to an explicit
+`unknown`/denied/grantable result; adding a future capability family therefore
+does not require executable endpoint special cases.
 
 ## Lifecycle and usage metering
 

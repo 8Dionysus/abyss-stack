@@ -1,9 +1,9 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
   "decision_count": 135,
-  "edge_count": 3032,
+  "edge_count": 3034,
   "edge_type_counts": {
-    "CITES_SOURCE_SURFACE": 1102,
+    "CITES_SOURCE_SURFACE": 1104,
     "DATED": 135,
     "GUARDED_BY": 417,
     "HAS_STATUS": 135,
@@ -14418,6 +14418,16 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0135",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/capability-classes.v1.json",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0135",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-capability-classes.schema.json",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0135",
       "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-capability-grant.schema.json",
       "type": "CITES_SOURCE_SURFACE"
     },
@@ -15178,7 +15188,7 @@
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 1312,
+  "node_count": 1314,
   "node_type_counts": {
     "date": 44,
     "decision": 135,
@@ -15186,7 +15196,7 @@
     "mechanic_parent": 11,
     "owner_surface": 68,
     "repo": 1,
-    "source_surface": 621,
+    "source_surface": 623,
     "stack_lane": 51,
     "status": 4,
     "surface_class": 150
@@ -20209,6 +20219,11 @@
       "type": "source_surface"
     },
     {
+      "id": "source_surface:mechanics/governed-execution/parts/external-codex-agent/capability-classes.v1.json",
+      "label": "mechanics/governed-execution/parts/external-codex-agent/capability-classes.v1.json",
+      "type": "source_surface"
+    },
+    {
       "id": "source_surface:mechanics/governed-execution/parts/external-codex-agent/external_codex_agent.py",
       "label": "mechanics/governed-execution/parts/external-codex-agent/external_codex_agent.py",
       "type": "source_surface"
@@ -20251,6 +20266,11 @@
     {
       "id": "source_surface:mechanics/governed-execution/parts/external-codex-agent/schemas/external-actor-launch-manifest.schema.json",
       "label": "mechanics/governed-execution/parts/external-codex-agent/schemas/external-actor-launch-manifest.schema.json",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-capability-classes.schema.json",
+      "label": "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-capability-classes.schema.json",
       "type": "source_surface"
     },
     {

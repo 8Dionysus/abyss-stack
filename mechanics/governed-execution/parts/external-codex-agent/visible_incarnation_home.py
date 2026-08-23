@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Prepare and enter a Codex home whose default follows one incarnation.
+"""Prepare and enter a projected Codex home for one incarnation.
 
-The operator-visible Codex process keeps the ambient user home so existing
-sessions and hook trust retain their identity.  Its shell children receive the
-incarnation home through Codex's shell environment policy; a plain nested
-``codex exec`` therefore keeps the selected model and reasoning effort.
+The operator-visible Codex process and its shell children use the dedicated
+incarnation home through Codex's shell environment policy.  Auth/session
+continuity and actor tooling enter through the owner-authored capability-class
+registry; ambient operator-control and unknown entries remain denied unless a
+subject-bound explicit grant projects one entry.
 """
 
 from __future__ import annotations
@@ -36,6 +37,13 @@ CAPABILITY_PROJECTION_SCHEMA_VERSION = (
     "abyss_stack_codex_capability_projection_v1"
 )
 CAPABILITY_GRANT_SCHEMA_VERSION = "abyss_stack_codex_capability_grant_v1"
+CAPABILITY_CLASS_REGISTRY_SCHEMA_VERSION = (
+    "abyss_stack_codex_capability_class_registry_v1"
+)
+CAPABILITY_CLASS_REGISTRY_NAME = "capability-classes.v1.json"
+CAPABILITY_CLASS_REGISTRY_PATH = Path(__file__).resolve().with_name(
+    CAPABILITY_CLASS_REGISTRY_NAME
+)
 HOLDER_RECEIPT_SCHEMA_VERSION = "abyss_stack_visible_incarnation_holder_terminal_v1"
 TERMINAL_JOIN_SCHEMA_VERSION = "abyss_stack_visible_incarnation_terminal_join_v1"
 CLOSURE_AUTHORIZATION_SCHEMA_VERSION = (
@@ -85,21 +93,6 @@ SAFE_PROJECTION_FORBIDDEN_KEYS = frozenset(
 LOCAL_NAMES = frozenset(
     {"config.toml", "cache", "log", "tmp", DESCENDANT_BIN_NAME}
 )
-SESSION_CONTINUITY_NAMES = frozenset(
-    {
-        "archived_sessions",
-        "attachments",
-        "auth.json",
-        "history.jsonl",
-        "memories",
-        "memories_1.sqlite",
-        "memories_1.sqlite-shm",
-        "memories_1.sqlite-wal",
-        "session_index.jsonl",
-        "sessions",
-    }
-)
-ACTOR_TOOLING_NAMES = frozenset({"skills"})
 ROOT_KEY_LINE = re.compile(
     r"^\s*(?P<key>model|model_reasoning_effort|\"model\"|\"model_reasoning_effort\")\s*="
 )
@@ -352,14 +345,105 @@ def _ambient_home_identity(ambient_home: Path) -> str:
     )
 
 
-def _ambient_capability_class(name: str) -> str:
-    """Classify one ambient entry by semantic role, not by endpoint name."""
+def _load_capability_class_registry() -> tuple[
+    dict[str, str], dict[str, dict[str, Any]], dict[str, Any]
+]:
+    """Load the authored capability meaning and retain its exact source digest."""
 
-    if name in SESSION_CONTINUITY_NAMES:
-        return "session_continuity"
-    if name in ACTOR_TOOLING_NAMES:
-        return "actor_tooling"
-    return "unknown"
+    path = _regular_file(
+        CAPABILITY_CLASS_REGISTRY_PATH, "capability-class registry"
+    )
+    value, raw = _load_json_snapshot(path, "capability-class registry")
+    required = {"$schema", "schema_version", "classes", "unknown"}
+    if set(value) != required:
+        raise IncarnationHomeError("capability-class registry fields are not exact")
+    if value.get("$schema") != "schemas/external-codex-capability-classes.schema.json":
+        raise IncarnationHomeError("capability-class registry schema binding is invalid")
+    if value.get("schema_version") != CAPABILITY_CLASS_REGISTRY_SCHEMA_VERSION:
+        raise IncarnationHomeError("unsupported capability-class registry schema")
+    classes = value.get("classes")
+    if not isinstance(classes, list) or not classes:
+        raise IncarnationHomeError("capability-class registry classes are invalid")
+
+    definitions: dict[str, dict[str, Any]] = {}
+    class_ids: set[str] = set()
+    for definition in classes:
+        if not isinstance(definition, dict) or set(definition) != {
+            "capability_class",
+            "projection",
+            "grantable",
+            "entries",
+        }:
+            raise IncarnationHomeError(
+                "capability-class registry definition is not exact"
+            )
+        capability_class = definition.get("capability_class")
+        projection = definition.get("projection")
+        grantable = definition.get("grantable")
+        entries = definition.get("entries")
+        if (
+            not isinstance(capability_class, str)
+            or not capability_class
+            or capability_class == "unknown"
+            or capability_class in class_ids
+            or projection not in {"shared_link", "denied"}
+            or not isinstance(grantable, bool)
+            or not isinstance(entries, list)
+            or not all(isinstance(name, str) for name in entries)
+            or len(set(entries)) != len(entries)
+        ):
+            raise IncarnationHomeError(
+                "capability-class registry definition is invalid"
+            )
+        class_ids.add(capability_class)
+        for name in entries:
+            if (
+                not isinstance(name, str)
+                or not name
+                or name in {".", ".."}
+                or name in LOCAL_NAMES
+                or Path(name).name != name
+                or name in definitions
+            ):
+                raise IncarnationHomeError(
+                    "capability-class registry entry is invalid"
+                )
+            definitions[name] = {
+                "capability_class": capability_class,
+                "projection": projection,
+                "grantable": grantable,
+            }
+
+    unknown = value.get("unknown")
+    if not isinstance(unknown, dict) or set(unknown) != {
+        "capability_class",
+        "projection",
+        "grantable",
+    }:
+        raise IncarnationHomeError("capability-class registry unknown is invalid")
+    if (
+        unknown.get("capability_class") != "unknown"
+        or unknown.get("projection") != "denied"
+        or unknown.get("grantable") is not True
+    ):
+        raise IncarnationHomeError("capability-class registry unknown is not deny-by-default")
+    metadata = {
+        "path": str(path),
+        "sha256": sha256_bytes(raw),
+        "schema_version": str(value["schema_version"]),
+    }
+    return metadata, definitions, dict(unknown)
+
+
+def _classify_ambient_entry(
+    name: str,
+    *,
+    definitions: dict[str, dict[str, Any]],
+    unknown: dict[str, Any],
+) -> dict[str, Any]:
+    """Resolve one entry through authored data, with an explicit unknown result."""
+
+    return dict(definitions.get(name, unknown))
 
 
 def _capability_grant_projection(
@@ -369,7 +453,7 @@ def _capability_grant_projection(
     model_realization_id: str,
     incarnation_coordinate: str,
 ) -> tuple[dict[str, Any], bytes]:
-    """Validate one owner-authored, exact-entry projection grant."""
+    """Validate one reusable, subject-bound exact-entry projection grant."""
 
     path = _regular_file(grant_path, "capability grant")
     value, raw = _load_json_snapshot(path, "capability grant")
@@ -451,8 +535,9 @@ def _build_capability_projection(
     incarnation_coordinate: str,
     capability_grants: Sequence[Path] = (),
 ) -> dict[str, Any]:
-    """Build the typed home projection; ambient operator state is denied by default."""
+    """Build the typed home projection; unknown entries are denied by default."""
 
+    registry, definitions, unknown = _load_capability_class_registry()
     grants: list[dict[str, Any]] = []
     grants_by_entry: dict[str, dict[str, Any]] = {}
     grant_ids: set[str] = set()
@@ -478,27 +563,27 @@ def _build_capability_projection(
             raise IncarnationHomeError(
                 f"ambient capability entry may not be a symlink: {source}"
             )
-        capability_class = _ambient_capability_class(source.name)
+        classification = _classify_ambient_entry(
+            source.name,
+            definitions=definitions,
+            unknown=unknown,
+        )
         grant = grants_by_entry.get(source.name)
-        if grant is not None and capability_class in {
-            "session_continuity",
-            "actor_tooling",
-        }:
+        if grant is not None and not classification["grantable"]:
             raise IncarnationHomeError(
-                "capability grant targets a non-operator capability entry"
+                "capability grant targets a non-grantable capability entry"
             )
-        projected = grant is not None or capability_class in {
-            "session_continuity",
-            "actor_tooling",
-        }
+        projected = grant is not None or classification["projection"] == "shared_link"
         entries.append(
             {
                 "name": source.name,
                 "capability_class": (
-                    "operator_control" if grant is not None else capability_class
+                    "operator_control"
+                    if grant is not None
+                    else classification["capability_class"]
                 ),
                 "projection": "shared_link" if projected else "denied",
-                "grantable": capability_class == "unknown",
+                "grantable": classification["grantable"],
                 "grant_id": None if grant is None else grant["grant_id"],
             }
         )
@@ -512,6 +597,7 @@ def _build_capability_projection(
     return {
         "schema_version": CAPABILITY_PROJECTION_SCHEMA_VERSION,
         "default_policy": "deny_ambient_operator_control",
+        "capability_class_registry": registry,
         "entries": entries,
         "explicit_grants": grants,
     }

@@ -106,14 +106,16 @@ and replay only through their matching legacy wake reservation. A retry after a 
   distinct from any nested proof actor. This operator surface is not A2A transport and
   does not replace the governed JSONL runtime;
 - records the v2 incarnation-home manifest as a model-neutral capability
-  projection. Session continuity and actor tooling entries remain available by
-  default, while ambient operator-control entries and unknown entries are
-  denied rather than admitted by an endpoint blacklist. An owner-authored
-  `external-codex-capability-grant.schema.json` grant may project exactly one
-  operator-control entry only when its capability ID, ambient-home identity,
-  model realization, incarnation coordinate, digest, and expiry match. This
-  projection controls runtime materialization; it is not itself an
-  app-server mutation gate or owner-acceptance proof;
+  projection. The owner-authored `capability-classes.v1.json` registry supplies
+  session-continuity, actor-tooling, and known operator-control meanings;
+  entries absent from it resolve explicitly to `unknown` and remain denied.
+  An owner-authored `external-codex-capability-grant.schema.json` grant may
+  project exactly one operator-control entry only when its capability ID,
+  ambient-home identity, model realization, incarnation coordinate, grant
+  artifact digest, and expiry match. The exact subject may reuse that grant
+  until expiry; dynamic endpoint contents are not target-content-bound. This
+  projection controls runtime materialization; it is not itself an app-server
+  mutation gate or owner-acceptance proof;
 - exposes the installed `aoa-external-codex-return` leaf for the final external
   return contour. The leaf receives an explicit return-owner binding and exact
   handoff/holder paths, uses a connectable local Codex app-server as a

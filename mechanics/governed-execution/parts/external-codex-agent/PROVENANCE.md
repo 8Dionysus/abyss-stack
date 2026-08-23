@@ -15,6 +15,16 @@ meaning into `abyss-stack`:
 | canonical result schema and session-local identity-bound derivative | `abyss-stack` | constrain the model-authored report shape and mechanically bind exact task/incarnation IDs |
 | runtime state/events/result and final workspace manifest | `abyss-stack` | record what process and thread actually ran, what bytes remained, and what it returned |
 
+The incarnation-home classifier consumes the checked-in
+`capability-classes.v1.json` data surface rather than encoding endpoint names
+in executable code. That registry is a runtime-owner projection of admitted
+capability meaning: entries absent from it resolve to explicit `unknown`,
+deny-by-default, and grantable status. The registry path and bytes are
+digest-bound in the generated projection, while a reusable grant separately
+binds the capability identity, ambient path, subject, grant artifact bytes,
+and expiry window. Mutable contents inside a dynamic target endpoint are not
+promoted into grant authority.
+
 For a visible responsibility holder, terminal lifecycle evidence is also
 runtime-owned. A `join_completed` or `wake_delivered` authorization binds the
 returned handoff, exact holder receipt, closure path, process identities, and
