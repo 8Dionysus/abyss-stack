@@ -748,6 +748,28 @@ def test_run_pause_reserves_and_replays_without_second_transport_mutation(
     ):
         MODULE.run_pause(args)
 
+    undeclared_lifecycle_claim = json.loads(json.dumps(first))
+    undeclared_lifecycle_claim["lifecycle"]["holder_closed"] = True
+    pause_path.write_bytes(
+        MODULE._canonical_bytes(undeclared_lifecycle_claim) + b"\n"
+    )
+    with pytest.raises(
+        MODULE.ExternalCodexReturnError,
+        match="schema mismatch",
+    ):
+        MODULE.run_pause(args)
+
+    undeclared_observed_claim = json.loads(json.dumps(first))
+    undeclared_observed_claim["observed"]["holder_closed"] = True
+    pause_path.write_bytes(
+        MODULE._canonical_bytes(undeclared_observed_claim) + b"\n"
+    )
+    with pytest.raises(
+        MODULE.ExternalCodexReturnError,
+        match="schema mismatch",
+    ):
+        MODULE.run_pause(args)
+
     undeclared_top_level_claim = json.loads(json.dumps(first))
     undeclared_top_level_claim["holder_closed"] = True
     pause_path.write_bytes(
@@ -840,6 +862,7 @@ def test_run_pause_reconciles_reserved_mutation_after_receipt_publication_failur
     assert reserved["state"] == "reserved"
     assert reserved["precondition"]["goal_status"] == "active"
     assert reserved["mutation_dispatched"]["method"] == "thread/goal/set"
+    assert isinstance(reserved["goal_response"], dict)
     assert "mutation_reserved" not in reserved
     assert len([method for method, _params in fake.calls if method == "thread/goal/set"]) == 1
 
@@ -864,6 +887,48 @@ def test_run_pause_reconciles_reserved_mutation_after_receipt_publication_failur
     ):
         MODULE.run_pause(args)
     assert len([method for method, _params in fake.calls if method == "thread/goal/set"]) == 1
+
+    monkeypatch.setattr(
+        MODULE,
+        "discover_app_server_socket",
+        lambda _owner: (endpoint, "explicit-endpoint"),
+    )
+
+    tampered_proof = json.loads(json.dumps(reserved))
+    tampered_proof["transition_proof"]["goal_response_sha256"] = "sha256:" + "0" * 64
+    pause_path.write_bytes(MODULE._canonical_bytes(tampered_proof) + b"\n")
+    with pytest.raises(
+        MODULE.ExternalCodexReturnError,
+        match="not bound",
+    ):
+        MODULE.run_pause(args)
+
+    missing_goal_response = json.loads(json.dumps(reserved))
+    missing_goal_response.pop("goal_response")
+    pause_path.write_bytes(
+        MODULE._canonical_bytes(missing_goal_response) + b"\n"
+    )
+    with pytest.raises(
+        MODULE.ExternalCodexReturnError,
+        match="schema mismatch",
+    ):
+        MODULE.run_pause(args)
+
+    contradictory_markers = json.loads(json.dumps(reserved))
+    contradictory_markers["mutation_reserved"] = {
+        **contradictory_markers["mutation_dispatched"],
+        "reserved_at": contradictory_markers["mutation_dispatched"]["issued_at"],
+    }
+    pause_path.write_bytes(
+        MODULE._canonical_bytes(contradictory_markers) + b"\n"
+    )
+    with pytest.raises(
+        MODULE.ExternalCodexReturnError,
+        match="schema mismatch",
+    ):
+        MODULE.run_pause(args)
+
+    pause_path.write_bytes(MODULE._canonical_bytes(reserved) + b"\n")
 
     monkeypatch.setattr(
         MODULE,

@@ -43,6 +43,11 @@ PAUSE_TRANSITION_PROOF_SCHEMA_VERSION = (
 PAUSE_RECEIPT_SCHEMA_PATH = (
     Path(__file__).resolve().parent / "schemas" / "external-codex-pause-receipt.schema.json"
 )
+PAUSE_RESERVATION_SCHEMA_PATH = (
+    Path(__file__).resolve().parent
+    / "schemas"
+    / "external-codex-pause-reservation.schema.json"
+)
 WEBSOCKET_ACCEPT_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 DEFAULT_TIMEOUT_SECONDS = 10.0
 APP_SERVER_DISCOVERY_PROBE_TIMEOUT_SECONDS = 1.0
@@ -158,6 +163,20 @@ def _validate_pause_receipt_schema(receipt: dict[str, Any]) -> None:
     if error is not None:
         raise ExternalCodexReturnError(
             "canonical Goal pause receipt schema mismatch: " + error
+        )
+
+
+def _validate_pause_reservation_schema(reservation: dict[str, Any]) -> None:
+    try:
+        schema = SCHEMA_VALIDATION.load_schema(PAUSE_RESERVATION_SCHEMA_PATH)
+        error = SCHEMA_VALIDATION.first_error(reservation, schema)
+    except SCHEMA_VALIDATION.SchemaValidationError as exc:
+        raise ExternalCodexReturnError(
+            "canonical Goal pause reservation schema cannot be loaded"
+        ) from exc
+    if error is not None:
+        raise ExternalCodexReturnError(
+            "canonical Goal pause reservation schema mismatch: " + error
         )
 
 
@@ -1136,6 +1155,7 @@ def _validated_pause_transition_proof(
     precondition: dict[str, Any],
     mutation: dict[str, Any],
     goal_response: dict[str, Any] | None = None,
+    expected_response_digest: object | None = None,
 ) -> dict[str, Any]:
     """Validate server evidence that the pause was an atomic transition."""
 
@@ -1155,11 +1175,12 @@ def _validated_pause_transition_proof(
         raise ExternalCodexReturnError(
             "Codex app-server pause response lacks an exact atomic transition proof"
         )
-    expected_response_digest = (
-        _sha256_bytes(_canonical_bytes(goal_response))
-        if goal_response is not None
-        else proof.get("goal_response_sha256")
-    )
+    if goal_response is not None:
+        expected_response_digest = _sha256_bytes(_canonical_bytes(goal_response))
+    elif not _is_sha256_digest(expected_response_digest):
+        raise ExternalCodexReturnError(
+            "Codex app-server pause transition proof lacks a verifiable Goal response"
+        )
     if (
         proof.get("schema_version") != PAUSE_TRANSITION_PROOF_SCHEMA_VERSION
         or proof.get("kind") != "server_compare_and_set"
@@ -1342,11 +1363,17 @@ def pause_goal(
                 owner=owner,
                 attempt_id=reservation.get("attempt_id"),
             )
+            durable_goal_response = reservation.get("goal_response")
+            if not isinstance(durable_goal_response, dict):
+                raise ExternalCodexReturnError(
+                    "reserved Goal pause lacks a durable mutation Goal response"
+                )
             transition_proof = _validated_pause_transition_proof(
                 reservation.get("transition_proof"),
                 owner=owner,
                 precondition=precondition,
                 mutation=mutation_dispatched,
+                goal_response=durable_goal_response,
             )
             return _pause_receipt(
                 owner=owner,
@@ -1356,7 +1383,7 @@ def pause_goal(
                 endpoint=endpoint,
                 initialize=initialize,
                 goal_get_response=goal_get_response,
-                goal_response=goal_get_response,
+                goal_response=durable_goal_response,
                 before_status="active",
                 goal_status="paused",
                 identity_source=goal_identity_source,
@@ -1546,7 +1573,11 @@ def pause_goal(
                 "Codex app-server did not confirm a paused Goal: "
                 f"{goal_status!r}"
             )
-        proof_reservation = {**reservation, "transition_proof": transition_proof}
+        proof_reservation = {
+            **reservation,
+            "goal_response": goal_response,
+            "transition_proof": transition_proof,
+        }
         _replace_json(
             reservation_path,
             proof_reservation,
@@ -2207,6 +2238,7 @@ def _pause_reservation(
             raise ExternalCodexReturnError(
                 "canonical Goal pause receipt is not canonically encoded"
             )
+        _validate_pause_reservation_schema(value)
         if value.get("schema_version") != PAUSE_RESERVATION_SCHEMA_VERSION:
             raise ExternalCodexReturnError(
                 "canonical Goal pause reservation schema mismatch"
@@ -2228,6 +2260,7 @@ def _pause_reservation(
         "attempt_id": secrets.token_hex(16),
         **binding,
     }
+    _validate_pause_reservation_schema(reservation)
     _write_new_json(path, reservation, "canonical Goal pause receipt reservation")
     return reservation
 
@@ -2348,6 +2381,7 @@ def _validate_pause_receipt(
         or not isinstance(lifecycle.get("goal_get"), dict)
         or not isinstance(lifecycle.get("goal"), dict)
         or not _is_sha256_digest(lifecycle.get("goal_summary_sha256"))
+        or not _is_sha256_digest(lifecycle.get("goal_response_sha256"))
         or (
             lifecycle.get("response_available") is False
             and recovery is None
@@ -2425,10 +2459,11 @@ def _validate_pause_receipt(
         owner=owner,
         precondition=precondition,
         mutation=mutation_dispatched,
+        expected_response_digest=lifecycle.get("goal_response_sha256"),
     )
-    if recovery is None and validated_proof.get(
+    if validated_proof.get("goal_response_sha256") != lifecycle.get(
         "goal_response_sha256"
-    ) != lifecycle.get("goal_response_sha256"):
+    ):
         raise ExternalCodexReturnError(
             "canonical Goal pause transition proof does not match its response"
         )

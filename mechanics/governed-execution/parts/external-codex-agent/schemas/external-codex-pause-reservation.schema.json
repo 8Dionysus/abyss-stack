@@ -148,6 +148,7 @@
     "prepared_at": {"type": "string", "minLength": 1},
     "precondition": {"$ref": "#/$defs/precondition"},
     "transport": {"$ref": "#/$defs/transport"},
+    "goal_response": {"type": "object"},
     "mutation_reserved": {"$ref": "#/$defs/mutation_reserved"},
     "mutation_dispatched": {"$ref": "#/$defs/mutation_dispatched"},
     "transition_proof": {"$ref": "#/$defs/transition_proof"}
@@ -169,6 +170,12 @@
       "then": {
         "required": ["prepared_at", "precondition", "transport"],
         "not": {"required": ["mutation_reserved"]}
+      }
+    },
+    {
+      "if": {"required": ["transition_proof"]},
+      "then": {
+        "required": ["goal_response"]
       }
     }
   ],
