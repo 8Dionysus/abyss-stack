@@ -1350,6 +1350,57 @@ def test_stale_tokened_preparer_is_recovered_before_retry(tmp_path: Path) -> Non
     assert not (Path(manifest["codex_home"]).parent / MODULE.PREPARATION_OWNER_FILE_NAME).exists()
 
 
+def test_owner_cleanup_rejects_token_replacement_before_unlink(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    realization_root = tmp_path / "realization-root"
+    incarnation_root = tmp_path / "incarnation-root"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    realization_root.mkdir()
+    incarnation_root.mkdir()
+    owner = MODULE._preparation_owner_record(
+        ambient_home=ambient,
+        runtime_root=runtime_root,
+        realization_root=realization_root,
+        incarnation_root=incarnation_root,
+        coordinate="sha256:" + "1" * 64,
+        holder_coordinate=None,
+    )
+    owner_path = incarnation_root / MODULE.PREPARATION_OWNER_FILE_NAME
+    MODULE._write_new_json(
+        owner_path,
+        owner,
+        "fixture preparation owner token",
+    )
+    published_path = incarnation_root / "incarnation-home.json"
+    published_path.write_bytes(b"published-marker")
+    original_read = MODULE._read_descriptor_bytes
+    replaced = False
+
+    def replace_after_read(descriptor: int, label: str) -> bytes:
+        nonlocal replaced
+        raw = original_read(descriptor, label)
+        if label == str(owner_path) and not replaced:
+            replaced = True
+            owner_path.unlink()
+            published_path.rename(owner_path)
+        return raw
+
+    monkeypatch.setattr(MODULE, "_read_descriptor_bytes", replace_after_read)
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="owner token changed before publication cleanup",
+    ):
+        MODULE._finish_preparation_owner(owner)
+
+    assert replaced
+    assert owner_path.read_bytes() == b"published-marker"
+    assert not published_path.exists()
+
+
 def test_stale_recovery_rejects_root_replacement_before_delete(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -2509,6 +2560,42 @@ def test_rebind_receipt_binds_holder_environment_and_manifest_snapshot(
     monkeypatch.setattr(MODULE, "_proc_argv", lambda _pid: holder_argv)
     monkeypatch.setattr(MODULE, "_proc_exe_digest", lambda _pid: executable_digest)
 
+    original_write_new_json = MODULE._write_new_json
+
+    def fail_replacement_receipt(
+        path: Path,
+        value: dict[str, object],
+        label: str,
+        *,
+        ambient_identities: set[tuple[int, int]] | None = None,
+    ) -> None:
+        if label == "replacement holder terminal receipt":
+            raise MODULE.IncarnationHomeError("synthetic receipt publication failure")
+        original_write_new_json(
+            path,
+            value,
+            label,
+            ambient_identities=ambient_identities,
+        )
+
+    monkeypatch.setattr(MODULE, "_write_new_json", fail_replacement_receipt)
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="synthetic receipt publication failure",
+    ):
+        MODULE._rebind_replacement_holder_receipt(
+            receipt_path=output_path,
+            holder_loss_reentry_path=reentry_path,
+            binding_context_path=context_path,
+            manifest_path=manifest_path,
+            codex_executable_path=executable,
+        )
+    assert not output_path.exists()
+    claim_path = manifest_path.parent / MODULE.HOLDER_CLAIM_FILE_NAME
+    claim = json.loads(claim_path.read_text(encoding="utf-8"))
+    assert claim["holder_receipt"] == str(original_receipt_path.resolve())
+
+    monkeypatch.setattr(MODULE, "_write_new_json", original_write_new_json)
     receipt = MODULE._rebind_replacement_holder_receipt(
         receipt_path=output_path,
         holder_loss_reentry_path=reentry_path,
@@ -2524,9 +2611,18 @@ def test_rebind_receipt_binds_holder_environment_and_manifest_snapshot(
         receipt["runtime"]["incarnation_manifest_snapshot_b64"]
     ) == manifest_path.read_bytes()
     assert json.loads(output_path.read_text(encoding="utf-8")) == receipt
-    claim_path = manifest_path.parent / MODULE.HOLDER_CLAIM_FILE_NAME
     claim = json.loads(claim_path.read_text(encoding="utf-8"))
     assert claim["holder_receipt"] == str(output_path.resolve())
+
+    retry = MODULE._rebind_replacement_holder_receipt(
+        receipt_path=output_path,
+        holder_loss_reentry_path=reentry_path,
+        binding_context_path=context_path,
+        manifest_path=manifest_path,
+        codex_executable_path=executable,
+    )
+    assert retry == receipt
+    assert json.loads(output_path.read_text(encoding="utf-8")) == receipt
     with pytest.raises(
         MODULE.IncarnationHomeError,
         match="holder-claimed incarnation home is frozen against re-preparation",

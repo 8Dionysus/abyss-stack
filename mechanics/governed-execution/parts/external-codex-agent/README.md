@@ -157,7 +157,9 @@ route only for a marked older v2 home. Every v2 manifest—including one with
 typed holder data or denied-state provenance—is rejected by canonical launch
 until preparation rewrites it as v3. Every first preparation is serialized by
   the runtime-owned preparation lock and claims an unpublished root with an
-  exact owner token;
+  exact owner token; owner-token retirement retains and revalidates that
+  descriptor before unlinking, and rebind restores a superseded claim if
+  replacement-receipt publication fails.
 - exposes the installed `aoa-external-codex-return` leaf for the final external
   return contour. The leaf receives an explicit return-owner binding and exact
   handoff/holder paths, uses a connectable local Codex app-server as a

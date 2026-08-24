@@ -96,8 +96,13 @@ the runtime snapshot loader for both v3 and legacy-v2 snapshots; pre-snapshot
 compatibility receipts remain readable without that conditional field. Rebind
 reserves the same holder claim under the preparation lock before publishing a
 replacement receipt; if canonical launch already claimed the home, rebind
-transfers the receipt binding from the superseded receipt under that lock, and
-an exact-claim retry remains idempotent.
+transfers the receipt binding from the superseded receipt under that lock. It
+accepts an existing output only when it is the same complete canonical receipt
+apart from creation time, and restores the exact prior claim bytes through a
+validated descriptor if receipt publication fails. Owner-token cleanup likewise
+revalidates its retained descriptor before unlinking, so a same-name
+replacement cannot delete a newly published marker. An exact-claim retry
+remains idempotent.
 
 ## Rationale
 

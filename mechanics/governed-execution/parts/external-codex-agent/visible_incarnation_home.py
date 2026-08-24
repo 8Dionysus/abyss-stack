@@ -1369,7 +1369,7 @@ def _write_descriptor_exact(
         raise IncarnationHomeError(f"cannot write admitted file: {label}") from exc
 
 
-def _revalidate_writable_regular_file_at(
+def _revalidate_regular_file_at(
     parent_fd: int,
     name: str,
     descriptor: int,
@@ -1378,7 +1378,7 @@ def _revalidate_writable_regular_file_at(
     label: str,
     ambient_identities: set[tuple[int, int]],
 ) -> None:
-    """Recheck a writable descriptor immediately before its first effect."""
+    """Recheck a retained regular-file descriptor before a name-based effect."""
 
     try:
         opened = os.fstat(descriptor)
@@ -1395,6 +1395,27 @@ def _revalidate_writable_regular_file_at(
         or (opened.st_dev, opened.st_ino) in ambient_identities
     ):
         raise IncarnationHomeError(f"{label} changed before mutation")
+
+
+def _revalidate_writable_regular_file_at(
+    parent_fd: int,
+    name: str,
+    descriptor: int,
+    initial: os.stat_result,
+    *,
+    label: str,
+    ambient_identities: set[tuple[int, int]],
+) -> None:
+    """Recheck a writable descriptor immediately before its first effect."""
+
+    _revalidate_regular_file_at(
+        parent_fd,
+        name,
+        descriptor,
+        initial,
+        label=label,
+        ambient_identities=ambient_identities,
+    )
 
 
 def _publish_unnameable_file_at(
@@ -2891,8 +2912,10 @@ def _write_atomic_json(
     label: str,
     *,
     replace: bool,
+    ambient_identities: set[tuple[int, int]] | None = None,
 ) -> None:
     payload = canonical_bytes(value) + b"\n"
+    ambient_identities = ambient_identities or set()
     parent_fd = _open_pinned_parent_directory(path, label)
     fd: int | None = None
     try:
@@ -2907,7 +2930,7 @@ def _write_atomic_json(
                 parent_fd,
                 path.name,
                 label=label,
-                ambient_identities=set(),
+                ambient_identities=ambient_identities,
                 writable=True,
             )
             try:
@@ -2917,7 +2940,7 @@ def _write_atomic_json(
                     fd,
                     opened,
                     label=label,
-                    ambient_identities=set(),
+                    ambient_identities=ambient_identities,
                 )
                 _write_descriptor_exact(fd, payload, 0o600, str(path))
             finally:
@@ -2938,8 +2961,20 @@ def _write_atomic_json(
         os.close(parent_fd)
 
 
-def _write_new_json(path: Path, value: dict[str, Any], label: str) -> None:
-    _write_atomic_json(path, value, label, replace=False)
+def _write_new_json(
+    path: Path,
+    value: dict[str, Any],
+    label: str,
+    *,
+    ambient_identities: set[tuple[int, int]] | None = None,
+) -> None:
+    _write_atomic_json(
+        path,
+        value,
+        label,
+        replace=False,
+        ambient_identities=ambient_identities,
+    )
 
 
 def _holder_claim_path(manifest_path: Path) -> Path:
@@ -2970,6 +3005,7 @@ def _reserve_holder_claim(
     manifest_digest: str,
     binding_context_digest: str,
     holder_receipt_path: Path,
+    ambient_identities: set[tuple[int, int]] | None = None,
 ) -> tuple[Path, str]:
     if SHA256_DIGEST_PATTERN.fullmatch(manifest_digest) is None:
         raise IncarnationHomeError("holder claim manifest digest is invalid")
@@ -2998,7 +3034,12 @@ def _reserve_holder_claim(
         "holder_receipt": receipt_ref,
         "created_at": _utc_now(),
     }
-    _write_new_json(claim_path, claim, "holder claim")
+    _write_new_json(
+        claim_path,
+        claim,
+        "holder claim",
+        ambient_identities=ambient_identities,
+    )
     try:
         claim_digest = sha256_bytes(claim_path.read_bytes())
     except OSError as exc:
@@ -3063,6 +3104,7 @@ def _reserve_or_transfer_holder_claim(
     manifest_digest: str,
     binding_context_digest: str,
     holder_receipt_path: Path,
+    ambient_identities: set[tuple[int, int]] | None = None,
 ) -> tuple[Path, str]:
     """Reserve a claim, or transfer the exact claim to a replacement receipt."""
 
@@ -3076,6 +3118,7 @@ def _reserve_or_transfer_holder_claim(
             manifest_digest=manifest_digest,
             binding_context_digest=binding_context_digest,
             holder_receipt_path=holder_receipt_path,
+            ambient_identities=ambient_identities,
         )
     except OSError as exc:
         raise IncarnationHomeError(
@@ -3116,12 +3159,154 @@ def _reserve_or_transfer_holder_claim(
     )
     transferred = dict(claim)
     transferred["holder_receipt"] = requested_receipt
-    _write_atomic_json(claim_path, transferred, "holder claim transfer", replace=True)
+    _write_atomic_json(
+        claim_path,
+        transferred,
+        "holder claim transfer",
+        replace=True,
+        ambient_identities=ambient_identities,
+    )
     try:
         transferred_raw = _regular_file(claim_path, "holder claim").read_bytes()
     except OSError as exc:
         raise IncarnationHomeError("holder claim transfer could not be hashed") from exc
     return claim_path, sha256_bytes(transferred_raw)
+
+
+def _stable_regular_file_bytes(
+    path: Path,
+    label: str,
+    *,
+    ambient_identities: set[tuple[int, int]],
+) -> bytes | None:
+    """Read one regular file through a retained, unaliased descriptor."""
+
+    parent_fd = _open_pinned_parent_directory(path, label)
+    descriptor: int | None = None
+    try:
+        try:
+            observed = os.lstat(path.name, dir_fd=parent_fd)
+        except FileNotFoundError:
+            return None
+        except OSError as exc:
+            raise IncarnationHomeError(f"{label} cannot be inspected") from exc
+        if stat.S_ISLNK(observed.st_mode) or not stat.S_ISREG(observed.st_mode):
+            raise IncarnationHomeError(f"{label} is not a regular file")
+        descriptor, opened = _open_stable_regular_file_at(
+            parent_fd,
+            path.name,
+            label=label,
+            ambient_identities=ambient_identities,
+        )
+        raw = _read_descriptor_bytes(descriptor, str(path))
+        _revalidate_regular_file_at(
+            parent_fd,
+            path.name,
+            descriptor,
+            opened,
+            label=label,
+            ambient_identities=ambient_identities,
+        )
+        return raw
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+        os.close(parent_fd)
+
+
+def _restore_holder_claim_snapshot(
+    *,
+    claim_path: Path,
+    before_raw: bytes | None,
+    after_digest: str,
+    ambient_identities: set[tuple[int, int]],
+) -> None:
+    """Restore a transferred claim only while its published inode is retained."""
+
+    if SHA256_DIGEST_PATTERN.fullmatch(after_digest) is None:
+        raise IncarnationHomeError("holder claim rollback digest is invalid")
+    parent_fd = _open_pinned_parent_directory(claim_path, "holder claim rollback")
+    descriptor: int | None = None
+    try:
+        try:
+            observed = os.lstat(claim_path.name, dir_fd=parent_fd)
+        except OSError as exc:
+            raise IncarnationHomeError(
+                "holder claim rollback target cannot be inspected"
+            ) from exc
+        if stat.S_ISLNK(observed.st_mode) or not stat.S_ISREG(observed.st_mode):
+            raise IncarnationHomeError(
+                "holder claim rollback target is not a regular file"
+            )
+        descriptor, opened = _open_stable_regular_file_at(
+            parent_fd,
+            claim_path.name,
+            label="holder claim rollback",
+            ambient_identities=ambient_identities,
+            writable=before_raw is not None,
+        )
+        current_raw = _read_descriptor_bytes(descriptor, str(claim_path))
+        if sha256_bytes(current_raw) != after_digest:
+            raise IncarnationHomeError("holder claim changed before rollback")
+        _revalidate_regular_file_at(
+            parent_fd,
+            claim_path.name,
+            descriptor,
+            opened,
+            label="holder claim rollback",
+            ambient_identities=ambient_identities,
+        )
+        if before_raw is None:
+            try:
+                os.unlink(claim_path.name, dir_fd=parent_fd)
+            except OSError as exc:
+                raise IncarnationHomeError(
+                    "holder claim could not be rolled back"
+                ) from exc
+        else:
+            _write_descriptor_exact(
+                descriptor,
+                before_raw,
+                0o600,
+                "holder claim rollback",
+            )
+        os.fsync(parent_fd)
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+        os.close(parent_fd)
+
+
+def _existing_rebind_receipt(
+    path: Path,
+    expected: dict[str, Any],
+    *,
+    ambient_identities: set[tuple[int, int]],
+) -> dict[str, Any] | None:
+    """Accept only the exact canonical receipt as an idempotent retry."""
+
+    raw = _stable_regular_file_bytes(
+        path,
+        "replacement holder terminal receipt",
+        ambient_identities=ambient_identities,
+    )
+    if raw is None:
+        return None
+    existing = _decode_json_snapshot(raw, "replacement holder terminal receipt")
+    _assert_safe_projection(existing)
+    existing, _validated_raw, _digest = _load_holder_receipt_snapshot(
+        path,
+        snapshot=(existing, raw),
+    )
+    comparable_existing = dict(existing)
+    comparable_expected = dict(expected)
+    comparable_existing.pop("created_at", None)
+    comparable_expected.pop("created_at", None)
+    if comparable_existing != comparable_expected:
+        raise IncarnationHomeError(
+            "replacement holder terminal receipt already exists with different binding"
+        )
+    return existing
 
 
 def _release_holder_claim(
@@ -3712,17 +3897,64 @@ def _rebind_replacement_holder_receipt(
         },
     }
     _assert_safe_projection(receipt)
-    _reserve_holder_claim_for_launch(
-        manifest_path=manifest_path,
-        manifest=manifest,
-        manifest_digest=manifest_digest,
-        binding_context_digest=context_digest,
-        binding_context=context,
-        holder_receipt_path=receipt_path,
-        allow_existing_claim=True,
+    runtime_root_value = manifest.get("runtime_root")
+    ambient_home_value = manifest.get("ambient_codex_home")
+    if not isinstance(runtime_root_value, str) or not isinstance(
+        ambient_home_value, str
+    ):
+        raise IncarnationHomeError(
+            "replacement holder rebind lacks runtime and ambient roots"
+        )
+    runtime_root = _absolute_directory(Path(runtime_root_value), "runtime root")
+    ambient_home = _absolute_directory(
+        Path(ambient_home_value), "ambient Codex home"
     )
-    _write_new_json(receipt_path, receipt, "replacement holder terminal receipt")
-    return receipt
+    ambient_identities = _ambient_inode_identities(ambient_home)
+    claim_path = _holder_claim_path(manifest_path)
+    with _incarnation_preparation_lock(runtime_root, ambient_identities):
+        existing = _existing_rebind_receipt(
+            receipt_path,
+            receipt,
+            ambient_identities=ambient_identities,
+        )
+        before_claim_raw = _stable_regular_file_bytes(
+            claim_path,
+            "holder claim",
+            ambient_identities=ambient_identities,
+        )
+        _claim_path, after_claim_digest = _reserve_holder_claim_for_launch_locked(
+            manifest_path=manifest_path,
+            manifest=manifest,
+            manifest_digest=manifest_digest,
+            binding_context_digest=context_digest,
+            binding_context=context,
+            holder_receipt_path=receipt_path,
+            ambient_identities=ambient_identities,
+            allow_existing_claim=True,
+        )
+        if existing is not None:
+            return existing
+        try:
+            _write_new_json(
+                receipt_path,
+                receipt,
+                "replacement holder terminal receipt",
+                ambient_identities=ambient_identities,
+            )
+        except BaseException:
+            try:
+                _restore_holder_claim_snapshot(
+                    claim_path=claim_path,
+                    before_raw=before_claim_raw,
+                    after_digest=after_claim_digest,
+                    ambient_identities=ambient_identities,
+                )
+            except BaseException as rollback_exc:
+                raise IncarnationHomeError(
+                    "holder claim rollback became uncertain"
+                ) from rollback_exc
+            raise
+        return receipt
 
 
 def _decode_holder_manifest_snapshot(runtime: dict[str, Any]) -> bytes | None:
@@ -5978,6 +6210,44 @@ def _incarnation_preparation_lock(
             os.close(parent_fd)
 
 
+def _reserve_holder_claim_for_launch_locked(
+    *,
+    manifest_path: Path,
+    manifest: dict[str, Any],
+    manifest_digest: str,
+    binding_context_digest: str,
+    binding_context: dict[str, str],
+    holder_receipt_path: Path,
+    ambient_identities: set[tuple[int, int]],
+    allow_existing_claim: bool = False,
+) -> tuple[Path, str]:
+    """Publish or rebind a holder claim while the preparation lock is held."""
+
+    _locked_manifest, _locked_bytes, locked_digest = _load_manifest_snapshot(
+        manifest_path,
+        binding_context=binding_context,
+        binding_context_digest=binding_context_digest,
+        require_holder_binding=True,
+    )
+    if locked_digest != manifest_digest:
+        raise IncarnationHomeError(
+            "incarnation-home manifest changed before holder claim"
+        )
+    reserve = (
+        _reserve_or_transfer_holder_claim
+        if allow_existing_claim
+        else _reserve_holder_claim
+    )
+    return reserve(
+        manifest_path=manifest_path,
+        manifest=_locked_manifest,
+        manifest_digest=manifest_digest,
+        binding_context_digest=binding_context_digest,
+        holder_receipt_path=holder_receipt_path,
+        ambient_identities=ambient_identities,
+    )
+
+
 def _reserve_holder_claim_for_launch(
     *,
     manifest_path: Path,
@@ -6004,27 +6274,15 @@ def _reserve_holder_claim_for_launch(
     )
     ambient_identities = _ambient_inode_identities(ambient_home)
     with _incarnation_preparation_lock(runtime_root, ambient_identities):
-        _locked_manifest, _locked_bytes, locked_digest = _load_manifest_snapshot(
-            manifest_path,
+        return _reserve_holder_claim_for_launch_locked(
+            manifest_path=manifest_path,
+            manifest=manifest,
+            manifest_digest=manifest_digest,
             binding_context=binding_context,
             binding_context_digest=binding_context_digest,
-            require_holder_binding=True,
-        )
-        if locked_digest != manifest_digest:
-            raise IncarnationHomeError(
-                "incarnation-home manifest changed before holder claim"
-            )
-        reserve = (
-            _reserve_or_transfer_holder_claim
-            if allow_existing_claim
-            else _reserve_holder_claim
-        )
-        return reserve(
-            manifest_path=manifest_path,
-            manifest=_locked_manifest,
-            manifest_digest=manifest_digest,
-            binding_context_digest=binding_context_digest,
             holder_receipt_path=holder_receipt_path,
+            ambient_identities=ambient_identities,
+            allow_existing_claim=allow_existing_claim,
         )
 
 
@@ -6535,19 +6793,58 @@ def _finish_preparation_owner(owner: dict[str, Any] | None) -> None:
     if owner is None:
         return
     owner_path = Path(str(owner["incarnation_root"])) / PREPARATION_OWNER_FILE_NAME
-    if not owner_path.exists() or owner_path.is_symlink():
-        return
-    observed = _load_json(owner_path, "incarnation preparation owner token")
-    if observed != owner:
-        raise IncarnationHomeError(
-            "incarnation preparation owner token changed before publication cleanup"
-        )
+    parent_fd = _open_pinned_parent_directory(
+        owner_path, "incarnation preparation owner token"
+    )
+    descriptor: int | None = None
     try:
-        owner_path.unlink()
-    except OSError as exc:
-        raise IncarnationHomeError(
-            "incarnation preparation owner token could not be retired"
-        ) from exc
+        try:
+            initial = os.lstat(owner_path.name, dir_fd=parent_fd)
+        except FileNotFoundError:
+            return
+        except OSError as exc:
+            raise IncarnationHomeError(
+                "incarnation preparation owner token cannot be inspected"
+            ) from exc
+        if stat.S_ISLNK(initial.st_mode) or not stat.S_ISREG(initial.st_mode):
+            return
+        descriptor, opened = _open_stable_regular_file_at(
+            parent_fd,
+            owner_path.name,
+            label="incarnation preparation owner token",
+            ambient_identities=set(),
+        )
+        observed = _decode_json_snapshot(
+            _read_descriptor_bytes(descriptor, str(owner_path)),
+            "incarnation preparation owner token",
+        )
+        if observed != owner:
+            raise IncarnationHomeError(
+                "incarnation preparation owner token changed before publication cleanup"
+            )
+        try:
+            _revalidate_regular_file_at(
+                parent_fd,
+                owner_path.name,
+                descriptor,
+                opened,
+                label="incarnation preparation owner token",
+                ambient_identities=set(),
+            )
+        except IncarnationHomeError as exc:
+            raise IncarnationHomeError(
+                "incarnation preparation owner token changed before publication cleanup"
+            ) from exc
+        try:
+            os.unlink(owner_path.name, dir_fd=parent_fd)
+        except OSError as exc:
+            raise IncarnationHomeError(
+                "incarnation preparation owner token could not be retired"
+            ) from exc
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+        os.close(parent_fd)
 
 
 def _prepare_home_attempt_owner(

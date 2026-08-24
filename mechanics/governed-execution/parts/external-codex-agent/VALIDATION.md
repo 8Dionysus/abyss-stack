@@ -98,7 +98,12 @@ v3 and legacy-v2 snapshots, while pre-snapshot receipts retain their bounded
 compatibility path. Rebind reserves that same holder claim under the
 preparation lock before publishing a replacement receipt, transferring an
 existing claim from the superseded receipt under that lock; an exact retry is
-idempotent. Directory enumeration retains its descriptor and rejects a
+idempotent. A failed receipt publication restores the superseded claim
+byte-for-byte through its validated descriptor, and an existing output is
+accepted only when it is the same complete canonical receipt apart from
+creation time. Owner-token cleanup also retains and revalidates the token
+descriptor before unlinking, so a deterministic replacement cannot delete a
+newly published marker. Directory enumeration retains its descriptor and rejects a
 deterministic pathname replacement after the descriptor is opened. Stale-root
 rollback validates and removes through a retained root descriptor, rejecting a
 replacement root before deleting the replacement tree.

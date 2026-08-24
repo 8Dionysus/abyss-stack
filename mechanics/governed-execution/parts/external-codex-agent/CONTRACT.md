@@ -274,8 +274,11 @@ the same holder claim under the runtime preparation lock. An exact retry
 validates its existing claim; recovery of an already claimed live holder
 transfers that claim's receipt binding from the superseded receipt to the
 replacement receipt under the lock, while a different holder or manifest is
-rejected. A rebind therefore cannot leave the live home writable after receipt
-publication.
+rejected. The existing output is accepted only when it is the same complete
+canonical receipt apart from its creation timestamp. If receipt publication
+fails after transfer, the exact prior claim snapshot is restored through its
+validated descriptor before the failure is propagated. A rebind therefore
+cannot leave the live home writable after receipt publication.
 
 The payload holder publishes its lifecycle receipt only after the exact Kitty
 ancestor and dedicated-window handshake is ready. The runtime retries that
@@ -839,7 +842,14 @@ and newly supplied grants cannot widen a live holder. Canonical claim
 publication and preparation share the runtime-owned lock to close the
 publication/re-preparation race. Canonical launch reloads and digest-checks
 the named manifest while holding that lock before publishing its claim; a
-changed snapshot is rejected rather than bound to stale launch evidence.
+    changed snapshot is rejected rather than bound to stale launch evidence.
+    Rollback and stale-owner retirement retain and revalidate the owner or
+    claim descriptor before unlinking it, so a same-name publication cannot
+    turn cleanup into deletion of another attempt's marker. Rebind also
+    preflights an existing output as the exact canonical receipt and keeps
+    claim transfer plus receipt publication under one lock; a publication
+    failure restores the prior claim bytes before returning the failure,
+    while an exact retry is idempotent.
 Distinct contexts therefore receive distinct
 mutable homes, manifests, configs, databases, credentials, temporary paths,
 and receipt reservations. For compatibility, a realization-scoped legacy v2
