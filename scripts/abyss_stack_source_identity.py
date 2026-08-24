@@ -244,6 +244,8 @@ def make_source_identity(
 
 
 def _validate_contract_shape(identity: Mapping[str, Any], *, consumer: str) -> dict[str, Any]:
+    if consumer not in CONSUMER_SURFACES:
+        raise SourceIdentityError(f"unknown invoked source identity consumer: {consumer}")
     if identity.get("schema_version") != SCHEMA_VERSION:
         raise SourceIdentityError("source identity schema version is unsupported")
     if identity.get("target_id") != TARGET_ID:

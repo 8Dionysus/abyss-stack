@@ -212,6 +212,17 @@ class AoADiagnoseTests(unittest.TestCase):
             ):
                 self.assertEqual(self.module.resolve_source_root(), foreign_root.resolve())
 
+    def test_identity_rejects_unknown_invoked_consumer(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source_root = make_source_checkout(Path(tmpdir) / "source")
+            identity = self.module.SOURCE_IDENTITY.make_source_identity(source_root, consumer="shared")
+            with self.assertRaises(self.module.SOURCE_IDENTITY.SourceIdentityError):
+                self.module.SOURCE_IDENTITY.verify_source_identity(
+                    source_root,
+                    identity,
+                    consumer="shared",
+                )
+
     def test_source_replacement_fails_binding_revalidation(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             source_root = make_source_checkout(Path(tmpdir) / "source")
