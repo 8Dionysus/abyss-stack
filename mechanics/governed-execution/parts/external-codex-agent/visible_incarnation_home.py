@@ -1279,42 +1279,13 @@ def _load_holder_loss_reentry(
 def _load_rebind_manifest(
     path: Path, *, runtime_state_root: Path
 ) -> tuple[dict[str, Any], bytes, str]:
-    """Read only the immutable realization fields needed by a rebind."""
+    """Load and fully revalidate the manifest admitted by a replacement."""
 
-    manifest, raw = _load_json_snapshot(path, "replacement incarnation manifest")
     if not path.resolve().is_relative_to(runtime_state_root.resolve()):
         raise IncarnationHomeError(
             "replacement incarnation manifest is outside the bound runtime state root"
         )
-    required = {
-        "schema_version",
-        "model_slug",
-        "reasoning_effort",
-        "runtime_version",
-        "ambient_codex_home",
-        "codex_home",
-    }
-    if not required <= manifest.keys():
-        raise IncarnationHomeError("replacement incarnation manifest is incomplete")
-    if manifest.get("schema_version") not in {
-        SCHEMA_VERSION,
-        "abyss_stack_codex_incarnation_home_v1",
-    }:
-        raise IncarnationHomeError("unsupported replacement incarnation manifest")
-    for key in (
-        "model_slug",
-        "reasoning_effort",
-        "runtime_version",
-        "ambient_codex_home",
-        "codex_home",
-    ):
-        _binding_ref(manifest.get(key), f"replacement incarnation manifest {key}")
-    for key in ("ambient_codex_home", "codex_home"):
-        if not Path(manifest[key]).is_absolute():
-            raise IncarnationHomeError(
-                f"replacement incarnation manifest {key} must be absolute"
-            )
-    return manifest, raw, sha256_bytes(raw)
+    return _load_manifest_snapshot(path)
 
 
 def _validate_replacement_reentry_binding(
@@ -1852,7 +1823,8 @@ def _post_exec_resolution(
                 env_fields = []
             if env_fields and not env_fields[0].startswith("-"):
                 resolved = shutil.which(
-                    env_fields[0], path=path or os.environ.get("PATH")
+                    env_fields[0],
+                    path=path if path is not None else os.environ.get("PATH"),
                 )
                 if resolved is not None:
                     # env resolves the command for lookup but preserves the
@@ -2637,25 +2609,34 @@ def _rebind_replacement_holder_receipt(
         kitty_pid=terminal_pid,
         terminal_argv=terminal_argv,
     )
-    manifest, _manifest_bytes, manifest_digest = _load_rebind_manifest(
+    manifest, manifest_bytes, manifest_digest = _load_rebind_manifest(
         manifest_path,
         runtime_state_root=Path(context["runtime_state_root"]),
     )
     executable = _regular_file(codex_executable_path, "replacement Codex executable")
-    observed_executable = Path(f"/proc/{holder_pid}/exe").resolve()
-    if observed_executable != executable.resolve():
-        raise IncarnationHomeError(
-            "replacement Codex executable path disagrees with live holder"
-        )
-    executable_digest = _proc_exe_digest(holder_pid)
-    if sha256_bytes(executable.read_bytes()) != executable_digest:
-        raise IncarnationHomeError("replacement Codex executable digest has drifted")
-    scoped_home = os.environ.get("CODEX_HOME")
-    if scoped_home != manifest["codex_home"]:
+    holder_environment = _proc_environ(holder_pid)
+    holder_codex_home = holder_environment.get("CODEX_HOME")
+    if holder_codex_home != manifest["codex_home"]:
         raise IncarnationHomeError(
             "replacement holder CODEX_HOME disagrees with its manifest"
         )
     holder_argv = _proc_argv(holder_pid)
+    if not holder_argv:
+        raise IncarnationHomeError("replacement holder argv is empty")
+    _post_exec_argv_value, post_exec_executable, post_exec_bytes = _post_exec_resolution(
+        executable,
+        [str(executable)],
+        path=holder_environment.get("PATH"),
+    )
+    observed_executable = Path(f"/proc/{holder_pid}/exe").resolve()
+    if observed_executable != post_exec_executable.resolve():
+        raise IncarnationHomeError(
+            "replacement Codex executable path disagrees with live holder"
+        )
+    executable_digest = sha256_bytes(executable.read_bytes())
+    post_exec_executable_digest = sha256_bytes(post_exec_bytes)
+    if _proc_exe_digest(holder_pid) != post_exec_executable_digest:
+        raise IncarnationHomeError("replacement Codex executable digest has drifted")
     holder_parent_pid = _proc_parent_pid(holder_pid)
     holder_parent_start_ticks = _proc_start_ticks(holder_parent_pid)
     holder_parent_comm = _proc_comm(holder_parent_pid)
@@ -2673,13 +2654,16 @@ def _rebind_replacement_holder_receipt(
             "parent_comm": holder_parent_comm,
             "argv": holder_argv,
             "argv_digest": sha256_bytes(canonical_bytes(holder_argv)),
-            "exe_digest": executable_digest,
+            "exe_digest": post_exec_executable_digest,
         },
         "runtime": {
             "codex_executable": str(executable.resolve()),
             "codex_executable_digest": executable_digest,
             "incarnation_manifest": str(manifest_path.resolve()),
             "incarnation_manifest_digest": manifest_digest,
+            "incarnation_manifest_snapshot_b64": base64.b64encode(
+                manifest_bytes
+            ).decode("ascii"),
             "model": str(manifest["model_slug"]),
             "reasoning_effort": str(manifest["reasoning_effort"]),
             "ambient_codex_home": str(manifest["ambient_codex_home"]),

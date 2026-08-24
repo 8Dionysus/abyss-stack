@@ -1046,6 +1046,108 @@ def test_load_manifest_revalidates_realization_and_derived_home(tmp_path: Path) 
         MODULE._load_manifest(manifest_path)
 
 
+def test_rebind_manifest_uses_full_manifest_validation(tmp_path: Path) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    realization = _realization(tmp_path / "realization.json")
+    manifest = MODULE.prepare_home(
+        ambient_home=ambient,
+        realization_path=realization,
+        runtime_root=runtime_root,
+    )
+    manifest_path = Path(manifest["codex_home"]).parent / "incarnation-home.json"
+
+    payload = json.loads(realization.read_text(encoding="utf-8"))
+    payload["configuration"]["runtime"]["model_slug"] = "gpt-5.6-other"
+    payload["configuration_fingerprint"] = MODULE.sha256_bytes(
+        MODULE.canonical_bytes(payload["configuration"])
+    )
+    realization.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(MODULE.IncarnationHomeError, match="binding drift"):
+        MODULE._load_rebind_manifest(
+            manifest_path,
+            runtime_state_root=runtime_root,
+        )
+
+
+def test_rebind_receipt_binds_holder_environment_and_manifest_snapshot(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    reentry_path, reentry, context = _holder_loss_reentry_fixture(tmp_path)
+    holder_pid = os.getpid()
+    terminal_pid = 202
+    reentry["current_holder"] = {"pid": holder_pid, "start_ticks": 1001}
+    reentry_path.write_bytes(MODULE.canonical_bytes(reentry) + b"\n")
+
+    context_path = tmp_path / "binding-context.json"
+    context_path.write_bytes(MODULE.canonical_bytes(context) + b"\n")
+    ambient = tmp_path / "ambient"
+    runtime_root = Path(context["runtime_state_root"])
+    ambient.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    manifest = MODULE.prepare_home(
+        ambient_home=ambient,
+        realization_path=_realization(tmp_path / "realization.json"),
+        runtime_root=runtime_root,
+    )
+    manifest_path = Path(manifest["codex_home"]).parent / "incarnation-home.json"
+    executable = Path("/proc/self/exe").resolve()
+    executable_digest = MODULE.sha256_bytes(executable.read_bytes())
+    holder_argv = [str(executable), "exec"]
+    output_path = tmp_path / "rebound-holder.json"
+
+    monkeypatch.setenv("CODEX_HOME", str(tmp_path / "wrong-ambient"))
+    monkeypatch.setattr(MODULE, "_descends_from", lambda *_: True)
+    monkeypatch.setattr(MODULE, "_proc_identity_state", lambda *_: "live")
+    monkeypatch.setattr(
+        MODULE,
+        "_proc_parent_pid",
+        lambda pid: terminal_pid if pid == holder_pid else 1,
+    )
+    monkeypatch.setattr(
+        MODULE,
+        "_proc_start_ticks",
+        lambda pid: {holder_pid: 1001, terminal_pid: 2002}[pid],
+    )
+    monkeypatch.setattr(MODULE, "_proc_comm", lambda _pid: "kitty")
+    monkeypatch.setattr(
+        MODULE,
+        "_kitty_ancestor",
+        lambda _pid: (terminal_pid, 2002, ["/usr/bin/kitty", "--title", "holder"]),
+    )
+    monkeypatch.setattr(MODULE, "_kitty_dedication", lambda **_: ("1", True))
+    monkeypatch.setattr(
+        MODULE,
+        "_proc_environ",
+        lambda _pid: {
+            "CODEX_HOME": str(manifest["codex_home"]),
+            "PATH": "/usr/bin:/bin",
+        },
+    )
+    monkeypatch.setattr(MODULE, "_proc_argv", lambda _pid: holder_argv)
+    monkeypatch.setattr(MODULE, "_proc_exe_digest", lambda _pid: executable_digest)
+
+    receipt = MODULE._rebind_replacement_holder_receipt(
+        receipt_path=output_path,
+        holder_loss_reentry_path=reentry_path,
+        binding_context_path=context_path,
+        manifest_path=manifest_path,
+        codex_executable_path=executable,
+    )
+
+    assert receipt["holder"]["argv"] == holder_argv
+    assert receipt["holder"]["exe_digest"] == executable_digest
+    assert receipt["runtime"]["codex_executable_digest"] == executable_digest
+    assert base64.b64decode(
+        receipt["runtime"]["incarnation_manifest_snapshot_b64"]
+    ) == manifest_path.read_bytes()
+    assert json.loads(output_path.read_text(encoding="utf-8")) == receipt
+
+
 def test_load_manifest_revalidates_realization_identifier(tmp_path: Path) -> None:
     ambient = tmp_path / "ambient"
     runtime_root = tmp_path / "runtime"
