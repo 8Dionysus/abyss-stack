@@ -210,7 +210,16 @@ EXPECTED_ACTIVE_SCHEMA_PATHS = {
         "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-actor-workspace-manifest.schema.json"
     ),
     Path(
+        "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-capability-classes.schema.json"
+    ),
+    Path(
+        "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-capability-grant.schema.json"
+    ),
+    Path(
         "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-event.schema.json"
+    ),
+    Path(
+        "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-incarnation-home.schema.json"
     ),
     Path(
         "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-launch.schema.json"
@@ -244,6 +253,9 @@ EXPECTED_ACTIVE_SCHEMA_PATHS = {
     ),
     Path(
         "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-result-evidence-closure.schema.json"
+    ),
+    Path(
+        "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-return-route.schema.json"
     ),
     Path(
         "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-resume.schema.json"
