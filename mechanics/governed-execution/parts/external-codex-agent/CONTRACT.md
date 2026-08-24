@@ -245,7 +245,10 @@ internal `payload-launch` helper runs as bubblewrap's payload, revalidates the
 manifest and private launcher digests, writes the receipt from its own PID
 immediately before `exec`, and then replaces itself with the private launcher;
 the bubblewrap monitor is retained only for snapshot cleanup and is bound to its
-parent lifetime. This receipt is not a governed proof-actor result and must not be substituted with a nested actor's runtime
+parent lifetime. The payload helper releases the exact validated claim on every
+pre-receipt admission or output-publication failure, because the outer launch
+process may already have exec'd into bubblewrap; once the receipt is published,
+the claim remains the immutable holder reservation. This receipt is not a governed proof-actor result and must not be substituted with a nested actor's runtime
 identity. The Kitty-ancestor binding covers the installed bubblewrap wrapper as
 well as a direct host exec while retaining one exact terminal identity; the
 holder environment must bind `KITTY_PID` and `KITTY_WINDOW_ID`, and no sibling
@@ -843,7 +846,10 @@ and newly supplied grants cannot widen a live holder. Canonical claim
 publication and preparation share the runtime-owned lock to close the
 publication/re-preparation race. Canonical launch reloads and digest-checks
 the named manifest while holding that lock before publishing its claim; a
-    changed snapshot is rejected rather than bound to stale launch evidence.
+    changed snapshot is rejected rather than bound to stale launch evidence. The
+    payload-side pre-receipt failure path releases that exact unpublished claim
+    even after the parent has exec'd into bubblewrap; a published receipt keeps
+    the claim frozen for the holder lifecycle.
     Rollback and stale-owner retirement retain and revalidate the owner or
     claim descriptor before unlinking it, so a same-name publication cannot
     turn cleanup into deletion of another attempt's marker. Rebind also

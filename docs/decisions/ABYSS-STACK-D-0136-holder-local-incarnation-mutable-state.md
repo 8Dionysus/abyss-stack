@@ -99,7 +99,10 @@ unpublished root is owned by an exact token before materialization, and only
 a tokened unmarked root can be rolled back or recovered as stale. Canonical
 launch reloads and digest-checks the manifest while that lock is held, so a
 concurrent manifest replacement fails closed before claim publication rather
-than binding stale launch evidence. A missing
+than binding stale launch evidence. If the outer launcher has already exec'd into
+bubblewrap, the payload helper releases the exact validated claim on every
+pre-receipt payload or output-publication failure; a published receipt retains
+the frozen claim. A missing
 typed binding remains valid only for an existing legacy v2 ownership marker and
 cannot satisfy canonical launch. Every v2 manifest, including one carrying
 typed binding data or denied-state provenance, is rejected by canonical launch

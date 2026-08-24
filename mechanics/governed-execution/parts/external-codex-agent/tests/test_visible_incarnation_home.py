@@ -942,6 +942,66 @@ def test_interrupted_staging_quarantine_is_recovered_before_reprepare(
     assert (actor_home / "config.toml").read_bytes() == before_config
 
 
+def test_staging_cleanup_preserves_quarantine_replacement_after_open(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    parent = tmp_path / "parent"
+    parent.mkdir()
+    stage_name = ".config.toml.stage-" + "a" * 32
+    stage = parent / stage_name
+    stage.write_bytes(b"staged-bytes")
+    descriptor = os.open(stage, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+    moved_name = "moved-quarantine"
+    raced = False
+    original_revalidate = MODULE._revalidate_recovery_entry
+
+    def replace_after_open(
+        parent_fd: int,
+        name: str,
+        opened_descriptor: int,
+        initial: os.stat_result,
+        label: str,
+    ) -> os.stat_result:
+        nonlocal raced
+        if label.endswith("cleanup directory") and not raced:
+            os.rename(
+                name,
+                moved_name,
+                src_dir_fd=parent_fd,
+                dst_dir_fd=parent_fd,
+            )
+            os.mkdir(name, 0o700, dir_fd=parent_fd)
+            raced = True
+        return original_revalidate(
+            parent_fd, name, opened_descriptor, initial, label
+        )
+
+    monkeypatch.setattr(MODULE, "_revalidate_recovery_entry", replace_after_open)
+    parent_fd = os.open(parent, os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC)
+    try:
+        with pytest.raises(MODULE.IncarnationHomeError, match="changed during recovery"):
+            MODULE._remove_staged_file_at(
+                parent_fd,
+                stage_name,
+                descriptor,
+                "staging cleanup",
+            )
+    finally:
+        os.close(parent_fd)
+        os.close(descriptor)
+
+    assert raced
+    assert not stage.exists()
+    assert (parent / moved_name).is_dir()
+    quarantine_replacement = [
+        path
+        for path in parent.iterdir()
+        if path.name != moved_name and path.name.startswith("..config.toml.stage-")
+    ]
+    assert len(quarantine_replacement) == 1
+    assert quarantine_replacement[0].is_dir()
+
+
 def test_abandoned_staging_alias_is_rejected_without_external_mutation(
     tmp_path: Path,
 ) -> None:
@@ -3467,6 +3527,100 @@ def test_payload_launch_binds_receipt_to_payload_process(
     assert exec_path == str(payload)
     assert exec_argv == args.codex_arguments
     assert environment["CODEX_HOME"] == str(manifest["codex_home"])
+
+
+def test_payload_launch_releases_claim_after_pre_receipt_payload_drift(
+    tmp_path: Path,
+) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    manifest = MODULE.prepare_home(
+        ambient_home=ambient,
+        realization_path=_realization(tmp_path / "realization.json"),
+        runtime_root=runtime_root,
+    )
+    manifest_path = Path(manifest["codex_home"]).parent / "incarnation-home.json"
+    manifest_bytes = manifest_path.read_bytes()
+    payload = tmp_path / "private-codex"
+    payload_bytes = b"#!/bin/sh\nexit 0\n"
+    payload.write_bytes(payload_bytes)
+    holder_path = tmp_path / "holder.json"
+    binding_args = _payload_binding_arguments(
+        runtime_root, manifest, manifest_path, holder_path
+    )
+    claim_path = Path(binding_args["holder_claim"])
+    payload.write_bytes(b"drifted-private-payload")
+    payload.chmod(0o500)
+
+    args = MODULE.argparse.Namespace(
+        manifest=str(manifest_path),
+        holder_receipt=str(holder_path),
+        codex_executable=str(tmp_path / "codex"),
+        payload_executable=str(payload),
+        manifest_digest=MODULE.sha256_bytes(manifest_bytes),
+        executable_digest=MODULE.sha256_bytes(payload_bytes),
+        **binding_args,
+        codex_arguments=[str(payload), "exec", "--help"],
+    )
+
+    with pytest.raises(MODULE.IncarnationHomeError, match="payload executable digest"):
+        MODULE.command_payload_launch(args)
+
+    assert not claim_path.exists()
+
+
+def test_payload_launch_releases_claim_when_receipt_path_becomes_occupied(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    manifest = MODULE.prepare_home(
+        ambient_home=ambient,
+        realization_path=_realization(tmp_path / "realization.json"),
+        runtime_root=runtime_root,
+    )
+    manifest_path = Path(manifest["codex_home"]).parent / "incarnation-home.json"
+    manifest_bytes = manifest_path.read_bytes()
+    payload = tmp_path / "private-codex"
+    payload_bytes = b"#!/bin/sh\nexit 0\n"
+    payload.write_bytes(payload_bytes)
+    payload.chmod(0o500)
+    holder_path = tmp_path / "holder.json"
+    binding_args = _payload_binding_arguments(
+        runtime_root, manifest, manifest_path, holder_path
+    )
+    claim_path = Path(binding_args["holder_claim"])
+    foreign_bytes = b"foreign receipt output"
+    holder_path.write_bytes(foreign_bytes)
+
+    def occupied_receipt(**kwargs: object) -> dict[str, object]:
+        assert Path(str(kwargs["receipt_path"])).read_bytes() == foreign_bytes
+        raise MODULE.IncarnationHomeError("holder terminal receipt already exists")
+
+    monkeypatch.setattr(MODULE, "_holder_receipt", occupied_receipt)
+    monkeypatch.setattr(MODULE.os, "execve", lambda *_args: None)
+    args = MODULE.argparse.Namespace(
+        manifest=str(manifest_path),
+        holder_receipt=str(holder_path),
+        codex_executable=str(tmp_path / "codex"),
+        payload_executable=str(payload),
+        manifest_digest=MODULE.sha256_bytes(manifest_bytes),
+        executable_digest=MODULE.sha256_bytes(payload_bytes),
+        **binding_args,
+        codex_arguments=[str(payload), "exec", "--help"],
+    )
+
+    with pytest.raises(MODULE.IncarnationHomeError, match="already exists"):
+        MODULE.command_payload_launch(args)
+
+    assert not claim_path.exists()
+    assert holder_path.read_bytes() == foreign_bytes
 
 
 @pytest.mark.parametrize(("decision", "exec_expected"), [("admit", True), ("reject", False)])

@@ -1672,6 +1672,7 @@ def _remove_staged_file_at(
         raise IncarnationHomeError(f"{label} staging entry changed before cleanup")
     quarantine_name: str | None = None
     quarantine_fd: int | None = None
+    quarantine_opened: os.stat_result | None = None
     quarantine_entry_moved = False
     try:
         for _attempt in range(8):
@@ -1748,23 +1749,30 @@ def _remove_staged_file_at(
     except OSError as exc:
         raise IncarnationHomeError(f"{label} staging entry could not be removed") from exc
     finally:
-        if quarantine_fd is not None:
-            os.close(quarantine_fd)
-        if quarantine_name is not None:
-            try:
-                os.rmdir(quarantine_name, dir_fd=parent_fd)
-            except FileNotFoundError:
-                pass
-            except OSError:
-                if quarantine_entry_moved:
-                    # Preserve any inode whose identity did not match the
-                    # retained descriptor; the caller is already failing
-                    # closed and must not turn a race into data loss.
+        try:
+            if quarantine_name is not None and not quarantine_entry_moved:
+                if quarantine_fd is None or quarantine_opened is None:
+                    raise IncarnationHomeError(
+                        f"{label} cleanup directory was not safely opened"
+                    )
+                _revalidate_recovery_entry(
+                    parent_fd,
+                    quarantine_name,
+                    quarantine_fd,
+                    quarantine_opened,
+                    f"{label} cleanup directory",
+                )
+                try:
+                    os.rmdir(quarantine_name, dir_fd=parent_fd)
+                except FileNotFoundError:
                     pass
-                else:
+                except OSError as exc:
                     raise IncarnationHomeError(
                         f"{label} cleanup directory could not be removed"
-                    )
+                    ) from exc
+        finally:
+            if quarantine_fd is not None:
+                os.close(quarantine_fd)
 
 
 def _recover_abandoned_staged_files(
@@ -9486,6 +9494,31 @@ def command_prepare(args: argparse.Namespace) -> int:
 
 
 def command_payload_launch(args: argparse.Namespace) -> int:
+    """Run a payload and release an unpublished claim if admission fails."""
+
+    claim_state: dict[str, bool] = {}
+    try:
+        return _command_payload_launch_impl(args, claim_state=claim_state)
+    except BaseException:
+        if claim_state.get("validated") and not claim_state.get("published"):
+            claim_path = Path(args.holder_claim)
+            claim_digest = args.holder_claim_digest
+            try:
+                _release_holder_claim(
+                    claim_path=claim_path,
+                    claim_digest=claim_digest,
+                    label="payload holder claim rollback",
+                )
+            except BaseException as rollback_exc:
+                raise IncarnationHomeError(
+                    "payload holder claim rollback became uncertain"
+                ) from rollback_exc
+        raise
+
+
+def _command_payload_launch_impl(
+    args: argparse.Namespace, *, claim_state: dict[str, bool] | None = None
+) -> int:
     """Bind the receipt to the exact process that owns the private payload."""
 
     manifest_path = Path(args.manifest)
@@ -9595,6 +9628,8 @@ def command_payload_launch(args: argparse.Namespace) -> int:
         binding_context_digest=binding_context_digest,
         holder_receipt_path=Path(args.holder_receipt),
     )
+    if claim_state is not None:
+        claim_state["validated"] = True
     holder_binding = _validate_holder_binding_manifest_record(
         manifest.get("holder_binding")
     )
@@ -9692,6 +9727,8 @@ def command_payload_launch(args: argparse.Namespace) -> int:
             control_socket=control_socket,
             terminal_title=terminal_title,
         )
+        if claim_state is not None:
+            claim_state["published"] = True
         if terminal_title is not None:
             _await_visible_launch_admission(
                 gate_path=Path(launch_gate_argument),

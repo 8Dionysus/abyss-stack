@@ -166,7 +166,10 @@ until preparation rewrites it as v3. Every first preparation is serialized by
   the runtime-owned preparation lock and claims an unpublished root with an
   exact owner token; owner-token retirement retains and revalidates that
   descriptor before unlinking, and rebind restores a superseded claim if
-  replacement-receipt publication fails. The exact writer pins the target
+  replacement-receipt publication fails. The private payload helper also
+  releases the exact validated claim on any pre-receipt payload or receipt-path
+  failure after the outer launcher has exec'd into bubblewrap; a published
+  receipt keeps the claim frozen. The exact writer pins the target
   parent descriptor, publishes new files from an unnameable descriptor, and
   stages every existing-file replacement through a separate fully written
   unnameable descriptor before an atomic exchange that verifies the displaced

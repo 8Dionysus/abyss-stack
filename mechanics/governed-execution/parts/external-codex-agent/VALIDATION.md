@@ -100,7 +100,9 @@ before claim publication. The exact writer pins the target parent descriptor,
 publishes new files from an unnameable descriptor, and stages existing-file
 updates through a fully written unnameable descriptor before atomic publication;
 deterministic parent and temporary-name replacement cannot change ambient bytes
-or mode.
+or mode. A payload-side private-payload drift or occupied-receipt failure after
+claim validation releases the exact unpublished claim even when the outer
+launcher has already exec'd into bubblewrap; a published receipt retains it.
 Incomplete holder receipts missing `runtime_state_root` or `closeout_route`
 are rejected by both the receipt schema and runtime binding validator. A
 receipt carrying an immutable manifest snapshot must also carry the complete
