@@ -80,7 +80,8 @@ schema-valid on their explicit compatibility route; every v2 manifest,
 including typed and provenance-bearing variants, is rejected by canonical
 loading until preparation migrates it to v3, and provenance-bearing v2 is
 rejected even on the non-canonical loader route because the public v2 branch
-forbids that field.
+forbids that field. A multiply linked preparation lock is rejected before
+`fchmod`, with the external inode's bytes and mode preserved.
 Incomplete holder receipts missing `runtime_state_root` or `closeout_route`
 are rejected by both the receipt schema and runtime binding validator. These
 are source and fixture claims; they

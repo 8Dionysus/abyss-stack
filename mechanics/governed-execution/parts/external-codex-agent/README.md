@@ -146,6 +146,9 @@ and replay only through their matching legacy wake reservation. A retry after a 
   claim freezes the complete home against every later preparation, so ambient
   changes or newly supplied grants cannot rewrite or widen a live holder;
   canonical claim publication and preparation use the same runtime-owned lock.
+  The preparation lock is itself a single-link runtime-owned regular file
+  validated before any mode effect, so an aliased lock cannot mutate an
+  external inode.
   The realization-scoped legacy path remains a compatibility read/preparation
 route only for a marked older v2 home. Every v2 manifest—including one with
 typed holder data or denied-state provenance—is rejected by canonical launch

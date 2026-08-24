@@ -5491,6 +5491,7 @@ def _incarnation_preparation_lock(
             (opened.st_dev, opened.st_ino, opened.st_mode)
             != (observed.st_dev, observed.st_ino, observed.st_mode)
             or not stat.S_ISREG(opened.st_mode)
+            or opened.st_nlink != 1
             or (opened.st_dev, opened.st_ino) in ambient_identities
         ):
             raise IncarnationHomeError(

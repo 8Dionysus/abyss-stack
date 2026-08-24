@@ -868,8 +868,10 @@ recomputes the exact denied set for older untyped v2 reads when that optional
 field is absent.
 
 All preparation attempts in one runtime state root hold the persistent
-`.incarnation-home.lock`. A first unpublished holder home is marked with the
-exact `.prepare-owner.json` token before materialization. Rollback removes only
+`.incarnation-home.lock`. The lock must itself be a runtime-owned, single-link
+regular file; its identity, type, and link count are checked before any mode
+normalization or lock effect. A first unpublished holder home is marked with
+the exact `.prepare-owner.json` token before materialization. Rollback removes only
 that tokened, unmarked root; a later attempt may recover the same stale tokened
 root under the lock, while a published home is never treated as stale.
 

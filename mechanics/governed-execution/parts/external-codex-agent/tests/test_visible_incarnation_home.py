@@ -466,6 +466,36 @@ def test_config_alias_rejection_preserves_ambient_bytes_and_mode(
     assert stat.S_IMODE(ambient_config.stat().st_mode) == before_mode
 
 
+def test_preparation_lock_alias_rejection_preserves_external_mode_and_bytes(
+    tmp_path: Path,
+) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    external_lock = tmp_path / "external.lock"
+    external_lock.write_bytes(b"external-lock-bytes")
+    external_lock.chmod(0o640)
+    os.link(external_lock, runtime_root / MODULE.PREPARATION_LOCK_FILE_NAME)
+    before_bytes = external_lock.read_bytes()
+    before_mode = stat.S_IMODE(external_lock.stat().st_mode)
+
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="incarnation preparation lock is not an isolated regular file",
+    ):
+        _ORIGINAL_PREPARE_HOME(
+            ambient_home=ambient,
+            realization_path=_realization(tmp_path / "realization.json"),
+            runtime_root=runtime_root,
+            binding_context=_holder_binding_context(runtime_root, "lock-alias"),
+        )
+
+    assert external_lock.read_bytes() == before_bytes
+    assert stat.S_IMODE(external_lock.stat().st_mode) == before_mode
+
+
 def test_new_home_requires_typed_holder_binding(tmp_path: Path) -> None:
     ambient = tmp_path / "ambient"
     runtime_root = tmp_path / "runtime"

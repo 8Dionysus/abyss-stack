@@ -71,7 +71,9 @@ lifecycle, so a mismatched, reassigned, overlapping, or sequential launch is
 rejected. Once published, the claim freezes the home against every later
 preparation: ambient changes and newly supplied grants cannot rewrite or widen
 the live holder. Claim publication and preparation share one runtime-root lock;
-an unpublished root is owned by an exact token before materialization, and only
+that lock is itself required to be a runtime-owned single-link regular file
+before any mode normalization or lock effect, so an aliased lock cannot mutate
+an external inode. An unpublished root is owned by an exact token before materialization, and only
 a tokened unmarked root can be rolled back or recovered as stale. A missing
 typed binding remains valid only for an existing legacy v2 ownership marker and
 cannot satisfy canonical launch. Every v2 manifest, including one carrying
