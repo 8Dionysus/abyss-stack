@@ -97,6 +97,23 @@ class GovernedRunnerPathTests(GovernedRunnerTestCase):
                 with self.assertRaisesRegex(RuntimeError, "source_root_unresolved"):
                     self.module.resolve_default_repo_root("abyss-stack", policy=make_policy())
 
+    def test_valid_explicit_root_without_identity_fails_closed_before_verification(self) -> None:
+        explicit_root = self.root / "explicit-without-identity"
+        init_minimal_repo(explicit_root)
+
+        with patch.dict(
+            "os.environ",
+            {"AOA_SOURCE_ROOT": str(explicit_root)},
+            clear=True,
+        ):
+            with self.assertRaisesRegex(
+                self.module.SOURCE_IDENTITY.SourceIdentityError,
+                "AOA_SOURCE_ROOT requires AOA_SOURCE_IDENTITY",
+            ):
+                self.module._bind_repo_root(explicit_root)
+            with self.assertRaisesRegex(RuntimeError, "source_root_unresolved"):
+                self.module.resolve_default_repo_root("abyss-stack", policy=make_policy())
+
     def test_source_local_root_is_the_only_implicit_candidate(self) -> None:
         script_root = self.root / "script"
         init_minimal_repo(script_root)

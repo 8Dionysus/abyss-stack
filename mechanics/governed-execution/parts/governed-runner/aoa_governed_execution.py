@@ -507,10 +507,17 @@ def candidate_repo_roots_for_target(
     return []
 
 
-def _explicit_source_identity() -> dict[str, Any] | None:
+def _explicit_source_identity() -> dict[str, Any]:
     if not os.environ.get(SOURCE_ROOT_ENV):
-        return None
-    return SOURCE_IDENTITY.load_environment_identity()
+        raise SOURCE_IDENTITY.SourceIdentityError(
+            "explicit source identity requires AOA_SOURCE_ROOT"
+        )
+    identity = SOURCE_IDENTITY.load_environment_identity()
+    if identity is None:
+        raise SOURCE_IDENTITY.SourceIdentityError(
+            "explicit AOA_SOURCE_ROOT requires AOA_SOURCE_IDENTITY"
+        )
+    return identity
 
 
 def _bind_repo_root(
