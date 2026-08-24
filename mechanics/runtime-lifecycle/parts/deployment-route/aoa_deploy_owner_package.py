@@ -25,7 +25,7 @@ import stat
 import subprocess
 import sys
 import uuid
-from typing import Any, Iterator
+from typing import Any, Callable, Iterator
 
 try:
     import fcntl
@@ -56,7 +56,15 @@ RELEASE_SPECIAL_FILE_POLICY = "reject"
 POST_SWITCH_VERIFICATION = "required_before_activation_receipt"
 POST_SWITCH_ROLLBACK = "durable-predecessor-restore"
 FINALIZATION_METHOD = "atomic-destination-effect-v1"
-DESTINATION_CAS_METHOD = "rename-noreplace-displaced-v1"
+DESTINATION_CAS_METHOD = "rename-noreplace-durable-displacement-sequence-v2"
+ROLLBACK_DISPLACEMENT_METHOD = "durable-displacement-sequence-v2"
+ROLLBACK_DISPLACEMENT_STATES = {
+    "planned",
+    "displaced",
+    "predecessor_installed",
+    "cleanup_started",
+    "cleaned",
+}
 ACTIVATION_CLAIM_CEILING = "source_activation_event_only_no_current_destination_claim"
 RECOVERY_CLAIM_CEILING = "source_activation_event_recovery_only_no_current_destination_claim"
 SOURCE_ROUTE_ADMISSION_KIND = "owner_source_deployment_route"
@@ -744,6 +752,40 @@ def _same_snapshot(left: dict[str, Any], right: dict[str, Any]) -> bool:
     )
 
 
+def _activation_owner_link_text(release_path: Path, destination: Path) -> str:
+    """Return a stable, route-owned spelling of the activated release target.
+
+    The extra ``release/../release`` traversal keeps the link target
+    semantically identical while carrying the prepared release's unique
+    operation token in the link text.  It creates no sidecar inode, so the
+    ownership token remains available for comparison without adding cleanup
+    state of its own.
+    """
+
+    relative = os.path.relpath(release_path, destination.parent)
+    return os.path.join(relative, "..", release_path.name)
+
+
+def _rollback_owner_link_text(
+    *,
+    activated_release: Path,
+    predecessor_target: Path,
+    release_root: Path,
+    destination: Path,
+) -> str:
+    """Return a unique spelling of a restored predecessor target.
+
+    The path walks through the still-present activated release and back to
+    the release root before reaching the predecessor.  A later writer using
+    the ordinary target spelling therefore cannot satisfy the owner token,
+    even if it reuses the predecessor symlink's device/inode tuple.
+    """
+
+    activated_relative = os.path.relpath(activated_release, destination.parent)
+    predecessor_relative = os.path.relpath(predecessor_target, release_root)
+    return os.path.join(activated_relative, "..", predecessor_relative)
+
+
 def _validate_recorded_snapshot(
     snapshot: dict[str, Any],
     release_root: Path,
@@ -901,6 +943,16 @@ def _receipt_binding(payload: dict[str, Any]) -> dict[str, Any]:
     if finalization is not None:
         _validate_finalization(finalization, "receipt finalization")
         binding["finalization"] = finalization
+    displacement = payload.get("rollback_displacement")
+    if displacement is not None:
+        binding["rollback_displacement"] = _validate_rollback_displacement(
+            displacement, "receipt rollback displacement"
+        )
+    rollback_owner = payload.get("rollback_owner")
+    if rollback_owner is not None:
+        binding["rollback_owner"] = _validate_rollback_owner(
+            rollback_owner, "receipt rollback owner"
+        )
     return binding
 
 
@@ -923,6 +975,8 @@ def _recovery_binding_payload(payload: dict[str, Any]) -> dict[str, Any]:
         "claim_ceiling": payload["claim_ceiling"],
         "destination_owner": payload.get("destination_owner"),
         "finalization": payload.get("finalization"),
+        "rollback_displacement": payload.get("rollback_displacement"),
+        "rollback_owner": payload.get("rollback_owner"),
     }
 
 
@@ -1035,6 +1089,8 @@ def _validate_historical_activation_reference(
         raise DeploymentError("recovery_record_invalid", "activation receipt lacks finalization event")
     historical = dict(journal)
     historical["finalization"] = finalization
+    historical.pop("rollback_displacement", None)
+    historical.pop("rollback_owner", None)
     historical["binding_sha256"] = _recovery_binding_digest(historical)
     if reference["binding_sha256"] != historical["binding_sha256"]:
         raise DeploymentError("recovery_record_invalid", "activation recovery journal historical binding digest is invalid")
@@ -1072,6 +1128,8 @@ def _recovery_state_digest(payload: dict[str, Any], status: str) -> str:
             {
                 "rollback_started_at": payload.get("rollback_started_at"),
                 "rollback_switched_at": payload.get("rollback_switched_at"),
+                "rollback_displacement": payload.get("rollback_displacement"),
+                "rollback_owner": payload.get("rollback_owner"),
             }
         )
     return _digest_payload(state)
@@ -1104,9 +1162,13 @@ def _validate_receipt_path_reference(reference: Any, label: str) -> dict[str, An
 def _validate_destination_owner(owner: Any, label: str) -> dict[str, Any]:
     if not isinstance(owner, dict):
         raise DeploymentError("recovery_record_invalid", f"{label} is not an object")
-    for key in ("target", "link_text"):
+    for key in ("target", "link_text", "owner_token"):
         if not isinstance(owner.get(key), str) or not owner[key]:
             raise DeploymentError("recovery_record_invalid", f"{label} lacks {key}")
+    if not re.fullmatch(r"[0-9a-f]{32}", owner["owner_token"]):
+        raise DeploymentError("recovery_record_invalid", f"{label} owner token is invalid")
+    if owner["owner_token"] not in owner["link_text"]:
+        raise DeploymentError("recovery_record_invalid", f"{label} link text lacks its owner token")
     _absolute_path(owner["target"], f"{label}.target")
     for key in ("device", "inode", "mode"):
         if not isinstance(owner.get(key), int) or owner[key] < 0:
@@ -1114,6 +1176,52 @@ def _validate_destination_owner(owner: Any, label: str) -> dict[str, Any]:
     if owner["inode"] == 0:
         raise DeploymentError("recovery_record_invalid", f"{label} inode is invalid")
     return owner
+
+
+def _validate_rollback_displacement(
+    displacement: Any,
+    label: str,
+    *,
+    destination: Path | None = None,
+) -> dict[str, Any]:
+    if not isinstance(displacement, dict):
+        raise DeploymentError("recovery_record_invalid", f"{label} is not an object")
+    if displacement.get("method") != ROLLBACK_DISPLACEMENT_METHOD:
+        raise DeploymentError("recovery_record_invalid", f"{label} method is invalid")
+    sequence = displacement.get("sequence")
+    if not isinstance(sequence, str) or not re.fullmatch(r"[0-9a-f]{32}", sequence):
+        raise DeploymentError("recovery_record_invalid", f"{label} sequence is invalid")
+    if displacement.get("state") not in ROLLBACK_DISPLACEMENT_STATES:
+        raise DeploymentError("recovery_record_invalid", f"{label} state is invalid")
+    for key in ("displaced_path", "predecessor_path"):
+        value = displacement.get(key)
+        if not isinstance(value, str):
+            raise DeploymentError("recovery_record_invalid", f"{label} lacks {key}")
+        path = _absolute_path(value, f"{label}.{key}")
+        if destination is not None:
+            expected_name = f".{destination.name}.{sequence}.rollback-{key.removesuffix('_path')}"
+            if path.name != expected_name:
+                raise DeploymentError("recovery_record_invalid", f"{label} {key} is not deterministic")
+            if path.parent != destination.parent:
+                raise DeploymentError("recovery_record_invalid", f"{label} {key} is outside destination parent")
+    return displacement
+
+
+def _validate_rollback_owner(owner: Any, label: str) -> dict[str, Any]:
+    if not isinstance(owner, dict):
+        raise DeploymentError("recovery_record_invalid", f"{label} is not an object")
+    sequence = owner.get("sequence")
+    if not isinstance(sequence, str) or not re.fullmatch(r"[0-9a-f]{32}", sequence):
+        raise DeploymentError("recovery_record_invalid", f"{label} sequence is invalid")
+    kind = owner.get("kind")
+    if kind == "absent":
+        return owner
+    if kind != "symlink":
+        raise DeploymentError("recovery_record_invalid", f"{label} kind is invalid")
+    checked = _validate_destination_owner(owner, label)
+    if checked["owner_token"] == sequence:
+        raise DeploymentError("recovery_record_invalid", f"{label} owner token must be distinct from displacement sequence")
+    return checked
 
 
 def _validate_finalization(finalization: Any, label: str) -> None:
@@ -1162,12 +1270,10 @@ def _validate_finalization_binding(
         if recorded_destination != destination_owner:
             raise DeploymentError("recovery_record_invalid", f"{label} destination owner is not event-bound")
     expected_target = os.fspath(activated_release.resolve(strict=False))
-    expected_link_text = os.path.relpath(activated_release, destination.parent)
-    if (
-        recorded_destination["target"] != expected_target
-        or recorded_destination["link_text"] != expected_link_text
-    ):
+    if recorded_destination["target"] != expected_target:
         raise DeploymentError("recovery_record_invalid", f"{label} destination target is not bound")
+    if recorded_destination["owner_token"] not in recorded_destination["link_text"]:
+        raise DeploymentError("recovery_record_invalid", f"{label} destination owner token is not bound")
     recorded_release = finalization["release"]
     if (
         recorded_release["path"] != os.fspath(activated_release)
@@ -1301,6 +1407,14 @@ def _validate_rollback_receipt_payload(payload: dict[str, Any], path: Path) -> N
     destination_owner = payload.get("destination_owner")
     if destination_owner is not None:
         _validate_destination_owner(destination_owner, "rollback destination owner")
+    displacement = _validate_rollback_displacement(
+        payload.get("rollback_displacement"),
+        "rollback displacement",
+        destination=destination,
+    )
+    rollback_owner = _validate_rollback_owner(payload.get("rollback_owner"), "rollback owner")
+    if rollback_owner.get("sequence") != displacement.get("sequence"):
+        raise DeploymentError("rollback_receipt_invalid", "rollback owner is not displacement-bound")
     predecessor = payload.get("restored_predecessor")
     if not isinstance(predecessor, dict):
         raise DeploymentError("rollback_receipt_invalid", "rollback receipt lacks predecessor snapshot")
@@ -1356,6 +1470,7 @@ def _validate_rollback_receipt_payload(payload: dict[str, Any], path: Path) -> N
         or atomicity.get("predecessor_identity_checked") is not True
         or atomicity.get("release_binding") != RELEASE_BINDING_METHOD
         or atomicity.get("destination_cas") != DESTINATION_CAS_METHOD
+        or atomicity.get("final_current_state_fence") != "immediately-before-receipt-and-journal"
     ):
         raise DeploymentError("rollback_receipt_invalid", "rollback atomicity is not bound")
     if payload.get("claim_ceiling") != "source_activation_rollback_only_no_runtime_claim":
@@ -1381,6 +1496,8 @@ def _validate_activation_against_journal(
     journal_binding = _receipt_binding(journal)
     if journal.get("status") in {"rollback_intent", "rollback_switch_complete", "rolled_back"}:
         activation_binding.pop("finalization", None)
+        journal_binding.pop("rollback_displacement", None)
+        journal_binding.pop("rollback_owner", None)
     if activation_binding != journal_binding:
         raise DeploymentError("recovery_record_invalid", "activation receipt identity does not match journal")
     if journal.get("status") in {"rollback_intent", "rollback_switch_complete", "rolled_back"}:
@@ -1439,6 +1556,10 @@ def _validate_rollback_against_journal(
         raise DeploymentError("recovery_record_invalid", "rollback prepare operation does not match journal")
     if _receipt_binding(rollback) != _receipt_binding(journal):
         raise DeploymentError("recovery_record_invalid", "rollback receipt identity does not match journal")
+    if rollback.get("rollback_displacement") != journal.get("rollback_displacement"):
+        raise DeploymentError("recovery_record_invalid", "rollback displacement does not match journal")
+    if rollback.get("rollback_owner") != journal.get("rollback_owner"):
+        raise DeploymentError("recovery_record_invalid", "rollback owner does not match journal")
     _validate_journal_reference(
         rollback["recovery_journal"],
         journal,
@@ -1462,8 +1583,12 @@ def _validate_rollback_against_journal(
     if require_current:
         destination = _absolute_path(journal["destination"], "recovery destination")
         release_root = _absolute_path(journal["release_root"], "recovery release root")
-        current = _snapshot_destination(destination, release_root)
-        if not _same_snapshot(current, journal["predecessor"]):
+        if not _rollback_current_state_matches(
+            destination=destination,
+            release_root=release_root,
+            predecessor=journal["predecessor"],
+            rollback_owner=_validate_rollback_owner(journal.get("rollback_owner"), "recovery rollback owner"),
+        ):
             raise DeploymentError("recovery_state_unrecognized", "destination is not the journal's predecessor")
 
 
@@ -1521,6 +1646,22 @@ def _validate_recovery_payload(payload: dict[str, Any], path: Path) -> None:
         )
     if status in {"rollback_intent", "rollback_switch_complete", "rolled_back"} and "finalization" in payload:
         raise DeploymentError("recovery_record_invalid", "rollback journal retains finalization event")
+    rollback_displacement = None
+    if status in {"rollback_intent", "rollback_switch_complete", "rolled_back"}:
+        rollback_displacement = _validate_rollback_displacement(
+            payload.get("rollback_displacement"),
+            "recovery rollback displacement",
+            destination=destination,
+        )
+    rollback_owner = None
+    if status in {"rollback_switch_complete", "rolled_back"}:
+        rollback_owner = _validate_rollback_owner(payload.get("rollback_owner"), "recovery rollback owner")
+        if rollback_owner.get("sequence") != rollback_displacement.get("sequence"):
+            raise DeploymentError("recovery_record_invalid", "recovery rollback owner is not displacement-bound")
+    elif payload.get("rollback_owner") is not None:
+        rollback_owner = _validate_rollback_owner(payload.get("rollback_owner"), "recovery rollback owner")
+        if rollback_displacement is None or rollback_owner.get("sequence") != rollback_displacement.get("sequence"):
+            raise DeploymentError("recovery_record_invalid", "recovery rollback owner is not displacement-bound")
     if payload.get("finalization") is not None:
         _validate_finalization_binding(
             payload["finalization"],
@@ -1916,11 +2057,91 @@ def _destination_identity_matches(path: Path, expected: dict[str, Any]) -> bool:
         actual = _destination_identity(path)
     except DeploymentError:
         return False
-    return all(actual.get(key) == expected.get(key) for key in ("device", "inode", "mode", "link_text", "target"))
+    if not all(actual.get(key) == expected.get(key) for key in ("device", "inode", "mode", "link_text", "target")):
+        return False
+    owner_token = expected.get("owner_token")
+    return not owner_token or owner_token in str(actual.get("link_text", ""))
 
 
 def _temporary_path(destination: Path, suffix: str) -> Path:
     return destination.parent / f".{destination.name}.{uuid.uuid4().hex}.{suffix}"
+
+
+def _rollback_displacement_paths(destination: Path, sequence: str) -> dict[str, Path]:
+    return {
+        "displaced_path": destination.parent / f".{destination.name}.{sequence}.rollback-displaced",
+        "predecessor_path": destination.parent / f".{destination.name}.{sequence}.rollback-predecessor",
+    }
+
+
+def _new_rollback_displacement(destination: Path) -> dict[str, Any]:
+    sequence = uuid.uuid4().hex
+    paths = _rollback_displacement_paths(destination, sequence)
+    return {
+        "method": ROLLBACK_DISPLACEMENT_METHOD,
+        "sequence": sequence,
+        "displaced_path": os.fspath(paths["displaced_path"]),
+        "predecessor_path": os.fspath(paths["predecessor_path"]),
+        "state": "planned",
+    }
+
+
+def _rollback_owner_from_current(
+    *,
+    destination: Path,
+    predecessor: dict[str, Any],
+    release_root: Path,
+    activated_release: Path,
+    owner_token: str,
+    sequence: str,
+) -> dict[str, Any] | None:
+    if predecessor.get("kind") == "absent":
+        # An absent destination is not enough to infer that rollback already
+        # installed the absent predecessor: it may still be the B1/B2 gap
+        # before the durable switch marker.  Only the helper that performed
+        # that transition may persist the absent rollback owner.
+        return None
+    try:
+        current = _snapshot_destination(destination, release_root)
+    except DeploymentError:
+        return None
+    if not _same_snapshot(current, predecessor):
+        return None
+    try:
+        physical = _destination_identity(destination)
+    except DeploymentError:
+        return None
+    if owner_token not in str(physical.get("link_text", "")):
+        return None
+    physical.update({"kind": "symlink", "sequence": sequence, "owner_token": owner_token})
+    return physical
+
+
+def _rollback_current_state_matches(
+    *,
+    destination: Path,
+    release_root: Path,
+    predecessor: dict[str, Any],
+    rollback_owner: dict[str, Any],
+) -> bool:
+    if rollback_owner.get("kind") == "absent":
+        return not os.path.lexists(destination)
+    try:
+        current = _snapshot_destination(destination, release_root)
+    except DeploymentError:
+        return False
+    return _same_snapshot(current, predecessor) and _destination_identity_matches(destination, rollback_owner)
+
+
+def _cleanup_rollback_artifacts(destination: Path, displacement: dict[str, Any]) -> None:
+    """Remove only this operation's detached paths after finalization."""
+
+    _validate_rollback_displacement(displacement, "rollback displacement", destination=destination)
+    for key in ("predecessor_path", "displaced_path"):
+        path = Path(displacement[key])
+        if os.path.lexists(path):
+            path.unlink()
+    _fsync_directory(destination.parent)
 
 
 def _verify_post_switch_state(
@@ -2051,15 +2272,33 @@ def _rollback_after_post_switch_failure(
                 "destination owner is not the durable activation owner before post-switch rollback",
             )
         _validate_recorded_snapshot(predecessor, release_root, label="predecessor")
-        _restore_predecessor(
+        def persist_rollback_state(
+            displacement: dict[str, Any], owner: dict[str, Any] | None
+        ) -> None:
+            nonlocal journal
+            journal["rollback_displacement"] = displacement
+            if owner is not None:
+                journal["rollback_owner"] = owner
+            journal = _write_json(recovery_path, _rollback_intent_payload(journal))
+
+        _, rollback_owner = _restore_predecessor(
             destination,
             predecessor,
             release_root,
             expected_owner=expected_owner,
+            displacement=journal["rollback_displacement"],
+            activated_release=release_path,
+            owner_token=str(journal["prepare_operation_id"]),
+            on_state=persist_rollback_state,
         )
+        journal["rollback_owner"] = rollback_owner
         journal = _write_json(recovery_path, _rollback_switch_complete_payload(journal))
-        restored = _snapshot_destination(destination, release_root)
-        if not _same_snapshot(restored, predecessor):
+        if not _rollback_current_state_matches(
+            destination=destination,
+            release_root=release_root,
+            predecessor=predecessor,
+            rollback_owner=rollback_owner,
+        ):
             raise DeploymentError(
                 "post_switch_rollback_failed",
                 "destination does not match its recorded predecessor after rollback",
@@ -2174,6 +2413,10 @@ def _rollback_intent_payload(journal: dict[str, Any]) -> dict[str, Any]:
     payload.pop("activation_receipt", None)
     payload.pop("rollback_receipt", None)
     payload.pop("finalization", None)
+    destination = _absolute_path(payload["destination"], "rollback destination")
+    displacement = payload.get("rollback_displacement") or _new_rollback_displacement(destination)
+    _validate_rollback_displacement(displacement, "rollback displacement", destination=destination)
+    payload["rollback_displacement"] = displacement
     payload["status"] = "rollback_intent"
     payload["updated_at"] = _iso(_utc_now())
     payload["rollback_started_at"] = payload.get("rollback_started_at") or _iso(_utc_now())
@@ -2188,6 +2431,17 @@ def _rollback_switch_complete_payload(journal: dict[str, Any]) -> dict[str, Any]
     payload.pop("activation_receipt", None)
     payload.pop("rollback_receipt", None)
     payload.pop("finalization", None)
+    destination = _absolute_path(payload["destination"], "rollback destination")
+    displacement = _validate_rollback_displacement(
+        payload.get("rollback_displacement"),
+        "rollback displacement",
+        destination=destination,
+    )
+    if displacement["state"] not in {"predecessor_installed", "cleanup_started", "cleaned"}:
+        raise DeploymentError("recovery_record_invalid", "rollback switch-complete displacement is not installed")
+    rollback_owner = _validate_rollback_owner(payload.get("rollback_owner"), "rollback owner")
+    if rollback_owner.get("sequence") != displacement["sequence"]:
+        raise DeploymentError("recovery_record_invalid", "rollback owner sequence is not displacement-bound")
     payload["status"] = "rollback_switch_complete"
     payload["updated_at"] = _iso(_utc_now())
     payload["rollback_started_at"] = payload.get("rollback_started_at") or _iso(_utc_now())
@@ -2451,10 +2705,12 @@ def activate(args: argparse.Namespace) -> dict[str, Any]:
                 label="activated_release",
                 seal=payload["release_seal"],
             )
-            target_link = os.path.relpath(release_path, destination.parent)
+            target_link = _activation_owner_link_text(release_path, destination)
             temporary = destination.parent / f".{destination.name}.{uuid.uuid4().hex}.switch"
             os.symlink(target_link, temporary)
             destination_owner = _destination_identity(temporary)
+            destination_owner["owner_token"] = str(payload["operation_id"])
+            _validate_destination_owner(destination_owner, "activation destination owner")
             os.replace(temporary, destination)
             _fsync_directory(destination.parent)
             journal["destination_owner"] = destination_owner
@@ -2516,84 +2772,128 @@ def _restore_predecessor(
     release_root: Path,
     *,
     expected_owner: dict[str, Any] | None = None,
-) -> str | None:
-    """Restore only the destination identity observed by this rollback.
+    displacement: dict[str, Any],
+    activated_release: Path,
+    owner_token: str,
+    on_state: Callable[[dict[str, Any], dict[str, Any] | None], None] | None = None,
+) -> tuple[str | None, dict[str, Any]]:
+    """Restore through a journaled, sequence-bound displacement protocol.
 
-    The destination is first moved to a unique displaced path without
-    replacement.  Its inode/link identity is compared there, and a
-    predecessor is installed only with RENAME_NOREPLACE.  A changed writer is
-    therefore preserved rather than overwritten or unlinked.
+    The detached path is selected and persisted before the first rename.  It
+    is retained through the rollback-switch-complete journal state, so a
+    retry never has to infer whether a tuple belongs to an inode-reusing
+    writer.  The restored symlink uses a unique spelling through the current
+    release directory; that token is the final portable CAS boundary.
     """
 
     expected_owner = expected_owner or _destination_identity(destination)
     target = _validate_recorded_snapshot(predecessor, release_root, label="predecessor")
-    displaced = _temporary_path(destination, "rollback-displaced")
-    predecessor_temp: Path | None = None
-    keep_displaced = True
-    try:
-        if target is not None:
-            predecessor_temp = _temporary_path(destination, "rollback-predecessor")
-            os.symlink(os.path.relpath(target, destination.parent), predecessor_temp)
-        try:
-            _rename_noreplace(destination, displaced)
-        except FileNotFoundError as exc:
-            raise DeploymentError("destination_missing", f"destination disappeared before rollback: {destination}") from exc
-        except OSError as exc:
-            raise DeploymentError("rollback_switch_failed", f"{destination}: {exc}") from exc
+    displacement = _validate_rollback_displacement(
+        displacement,
+        "rollback displacement",
+        destination=destination,
+    )
+    sequence = str(displacement["sequence"])
+    paths = _rollback_displacement_paths(destination, sequence)
+    displaced = paths["displaced_path"]
+    predecessor_temp = paths["predecessor_path"]
 
-        if not _destination_identity_matches(displaced, expected_owner):
+    def mark(state: str, owner: dict[str, Any] | None = None) -> None:
+        displacement["state"] = state
+        if on_state is not None:
+            on_state(displacement, owner)
+
+    try:
+        if target is not None and not os.path.lexists(predecessor_temp):
+            link_text = _rollback_owner_link_text(
+                activated_release=activated_release,
+                predecessor_target=target,
+                release_root=release_root,
+                destination=destination,
+            )
+            os.symlink(link_text, predecessor_temp)
+
+        if os.path.lexists(displaced):
+            if not _destination_identity_matches(displaced, expected_owner):
+                raise DeploymentError(
+                    "concurrent_deployment",
+                    "durable displaced path is not the recorded activation owner",
+                    {"displaced_path": os.fspath(displaced)},
+                )
+            if os.path.lexists(destination):
+                raise DeploymentError(
+                    "concurrent_deployment",
+                    "a later writer occupies the destination while the original owner is displaced",
+                    {"displaced_path": os.fspath(displaced)},
+                )
+            if displacement["state"] == "planned":
+                mark("displaced")
+        else:
+            if not os.path.lexists(destination):
+                raise DeploymentError(
+                    "destination_missing",
+                    f"destination is missing before rollback displacement: {destination}",
+                )
+            if not _destination_identity_matches(destination, expected_owner):
+                raise DeploymentError(
+                    "concurrent_deployment",
+                    "destination is not the recorded activation owner before rollback displacement",
+                )
             try:
-                _rename_noreplace(displaced, destination)
-                keep_displaced = False
-            except FileExistsError:
-                # A newer writer owns the destination.  Leave both that path
-                # and the displaced writer untouched for explicit recovery.
-                pass
+                _rename_noreplace(destination, displaced)
+            except FileNotFoundError as exc:
+                raise DeploymentError(
+                    "destination_missing",
+                    f"destination disappeared before rollback displacement: {destination}",
+                ) from exc
             except OSError as exc:
-                raise DeploymentError("rollback_switch_failed", f"cannot restore displaced destination: {exc}") from exc
+                raise DeploymentError("rollback_switch_failed", f"{destination}: {exc}") from exc
+            if not _destination_identity_matches(displaced, expected_owner):
+                try:
+                    _rename_noreplace(displaced, destination)
+                except FileExistsError:
+                    pass
+                except OSError as exc:
+                    raise DeploymentError(
+                        "rollback_switch_failed",
+                        f"cannot restore displaced destination: {exc}",
+                    ) from exc
+                raise DeploymentError(
+                    "concurrent_deployment",
+                    "destination identity changed across durable rollback displacement",
+                    {"displaced_path": os.fspath(displaced)},
+                )
+            mark("displaced")
+
+        if os.path.lexists(destination):
             raise DeploymentError(
                 "concurrent_deployment",
-                "destination identity changed before rollback compare-and-swap",
-                {"displaced_path": os.fspath(displaced)} if keep_displaced else {},
+                "a later writer occupies the destination before predecessor compare-and-swap",
+                {"displaced_path": os.fspath(displaced)},
             )
 
         if target is None:
-            if os.path.lexists(destination):
-                os.unlink(displaced)
-                keep_displaced = False
-                raise DeploymentError(
-                    "concurrent_deployment",
-                    "destination was replaced before the absent predecessor could be committed",
-                )
-            os.unlink(displaced)
-            keep_displaced = False
             _fsync_directory(destination.parent)
-            if os.path.lexists(destination):
-                raise DeploymentError(
-                    "concurrent_deployment",
-                    "destination changed after the absent predecessor compare-and-swap",
-                )
-            return None
+            owner = {"kind": "absent", "sequence": sequence}
+            mark("predecessor_installed", owner)
+            return None, owner
 
         if os.path.lexists(destination):
-            os.unlink(predecessor_temp)  # type: ignore[arg-type]
-            predecessor_temp = None
-            os.unlink(displaced)
-            keep_displaced = False
             raise DeploymentError(
                 "concurrent_deployment",
-                "destination was replaced before predecessor compare-and-swap",
+                "a later writer appeared during predecessor compare-and-swap",
+                {"displaced_path": os.fspath(displaced)},
             )
         try:
-            _rename_noreplace(predecessor_temp, destination)  # type: ignore[arg-type]
+            _rename_noreplace(predecessor_temp, destination)
         except FileExistsError as exc:
             raise DeploymentError(
                 "concurrent_deployment",
                 "destination was replaced during predecessor compare-and-swap",
+                {"displaced_path": os.fspath(displaced)},
             ) from exc
         except OSError as exc:
             raise DeploymentError("rollback_switch_failed", f"{destination}: {exc}") from exc
-        predecessor_temp = None
         _fsync_directory(destination.parent)
         try:
             restored = _snapshot_destination(destination, release_root)
@@ -2601,31 +2901,23 @@ def _restore_predecessor(
             raise DeploymentError(
                 "concurrent_deployment",
                 f"destination changed after predecessor compare-and-swap: {exc.detail}",
+                {"displaced_path": os.fspath(displaced)},
             ) from exc
         if not _same_snapshot(restored, predecessor):
             raise DeploymentError(
                 "concurrent_deployment",
                 "destination does not match the predecessor after compare-and-swap",
+                {"displaced_path": os.fspath(displaced)},
             )
-        os.unlink(displaced)
-        keep_displaced = False
-        _fsync_directory(destination.parent)
-        return os.fspath(target)
+        owner = _destination_identity(destination)
+        owner.update({"kind": "symlink", "sequence": sequence, "owner_token": owner_token})
+        _validate_rollback_owner(owner, "rollback owner")
+        mark("predecessor_installed", owner)
+        return os.fspath(target), owner
     except DeploymentError:
         raise
     except OSError as exc:
         raise DeploymentError("rollback_switch_failed", f"{destination}: {exc}") from exc
-    finally:
-        if predecessor_temp is not None:
-            try:
-                predecessor_temp.unlink(missing_ok=True)
-            except OSError:
-                pass
-        if not keep_displaced:
-            try:
-                displaced.unlink(missing_ok=True)
-            except OSError:
-                pass
 
 
 def _rollback_payload(
@@ -2651,6 +2943,8 @@ def _rollback_payload(
         "removed_activation": journal["activated_release"],
         "release_seal": journal["release_seal"],
         "destination_owner": journal.get("destination_owner"),
+        "rollback_displacement": journal["rollback_displacement"],
+        "rollback_owner": journal["rollback_owner"],
         "restored_predecessor": predecessor,
         "restored_target": restored_target,
         "admission": journal["admission"],
@@ -2666,11 +2960,124 @@ def _rollback_payload(
             "predecessor_identity_checked": True,
             "release_binding": RELEASE_BINDING_METHOD,
             "destination_cas": DESTINATION_CAS_METHOD,
+            "final_current_state_fence": "immediately-before-receipt-and-journal",
         },
         "dependency_posture": "source_only_no_install",
         "effects": ["destination_symlink_restored" if restored_target else "destination_removed"],
         "claim_ceiling": "source_activation_rollback_only_no_runtime_claim",
     }
+
+
+def _rollback_switch_state_payload(journal: dict[str, Any], state: str) -> dict[str, Any]:
+    payload = dict(journal)
+    displacement = dict(payload["rollback_displacement"])
+    displacement["state"] = state
+    payload["rollback_displacement"] = displacement
+    return _rollback_switch_complete_payload(payload)
+
+
+def _remove_unpublished_rollback_receipt(path: Path) -> None:
+    try:
+        path.unlink(missing_ok=True)
+        _fsync_directory(path.parent)
+    except OSError:
+        # The journal remains rollback-switch-complete and therefore cannot
+        # admit the receipt.  Preserve the failure as recovery-required even
+        # if a best-effort cleanup is not possible.
+        pass
+
+
+def _finish_rollback(
+    *,
+    journal: dict[str, Any],
+    recovery_path: Path,
+    activation_path: Path,
+    activation_reference: dict[str, Any],
+    receipt_path: Path,
+    destination: Path,
+    release_root: Path,
+) -> dict[str, Any]:
+    """Publish rollback only across two immediate current-state fences."""
+
+    journal = _write_json(
+        recovery_path,
+        _rollback_switch_state_payload(journal, "cleanup_started"),
+    )
+    try:
+        _cleanup_rollback_artifacts(destination, journal["rollback_displacement"])
+    except OSError as exc:
+        raise _recovery_required(
+            recovery_path,
+            DeploymentError("rollback_cleanup_failed", f"{destination}: {exc}"),
+        ) from exc
+    journal = _write_json(
+        recovery_path,
+        _rollback_switch_state_payload(journal, "cleaned"),
+    )
+    journal["_recovery_path"] = os.fspath(recovery_path)
+    rollback_owner = _validate_rollback_owner(journal.get("rollback_owner"), "rollback owner")
+    if not _rollback_current_state_matches(
+        destination=destination,
+        release_root=release_root,
+        predecessor=journal["predecessor"],
+        rollback_owner=rollback_owner,
+    ):
+        raise _recovery_required(
+            recovery_path,
+            DeploymentError(
+                "rollback_current_state_mismatch",
+                "destination changed before rollback receipt publication",
+            ),
+        )
+
+    rollback_payload = _rollback_payload(
+        journal=journal,
+        recovery_path=recovery_path,
+        activation_reference=activation_reference,
+        restored_target=(
+            journal["predecessor"].get("target")
+            if journal["predecessor"].get("kind") == "symlink"
+            else None
+        ),
+    )
+    try:
+        receipt = _write_json(receipt_path, rollback_payload)
+    except DeploymentError as exc:
+        raise _recovery_required(recovery_path, exc) from exc
+
+    # The receipt write is deliberately followed by another fence.  This
+    # closes the injected/realistic boundary where a later writer appears
+    # while the receipt is being materialized.
+    if not _rollback_current_state_matches(
+        destination=destination,
+        release_root=release_root,
+        predecessor=journal["predecessor"],
+        rollback_owner=rollback_owner,
+    ):
+        _remove_unpublished_rollback_receipt(receipt_path)
+        raise _recovery_required(
+            recovery_path,
+            DeploymentError(
+                "rollback_current_state_mismatch",
+                "destination changed before rollback journal finalization",
+            ),
+        )
+
+    final_journal = {key: value for key, value in journal.items() if key != "_recovery_path"}
+    final_journal.pop("activation_receipt", None)
+    final_journal.update(
+        {
+            "status": "rolled_back",
+            "updated_at": _iso(_utc_now()),
+            "rollback_receipt": _completed_receipt_reference(receipt_path, receipt),
+        }
+    )
+    try:
+        _write_json(recovery_path, final_journal)
+    except DeploymentError as exc:
+        _remove_unpublished_rollback_receipt(receipt_path)
+        raise _recovery_required(recovery_path, exc) from exc
+    return {"receipt_path": os.fspath(receipt_path), **receipt}
 
 
 def rollback(args: argparse.Namespace) -> dict[str, Any]:
@@ -2724,12 +3131,27 @@ def rollback(args: argparse.Namespace) -> dict[str, Any]:
                 seal=journal["release_seal"],
             )
             _validate_recorded_snapshot(journal["predecessor"], release_root, label="predecessor")
-            restored = _restore_predecessor(
+            def persist_rollback_state(
+                displacement: dict[str, Any], owner: dict[str, Any] | None
+            ) -> None:
+                nonlocal journal
+                journal["rollback_displacement"] = displacement
+                if owner is not None:
+                    journal["rollback_owner"] = owner
+                journal = _write_json(recovery_path, _rollback_intent_payload(journal))
+                journal["_recovery_path"] = os.fspath(recovery_path)
+
+            _, rollback_owner = _restore_predecessor(
                 destination,
                 journal["predecessor"],
                 release_root,
                 expected_owner=expected_owner,
+                displacement=journal["rollback_displacement"],
+                activated_release=_absolute_path(journal["activated_release"], "activated release"),
+                owner_token=str(journal["prepare_operation_id"]),
+                on_state=persist_rollback_state,
             )
+            journal["rollback_owner"] = rollback_owner
         except DeploymentError as exc:
             raise _recovery_required(recovery_path, exc) from exc
         except OSError as exc:
@@ -2743,32 +3165,21 @@ def rollback(args: argparse.Namespace) -> dict[str, Any]:
             raise _recovery_required(recovery_path, exc) from exc
         journal["_recovery_path"] = os.fspath(recovery_path)
         activation_reference = _completed_receipt_reference(activation_path, fresh_activation)
-        receipt_dir = _absolute_path(args.receipt_dir, "receipt_dir") if args.receipt_dir else activation_path.parent
-        receipt_path = receipt_dir / f"rollback-{journal['operation_id']}.json"
-        rollback_payload = _rollback_payload(
-            journal=journal,
-            recovery_path=recovery_path,
-            activation_reference=activation_reference,
-            restored_target=restored,
-        )
+        receipt_path = _absolute_path(journal["rollback_receipt_path"], "rollback receipt")
         try:
-            receipt = _write_json(receipt_path, rollback_payload)
+            return _finish_rollback(
+                journal=journal,
+                recovery_path=recovery_path,
+                activation_path=activation_path,
+                activation_reference=activation_reference,
+                receipt_path=receipt_path,
+                destination=destination,
+                release_root=release_root,
+            )
         except DeploymentError as exc:
+            if exc.code == "activation_recovery_required":
+                raise
             raise _recovery_required(recovery_path, exc) from exc
-        final_journal = {key: value for key, value in journal.items() if key != "_recovery_path"}
-        final_journal.pop("activation_receipt", None)
-        final_journal.update(
-            {
-                "status": "rolled_back",
-                "updated_at": _iso(_utc_now()),
-                "rollback_receipt": _completed_receipt_reference(receipt_path, receipt),
-            }
-        )
-        try:
-            _write_json(recovery_path, final_journal)
-        except DeploymentError as exc:
-            raise _recovery_required(recovery_path, exc) from exc
-        return {"receipt_path": os.fspath(receipt_path), **receipt}
 
 
 def _recovery_target_snapshot(journal: dict[str, Any]) -> dict[str, Any]:
@@ -2902,101 +3313,222 @@ def _recover_rollback(recovery_path: Path) -> dict[str, Any]:
             "rollback_switch_complete",
         }:
             raise DeploymentError("recovery_record_invalid", "recovery journal cannot be rolled back")
-        current = _snapshot_destination(destination, release_root)
-        expected_target = _recovery_target_snapshot(fresh)
         predecessor = fresh["predecessor"]
-        destination_owner = fresh.get("destination_owner")
-        owner_matches = (
-            isinstance(destination_owner, dict)
-            and _destination_identity_matches(destination, destination_owner)
-        )
-        target_current = (
-            _same_snapshot(current, expected_target)
-            and current.get("release_seal") == fresh.get("release_seal")
-            and owner_matches
-        )
-        predecessor_current = _same_snapshot(current, predecessor)
-        if not target_current and not predecessor_current:
-            raise _recovery_required(
-                recovery_path,
-                DeploymentError(
-                    "recovery_state_unrecognized",
-                    "destination is neither the durable activated owner nor its predecessor",
-                ),
+        try:
+            current = _snapshot_destination(destination, release_root)
+        except DeploymentError as exc:
+            raise _recovery_required(recovery_path, exc) from exc
+
+        status = str(fresh["status"])
+        rollback_owner: dict[str, Any] | None = None
+        if status in {"rollback_intent", "rollback_switch_complete"}:
+            displacement = _validate_rollback_displacement(
+                fresh.get("rollback_displacement"),
+                "recovery rollback displacement",
+                destination=destination,
             )
-        if fresh.get("status") == "rollback_switch_complete" and target_current:
-            raise DeploymentError(
-                "recovery_state_unrecognized",
-                "rollback-switch-complete journal points at the activated release",
+            if fresh.get("rollback_owner") is not None:
+                rollback_owner = _validate_rollback_owner(
+                    fresh["rollback_owner"], "recovery rollback owner"
+                )
+            if rollback_owner is None and status == "rollback_intent":
+                rollback_owner = _rollback_owner_from_current(
+                    destination=destination,
+                    predecessor=predecessor,
+                    release_root=release_root,
+                    activated_release=activated_release,
+                    owner_token=str(fresh["prepare_operation_id"]),
+                    sequence=str(displacement["sequence"]),
+                )
+            if rollback_owner is not None:
+                if rollback_owner.get("sequence") != displacement["sequence"]:
+                    raise _recovery_required(
+                        recovery_path,
+                        DeploymentError(
+                            "recovery_state_unrecognized",
+                            "rollback owner sequence is not bound to the durable displacement",
+                        ),
+                    )
+                fresh["rollback_owner"] = rollback_owner
+                if not _rollback_current_state_matches(
+                    destination=destination,
+                    release_root=release_root,
+                    predecessor=predecessor,
+                    rollback_owner=rollback_owner,
+                ):
+                    raise _recovery_required(
+                        recovery_path,
+                        DeploymentError(
+                            "rollback_current_state_mismatch",
+                            "destination no longer matches the recorded rollback owner",
+                        ),
+                    )
+                if status == "rollback_intent":
+                    try:
+                        fresh = _write_json(
+                            recovery_path,
+                            _rollback_switch_complete_payload(fresh),
+                        )
+                    except DeploymentError as exc:
+                        raise _recovery_required(recovery_path, exc) from exc
+                    fresh["_recovery_path"] = os.fspath(recovery_path)
+                activation_reference = _recovery_activation_reference(fresh, activation_path)
+                try:
+                    return _finish_rollback(
+                        journal=fresh,
+                        recovery_path=recovery_path,
+                        activation_path=activation_path,
+                        activation_reference=activation_reference,
+                        receipt_path=rollback_path,
+                        destination=destination,
+                        release_root=release_root,
+                    )
+                except DeploymentError as exc:
+                    if exc.code == "activation_recovery_required":
+                        raise
+                    raise _recovery_required(recovery_path, exc) from exc
+
+            displaced_path = Path(displacement["displaced_path"])
+            if os.path.lexists(displaced_path) and os.path.lexists(destination):
+                raise _recovery_required(
+                    recovery_path,
+                    DeploymentError(
+                        "concurrent_deployment",
+                        "a later writer is preserved beside the durable displaced owner",
+                        {"displaced_path": os.fspath(displaced_path)},
+                    ),
+                )
+            if displacement["state"] not in {"planned", "displaced"}:
+                raise _recovery_required(
+                    recovery_path,
+                    DeploymentError(
+                        "recovery_state_unrecognized",
+                        "rollback displacement is incomplete but its owner is not current",
+                    ),
+                )
+        else:
+            expected_target = _recovery_target_snapshot(fresh)
+            destination_owner = fresh.get("destination_owner")
+            target_current = (
+                isinstance(destination_owner, dict)
+                and _same_snapshot(current, expected_target)
+                and current.get("release_seal") == fresh.get("release_seal")
+                and _destination_identity_matches(destination, destination_owner)
             )
-        if fresh.get("status") not in {"rollback_intent", "rollback_switch_complete"}:
+            if not target_current:
+                # An intent journal with no installed owner and an unchanged
+                # absent predecessor means the switch never happened.  This
+                # is safe to close without inferring a mutable inode owner.
+                if (
+                    status == "intent_written"
+                    and predecessor.get("kind") == "absent"
+                    and not os.path.lexists(destination)
+                ):
+                    try:
+                        fresh = _write_json(recovery_path, _rollback_intent_payload(fresh))
+                        fresh["rollback_owner"] = {
+                            "kind": "absent",
+                            "sequence": fresh["rollback_displacement"]["sequence"],
+                        }
+                        fresh["rollback_displacement"]["state"] = "cleaned"
+                        fresh = _write_json(
+                            recovery_path,
+                            _rollback_switch_complete_payload(fresh),
+                        )
+                    except DeploymentError as exc:
+                        raise _recovery_required(recovery_path, exc) from exc
+                    fresh["_recovery_path"] = os.fspath(recovery_path)
+                    activation_reference = _recovery_activation_reference(fresh, activation_path)
+                    try:
+                        return _finish_rollback(
+                            journal=fresh,
+                            recovery_path=recovery_path,
+                            activation_path=activation_path,
+                            activation_reference=activation_reference,
+                            receipt_path=rollback_path,
+                            destination=destination,
+                            release_root=release_root,
+                        )
+                    except DeploymentError as exc:
+                        if exc.code == "activation_recovery_required":
+                            raise
+                        raise _recovery_required(recovery_path, exc) from exc
+                raise _recovery_required(
+                    recovery_path,
+                    DeploymentError(
+                        "recovery_state_unrecognized",
+                        "destination is neither the unique activated owner nor a safely closed predecessor state",
+                    ),
+                )
+
             try:
                 fresh = _write_json(recovery_path, _rollback_intent_payload(fresh))
             except DeploymentError as exc:
                 raise _recovery_required(recovery_path, exc) from exc
             fresh["_recovery_path"] = os.fspath(recovery_path)
-        restored: str | None
-        if target_current:
-            source = fresh["source"]
-            try:
-                expected_owner = _validate_destination_owner(
-                    fresh.get("destination_owner"), "rollback destination owner"
-                )
-                _verify_recorded_release(
-                    activated_release,
-                    source["ref"],
-                    source["tree"],
-                    label="activated_release",
-                    seal=fresh["release_seal"],
-                )
-                _validate_recorded_snapshot(predecessor, release_root, label="predecessor")
-                restored = _restore_predecessor(
-                    destination,
-                    predecessor,
-                    release_root,
-                    expected_owner=expected_owner,
-                )
-            except DeploymentError as exc:
-                raise _recovery_required(recovery_path, exc) from exc
-            except OSError as exc:
-                raise _recovery_required(
-                    recovery_path,
-                    DeploymentError("rollback_switch_failed", f"{destination}: {exc}"),
-                ) from exc
-        else:
+
+        source = fresh["source"]
+        try:
+            expected_owner = _validate_destination_owner(
+                fresh.get("destination_owner"), "rollback destination owner"
+            )
+            _verify_recorded_release(
+                activated_release,
+                source["ref"],
+                source["tree"],
+                label="activated_release",
+                seal=fresh["release_seal"],
+            )
             _validate_recorded_snapshot(predecessor, release_root, label="predecessor")
-            restored = predecessor.get("target") if predecessor.get("kind") == "symlink" else None
-        if fresh.get("status") != "rollback_switch_complete":
-            try:
-                fresh = _write_json(recovery_path, _rollback_switch_complete_payload(fresh))
-            except DeploymentError as exc:
-                raise _recovery_required(recovery_path, exc) from exc
-            fresh["_recovery_path"] = os.fspath(recovery_path)
+
+            def persist_rollback_state(
+                displacement: dict[str, Any], owner: dict[str, Any] | None
+            ) -> None:
+                nonlocal fresh
+                fresh["rollback_displacement"] = displacement
+                if owner is not None:
+                    fresh["rollback_owner"] = owner
+                fresh = _write_json(recovery_path, _rollback_intent_payload(fresh))
+                fresh["_recovery_path"] = os.fspath(recovery_path)
+
+            _, rollback_owner = _restore_predecessor(
+                destination,
+                predecessor,
+                release_root,
+                expected_owner=expected_owner,
+                displacement=fresh["rollback_displacement"],
+                activated_release=activated_release,
+                owner_token=str(fresh["prepare_operation_id"]),
+                on_state=persist_rollback_state,
+            )
+            fresh["rollback_owner"] = rollback_owner
+            fresh = _write_json(
+                recovery_path,
+                _rollback_switch_complete_payload(fresh),
+            )
+        except DeploymentError as exc:
+            raise _recovery_required(recovery_path, exc) from exc
+        except OSError as exc:
+            raise _recovery_required(
+                recovery_path,
+                DeploymentError("rollback_switch_failed", f"{destination}: {exc}"),
+            ) from exc
+        fresh["_recovery_path"] = os.fspath(recovery_path)
         activation_reference = _recovery_activation_reference(fresh, activation_path)
-        rollback_payload = _rollback_payload(
-            journal=fresh,
-            recovery_path=recovery_path,
-            activation_reference=activation_reference,
-            restored_target=restored,
-        )
         try:
-            receipt = _write_json(rollback_path, rollback_payload)
+            return _finish_rollback(
+                journal=fresh,
+                recovery_path=recovery_path,
+                activation_path=activation_path,
+                activation_reference=activation_reference,
+                receipt_path=rollback_path,
+                destination=destination,
+                release_root=release_root,
+            )
         except DeploymentError as exc:
+            if exc.code == "activation_recovery_required":
+                raise
             raise _recovery_required(recovery_path, exc) from exc
-        final_journal = {key: value for key, value in fresh.items() if key != "_recovery_path"}
-        final_journal.pop("activation_receipt", None)
-        final_journal.update(
-            {
-                "status": "rolled_back",
-                "updated_at": _iso(_utc_now()),
-                "rollback_receipt": _completed_receipt_reference(rollback_path, receipt),
-            }
-        )
-        try:
-            _write_json(recovery_path, final_journal)
-        except DeploymentError as exc:
-            raise _recovery_required(recovery_path, exc) from exc
-        return {"receipt_path": os.fspath(rollback_path), **receipt}
 
 
 def recover(args: argparse.Namespace) -> dict[str, Any]:

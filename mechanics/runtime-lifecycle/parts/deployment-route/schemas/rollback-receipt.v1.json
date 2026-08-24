@@ -44,14 +44,55 @@
     "destinationOwner": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["target", "link_text", "device", "inode", "mode"],
+      "required": ["target", "link_text", "device", "inode", "mode", "owner_token"],
       "properties": {
         "target": {"$ref": "#/$defs/absolutePath"},
         "link_text": {"type": "string", "minLength": 1},
         "device": {"type": "integer", "minimum": 0},
         "inode": {"type": "integer", "minimum": 1},
-        "mode": {"type": "integer", "minimum": 0}
+        "mode": {"type": "integer", "minimum": 0},
+        "owner_token": {"type": "string", "pattern": "^[0-9a-f]{32}$"}
       }
+    },
+    "rollbackDisplacement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["method", "sequence", "displaced_path", "predecessor_path", "state"],
+      "properties": {
+        "method": {"const": "durable-displacement-sequence-v2"},
+        "sequence": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
+        "displaced_path": {"$ref": "#/$defs/absolutePath"},
+        "predecessor_path": {"$ref": "#/$defs/absolutePath"},
+        "state": {"enum": ["planned", "displaced", "predecessor_installed", "cleanup_started", "cleaned"]}
+      }
+    },
+    "rollbackOwner": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "sequence"],
+          "properties": {
+            "kind": {"const": "absent"},
+            "sequence": {"type": "string", "pattern": "^[0-9a-f]{32}$"}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "sequence", "target", "link_text", "device", "inode", "mode", "owner_token"],
+          "properties": {
+            "kind": {"const": "symlink"},
+            "sequence": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
+            "target": {"$ref": "#/$defs/absolutePath"},
+            "link_text": {"type": "string", "minLength": 1},
+            "device": {"type": "integer", "minimum": 0},
+            "inode": {"type": "integer", "minimum": 1},
+            "mode": {"type": "integer", "minimum": 0},
+            "owner_token": {"type": "string", "pattern": "^[0-9a-f]{32}$"}
+          }
+        }
+      ]
     },
     "finalization": {
       "type": "object",
@@ -149,7 +190,9 @@
         },
         "predecessor": {"$ref": "#/$defs/snapshot"},
         "admission": {"$ref": "#/$defs/admission"},
-        "finalization": {"$ref": "#/$defs/finalization"}
+        "finalization": {"$ref": "#/$defs/finalization"},
+        "rollback_displacement": {"$ref": "#/$defs/rollbackDisplacement"},
+        "rollback_owner": {"$ref": "#/$defs/rollbackOwner"}
       }
     },
     "recoveryReference": {
@@ -196,7 +239,8 @@
         "destination_identity_checked",
         "predecessor_identity_checked",
         "release_binding",
-        "destination_cas"
+        "destination_cas",
+        "final_current_state_fence"
       ],
       "properties": {
         "same_filesystem": {"const": true},
@@ -204,7 +248,8 @@
         "destination_identity_checked": {"const": true},
         "predecessor_identity_checked": {"const": true},
         "release_binding": {"const": "content-manifest-root-inode-v1"},
-        "destination_cas": {"const": "rename-noreplace-displaced-v1"}
+        "destination_cas": {"const": "rename-noreplace-durable-displacement-sequence-v2"},
+        "final_current_state_fence": {"const": "immediately-before-receipt-and-journal"}
       }
     }
   },
@@ -224,6 +269,8 @@
     "removed_activation",
     "release_seal",
     "destination_owner",
+    "rollback_displacement",
+    "rollback_owner",
     "admission",
     "restored_predecessor",
     "restored_target",
@@ -254,6 +301,8 @@
         {"type": "null"}
       ]
     },
+    "rollback_displacement": {"$ref": "#/$defs/rollbackDisplacement"},
+    "rollback_owner": {"$ref": "#/$defs/rollbackOwner"},
     "admission": {"$ref": "#/$defs/admission"},
     "restored_predecessor": {"$ref": "#/$defs/snapshot"},
     "restored_target": {

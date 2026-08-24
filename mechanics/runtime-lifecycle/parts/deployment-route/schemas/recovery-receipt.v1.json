@@ -44,14 +44,55 @@
     "destinationOwner": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["target", "link_text", "device", "inode", "mode"],
+      "required": ["target", "link_text", "device", "inode", "mode", "owner_token"],
       "properties": {
         "target": {"$ref": "#/$defs/absolutePath"},
         "link_text": {"type": "string", "minLength": 1},
         "device": {"type": "integer", "minimum": 0},
         "inode": {"type": "integer", "minimum": 1},
-        "mode": {"type": "integer", "minimum": 0}
+        "mode": {"type": "integer", "minimum": 0},
+        "owner_token": {"type": "string", "pattern": "^[0-9a-f]{32}$"}
       }
+    },
+    "rollbackDisplacement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["method", "sequence", "displaced_path", "predecessor_path", "state"],
+      "properties": {
+        "method": {"const": "durable-displacement-sequence-v2"},
+        "sequence": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
+        "displaced_path": {"$ref": "#/$defs/absolutePath"},
+        "predecessor_path": {"$ref": "#/$defs/absolutePath"},
+        "state": {"enum": ["planned", "displaced", "predecessor_installed", "cleanup_started", "cleaned"]}
+      }
+    },
+    "rollbackOwner": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "sequence"],
+          "properties": {
+            "kind": {"const": "absent"},
+            "sequence": {"type": "string", "pattern": "^[0-9a-f]{32}$"}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "sequence", "target", "link_text", "device", "inode", "mode", "owner_token"],
+          "properties": {
+            "kind": {"const": "symlink"},
+            "sequence": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
+            "target": {"$ref": "#/$defs/absolutePath"},
+            "link_text": {"type": "string", "minLength": 1},
+            "device": {"type": "integer", "minimum": 0},
+            "inode": {"type": "integer", "minimum": 1},
+            "mode": {"type": "integer", "minimum": 0},
+            "owner_token": {"type": "string", "pattern": "^[0-9a-f]{32}$"}
+          }
+        }
+      ]
     },
     "finalization": {
       "type": "object",
@@ -117,7 +158,9 @@
         "destination_owner": {"$ref": "#/$defs/destinationOwner"},
         "predecessor": {"$ref": "#/$defs/snapshot"},
         "admission": {"$ref": "#/$defs/admission"},
-        "finalization": {"$ref": "#/$defs/finalization"}
+        "finalization": {"$ref": "#/$defs/finalization"},
+        "rollback_displacement": {"$ref": "#/$defs/rollbackDisplacement"},
+        "rollback_owner": {"$ref": "#/$defs/rollbackOwner"}
       }
     },
     "completedReference": {
@@ -209,6 +252,8 @@
     "activated_release": {"$ref": "#/$defs/absolutePath"},
     "release_seal": {"$ref": "#/$defs/releaseSeal"},
     "destination_owner": {"$ref": "#/$defs/destinationOwner"},
+    "rollback_displacement": {"$ref": "#/$defs/rollbackDisplacement"},
+    "rollback_owner": {"$ref": "#/$defs/rollbackOwner"},
     "predecessor": {"$ref": "#/$defs/snapshot"},
     "admission": {"$ref": "#/$defs/admission"},
     "activation_receipt_path": {"$ref": "#/$defs/absolutePath"},
@@ -243,7 +288,7 @@
         "required": ["status"],
         "properties": {"status": {"enum": ["rollback_intent", "rollback_switch_complete", "rolled_back"]}}
       },
-      "then": {"required": ["switch_complete_sha256"]}
+      "then": {"required": ["switch_complete_sha256", "rollback_displacement"]}
     },
     {
       "if": {
@@ -257,7 +302,7 @@
         "required": ["status"],
         "properties": {"status": {"enum": ["rollback_switch_complete", "rolled_back"]}}
       },
-      "then": {"required": ["rollback_switched_at", "rollback_switch_complete_sha256"]}
+      "then": {"required": ["rollback_switched_at", "rollback_switch_complete_sha256", "rollback_owner"]}
     },
     {
       "if": {

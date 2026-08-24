@@ -31,7 +31,10 @@ target/seal comparison alone had the same defect.
 The source owner, the host artifact-trust owner, and the runtime/deployment
 owner are different responsibilities. A source commit/tree check, artifact
 admission, and live runtime health therefore cannot be collapsed into one
-green result.
+green result. The first rollback implementation review further found three
+independent gaps: displacement was random and unjournaled, device/inode/link
+tuples could be reused by a later writer, and receipt publication had no final
+current-state fence.
 
 ## Options considered
 
@@ -60,14 +63,14 @@ files are rejected and symlinks are recorded without traversal. The route
 revalidates that seal immediately before switching and again after the
 destination switch. The lock coordinates cooperating route writers, but
 staged rename alone cannot exclude a same-UID path replacement. The route
-captures the temporary symlink's device/inode, mode, target, and link text
-before the successful `os.replace`, then durably records that owner with a
-committed switch event before an activation receipt is written. Ordinary
-activation and `recover --action finalize` share this contract. Their
-finalization is historical (`current_destination_claim: false`), so a later
-writer is not misclaimed as the route's current destination; a defensive
-post-switch read remains an integrity fence, not the atomicity proof. A
-privileged actor that changes modes or bypasses the filesystem controls
+captures the temporary symlink's device/inode, mode, target, link text, and a
+prepared-release owner token before the successful `os.replace`, then durably
+records that owner with a committed switch event before an activation receipt
+is written. Ordinary activation and `recover --action finalize` share this
+contract. Their finalization is historical (`current_destination_claim: false`),
+so a later writer is not misclaimed as the route's current destination; a
+defensive post-switch read remains an integrity fence, not the atomicity proof.
+A privileged actor that changes modes or bypasses the filesystem controls
 remains outside this source-only guarantee. Ignored cache content is outside
 Git's source identity and is not introduced by staging, but any ignored content
 present in a release is covered by the release manifest; tracked and
@@ -77,6 +80,19 @@ durable recovery journal before the same-filesystem relative symlink plus
 finalized or rolled back, and rollback restores the recorded predecessor
 without deleting releases. If the switch owner was not durably recorded,
 recovery refuses to infer it from target or seal.
+
+Rollback uses a portable protocol boundary rather than a kernel handle: the
+intent journal allocates a deterministic displacement path and fresh sequence
+before any rename; `RENAME_NOREPLACE` moves the owner there and the path is
+retained through the durable rollback-switch marker. The predecessor effect
+uses a link spelling bound to that sequence and the prepared activation token,
+so an inode-reusing later writer with the same target cannot satisfy the CAS.
+The state machine explicitly covers B1 after displacement, B2 after
+predecessor install/cleanup, B3 after the rollback-switch marker, B4 during
+receipt publication, and B5 after inode reuse. A final current-state fence is
+performed immediately before the rollback receipt and again immediately
+before the final journal; either mismatch suppresses the receipt and leaves
+the journal recovery-required.
 
 The route admission is an input contract, not an `abyss-machine` artifact
 signature. Artifact classes, signatures, SBOM/provenance, registry selection,
@@ -109,10 +125,12 @@ exchange without a cross-file receipt transaction cannot establish that
 ownership. The durable intent/switch/receipt sequence makes an active
 destination explicit instead of allowing a plain rejection with an unjournaled
 new target. Rollback has its own `rollback_intent` and
-`rollback_switch_complete` states and carries the exact destination owner
-through retries; changed inode/link identity, even with the same target and
-seal, is preserved and remains recovery-required. The rollback receipt is
-written only after the predecessor effect is journaled. Typed receipts bind
+`rollback_switch_complete` states, a durable displacement record, and a
+sequence-bound rollback owner. It carries those records through retries;
+changed inode/link identity, even with the same target and seal, is preserved
+and remains recovery-required. The rollback receipt is written only after the
+predecessor effect and cleanup state are journaled and both final current-state
+fences pass. Typed receipts bind
 every finalized activation/rollback reference to the journal state digest and
 immutable operation/source/destination/release/predecessor/admission identity.
 Directory-open/fsync and receipt-write failures therefore return a
@@ -135,7 +153,11 @@ explicit so source preparation cannot be mistaken for runtime proof.
   before any activation receipt is emitted.
 - Activation receipts describe the historical atomic switch event and
   explicitly do not claim that the mutable destination is still current;
-  rollback requires the durable destination owner token.
+  rollback requires the durable destination owner token, displacement sequence,
+  and rollback owner.
+- Rollback keeps a discoverable displaced path through each pre-receipt state;
+  B1-B5 later-writer and inode-reuse interleavings fail closed without object
+  loss, overwrite, or a false rollback receipt.
 - Configs sync remains the source/runtime mirror route for ordinary stack
   changes; this route is not a replacement for it.
 

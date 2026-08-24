@@ -177,6 +177,39 @@ def install_same_target_writer(destination: Path, release_path: Path, suffix: st
     return ROUTE._destination_identity(destination)
 
 
+def install_same_target_writer_reusing_inode(
+    destination: Path,
+    release_path: Path,
+    expected_owner: dict[str, object],
+    suffix: str,
+) -> tuple[dict[str, object], bool]:
+    """Exercise inode reuse, with a physical-identity fallback for tmpfs."""
+
+    replacement = destination.parent / f".{destination.name}.{suffix}"
+    for attempt in range(4096):
+        # Free the predecessor inode before allocating the replacement.  The
+        # fixture intentionally models the inode-reuse boundary after the
+        # predecessor CAS/cleanup; doing this before symlink allocation makes
+        # the reuse probe deterministic across disposable directory roots.
+        destination.unlink(missing_ok=True)
+        replacement.unlink(missing_ok=True)
+        replacement.symlink_to(os.path.relpath(release_path, destination.parent))
+        os.replace(replacement, destination)
+        actual = ROUTE._destination_identity(destination)
+        if all(actual[key] == expected_owner[key] for key in ("device", "inode", "mode")):
+            return actual, True
+        replacement = destination.parent / f".{destination.name}.{suffix}-{attempt}"
+    # tmpfs allocates monotonically and cannot expose this collision in a
+    # bounded disposable probe.  Preserve the real later-writer link text and
+    # model only the reused physical tuple at the lstat boundary; the route's
+    # owner-token/link-spelling check must still reject it.  The same test is
+    # run on the workspace filesystem below with an actual reused inode.
+    actual = ROUTE._destination_identity(destination)
+    for key in ("device", "inode", "mode"):
+        actual[key] = expected_owner[key]
+    return actual, False
+
+
 def two_release_fixture(tmp_path: Path) -> tuple[dict[str, Path | str], Path, dict[str, object]]:
     fixture = route_fixture(tmp_path)
     first_prepare = output(invoke(*prepare_command(fixture)))
@@ -666,6 +699,211 @@ def test_rollback_retry_preserves_same_target_writer_after_displacement(
     assert not Path(journal["rollback_receipt_path"]).exists()
 
 
+def test_rb_b1_displacement_is_durable_before_predecessor_install(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fixture, _, second_activate = two_release_fixture(tmp_path)
+    destination = Path(fixture["destination"])
+    second_release = Path(second_activate["activated_release"])
+    original_rename = ROUTE._rename_noreplace
+    writer: dict[str, object] = {}
+    fired = False
+
+    def install_writer_after_displacement(source: Path, target: Path) -> None:
+        nonlocal fired
+        original_rename(source, target)
+        if not fired and Path(target).name.endswith(".rollback-displaced"):
+            fired = True
+            writer.update(install_same_target_writer(destination, second_release, "rb-b1-writer"))
+
+    monkeypatch.setattr(ROUTE, "_rename_noreplace", install_writer_after_displacement)
+    with pytest.raises(ROUTE.DeploymentError) as raised:
+        ROUTE.rollback(argparse.Namespace(activation_receipt=second_activate["receipt_path"], receipt_dir=None))
+
+    assert raised.value.code == "activation_recovery_required"
+    assert fired is True
+    journal_path = Path(second_activate["recovery_journal"]["path"])
+    journal = validate_instance(journal_path, "recovery-receipt.v1.json")
+    assert journal["status"] == "rollback_intent"
+    assert journal["rollback_displacement"]["state"] == "displaced"
+    assert Path(journal["rollback_displacement"]["displaced_path"]).is_symlink()
+    assert ROUTE._destination_identity(destination)["inode"] == writer["inode"]
+    assert not Path(journal["rollback_receipt_path"]).exists()
+
+    retry = invoke("recover", "--recovery-journal", str(journal_path), "--action", "rollback")
+    assert retry.returncode == 2
+    assert json.loads(retry.stderr)["error"]["code"] == "activation_recovery_required"
+    assert Path(journal["rollback_displacement"]["displaced_path"]).is_symlink()
+    assert ROUTE._destination_identity(destination)["inode"] == writer["inode"]
+
+
+def test_rb_b2_predecessor_and_cleanup_are_journaled_before_switch_complete(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fixture, first_release, second_activate = two_release_fixture(tmp_path)
+    destination = Path(fixture["destination"])
+    original_switch_complete = ROUTE._rollback_switch_complete_payload
+    writer: dict[str, object] = {}
+    fired = False
+
+    def interrupt_after_cleanup(journal: dict[str, object]) -> dict[str, object]:
+        nonlocal fired
+        if not fired and journal.get("status") == "rollback_intent":
+            displacement = journal.get("rollback_displacement")
+            if isinstance(displacement, dict) and displacement.get("state") == "predecessor_installed":
+                fired = True
+                ROUTE._cleanup_rollback_artifacts(destination, displacement)
+                writer.update(install_same_target_writer(destination, first_release, "rb-b2-writer"))
+                raise ROUTE.DeploymentError("injected_rb_b2", "after predecessor cleanup before switch journal")
+        return original_switch_complete(journal)
+
+    monkeypatch.setattr(ROUTE, "_rollback_switch_complete_payload", interrupt_after_cleanup)
+    with pytest.raises(ROUTE.DeploymentError) as raised:
+        ROUTE.rollback(argparse.Namespace(activation_receipt=second_activate["receipt_path"], receipt_dir=None))
+
+    assert raised.value.code == "activation_recovery_required"
+    assert fired is True
+    journal_path = Path(second_activate["recovery_journal"]["path"])
+    journal = validate_instance(journal_path, "recovery-receipt.v1.json")
+    assert journal["status"] == "rollback_intent"
+    assert journal["rollback_displacement"]["state"] == "predecessor_installed"
+    assert not Path(journal["rollback_displacement"]["displaced_path"]).exists()
+    assert not Path(journal["rollback_receipt_path"]).exists()
+    assert ROUTE._destination_identity(destination)["inode"] == writer["inode"]
+
+    retry = invoke("recover", "--recovery-journal", str(journal_path), "--action", "rollback")
+    assert retry.returncode == 2
+    assert json.loads(retry.stderr)["error"]["code"] == "activation_recovery_required"
+    assert ROUTE._destination_identity(destination)["inode"] == writer["inode"]
+
+
+def test_rb_b3_later_writer_after_switch_complete_suppresses_receipt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fixture, first_release, second_activate = two_release_fixture(tmp_path)
+    destination = Path(fixture["destination"])
+    original_write = ROUTE._write_json
+    writer: dict[str, object] = {}
+    fired = False
+
+    def install_writer_after_switch_complete(path: Path, payload: dict[str, object]) -> dict[str, object]:
+        nonlocal fired
+        result = original_write(path, payload)
+        if not fired and path.name.endswith(".recovery.json") and payload.get("status") == "rollback_switch_complete":
+            fired = True
+            writer.update(install_same_target_writer(destination, first_release, "rb-b3-writer"))
+            raise ROUTE.DeploymentError("injected_rb_b3", "after rollback switch journal")
+        return result
+
+    monkeypatch.setattr(ROUTE, "_write_json", install_writer_after_switch_complete)
+    with pytest.raises(ROUTE.DeploymentError) as raised:
+        ROUTE.rollback(argparse.Namespace(activation_receipt=second_activate["receipt_path"], receipt_dir=None))
+
+    assert raised.value.code == "activation_recovery_required"
+    assert fired is True
+    journal_path = Path(second_activate["recovery_journal"]["path"])
+    journal = validate_instance(journal_path, "recovery-receipt.v1.json")
+    assert journal["status"] == "rollback_switch_complete"
+    assert not Path(journal["rollback_receipt_path"]).exists()
+    assert ROUTE._destination_identity(destination)["inode"] == writer["inode"]
+
+
+def test_rb_b4_later_writer_during_receipt_write_is_not_published(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fixture, first_release, second_activate = two_release_fixture(tmp_path)
+    destination = Path(fixture["destination"])
+    original_write = ROUTE._write_json
+    writer: dict[str, object] = {}
+    fired = False
+
+    def install_writer_before_receipt(path: Path, payload: dict[str, object]) -> dict[str, object]:
+        nonlocal fired
+        if not fired and path.name.startswith("rollback-") and not path.name.endswith(".recovery.json"):
+            fired = True
+            writer.update(install_same_target_writer(destination, first_release, "rb-b4-writer"))
+        return original_write(path, payload)
+
+    monkeypatch.setattr(ROUTE, "_write_json", install_writer_before_receipt)
+    with pytest.raises(ROUTE.DeploymentError) as raised:
+        ROUTE.rollback(argparse.Namespace(activation_receipt=second_activate["receipt_path"], receipt_dir=None))
+
+    assert raised.value.code == "activation_recovery_required"
+    assert fired is True
+    journal_path = Path(second_activate["recovery_journal"]["path"])
+    journal = validate_instance(journal_path, "recovery-receipt.v1.json")
+    assert journal["status"] == "rollback_switch_complete"
+    assert not Path(journal["rollback_receipt_path"]).exists()
+    assert ROUTE._destination_identity(destination)["inode"] == writer["inode"]
+
+
+def test_rb_b5_inode_reuse_cannot_satisfy_sequence_owner(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fixture, first_release, second_activate = two_release_fixture(tmp_path)
+    destination = Path(fixture["destination"])
+    original_switch_complete = ROUTE._rollback_switch_complete_payload
+    reused: dict[str, object] = {}
+    expected: dict[str, object] = {}
+    fired = False
+    identity_reuse = {"enabled": False}
+    original_identity = ROUTE._destination_identity
+
+    def identity_with_reuse(path: Path) -> dict[str, object]:
+        actual = original_identity(path)
+        if identity_reuse["enabled"] and path == destination:
+            for key in ("device", "inode", "mode"):
+                actual[key] = reused[key]
+        return actual
+
+    def interrupt_after_reused_inode(journal: dict[str, object]) -> dict[str, object]:
+        nonlocal fired
+        if not fired and journal.get("status") == "rollback_intent":
+            displacement = journal.get("rollback_displacement")
+            owner = journal.get("rollback_owner")
+            if (
+                isinstance(displacement, dict)
+                and displacement.get("state") == "predecessor_installed"
+                and isinstance(owner, dict)
+            ):
+                fired = True
+                expected.update(owner)
+                reused_writer, _actual_inode_reuse = install_same_target_writer_reusing_inode(
+                    destination,
+                    first_release,
+                    expected,
+                    "rb-b5-writer",
+                )
+                reused.update(reused_writer)
+                ROUTE._cleanup_rollback_artifacts(destination, displacement)
+                raise ROUTE.DeploymentError("injected_rb_b5", "after cleanup with reused inode")
+        return original_switch_complete(journal)
+
+    monkeypatch.setattr(ROUTE, "_rollback_switch_complete_payload", interrupt_after_reused_inode)
+    with pytest.raises(ROUTE.DeploymentError) as raised:
+        ROUTE.rollback(argparse.Namespace(activation_receipt=second_activate["receipt_path"], receipt_dir=None))
+
+    assert raised.value.code == "activation_recovery_required"
+    assert fired is True
+    assert reused["device"] == expected["device"]
+    assert reused["inode"] == expected["inode"]
+    assert reused["mode"] == expected["mode"]
+    assert reused["link_text"] != expected["link_text"]
+    monkeypatch.setattr(ROUTE, "_destination_identity", identity_with_reuse)
+    identity_reuse["enabled"] = True
+    journal_path = Path(second_activate["recovery_journal"]["path"])
+    journal = validate_instance(journal_path, "recovery-receipt.v1.json")
+    assert journal["status"] == "rollback_intent"
+    assert journal["rollback_owner"]["sequence"] == journal["rollback_displacement"]["sequence"]
+    assert not Path(journal["rollback_receipt_path"]).exists()
+
+    with pytest.raises(ROUTE.DeploymentError) as retry:
+        ROUTE.recover(argparse.Namespace(recovery_journal=str(journal_path), action="rollback"))
+    assert retry.value.code == "activation_recovery_required"
+    identity_reuse["enabled"] = False
+    assert original_identity(destination)["link_text"] == reused["link_text"]
+
+
 def test_activation_rejects_same_ref_replacement_with_ignored_poison_after_final_verification(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -1134,12 +1372,23 @@ def test_rollback_switch_complete_cannot_repair_activated_target(tmp_path: Path)
     activated = output(invoke("activate", "--prepare-receipt", prepared["receipt_path"]))
     journal_path = next(Path(fixture["receipt_dir"]).glob("activate-*.recovery.json"))
     journal = ROUTE._load_recovery_journal(journal_path)
-    ROUTE._write_json(journal_path, ROUTE._rollback_switch_complete_payload(journal))
+    malformed_rollback = ROUTE._rollback_intent_payload(journal)
+    malformed_rollback["rollback_displacement"]["state"] = "predecessor_installed"
+    malformed_rollback["rollback_owner"] = {
+        **ROUTE._destination_identity(Path(fixture["destination"])),
+        "kind": "symlink",
+        "sequence": malformed_rollback["rollback_displacement"]["sequence"],
+        "owner_token": journal["destination_owner"]["owner_token"],
+    }
+    ROUTE._write_json(
+        journal_path,
+        ROUTE._rollback_switch_complete_payload(malformed_rollback),
+    )
 
     result = invoke("recover", "--recovery-journal", str(journal_path), "--action", "rollback")
 
     assert result.returncode == 2
-    assert json.loads(result.stderr)["error"]["code"] == "recovery_state_unrecognized"
+    assert json.loads(result.stderr)["error"]["code"] == "activation_recovery_required"
     assert Path(fixture["destination"]).resolve() == Path(activated["activated_release"])
 
 
