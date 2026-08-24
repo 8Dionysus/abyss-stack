@@ -14,10 +14,13 @@ Tracking starts with the community-docs baseline for this repository.
   loader behavior and separate artifact-admission verdicts.
 - Preserve the legacy positional `aoa-kag` portable-family loader interface
   when no cold-CAS root is configured, while retaining the explicit v4
-  binding path for complete owner delivery.
+  binding path for complete owner delivery and failing closed when a managed
+  binding meets a pre-v4 owner.
 - Carry public event `evidence_refs` through exact lookup results and make
   text matching a miss-only fallback after indexed ID/path/label checks;
-  managed read units now carry the deployed cold-CAS binding directly.
+  managed read units now carry the deployed cold-CAS binding directly, and
+  the exact application avoids both text-lane scans when either indexed lane
+  identifies the requested record.
 - Pin the repo-local KAG validation action to the exact merged `aoa-kag`
   provider commit used by this consumer change.
 - Keep the read-contour validator compatible with the pinned MCP 2.x

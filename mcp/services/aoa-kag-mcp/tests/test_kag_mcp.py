@@ -381,6 +381,35 @@ def test_canonical_query_passes_cold_cas_binding_to_owner_loader(
     }
 
 
+def test_canonical_query_fails_closed_for_legacy_loader_with_artifact_binding(
+    tmp_path: Path,
+) -> None:
+    state = _state(tmp_path)
+    _use_portable_family(state)
+    artifact_root = tmp_path / "cold-cas"
+    artifact_root.mkdir()
+    state = AoAKagMCPState.discover(
+        workspace_root=state.workspace_root,
+        aoa_kag_root=state.aoa_kag_root,
+        artifact_root=artifact_root,
+    )
+    query_path = state.aoa_kag_root / "scripts" / "query_repo_local_kag.py"
+    query_path.parent.mkdir(parents=True, exist_ok=True)
+    query_path.write_text(
+        "class RepoKagQuery:\n"
+        "    def __init__(self, source_index, family):\n"
+        "        self.source_index = source_index\n"
+        "    def discover(self):\n"
+        "        return {'storage': self.source_index['storage']}\n"
+        "def load_family(repo_root):\n"
+        "    return {'storage': 'portable-v3'}, {}, None, None\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(RuntimeError, match="requires the owner v4"):
+        CanonicalRepoKag(state)._query("repo-a")
+
+
 def test_server_exposes_compact_read_only_kag_surface(tmp_path: Path) -> None:
     state = _state(tmp_path)
     server = build_server(

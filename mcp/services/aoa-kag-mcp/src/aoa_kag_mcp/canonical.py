@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import inspect
 import json
 import sys
 import threading
@@ -92,6 +93,28 @@ class CanonicalRepoKag:
             # query module has not adopted the optional delivery arguments.
             loaded = module.load_family(provider_root)
         else:
+            load_parameters = inspect.signature(module.load_family).parameters
+            query_parameters = inspect.signature(module.RepoKagQuery).parameters
+            accepts_loader_keywords = any(
+                parameter.kind is inspect.Parameter.VAR_KEYWORD
+                for parameter in load_parameters.values()
+            )
+            if not (
+                {
+                    "artifact_root",
+                    "allow_shadow_git",
+                }.issubset(load_parameters)
+                or accepts_loader_keywords
+            ):
+                raise RuntimeError(
+                    "configured canonical KAG artifact delivery requires the "
+                    "owner v4 loader keyword interface"
+                )
+            if "repo_root" not in query_parameters:
+                raise RuntimeError(
+                    "configured canonical KAG artifact delivery requires the "
+                    "owner v4 RepoKagQuery interface"
+                )
             loaded = module.load_family(
                 provider_root,
                 artifact_root=self.state.artifact_root,

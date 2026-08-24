@@ -939,6 +939,7 @@ def _exact_union_rows(
     order_by: str,
     limit: int,
     offset: int,
+    allow_text_fallback: bool = True,
 ) -> list[sqlite3.Row]:
     indexed_fields = tuple(
         field for field in query_fields if field not in {"search_text", "text"}
@@ -980,7 +981,12 @@ def _exact_union_rows(
     # IDs, paths, labels, and other equality-addressable fields must decide
     # exact hits before SQLite is asked to scan the large text columns.
     indexed_rows = run(indexed_fields, substring=False)
-    if indexed_rows or not text_fields or not query:
+    if (
+        indexed_rows
+        or not text_fields
+        or not query
+        or not allow_text_fallback
+    ):
         return indexed_rows
     # Text is an intentional bounded fallback for evidence refs and readiness
     # phrases, reached only after all indexed exact fields miss.
@@ -1366,6 +1372,7 @@ def search_records_exact(
     detail: str = "compact",
     offset: int = 0,
     limit: int = 10,
+    allow_text_fallback: bool = True,
 ) -> tuple[list[dict[str, Any]], float]:
     started = time.perf_counter()
     scopes = tuple(dict.fromkeys(access_scopes))
@@ -1409,6 +1416,7 @@ def search_records_exact(
         order_by="repo,node_class,kind,id",
         limit=limit,
         offset=offset,
+        allow_text_fallback=allow_text_fallback,
     )
     return (
         [record_payload(row, detail=detail) for row in rows],
@@ -1782,6 +1790,7 @@ def search_documents_exact(
     detail: str = "compact",
     offset: int = 0,
     limit: int = 10,
+    allow_text_fallback: bool = True,
 ) -> tuple[list[dict[str, Any]], float]:
     started = time.perf_counter()
     scopes = tuple(dict.fromkeys(access_scopes))
@@ -1836,6 +1845,7 @@ def search_documents_exact(
         order_by="repo,path,start_line,chunk_index,id",
         limit=limit,
         offset=offset,
+        allow_text_fallback=allow_text_fallback,
     )
     return (
         [document_payload(row, detail=detail) for row in rows],
