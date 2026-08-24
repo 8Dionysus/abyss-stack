@@ -84,7 +84,10 @@ typed binding data or denied-state provenance, is rejected by canonical launch
 until preparation rewrites it to v3; a provenance-bearing v2 marker is not a
 schema-valid compatibility shape and is rejected by the loader on any route.
 Holder receipts require the complete runtime binding, including
-`runtime_state_root` and `closeout_route`.
+`runtime_state_root` and `closeout_route`. A receipt carrying an immutable
+manifest snapshot also requires `holder_binding` in the public schema, matching
+the runtime snapshot loader; pre-snapshot compatibility receipts remain
+readable without that conditional field.
 
 ## Rationale
 

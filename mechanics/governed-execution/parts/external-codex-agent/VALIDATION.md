@@ -85,8 +85,10 @@ forbids that field. A multiply linked preparation lock is rejected before
 also reloads and digest-checks the manifest while holding the preparation lock,
 rejecting a deterministic replacement race before claim publication.
 Incomplete holder receipts missing `runtime_state_root` or `closeout_route`
-are rejected by both the receipt schema and runtime binding validator. These
-are source and fixture claims; they
+are rejected by both the receipt schema and runtime binding validator. A
+receipt carrying an immutable manifest snapshot must also carry the complete
+`holder_binding`; the schema and snapshot loader reject its omission.
+These are source and fixture claims; they
 do not establish host artifact admission, activation, live canary success,
 transport delivery, or owner acceptance.
 

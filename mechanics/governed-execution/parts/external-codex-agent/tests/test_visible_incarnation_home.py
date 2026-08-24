@@ -1692,6 +1692,52 @@ def test_holder_schema_and_loader_reject_rebind_post_exec_identity_without_prove
         "task_ref": "task:test/receipt",
         "run_ref": "run:test/receipt",
     }
+    snapshot_context = _holder_binding_context(tmp_path, "receipt-snapshot")
+    snapshot_context_digest = MODULE.sha256_bytes(
+        MODULE.canonical_bytes(snapshot_context)
+    )
+    snapshot_binding = MODULE._holder_binding_manifest_record(
+        snapshot_context,
+        snapshot_context_digest,
+        MODULE._holder_binding_context_coordinate(
+            snapshot_context, snapshot_context_digest
+        ),
+    )
+    snapshot_manifest = {
+        "schema_version": MODULE.SCHEMA_VERSION,
+        "model_slug": receipt["runtime"]["model"],
+        "reasoning_effort": receipt["runtime"]["reasoning_effort"],
+        "ambient_codex_home": receipt["runtime"]["ambient_codex_home"],
+        "codex_home": receipt["runtime"]["incarnation_codex_home"],
+        "holder_binding": snapshot_binding,
+    }
+    snapshot = MODULE.canonical_bytes(snapshot_manifest)
+    snapshot_path = tmp_path / "snapshot-holder.json"
+    snapshot_receipt = {
+        **receipt,
+        "receipt_ref": str(snapshot_path.resolve()),
+        "holder": {
+            key: value
+            for key, value in receipt["holder"].items()
+            if key != "exe_digest"
+        },
+        "runtime": {
+            **receipt["runtime"],
+            "incarnation_manifest_snapshot_b64": base64.b64encode(snapshot).decode(
+                "ascii"
+            ),
+            "incarnation_manifest_digest": MODULE.sha256_bytes(snapshot),
+        },
+    }
+    with pytest.raises(ValidationError):
+        Draft202012Validator(schema).validate(snapshot_receipt)
+    snapshot_path.write_bytes(MODULE.canonical_bytes(snapshot_receipt) + b"\n")
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="holder incarnation manifest snapshot holder binding is missing",
+    ):
+        MODULE._load_holder_receipt_snapshot(snapshot_path)
+
     for missing in ("runtime_state_root", "closeout_route"):
         incomplete = dict(complete_binding)
         incomplete.pop(missing)

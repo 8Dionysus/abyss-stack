@@ -148,6 +148,20 @@
         }
       },
       "then": {"required": ["replacement_reentry"]}
+    },
+    {
+      "if": {
+        "properties": {
+          "runtime": {
+            "required": ["incarnation_manifest_snapshot_b64"]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "runtime": {"required": ["holder_binding"]}
+        }
+      }
     }
   ],
   "$defs": {
