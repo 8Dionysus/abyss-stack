@@ -1778,6 +1778,67 @@ def _open_pinned_parent_directory(path: Path, label: str) -> int:
         ) from exc
 
 
+def _chmod_stable_directory(path: Path, mode: int, label: str) -> None:
+    """Apply directory mode through the identity-validated retained descriptor."""
+
+    parent_fd = _open_pinned_parent_directory(path, label)
+    descriptor: int | None = None
+    target_mode = stat.S_IMODE(mode)
+    try:
+        try:
+            initial = os.stat(path.name, dir_fd=parent_fd, follow_symlinks=False)
+        except OSError as exc:
+            raise IncarnationHomeError(
+                f"{label} cannot be inspected safely"
+            ) from exc
+        if stat.S_ISLNK(initial.st_mode) or not stat.S_ISDIR(initial.st_mode):
+            raise IncarnationHomeError(f"{label} is not a real directory")
+        flags = (
+            os.O_RDONLY
+            | getattr(os, "O_DIRECTORY", 0)
+            | getattr(os, "O_NOFOLLOW", 0)
+            | getattr(os, "O_CLOEXEC", 0)
+        )
+        try:
+            descriptor = os.open(path.name, flags, dir_fd=parent_fd)
+            opened = os.fstat(descriptor)
+            observed = os.stat(path.name, dir_fd=parent_fd, follow_symlinks=False)
+        except OSError as exc:
+            raise IncarnationHomeError(
+                f"{label} cannot be opened safely"
+            ) from exc
+        if (
+            _actor_local_identity_mode(opened)
+            != _actor_local_identity_mode(initial)
+            or _actor_local_identity_mode(opened)
+            != _actor_local_identity_mode(observed)
+        ):
+            raise IncarnationHomeError(f"{label} changed before mode binding")
+        try:
+            os.fchmod(descriptor, target_mode)
+            bound = os.fstat(descriptor)
+            observed_bound = os.stat(
+                path.name, dir_fd=parent_fd, follow_symlinks=False
+            )
+            os.fsync(descriptor)
+        except OSError as exc:
+            raise IncarnationHomeError(
+                f"{label} could not be mode-bound safely"
+            ) from exc
+        if (
+            not stat.S_ISDIR(bound.st_mode)
+            or (bound.st_dev, bound.st_ino) != (initial.st_dev, initial.st_ino)
+            or _actor_local_identity_mode(observed_bound)
+            != _actor_local_identity_mode(bound)
+            or stat.S_IMODE(bound.st_mode) != target_mode
+        ):
+            raise IncarnationHomeError(f"{label} changed during mode binding")
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+        os.close(parent_fd)
+
+
 def _open_stable_regular_file_at(
     parent_fd: int,
     name: str,
@@ -2332,6 +2393,162 @@ def _restore_quarantined_entry_at(
         f"{label} occupied-destination restore",
     )
     return True
+
+
+def _remove_validated_projection_link_at(
+    target: Path,
+    expected_source: Path,
+    label: str,
+) -> None:
+    """Remove only the symlink inode retained across a rename quarantine."""
+
+    parent_fd = _open_pinned_parent_directory(target, label)
+    descriptor: int | None = None
+    quarantine_name: str | None = None
+    quarantine_fd: int | None = None
+    quarantine_opened: os.stat_result | None = None
+    quarantine_entry_moved = False
+    try:
+        try:
+            initial = os.lstat(target.name, dir_fd=parent_fd)
+            initial_target = Path(os.readlink(target.name, dir_fd=parent_fd))
+        except OSError as exc:
+            raise IncarnationHomeError(
+                f"{label} cannot be inspected safely"
+            ) from exc
+        if not stat.S_ISLNK(initial.st_mode) or initial_target != expected_source:
+            raise IncarnationHomeError(f"{label} projection link changed")
+        path_flag = getattr(os, "O_PATH", 0)
+        if not path_flag:
+            raise IncarnationHomeError(
+                f"{label} requires descriptor-backed symlink removal"
+            )
+        flags = path_flag | getattr(os, "O_NOFOLLOW", 0) | getattr(
+            os, "O_CLOEXEC", 0
+        )
+        try:
+            descriptor = os.open(target.name, flags, dir_fd=parent_fd)
+            opened = os.fstat(descriptor)
+            observed = os.lstat(target.name, dir_fd=parent_fd)
+            observed_target = Path(os.readlink(target.name, dir_fd=parent_fd))
+        except OSError as exc:
+            raise IncarnationHomeError(
+                f"{label} cannot be opened safely"
+            ) from exc
+        if (
+            _actor_local_identity_mode(opened)
+            != _actor_local_identity_mode(initial)
+            or _actor_local_identity_mode(opened)
+            != _actor_local_identity_mode(observed)
+            or observed_target != initial_target
+            or opened.st_nlink != 1
+        ):
+            raise IncarnationHomeError(f"{label} changed during safe validation")
+
+        for _attempt in range(8):
+            candidate = f".{target.name}.quarantine-{secrets.token_hex(16)}"
+            try:
+                os.mkdir(candidate, 0o700, dir_fd=parent_fd)
+            except FileExistsError:
+                continue
+            quarantine_name = candidate
+            break
+        if quarantine_name is None:
+            raise IncarnationHomeError(
+                f"{label} could not allocate a private cleanup directory"
+            )
+        quarantine_flags = (
+            os.O_RDONLY
+            | getattr(os, "O_DIRECTORY", 0)
+            | getattr(os, "O_NOFOLLOW", 0)
+            | getattr(os, "O_CLOEXEC", 0)
+        )
+        try:
+            quarantine_fd = os.open(
+                quarantine_name,
+                quarantine_flags,
+                dir_fd=parent_fd,
+            )
+            quarantine_opened = os.fstat(quarantine_fd)
+            quarantine_observed = os.lstat(quarantine_name, dir_fd=parent_fd)
+            if (
+                _actor_local_identity_mode(quarantine_opened)
+                != _actor_local_identity_mode(quarantine_observed)
+                or not stat.S_ISDIR(quarantine_opened.st_mode)
+            ):
+                raise IncarnationHomeError(
+                    f"{label} cleanup directory changed during safe open"
+                )
+            try:
+                os.rename(
+                    target.name,
+                    target.name,
+                    src_dir_fd=parent_fd,
+                    dst_dir_fd=quarantine_fd,
+                )
+            except OSError as exc:
+                raise IncarnationHomeError(
+                    f"{label} projection link could not be quarantined"
+                ) from exc
+            quarantine_entry_moved = True
+            quarantined = os.lstat(target.name, dir_fd=quarantine_fd)
+            retained = os.fstat(descriptor)
+            quarantined_target: Path | None = None
+            if stat.S_ISLNK(quarantined.st_mode):
+                quarantined_target = Path(
+                    os.readlink(target.name, dir_fd=quarantine_fd)
+                )
+            if (
+                _actor_local_identity_mode(quarantined)
+                != _actor_local_identity_mode(retained)
+                or not stat.S_ISLNK(retained.st_mode)
+                or retained.st_nlink != 1
+                or quarantined_target != initial_target
+            ):
+                quarantine_entry_moved = _restore_quarantined_entry_at(
+                    parent_fd=parent_fd,
+                    quarantine_fd=quarantine_fd,
+                    quarantine_name=target.name,
+                    target_name=target.name,
+                    label=f"{label} raced projection link",
+                )
+                raise IncarnationHomeError(
+                    f"{label} projection link changed during quarantine"
+                )
+            os.unlink(target.name, dir_fd=quarantine_fd)
+            quarantine_entry_moved = False
+            if os.fstat(descriptor).st_nlink != 0:
+                raise IncarnationHomeError(
+                    f"{label} projection link remained linked after cleanup"
+                )
+        finally:
+            if (
+                quarantine_name is not None
+                and not quarantine_entry_moved
+                and quarantine_fd is not None
+                and quarantine_opened is not None
+            ):
+                _revalidate_recovery_entry_before_removal(
+                    parent_fd,
+                    quarantine_name,
+                    quarantine_fd,
+                    quarantine_opened,
+                    f"{label} cleanup directory",
+                )
+                try:
+                    os.rmdir(quarantine_name, dir_fd=parent_fd)
+                except FileNotFoundError:
+                    pass
+                except OSError as exc:
+                    raise IncarnationHomeError(
+                        f"{label} cleanup directory could not be removed"
+                    ) from exc
+    finally:
+        if quarantine_fd is not None:
+            os.close(quarantine_fd)
+        if descriptor is not None:
+            os.close(descriptor)
+        os.close(parent_fd)
 
 
 def _recover_staging_quarantine_directory_at(
@@ -9040,7 +9257,11 @@ def _prepare_home_impl(
         realization_root.mkdir(mode=0o700, exist_ok=True)
         if realization_root.is_symlink() or not realization_root.is_dir():
             raise IncarnationHomeError("realization incarnation root is not a real directory")
-        realization_root.chmod(0o700)
+        _chmod_stable_directory(
+            realization_root,
+            0o700,
+            "realization incarnation root",
+        )
     active_owner = _claim_preparation_root(
         incarnation_root=incarnation_root,
         ambient_home=ambient_home,
@@ -9059,8 +9280,8 @@ def _prepare_home_impl(
         codex_home,
         ambient_identities=ambient_identities,
     )
-    incarnation_root.chmod(0o700)
-    codex_home.chmod(0o700)
+    _chmod_stable_directory(incarnation_root, 0o700, "incarnation root")
+    _chmod_stable_directory(codex_home, 0o700, "incarnation Codex home")
     for name in ("cache", "log", "tmp", DESCENDANT_BIN_NAME):
         local = codex_home / name
         if local.is_symlink():
@@ -9069,7 +9290,7 @@ def _prepare_home_impl(
             local.mkdir(mode=0o700, exist_ok=False)
         if local.is_symlink() or not local.is_dir():
             raise IncarnationHomeError(f"actor-local {name} is not a real directory")
-        local.chmod(0o700)
+        _chmod_stable_directory(local, 0o700, f"actor-local {name}")
 
     _write_exact(
         codex_home / "config.toml",
@@ -9101,7 +9322,11 @@ def _prepare_home_impl(
         if not target.exists() and not target.is_symlink():
             continue
         if target.is_symlink() and target.readlink() == source:
-            target.unlink()
+            _remove_validated_projection_link_at(
+                target,
+                source,
+                f"obsolete capability projection link {name}",
+            )
             continue
         if name in actor_local_state_names:
             _validate_actor_local_entry(

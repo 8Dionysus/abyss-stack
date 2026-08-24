@@ -1375,6 +1375,93 @@ def test_staging_cleanup_restores_raced_replacement_before_rejecting(
     ]
 
 
+def test_projection_link_removal_preserves_replacement_on_quarantine_race(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    parent = tmp_path / "holder-home"
+    parent.mkdir()
+    source = tmp_path / "ambient-entry"
+    source.write_bytes(b"ambient")
+    target = parent / "shared-entry"
+    target.symlink_to(source)
+    replacement = tmp_path / "replacement"
+    replacement.write_bytes(b"replacement-victim")
+    replacement.chmod(0o640)
+    original_rename = MODULE.os.rename
+    raced = False
+
+    def replace_before_quarantine(
+        source_name: object,
+        target_name: object,
+        *args: object,
+        **kwargs: object,
+    ) -> None:
+        nonlocal raced
+        if (
+            source_name == target.name
+            and target_name == target.name
+            and not raced
+        ):
+            os.replace(replacement, target)
+            raced = True
+        original_rename(source_name, target_name, *args, **kwargs)
+
+    monkeypatch.setattr(MODULE.os, "rename", replace_before_quarantine)
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="projection link changed during quarantine",
+    ):
+        MODULE._remove_validated_projection_link_at(
+            target,
+            source,
+            "projection link",
+        )
+
+    assert raced
+    assert target.read_bytes() == b"replacement-victim"
+    assert stat.S_IMODE(target.stat().st_mode) == 0o640
+
+
+def test_directory_mode_binding_rejects_replacement_without_touching_target(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    parent = tmp_path / "holder-home"
+    parent.mkdir()
+    target = parent / "codex-home"
+    target.mkdir(mode=0o755)
+    foreign = tmp_path / "foreign"
+    foreign.mkdir(mode=0o755)
+    displaced = tmp_path / "displaced"
+    before_foreign_mode = stat.S_IMODE(foreign.stat().st_mode)
+    original_open = MODULE.os.open
+    replaced = False
+
+    def replace_before_target_open(
+        path: object,
+        flags: int,
+        mode: int = 0o777,
+        *,
+        dir_fd: int | None = None,
+    ) -> int:
+        nonlocal replaced
+        if path == target.name and dir_fd is not None and not replaced:
+            target.rename(displaced)
+            target.symlink_to(foreign)
+            replaced = True
+        return original_open(path, flags, mode, dir_fd=dir_fd)
+
+    monkeypatch.setattr(MODULE.os, "open", replace_before_target_open)
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="cannot be opened safely",
+    ):
+        MODULE._chmod_stable_directory(target, 0o700, "codex-home")
+
+    assert replaced
+    assert target.is_symlink()
+    assert stat.S_IMODE(foreign.stat().st_mode) == before_foreign_mode
+
+
 def test_abandoned_staging_alias_is_rejected_without_external_mutation(
     tmp_path: Path,
 ) -> None:

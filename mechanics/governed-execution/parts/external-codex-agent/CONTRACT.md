@@ -916,6 +916,11 @@ manifest admission or launch. When a previous shared link becomes denied under
 the current typed policy, the exact old ambient link may be removed; a regular
 local shadow is retained and validated. A shared projection still requires its
 exact ambient symlink, so local files cannot widen a denied capability.
+That link removal is bound to the retained symlink inode through a pinned parent
+descriptor and a private quarantine; a concurrent replacement is restored or
+preserved and causes fail-closed rejection. All realization-root, incarnation-
+root, Codex-home, and actor-local directory modes are likewise applied through
+retained no-follow directory descriptors, never through a mutable pathname.
 The v3 `denied_state_provenance` field is required for current typed homes. It
 records only the current denied projection: each name has the ambient entry's
 current device/inode identity, when present, and a digest of the admitted local
