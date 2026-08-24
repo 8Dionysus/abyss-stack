@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 30865913,
+  "allowed_tracked_bytes": 38858626,
+  "approved_by": "repository-owner",
+  "base_ref": "d1603cafd10b88a3372ec974d78b2b0163cf287d",
+  "changed_generated_bytes": 30865913,
+  "changed_generated_files": 338,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "cc488620ee16d45048f27890c558b33133e1b84c5bfefbe2b2206d6734144c6b",
+  "reason": "Refresh the exact owner portable family after rollback restores restrictive legacy directories through retained descriptors before cleanup; standing generated-family budgets remain unchanged.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 38858626,
+  "tracked_bytes_max": 24117248
+}

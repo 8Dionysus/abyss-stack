@@ -8290,6 +8290,42 @@ def _revalidate_recovery_entry_before_removal(
     _revalidate_recovery_entry(parent_fd, name, descriptor, initial, label)
 
 
+def _make_recovery_directory_writable(
+    parent_fd: int,
+    name: str,
+    descriptor: int,
+    initial: os.stat_result,
+    label: str,
+) -> tuple[os.stat_result, os.stat_result]:
+    """Temporarily grant owner write/execute access through the retained fd."""
+
+    _revalidate_recovery_entry_before_removal(
+        parent_fd, name, descriptor, initial, label
+    )
+    try:
+        current = os.fstat(descriptor)
+        if _actor_local_identity_mode(current) != _actor_local_identity_mode(initial):
+            raise IncarnationHomeError(f"{label} changed during recovery")
+        writable_mode = stat.S_IMODE(current.st_mode) | 0o700
+        os.fchmod(descriptor, writable_mode)
+        opened = os.fstat(descriptor)
+        observed = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+    except IncarnationHomeError:
+        raise
+    except OSError as exc:
+        raise IncarnationHomeError(
+            f"{label} could not be made writable for recovery"
+        ) from exc
+    if (
+        not stat.S_ISDIR(opened.st_mode)
+        or (opened.st_dev, opened.st_ino) != (initial.st_dev, initial.st_ino)
+        or _actor_local_identity_mode(observed) != _actor_local_identity_mode(opened)
+        or stat.S_IMODE(opened.st_mode) != writable_mode
+    ):
+        raise IncarnationHomeError(f"{label} changed while becoming writable")
+    return observed, opened
+
+
 def _validate_recoverable_entry_at(
     parent_fd: int,
     name: str,
@@ -8414,6 +8450,9 @@ def _remove_recoverable_entry_at(
             ) from exc
         if _actor_local_identity_mode(after_listing) != _actor_local_identity_mode(opened):
             raise IncarnationHomeError(f"{label} changed during recovery")
+        initial, opened = _make_recovery_directory_writable(
+            parent_fd, name, descriptor, initial, label
+        )
         for child_name in children:
             _remove_recoverable_entry_at(
                 descriptor,

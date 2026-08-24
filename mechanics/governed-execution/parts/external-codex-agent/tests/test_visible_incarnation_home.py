@@ -1650,7 +1650,7 @@ def test_canonical_launch_rejects_every_typed_legacy_v2_manifest(
 
 
 def test_explicit_legacy_migration_carries_local_state_into_typed_v3(
-    tmp_path: Path,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     ambient = tmp_path / "ambient"
     runtime_root = tmp_path / "runtime"
@@ -1714,6 +1714,25 @@ def test_explicit_legacy_migration_carries_local_state_into_typed_v3(
         ]
     )
     assert parsed.handler is MODULE.command_migrate
+
+    original_denied_state_provenance = MODULE._denied_state_provenance
+
+    def fail_after_materialization(*_args: object, **_kwargs: object) -> object:
+        raise MODULE.IncarnationHomeError("synthetic post-copy failure")
+
+    monkeypatch.setattr(
+        MODULE, "_denied_state_provenance", fail_after_materialization
+    )
+    with pytest.raises(
+        MODULE.IncarnationHomeError, match="synthetic post-copy failure"
+    ):
+        MODULE.migrate_legacy_home(
+            legacy_manifest_path=legacy_manifest_path,
+            binding_context=context,
+        )
+    monkeypatch.setattr(
+        MODULE, "_denied_state_provenance", original_denied_state_provenance
+    )
 
     migrated = MODULE.migrate_legacy_home(
         legacy_manifest_path=legacy_manifest_path,
