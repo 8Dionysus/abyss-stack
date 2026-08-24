@@ -14,6 +14,7 @@ import argparse
 import base64
 import contextlib
 import ctypes
+import errno
 import fcntl
 import hashlib
 import json
@@ -1735,6 +1736,13 @@ def _remove_staged_file_at(
                 or not stat.S_ISREG(retained.st_mode)
                 or retained.st_nlink != 1
             ):
+                quarantine_entry_moved = _restore_quarantined_entry_at(
+                    parent_fd=parent_fd,
+                    quarantine_fd=quarantine_fd,
+                    quarantine_name=name,
+                    target_name=name,
+                    label=f"{label} raced staging entry",
+                )
                 raise IncarnationHomeError(
                     f"{label} staging entry changed during quarantine"
                 )
@@ -1847,8 +1855,52 @@ def _recover_abandoned_staged_files(
         os.close(parent_fd)
 
 
-def _rename_exchange_at(
-    parent_fd: int, source_name: str, target_name: str, label: str
+def _rename_noreplace_between_at(
+    source_parent_fd: int,
+    source_name: str,
+    target_parent_fd: int,
+    target_name: str,
+    label: str,
+) -> bool:
+    """Restore a raced entry without overwriting a newer destination."""
+
+    try:
+        libc = ctypes.CDLL(None, use_errno=True)
+        renameat2 = libc.renameat2
+    except (AttributeError, OSError) as exc:
+        raise IncarnationHomeError(
+            f"{label} requires atomic no-replace support"
+        ) from exc
+    renameat2.argtypes = [
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_uint,
+    ]
+    renameat2.restype = ctypes.c_int
+    result = renameat2(
+        source_parent_fd,
+        os.fsencode(source_name),
+        target_parent_fd,
+        os.fsencode(target_name),
+        0x1,  # Linux renameat2 RENAME_NOREPLACE.
+    )
+    if result != 0:
+        error_number = ctypes.get_errno()
+        if error_number == errno.EEXIST:
+            return False
+        detail = os.strerror(error_number) if error_number else "unknown error"
+        raise IncarnationHomeError(f"{label} atomic no-replace restore failed: {detail}")
+    return True
+
+
+def _rename_exchange_between_at(
+    source_parent_fd: int,
+    source_name: str,
+    target_parent_fd: int,
+    target_name: str,
+    label: str,
 ) -> None:
     """Atomically exchange two names without unlinking an unvalidated target."""
 
@@ -1868,9 +1920,9 @@ def _rename_exchange_at(
     ]
     renameat2.restype = ctypes.c_int
     result = renameat2(
-        parent_fd,
+        source_parent_fd,
         os.fsencode(source_name),
-        parent_fd,
+        target_parent_fd,
         os.fsencode(target_name),
         0x2,  # Linux renameat2 RENAME_EXCHANGE.
     )
@@ -1878,6 +1930,50 @@ def _rename_exchange_at(
         error_number = ctypes.get_errno()
         detail = os.strerror(error_number) if error_number else "unknown error"
         raise IncarnationHomeError(f"{label} atomic exchange failed: {detail}")
+
+
+def _rename_exchange_at(
+    parent_fd: int, source_name: str, target_name: str, label: str
+) -> None:
+    _rename_exchange_between_at(
+        parent_fd, source_name, parent_fd, target_name, label
+    )
+
+
+def _restore_quarantined_entry_at(
+    *,
+    parent_fd: int,
+    quarantine_fd: int,
+    quarantine_name: str,
+    target_name: str,
+    label: str,
+) -> bool:
+    """Put a raced victim back, preserving a concurrent replacement if needed.
+
+    The normal path uses RENAME_NOREPLACE so a concurrent new destination is
+    never overwritten.  If a destination appeared after quarantine, an
+    exchange restores the quarantined victim atomically and leaves the newer
+    entry in the private quarantine; the caller must then retain that
+    quarantine and fail closed rather than deleting either entry.
+    """
+
+    restored = _rename_noreplace_between_at(
+        quarantine_fd,
+        quarantine_name,
+        parent_fd,
+        target_name,
+        label,
+    )
+    if restored:
+        return False
+    _rename_exchange_between_at(
+        quarantine_fd,
+        quarantine_name,
+        parent_fd,
+        target_name,
+        f"{label} occupied-destination restore",
+    )
+    return True
 
 
 def _recover_staging_quarantine_directory_at(
@@ -3953,11 +4049,55 @@ def _existing_rebind_receipt(
     return existing
 
 
+def _holder_receipt_matches_claim(
+    *, claim_path: Path, claim_digest: str, receipt_path: Path
+) -> bool:
+    """Prove that a receipt was published before releasing its claim.
+
+    Payload admission crosses an exec boundary, so an asynchronous exception
+    can arrive after the receipt's atomic publication but before the caller's
+    in-memory publication flag is updated.  Only the exact canonical receipt
+    bound by the unchanged claim counts as publication; missing, malformed, or
+    foreign receipt bytes leave the claim eligible for rollback.
+    """
+
+    try:
+        claim, claim_raw = _load_json_snapshot(claim_path, "holder claim")
+        if sha256_bytes(claim_raw) != claim_digest:
+            return False
+        receipt, _receipt_raw, _receipt_digest = _load_holder_receipt_snapshot(
+            receipt_path
+        )
+        expected_receipt = _safe_source_receipt_path(receipt_path)
+    except IncarnationHomeError:
+        return False
+    runtime = receipt.get("runtime")
+    if not isinstance(runtime, dict):
+        return False
+    return (
+        claim.get("holder_receipt") == expected_receipt
+        and receipt.get("receipt_ref") == expected_receipt
+        and runtime.get("incarnation_manifest") == claim.get("manifest_path")
+        and runtime.get("incarnation_manifest_digest") == claim.get("manifest_digest")
+        and runtime.get("holder_binding") == claim.get("holder_binding")
+    )
+
+
 def _release_holder_claim(
-    *, claim_path: Path, claim_digest: str, label: str = "holder claim"
+    *,
+    claim_path: Path,
+    claim_digest: str,
+    receipt_path: Path | None = None,
+    label: str = "holder claim",
 ) -> None:
     """Remove only the exact unpublished reservation; uncertainty is retained."""
 
+    if receipt_path is not None and _holder_receipt_matches_claim(
+        claim_path=claim_path,
+        claim_digest=claim_digest,
+        receipt_path=receipt_path,
+    ):
+        return
     try:
         raw = _regular_file(claim_path, label).read_bytes()
     except IncarnationHomeError:
@@ -9507,6 +9647,7 @@ def command_payload_launch(args: argparse.Namespace) -> int:
                 _release_holder_claim(
                     claim_path=claim_path,
                     claim_digest=claim_digest,
+                    receipt_path=Path(args.holder_receipt),
                     label="payload holder claim rollback",
                 )
             except BaseException as rollback_exc:

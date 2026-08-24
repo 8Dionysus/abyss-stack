@@ -1002,6 +1002,70 @@ def test_staging_cleanup_preserves_quarantine_replacement_after_open(
     assert quarantine_replacement[0].is_dir()
 
 
+def test_staging_cleanup_restores_raced_replacement_before_rejecting(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    parent = tmp_path / "parent"
+    parent.mkdir()
+    stage_name = ".config.toml.stage-" + "b" * 32
+    stage = parent / stage_name
+    stage.write_bytes(b"original-stage")
+    descriptor = os.open(stage, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+    raced = False
+    original_rename = os.rename
+    parent_fd: int
+
+    def replace_before_quarantine(
+        source: str,
+        destination: str,
+        *,
+        src_dir_fd: int | None = None,
+        dst_dir_fd: int | None = None,
+    ) -> None:
+        nonlocal raced
+        if (
+            not raced
+            and source == stage_name
+            and destination == stage_name
+            and src_dir_fd == parent_fd
+            and dst_dir_fd != parent_fd
+        ):
+            replacement = parent / "replacement-config"
+            replacement.write_bytes(b"ambient-config")
+            replacement.chmod(0o640)
+            os.replace(replacement, stage)
+            raced = True
+        original_rename(
+            source,
+            destination,
+            src_dir_fd=src_dir_fd,
+            dst_dir_fd=dst_dir_fd,
+        )
+
+    monkeypatch.setattr(MODULE.os, "rename", replace_before_quarantine)
+    parent_fd = os.open(parent, os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC)
+    try:
+        with pytest.raises(MODULE.IncarnationHomeError, match="changed during quarantine"):
+            MODULE._remove_staged_file_at(
+                parent_fd,
+                stage_name,
+                descriptor,
+                "staging cleanup",
+            )
+    finally:
+        os.close(parent_fd)
+        os.close(descriptor)
+
+    assert raced
+    assert stage.read_bytes() == b"ambient-config"
+    assert stat.S_IMODE(stage.stat().st_mode) == 0o640
+    assert not [
+        path
+        for path in parent.iterdir()
+        if ".quarantine-" in path.name
+    ]
+
+
 def test_abandoned_staging_alias_is_rejected_without_external_mutation(
     tmp_path: Path,
 ) -> None:
@@ -3621,6 +3685,100 @@ def test_payload_launch_releases_claim_when_receipt_path_becomes_occupied(
 
     assert not claim_path.exists()
     assert holder_path.read_bytes() == foreign_bytes
+
+
+def test_payload_launch_retains_claim_when_receipt_published_before_interrupt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    manifest = MODULE.prepare_home(
+        ambient_home=ambient,
+        realization_path=_realization(tmp_path / "realization.json"),
+        runtime_root=runtime_root,
+    )
+    manifest_path = Path(manifest["codex_home"]).parent / "incarnation-home.json"
+    manifest_bytes = manifest_path.read_bytes()
+    manifest_digest = MODULE.sha256_bytes(manifest_bytes)
+    payload = tmp_path / "private-codex"
+    payload_bytes = b"#!/bin/sh\nexit 0\n"
+    payload.write_bytes(payload_bytes)
+    payload.chmod(0o500)
+    holder_path = tmp_path / "holder.json"
+    binding_args = _payload_binding_arguments(
+        runtime_root, manifest, manifest_path, holder_path
+    )
+    claim_path = Path(binding_args["holder_claim"])
+
+    def publish_then_interrupt(**_kwargs: object) -> dict[str, object]:
+        receipt = {
+            "schema_version": MODULE.HOLDER_RECEIPT_SCHEMA_VERSION,
+            "receipt_ref": str(holder_path.resolve()),
+            "created_at": "2026-08-24T00:00:00Z",
+            "lifecycle_role": "responsibility_holder",
+            "boot_id": MODULE._proc_boot_id(),
+            "holder": {
+                "pid": os.getpid(),
+                "start_ticks": MODULE._proc_start_ticks(os.getpid()),
+                "parent_pid": os.getppid(),
+                "parent_start_ticks": MODULE._proc_start_ticks(os.getppid()),
+                "parent_comm": "kitty",
+                "argv": ["/var/tmp/codex"],
+                "argv_digest": MODULE.sha256_bytes(
+                    MODULE.canonical_bytes(["/var/tmp/codex"])
+                ),
+            },
+            "runtime": {
+                "codex_executable": str(tmp_path / "codex"),
+                "codex_executable_digest": MODULE.sha256_bytes(payload_bytes),
+                "incarnation_manifest": str(manifest_path.resolve()),
+                "incarnation_manifest_digest": manifest_digest,
+                "incarnation_manifest_snapshot_b64": base64.b64encode(
+                    manifest_bytes
+                ).decode("ascii"),
+                "model": manifest["model_slug"],
+                "reasoning_effort": manifest["reasoning_effort"],
+                "ambient_codex_home": manifest["ambient_codex_home"],
+                "incarnation_codex_home": manifest["codex_home"],
+                "holder_binding": manifest["holder_binding"],
+            },
+            "terminal": {
+                "binding": "kitty_ancestor_at_exec",
+                "required_comm": "kitty",
+                "pid": 2,
+                "start_ticks": 1,
+                "argv": ["kitty"],
+                "window_id": "1",
+                "dedicated": True,
+            },
+        }
+        MODULE._write_new_json(holder_path, receipt, "holder terminal receipt")
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(MODULE, "_holder_receipt", publish_then_interrupt)
+    args = MODULE.argparse.Namespace(
+        manifest=str(manifest_path),
+        holder_receipt=str(holder_path),
+        codex_executable=str(tmp_path / "codex"),
+        payload_executable=str(payload),
+        manifest_digest=manifest_digest,
+        executable_digest=MODULE.sha256_bytes(payload_bytes),
+        **binding_args,
+        codex_arguments=[str(payload), "exec", "--help"],
+    )
+
+    with pytest.raises(KeyboardInterrupt):
+        MODULE.command_payload_launch(args)
+
+    assert claim_path.exists()
+    assert MODULE._holder_receipt_matches_claim(
+        claim_path=claim_path,
+        claim_digest=args.holder_claim_digest,
+        receipt_path=holder_path,
+    )
 
 
 @pytest.mark.parametrize(("decision", "exec_expected"), [("admit", True), ("reject", False)])

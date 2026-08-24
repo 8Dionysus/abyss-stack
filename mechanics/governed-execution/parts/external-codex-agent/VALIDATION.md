@@ -78,8 +78,10 @@ target inode, so a concurrent target replacement cannot delete a victim and a
 deterministic truncate/write failure preserves the prior bytes, mode, and inode.
 Only stages for owner-local file targets are recovered; legitimate denied names
 that resemble stages remain intact. Interrupted staging quarantine directories
-are also recovered only after descriptor and child identity validation, while
-an aliased stage remains intact and preserves the external inode.
+are also recovered only after descriptor and child identity validation. If a
+replacement wins the quarantine race, the replacement is restored before the
+rejection; an occupied destination is atomically exchanged and retained so an
+aliased stage remains intact and preserves the external inode.
 Distinct contexts receive separate manifest, config, cache, log,
 tmp, and descendant-binary coordinates. Synchronized first preparation is
 serializable and idempotent, while a failed or stale tokened preparer is

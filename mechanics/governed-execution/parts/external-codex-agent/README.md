@@ -168,8 +168,10 @@ until preparation rewrites it as v3. Every first preparation is serialized by
   descriptor before unlinking, and rebind restores a superseded claim if
   replacement-receipt publication fails. The private payload helper also
   releases the exact validated claim on any pre-receipt payload or receipt-path
-  failure after the outer launcher has exec'd into bubblewrap; a published
-  receipt keeps the claim frozen. The exact writer pins the target
+  failure after the outer launcher has exec'd into bubblewrap; immediately
+  before rollback it rechecks whether the exact canonical receipt was already
+  published, and a published receipt keeps the claim frozen. The exact writer
+  pins the target
   parent descriptor, publishes new files from an unnameable descriptor, and
   stages every existing-file replacement through a separate fully written
   unnameable descriptor before an atomic exchange that verifies the displaced
@@ -178,9 +180,11 @@ until preparation rewrites it as v3. Every first preparation is serialized by
   write failure leaves the prior target intact. If a process is interrupted after
   creating a private staging link, the next unclaimed preparation removes only
   an inode-validated stage for an owner-local file target, and recovers any
-  matching interrupted quarantine directory. A legitimate denied entry that
-  merely resembles a stage, or a multiply linked/replaced artifact, is not
-  deleted and fails closed.
+  matching interrupted quarantine directory. If a replacement wins the
+  quarantine race, the replacement is atomically restored before rejection;
+  an occupied destination is exchanged and retained in quarantine so neither
+  entry is deleted. A legitimate denied entry that merely resembles a stage,
+  or a multiply linked/replaced artifact, is not deleted and fails closed.
 - exposes the installed `aoa-external-codex-return` leaf for the final external
   return contour. The leaf receives an explicit return-owner binding and exact
   handoff/holder paths, uses a connectable local Codex app-server as a

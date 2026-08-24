@@ -247,8 +247,10 @@ immediately before `exec`, and then replaces itself with the private launcher;
 the bubblewrap monitor is retained only for snapshot cleanup and is bound to its
 parent lifetime. The payload helper releases the exact validated claim on every
 pre-receipt admission or output-publication failure, because the outer launch
-process may already have exec'd into bubblewrap; once the receipt is published,
-the claim remains the immutable holder reservation. This receipt is not a governed proof-actor result and must not be substituted with a nested actor's runtime
+process may already have exec'd into bubblewrap; immediately before unlinking
+it rechecks whether the exact canonical receipt was published, and once the
+receipt is published, the claim remains the immutable holder reservation.
+This receipt is not a governed proof-actor result and must not be substituted with a nested actor's runtime
 identity. The Kitty-ancestor binding covers the installed bubblewrap wrapper as
 well as a direct host exec while retaining one exact terminal identity; the
 holder environment must bind `KITTY_PID` and `KITTY_WINDOW_ID`, and no sibling
@@ -908,7 +910,10 @@ replaceable temporary pathname; existing admitted regular files are opened
 read-only for identity admission, written completely through a separate
 unnameable descriptor, and atomically exchanged only after both descriptors are
 revalidated; the displaced name is checked against the retained target inode,
-and a mismatch is exchanged back without deleting the victim. A staging write or fsync failure therefore leaves the prior bytes,
+and a mismatch is exchanged back without deleting the victim. If a raced
+replacement was moved into quarantine, it is restored with an atomic
+no-replace move, or exchanged back while the newer occupant is retained
+and recovery fails closed. A staging write or fsync failure therefore leaves the prior bytes,
 mode, and inode intact. If a process is interrupted after linking a private
 stage for an owner-local file target, and recovers matching interrupted
 quarantine directories through the same descriptor validation. A legitimate
