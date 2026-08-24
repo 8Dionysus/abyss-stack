@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/8Dionysus/abyss-stack/main/mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-capability-classes.schema.json",
+  "title": "Owner-authored external Codex capability-class registry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "schema_version", "classes", "entries", "unknown"],
+  "properties": {
+    "$schema": {
+      "const": "schemas/external-codex-capability-classes.schema.json"
+    },
+    "schema_version": {
+      "const": "abyss_stack_codex_capability_class_registry_v1"
+    },
+    "classes": {
+      "type": "object",
+      "minProperties": 3,
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_]*$",
+        "not": {"const": "unknown"}
+      },
+      "required": ["session_continuity", "actor_tooling", "operator_control"],
+      "properties": {
+        "session_continuity": {
+          "$ref": "#/$defs/sessionContinuityDefinition"
+        },
+        "actor_tooling": {
+          "$ref": "#/$defs/actorToolingDefinition"
+        },
+        "operator_control": {
+          "$ref": "#/$defs/operatorControlDefinition"
+        }
+      },
+      "additionalProperties": {"$ref": "#/$defs/futureClassDefinition"}
+    },
+    "entries": {
+      "type": "object",
+      "propertyNames": {"$ref": "#/$defs/entryName"},
+      "additionalProperties": {"$ref": "#/$defs/classId"}
+    },
+    "unknown": {"$ref": "#/$defs/unknownDefinition"}
+  },
+  "$defs": {
+    "classId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "not": {"const": "unknown"}
+    },
+    "entryName": {
+      "type": "string",
+      "pattern": "^(?!\\.\\.?$)[^/]+$",
+      "minLength": 1
+    },
+    "classDefinition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["projection", "grantable"],
+      "properties": {
+        "projection": {"enum": ["shared_link", "denied"]},
+        "grantable": {"type": "boolean"}
+      }
+    },
+    "sessionContinuityDefinition": {
+      "allOf": [
+        {"$ref": "#/$defs/classDefinition"},
+        {
+          "properties": {
+            "projection": {"const": "shared_link"},
+            "grantable": {"const": false}
+          }
+        }
+      ]
+    },
+    "actorToolingDefinition": {
+      "allOf": [
+        {"$ref": "#/$defs/classDefinition"},
+        {
+          "properties": {
+            "projection": {"const": "shared_link"},
+            "grantable": {"const": false}
+          }
+        }
+      ]
+    },
+    "operatorControlDefinition": {
+      "allOf": [
+        {"$ref": "#/$defs/classDefinition"},
+        {
+          "properties": {
+            "projection": {"const": "denied"},
+            "grantable": {"const": true}
+          }
+        }
+      ]
+    },
+    "futureClassDefinition": {
+      "allOf": [
+        {"$ref": "#/$defs/classDefinition"},
+        {
+          "properties": {
+            "projection": {"const": "denied"},
+            "grantable": {"const": false}
+          }
+        }
+      ]
+    },
+    "unknownDefinition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["capability_class", "projection", "grantable"],
+      "properties": {
+        "capability_class": {"const": "unknown"},
+        "projection": {"const": "denied"},
+        "grantable": {"const": true}
+      }
+    }
+  }
+}

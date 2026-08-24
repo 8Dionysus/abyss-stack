@@ -15,6 +15,34 @@ meaning into `abyss-stack`:
 | canonical result schema and session-local identity-bound derivative | `abyss-stack` | constrain the model-authored report shape and mechanically bind exact task/incarnation IDs |
 | runtime state/events/result and final workspace manifest | `abyss-stack` | record what process and thread actually ran, what bytes remained, and what it returned |
 
+The incarnation-home classifier consumes the checked-in
+`capability-classes.v1.json` data surface rather than encoding endpoint names
+in executable code. That registry is a runtime-owner projection of admitted
+capability meaning: entries absent from it resolve to explicit `unknown`,
+deny-by-default, and grantable status. The registry path and bytes are
+digest-bound in the generated projection. The schema and loader require exact
+policies for the three canonical classes; future vocabulary IDs are admitted
+only as denied and non-grantable, so a registry edit cannot widen authority or
+produce a manifest outside its schema. `operator_control` is denied in the
+registry and becomes shared only through the separate explicit grant relation.
+A reusable grant separately
+binds the capability identity, ambient path, subject, grant artifact bytes,
+and expiry window. Mutable contents inside a dynamic target endpoint are not
+promoted into grant authority.
+
+The authored registry represents `classes` as an object keyed by unique class
+ID and `entries` as one object keyed by exact ambient entry name whose value is
+the sole owning class ID. That structural relation means a schema-only
+consumer cannot observe one ambient entry owned by multiple classes. The
+generated projection also represents `entries` as an object keyed by the exact
+ambient entry name. A shared operator-control value must contain the complete
+`explicit_grant` projection nested at that key; denied values contain
+`explicit_grant: null`. This removes both the authored cross-class duplicate
+shape and the detached grant-ID/list shape that could describe relations the
+runtime could not materialize. Runtime loading still re-reads and recomputes
+the grant artifact, so schema validity alone is not a grant-artifact, trust,
+or app-server-enforcement claim.
+
 For a visible responsibility holder, terminal lifecycle evidence is also
 runtime-owned. A `join_completed` or `wake_delivered` authorization binds the
 returned handoff, exact holder receipt, closure path, process identities, and

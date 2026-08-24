@@ -20,11 +20,13 @@ The controller:
   realization, runtime/tool profile, result schema, workspace HEAD, immutable
   inputs, Codex binary digest/version, ChatGPT login, and live model catalog;
 - prepares an incarnation-scoped Codex home for operator-visible external
-  actors without moving the top-level TUI out of the ambient trusted home. The
-  launcher binds model and effort explicitly and passes the scoped home only
-  through Codex's shell environment policy, so ordinary descendant
-  `codex exec` processes retain the selected incarnation while session and hook
-  trust identities remain stable. A direct visible holder can additionally
+  actors. The canonical visible holder and its descendants use the projected
+  incarnation home; authentication, session continuity, and actor tooling are
+  retained through typed shared links, while ambient operator-control and
+  unknown entries are not inherited. The launcher binds model and effort
+  explicitly and passes the same scoped home through Codex's shell environment
+  policy, so ordinary descendant `codex exec` processes retain the selected
+  incarnation. A direct visible holder can additionally
   emit its own PID/start-ticks/post-exec-argv-bound lifecycle receipt immediately
   before `exec`, including the first detached Kitty ancestor, its window identity,
   and a no-sibling dedication proof across the installed bubblewrap wrapper;
@@ -103,6 +105,28 @@ and replay only through their matching legacy wake reservation. A retry after a 
   This identity is
   distinct from any nested proof actor. This operator surface is not A2A transport and
   does not replace the governed JSONL runtime;
+- records the v2 incarnation-home manifest as a model-neutral capability
+  projection. The owner-authored `capability-classes.v1.json` registry supplies
+  session-continuity, actor-tooling, and known operator-control meanings. Its
+  loader and schema pin those canonical policies; future vocabulary entries
+  are representable only as denied and non-grantable, so registry data alone
+  cannot widen authority or emit a schema-invalid manifest. Entries absent from
+  it resolve explicitly to `unknown` and remain denied.
+  `operator_control` remains denied in the registry and can become a shared
+  link only through the exact explicit grant relation below.
+  An owner-authored `external-codex-capability-grant.schema.json` grant may
+  project exactly one operator-control entry only when its capability ID,
+  ambient-home identity, model realization, incarnation coordinate, grant
+  artifact digest, and expiry match. The exact subject may reuse that grant
+  until expiry; dynamic endpoint contents are not target-content-bound. This
+  projection controls runtime materialization; it is not itself an app-server
+  mutation gate or owner-acceptance proof. The registry uses a class-definition
+  object keyed by unique class ID plus one ownership object keyed by ambient
+  entry name, so each entry has one structural class owner. The manifest also
+  uses an object keyed by ambient entry name; a shared operator-control entry
+  must carry its complete `explicit_grant`
+  object under that key. Denied entries carry `explicit_grant: null`, with no
+  detached grant list or grant-ID-only relation;
 - exposes the installed `aoa-external-codex-return` leaf for the final external
   return contour. The leaf receives an explicit return-owner binding and exact
   handoff/holder paths, uses a connectable local Codex app-server as a
@@ -110,6 +134,17 @@ and replay only through their matching legacy wake reservation. A retry after a 
   active Goal through bounded turn views without treating omitted history as
   idle, and composes typed authorization with exact holder closure. It does not
   claim owner acceptance or semantic re-entry;
+- exposes `aoa-external-codex-return return-route --route <absolute json>` as a
+  digest-bound bridge entrypoint that selects no Goal or terminal and delegates
+  only to the canonical return leaf. The canonical leaf reasserts the bound
+  owner, handoff, and holder digests at the locked directed-input boundary, so
+  a valid-input replacement after route preflight fails closed before any
+  delivery or close effect. The route's wrapper exit is not delivery or closure
+  evidence; durable return, authorization, and exact-holder closure receipts
+  remain required. After a pre-return CLI loss,
+  `visible_incarnation_home.py rebind` can derive a canonical holder receipt
+  only from the exact holder-loss packet and live replacement lineage, and that
+  receipt proves holder identity only;
 - exposes the separate `aoa-external-codex-return pause` lifecycle action. It
   receives a pause-owner binding and requires an `atomic_goal_transition`
   adapter method that performs a server-supported compare-and-set/version proof

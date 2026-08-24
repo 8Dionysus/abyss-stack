@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Prepare and enter a Codex home whose default follows one incarnation.
+"""Prepare and enter a projected Codex home for one incarnation.
 
-The operator-visible Codex process keeps the ambient user home so existing
-sessions and hook trust retain their identity.  Its shell children receive the
-incarnation home through Codex's shell environment policy; a plain nested
-``codex exec`` therefore keeps the selected model and reasoning effort.
+The operator-visible Codex process and its shell children use the dedicated
+incarnation home through Codex's shell environment policy.  Auth/session
+continuity and actor tooling enter through the owner-authored capability-class
+registry; ambient operator-control and unknown entries remain denied unless a
+subject-bound explicit grant projects one entry.
 """
 
 from __future__ import annotations
@@ -31,8 +32,29 @@ from pathlib import Path
 from typing import Any, Sequence
 
 
-SCHEMA_VERSION = "abyss_stack_codex_incarnation_home_v1"
+SCHEMA_VERSION = "abyss_stack_codex_incarnation_home_v2"
+CAPABILITY_PROJECTION_SCHEMA_VERSION = (
+    "abyss_stack_codex_capability_projection_v2"
+)
+CAPABILITY_GRANT_SCHEMA_VERSION = "abyss_stack_codex_capability_grant_v1"
+CAPABILITY_CLASS_REGISTRY_SCHEMA_VERSION = (
+    "abyss_stack_codex_capability_class_registry_v1"
+)
+CAPABILITY_CLASS_REGISTRY_NAME = "capability-classes.v1.json"
+CAPABILITY_CLASS_REGISTRY_PATH = Path(__file__).resolve().with_name(
+    CAPABILITY_CLASS_REGISTRY_NAME
+)
+CAPABILITY_CLASS_POLICIES = {
+    "session_continuity": ("shared_link", False),
+    "actor_tooling": ("shared_link", False),
+    "operator_control": ("denied", True),
+}
+CAPABILITY_CLASS_ID_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
+CAPABILITY_ENTRY_NAME_PATTERN = re.compile(r"^(?!\.\.?$)[^/]+$")
 HOLDER_RECEIPT_SCHEMA_VERSION = "abyss_stack_visible_incarnation_holder_terminal_v1"
+HOLDER_LOSS_REENTRY_SCHEMA_VERSION = (
+    "task_local_external_actor_holder_loss_reentry_v1"
+)
 TERMINAL_JOIN_SCHEMA_VERSION = "abyss_stack_visible_incarnation_terminal_join_v1"
 CLOSURE_AUTHORIZATION_SCHEMA_VERSION = (
     "abyss_stack_visible_incarnation_terminal_closure_authorization_v1"
@@ -55,6 +77,8 @@ CONTROL_SOCKET_MAX_LENGTH = 103
 VISIBLE_LAUNCH_GATE_SCHEMA_VERSION = "abyss_stack_visible_launch_admission_gate_v1"
 VISIBLE_LAUNCH_GATE_WAIT_SECONDS = 15.0
 VISIBLE_LAUNCH_GATE_POLL_SECONDS = 0.05
+VISIBLE_TERMINAL_BINDING_WAIT_SECONDS = 15.0
+VISIBLE_TERMINAL_BINDING_POLL_SECONDS = 0.05
 SAFE_PROJECTION_FORBIDDEN_KEYS = frozenset(
     {
         "env",
@@ -329,6 +353,282 @@ def _ambient_home_identity(ambient_home: Path) -> str:
     return sha256_bytes(
         canonical_bytes({"ambient_codex_home": str(ambient_home)})
     )
+
+
+def _load_capability_class_registry() -> tuple[
+    dict[str, str], dict[str, dict[str, Any]], dict[str, Any]
+]:
+    """Load the authored capability meaning and retain its exact source digest."""
+
+    path = _regular_file(
+        CAPABILITY_CLASS_REGISTRY_PATH, "capability-class registry"
+    )
+    value, raw = _load_json_snapshot(path, "capability-class registry")
+    required = {"$schema", "schema_version", "classes", "entries", "unknown"}
+    if set(value) != required:
+        raise IncarnationHomeError("capability-class registry fields are not exact")
+    if value.get("$schema") != "schemas/external-codex-capability-classes.schema.json":
+        raise IncarnationHomeError("capability-class registry schema binding is invalid")
+    if value.get("schema_version") != CAPABILITY_CLASS_REGISTRY_SCHEMA_VERSION:
+        raise IncarnationHomeError("unsupported capability-class registry schema")
+    classes = value.get("classes")
+    if not isinstance(classes, dict) or not classes:
+        raise IncarnationHomeError("capability-class registry classes are invalid")
+
+    definitions: dict[str, dict[str, Any]] = {}
+    class_definitions: dict[str, dict[str, Any]] = {}
+    class_ids: set[str] = set()
+    for capability_class, definition in classes.items():
+        if (
+            not isinstance(capability_class, str)
+            or not isinstance(definition, dict)
+            or set(definition) != {"projection", "grantable"}
+        ):
+            raise IncarnationHomeError(
+                "capability-class registry definition is not exact"
+            )
+        projection = definition.get("projection")
+        grantable = definition.get("grantable")
+        if (
+            not isinstance(capability_class, str)
+            or CAPABILITY_CLASS_ID_PATTERN.fullmatch(capability_class) is None
+            or capability_class == "unknown"
+            or capability_class in class_ids
+            or projection not in {"shared_link", "denied"}
+            or not isinstance(grantable, bool)
+        ):
+            raise IncarnationHomeError(
+                "capability-class registry definition is invalid"
+            )
+        expected_policy = CAPABILITY_CLASS_POLICIES.get(capability_class)
+        if expected_policy is None:
+            expected_policy = ("denied", False)
+        if (projection, grantable) != expected_policy:
+            raise IncarnationHomeError(
+                "capability-class registry policy is not an admitted safe tuple"
+            )
+        class_ids.add(capability_class)
+        class_definitions[capability_class] = {
+            "projection": projection,
+            "grantable": grantable,
+        }
+
+    if not set(CAPABILITY_CLASS_POLICIES).issubset(class_ids):
+        raise IncarnationHomeError(
+            "capability-class registry omits an admitted canonical class"
+        )
+
+    entries = value.get("entries")
+    if not isinstance(entries, dict):
+        raise IncarnationHomeError("capability-class registry entries are invalid")
+    for name, capability_class in entries.items():
+        if (
+            not isinstance(name, str)
+            or CAPABILITY_ENTRY_NAME_PATTERN.fullmatch(name) is None
+            or name in {".", ".."}
+            or name in LOCAL_NAMES
+            or Path(name).name != name
+            or not isinstance(capability_class, str)
+            or CAPABILITY_CLASS_ID_PATTERN.fullmatch(capability_class) is None
+            or capability_class == "unknown"
+            or capability_class not in class_definitions
+        ):
+            raise IncarnationHomeError(
+                "capability-class registry entry is invalid"
+            )
+        class_definition = class_definitions[capability_class]
+        definitions[name] = {
+            "capability_class": capability_class,
+            **class_definition,
+        }
+
+    unknown = value.get("unknown")
+    if not isinstance(unknown, dict) or set(unknown) != {
+        "capability_class",
+        "projection",
+        "grantable",
+    }:
+        raise IncarnationHomeError("capability-class registry unknown is invalid")
+    if (
+        unknown.get("capability_class") != "unknown"
+        or unknown.get("projection") != "denied"
+        or unknown.get("grantable") is not True
+    ):
+        raise IncarnationHomeError("capability-class registry unknown is not deny-by-default")
+    metadata = {
+        "path": str(path),
+        "sha256": sha256_bytes(raw),
+        "schema_version": str(value["schema_version"]),
+    }
+    return metadata, definitions, dict(unknown)
+
+
+def _classify_ambient_entry(
+    name: str,
+    *,
+    definitions: dict[str, dict[str, Any]],
+    unknown: dict[str, Any],
+) -> dict[str, Any]:
+    """Resolve one entry through authored data, with an explicit unknown result."""
+
+    return dict(definitions.get(name, unknown))
+
+
+def _capability_grant_projection(
+    *,
+    grant_path: Path,
+    ambient_home_identity: str,
+    model_realization_id: str,
+    incarnation_coordinate: str,
+) -> tuple[dict[str, Any], bytes]:
+    """Validate one reusable, subject-bound exact-entry projection grant."""
+
+    path = _regular_file(grant_path, "capability grant")
+    value, raw = _load_json_snapshot(path, "capability grant")
+    if value.get("schema_version") != CAPABILITY_GRANT_SCHEMA_VERSION:
+        raise IncarnationHomeError("unsupported capability grant schema")
+    required = {
+        "$schema",
+        "schema_version",
+        "grant_id",
+        "capability_id",
+        "capability_class",
+        "ambient_entry",
+        "effect",
+        "subject",
+        "expires_at",
+    }
+    if set(value) != required:
+        raise IncarnationHomeError("capability grant fields are not exact")
+    if value.get("$schema") != "schemas/external-codex-capability-grant.schema.json":
+        raise IncarnationHomeError("capability grant schema binding is invalid")
+    grant_id = value.get("grant_id")
+    capability_id = value.get("capability_id")
+    capability_class = value.get("capability_class")
+    ambient_entry = value.get("ambient_entry")
+    effect = value.get("effect")
+    expires_at = value.get("expires_at")
+    if not all(
+        isinstance(item, str) and item.strip()
+        for item in (grant_id, capability_id, ambient_entry, expires_at)
+    ):
+        raise IncarnationHomeError("capability grant identity is invalid")
+    if (
+        capability_class != "operator_control"
+        or effect != "project_shared_link"
+        or ambient_entry in LOCAL_NAMES
+        or Path(ambient_entry).name != ambient_entry
+        or ambient_entry in {"", ".", ".."}
+        or capability_id != f"codex.home.{ambient_entry}"
+    ):
+        raise IncarnationHomeError("capability grant scope is invalid")
+    subject = value.get("subject")
+    if not isinstance(subject, dict) or set(subject) != {
+        "ambient_home_identity",
+        "model_realization_id",
+        "incarnation_coordinate",
+    }:
+        raise IncarnationHomeError("capability grant subject is invalid")
+    if (
+        subject.get("ambient_home_identity") != ambient_home_identity
+        or subject.get("model_realization_id") != model_realization_id
+        or subject.get("incarnation_coordinate") != incarnation_coordinate
+    ):
+        raise IncarnationHomeError("capability grant subject does not match incarnation")
+    try:
+        expiry = datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise IncarnationHomeError("capability grant expiry is invalid") from exc
+    if expiry.tzinfo is None or expiry <= datetime.now(UTC):
+        raise IncarnationHomeError("capability grant is stale or expired")
+    projection = {
+        "grant_id": grant_id,
+        "capability_id": capability_id,
+        "capability_class": capability_class,
+        "ambient_entry": ambient_entry,
+        "effect": effect,
+        "subject": dict(subject),
+        "expires_at": expires_at,
+        "path": str(path),
+        "sha256": sha256_bytes(raw),
+    }
+    return projection, raw
+
+
+def _build_capability_projection(
+    *,
+    ambient_home: Path,
+    ambient_home_identity: str,
+    model_realization_id: str,
+    incarnation_coordinate: str,
+    capability_grants: Sequence[Path] = (),
+) -> dict[str, Any]:
+    """Build the typed home projection; unknown entries are denied by default."""
+
+    registry, definitions, unknown = _load_capability_class_registry()
+    grants_by_entry: dict[str, dict[str, Any]] = {}
+    grant_ids: set[str] = set()
+    for grant_path in capability_grants:
+        grant, _raw = _capability_grant_projection(
+            grant_path=Path(grant_path),
+            ambient_home_identity=ambient_home_identity,
+            model_realization_id=model_realization_id,
+            incarnation_coordinate=incarnation_coordinate,
+        )
+        entry = str(grant["ambient_entry"])
+        if entry in grants_by_entry or grant["grant_id"] in grant_ids:
+            raise IncarnationHomeError("capability grants contain a duplicate identity")
+        grants_by_entry[entry] = grant
+        grant_ids.add(str(grant["grant_id"]))
+
+    entries: dict[str, dict[str, Any]] = {}
+    for source in sorted(ambient_home.iterdir(), key=lambda item: item.name):
+        if source.name in LOCAL_NAMES:
+            continue
+        if source.is_symlink():
+            raise IncarnationHomeError(
+                f"ambient capability entry may not be a symlink: {source}"
+            )
+        classification = _classify_ambient_entry(
+            source.name,
+            definitions=definitions,
+            unknown=unknown,
+        )
+        grant = grants_by_entry.get(source.name)
+        if grant is not None and not classification["grantable"]:
+            raise IncarnationHomeError(
+                "capability grant targets a non-grantable capability entry"
+            )
+        projected = grant is not None or classification["projection"] == "shared_link"
+        entries[source.name] = {
+            "capability_class": (
+                "operator_control"
+                if grant is not None
+                else classification["capability_class"]
+            ),
+            "projection": "shared_link" if projected else "denied",
+            "grantable": classification["grantable"],
+            "explicit_grant": (
+                None
+                if grant is None
+                else {
+                    key: value
+                    for key, value in grant.items()
+                    if key != "ambient_entry"
+                }
+            ),
+        }
+    entry_names = set(entries)
+    if set(grants_by_entry) - entry_names:
+        raise IncarnationHomeError(
+            "capability grant targets an absent ambient capability entry"
+        )
+    return {
+        "schema_version": CAPABILITY_PROJECTION_SCHEMA_VERSION,
+        "default_policy": "deny_ambient_operator_control",
+        "capability_class_registry": registry,
+        "entries": entries,
+    }
 
 
 def _incarnation_coordinate(realization_id: str, fingerprint: str) -> str:
@@ -863,6 +1163,182 @@ def _load_binding_context_snapshot(raw: bytes) -> dict[str, str]:
     )
 
 
+def _load_holder_loss_reentry(
+    path: Path,
+    *,
+    expected_context: dict[str, str] | None = None,
+    expected_holder: tuple[int, int] | None = None,
+    expected_terminal: tuple[int, int] | None = None,
+) -> tuple[dict[str, Any], bytes, str]:
+    """Load the exact task-local evidence that admitted a replacement holder.
+
+    A holder-loss reentry receipt is not itself a canonical visible-holder
+    receipt.  It is an immutable admission input for the explicit rebind
+    operation below.  Keep that distinction visible and require every
+    identity/path/digest relation before a canonical receipt can be derived.
+    """
+
+    receipt, raw = _load_json_snapshot(path, "holder-loss reentry receipt")
+    if receipt.get("schema_version") != HOLDER_LOSS_REENTRY_SCHEMA_VERSION:
+        raise IncarnationHomeError("unsupported holder-loss reentry receipt schema")
+    expected_keys = {
+        "schema_version",
+        "goal_id",
+        "actor_id",
+        "role",
+        "session_id",
+        "workspace",
+        "duty_ref",
+        "duty_sha256",
+        "failure_event_ref",
+        "failure_event_sha256",
+        "prior_holder",
+        "current_holder",
+        "terminal",
+        "continuity",
+        "claim_limit",
+    }
+    if set(receipt) != expected_keys:
+        raise IncarnationHomeError("holder-loss reentry receipt fields are not exact")
+    for key in ("goal_id", "actor_id", "role", "session_id", "claim_limit"):
+        _binding_ref(receipt.get(key), f"holder-loss reentry {key}")
+    workspace = _binding_ref(receipt.get("workspace"), "holder-loss reentry workspace")
+    if not Path(workspace).is_absolute():
+        raise IncarnationHomeError("holder-loss reentry workspace must be absolute")
+    if expected_context is not None:
+        if receipt["goal_id"] != expected_context["goal_ref"]:
+            raise IncarnationHomeError("holder-loss reentry Goal identity disagrees with context")
+        if receipt["actor_id"] != expected_context["actor_ref"]:
+            raise IncarnationHomeError("holder-loss reentry actor identity disagrees with context")
+        if receipt["session_id"] != expected_context["session_ref"]:
+            raise IncarnationHomeError("holder-loss reentry session identity disagrees with context")
+        context_workspace = expected_context.get("workspace")
+        if context_workspace is not None and workspace != context_workspace:
+            raise IncarnationHomeError("holder-loss reentry workspace disagrees with context")
+    for ref_key, digest_key, label in (
+        ("duty_ref", "duty_sha256", "holder-loss duty"),
+        ("failure_event_ref", "failure_event_sha256", "holder-loss failure event"),
+    ):
+        reference = _regular_file(Path(receipt[ref_key]), label)
+        digest = receipt[digest_key]
+        if not isinstance(digest, str) or SHA256_DIGEST_PATTERN.fullmatch(digest) is None:
+            raise IncarnationHomeError(f"{label} digest is invalid")
+        if sha256_bytes(reference.read_bytes()) != digest:
+            raise IncarnationHomeError(f"{label} digest has drifted")
+    prior_holder = receipt["prior_holder"]
+    current_holder = receipt["current_holder"]
+    terminal = receipt["terminal"]
+    continuity = receipt["continuity"]
+    if (
+        not isinstance(prior_holder, dict)
+        or set(prior_holder) != {"pid", "start_ticks", "state"}
+        or not _positive_int(prior_holder.get("pid"))
+        or not _positive_int(prior_holder.get("start_ticks"))
+        or prior_holder.get("state") != "lost_before_return"
+    ):
+        raise IncarnationHomeError("holder-loss prior-holder evidence is invalid")
+    if (
+        not isinstance(current_holder, dict)
+        or set(current_holder) != {"pid", "start_ticks"}
+        or not _positive_int(current_holder.get("pid"))
+        or not _positive_int(current_holder.get("start_ticks"))
+    ):
+        raise IncarnationHomeError("holder-loss current-holder evidence is invalid")
+    if expected_holder is not None and (
+        current_holder["pid"] != expected_holder[0]
+        or current_holder["start_ticks"] != expected_holder[1]
+    ):
+        raise IncarnationHomeError("holder-loss current-holder identity disagrees")
+    if (
+        not isinstance(terminal, dict)
+        or set(terminal) != {"pid", "start_ticks", "visible", "operator_interactive"}
+        or not _positive_int(terminal.get("pid"))
+        or not _positive_int(terminal.get("start_ticks"))
+        or terminal.get("visible") is not True
+        or terminal.get("operator_interactive") is not True
+    ):
+        raise IncarnationHomeError("holder-loss terminal evidence is invalid")
+    if expected_terminal is not None and (
+        terminal["pid"] != expected_terminal[0]
+        or terminal["start_ticks"] != expected_terminal[1]
+    ):
+        raise IncarnationHomeError("holder-loss terminal identity disagrees")
+    if (
+        not isinstance(continuity, dict)
+        or continuity
+        != {
+            "same_actor": True,
+            "same_session": True,
+            "replacement_physical_incarnation": True,
+        }
+    ):
+        raise IncarnationHomeError("holder-loss continuity evidence is invalid")
+    return receipt, raw, sha256_bytes(raw)
+
+
+def _load_rebind_manifest(
+    path: Path, *, runtime_state_root: Path
+) -> tuple[dict[str, Any], bytes, str]:
+    """Load and fully revalidate the manifest admitted by a replacement."""
+
+    if not path.resolve().is_relative_to(runtime_state_root.resolve()):
+        raise IncarnationHomeError(
+            "replacement incarnation manifest is outside the bound runtime state root"
+        )
+    return _load_manifest_snapshot(path)
+
+
+def _validate_replacement_reentry_binding(
+    value: object,
+    *,
+    holder: dict[str, Any],
+) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise IncarnationHomeError("replacement reentry binding is not an object")
+    required = {
+        "receipt_ref",
+        "receipt_sha256",
+        "duty_ref",
+        "duty_sha256",
+        "failure_event_ref",
+        "failure_event_sha256",
+        "goal_id",
+        "actor_id",
+        "session_id",
+        "holder_pid",
+        "holder_start_ticks",
+    }
+    if set(value) != required:
+        raise IncarnationHomeError("replacement reentry binding fields are not exact")
+    reference = _regular_file(Path(value["receipt_ref"]), "replacement reentry receipt")
+    digest = value["receipt_sha256"]
+    if not isinstance(digest, str) or SHA256_DIGEST_PATTERN.fullmatch(digest) is None:
+        raise IncarnationHomeError("replacement reentry receipt digest is invalid")
+    if sha256_bytes(reference.read_bytes()) != digest:
+        raise IncarnationHomeError("replacement reentry receipt digest has drifted")
+    reentry, _raw, _digest = _load_holder_loss_reentry(
+        reference,
+        expected_holder=(holder.get("pid"), holder.get("start_ticks"))
+        if _positive_int(holder.get("pid")) and _positive_int(holder.get("start_ticks"))
+        else None,
+    )
+    for key in ("duty_ref", "duty_sha256", "failure_event_ref", "failure_event_sha256"):
+        if value[key] != reentry[key]:
+            raise IncarnationHomeError(
+                f"replacement reentry binding {key} disagrees with source receipt"
+            )
+    for key in ("goal_id", "actor_id", "session_id"):
+        if value[key] != reentry[key]:
+            raise IncarnationHomeError(
+                f"replacement reentry binding {key} disagrees with source receipt"
+            )
+    if value["holder_pid"] != reentry["current_holder"]["pid"] or value[
+        "holder_start_ticks"
+    ] != reentry["current_holder"]["start_ticks"]:
+        raise IncarnationHomeError("replacement reentry holder identity disagrees")
+    return value
+
+
 def _revalidate_bound_holder_identity(holder: dict[str, object]) -> None:
     """Recheck the bound holder identity at the directed-input boundary."""
 
@@ -1347,7 +1823,8 @@ def _post_exec_resolution(
                 env_fields = []
             if env_fields and not env_fields[0].startswith("-"):
                 resolved = shutil.which(
-                    env_fields[0], path=path or os.environ.get("PATH")
+                    env_fields[0],
+                    path=path if path is not None else os.environ.get("PATH"),
                 )
                 if resolved is not None:
                     # env resolves the command for lookup but preserves the
@@ -1904,6 +2381,34 @@ def _reserve_closure_receipt(
         raise
 
 
+def _wait_for_visible_terminal_binding(
+    *, holder_pid: int
+) -> tuple[int, int, list[str], str, bool]:
+    """Wait for the causal Kitty ancestry and dedication handshake to settle."""
+
+    deadline = time.monotonic() + VISIBLE_TERMINAL_BINDING_WAIT_SECONDS
+    last_error: IncarnationHomeError | None = None
+    while True:
+        try:
+            terminal_pid, terminal_start_ticks, terminal_argv = _kitty_ancestor(
+                holder_pid
+            )
+            window_id, dedicated = _kitty_dedication(
+                holder_pid=holder_pid,
+                kitty_pid=terminal_pid,
+                terminal_argv=terminal_argv,
+            )
+            return terminal_pid, terminal_start_ticks, terminal_argv, window_id, dedicated
+        except IncarnationHomeError as exc:
+            last_error = exc
+            if time.monotonic() >= deadline:
+                raise IncarnationHomeError(
+                    "visible holder terminal binding did not become ready: "
+                    f"{last_error}"
+                ) from exc
+            time.sleep(VISIBLE_TERMINAL_BINDING_POLL_SECONDS)
+
+
 def _holder_receipt(
     *,
     receipt_path: Path,
@@ -1925,12 +2430,13 @@ def _holder_receipt(
     if holder_parent_pid <= 1:
         raise IncarnationHomeError("visible holder has no usable process parent")
     parent_comm = _proc_comm(holder_parent_pid)
-    terminal_pid, terminal_start_ticks, terminal_argv = _kitty_ancestor(holder_pid)
-    window_id, dedicated = _kitty_dedication(
-        holder_pid=holder_pid,
-        kitty_pid=terminal_pid,
-        terminal_argv=terminal_argv,
-    )
+    (
+        terminal_pid,
+        terminal_start_ticks,
+        terminal_argv,
+        window_id,
+        dedicated,
+    ) = _wait_for_visible_terminal_binding(holder_pid=holder_pid)
     post_exec_argv = _post_exec_argv(
         executable,
         argv,
@@ -2041,6 +2547,153 @@ def _holder_receipt(
     if binding is not None:
         receipt["binding"] = binding
     _write_new_json(receipt_path, receipt, "holder terminal receipt")
+    return receipt
+
+
+def _rebind_replacement_holder_receipt(
+    *,
+    receipt_path: Path,
+    holder_loss_reentry_path: Path,
+    binding_context_path: Path,
+    manifest_path: Path,
+    codex_executable_path: Path,
+) -> dict[str, Any]:
+    """Bind a live replacement holder after a pre-return CLI loss.
+
+    This is an explicit recovery adapter for the old direct visible bootstrap.
+    It never upgrades the holder-loss receipt by itself: the replacement PID,
+    Kitty ancestry, current argv/executable, scoped manifest, and every source
+    digest are re-observed before a new canonical holder receipt is published.
+    """
+
+    context_document, _context_raw = _load_json_snapshot(
+        binding_context_path, "terminal binding context"
+    )
+    context = _validate_binding_context(context_document)
+    context_workspace = context_document.get("workspace")
+    if not isinstance(context_workspace, str) or not Path(context_workspace).is_absolute():
+        raise IncarnationHomeError("terminal binding context workspace is invalid")
+    context["workspace"] = context_workspace
+    reentry, _reentry_raw, reentry_digest = _load_holder_loss_reentry(
+        holder_loss_reentry_path,
+        expected_context=context,
+    )
+    holder_pid = reentry["current_holder"]["pid"]
+    holder_start_ticks = reentry["current_holder"]["start_ticks"]
+    terminal_pid = reentry["terminal"]["pid"]
+    terminal_start_ticks = reentry["terminal"]["start_ticks"]
+    if not _descends_from(os.getpid(), holder_pid):
+        raise IncarnationHomeError(
+            "replacement holder rebind must run from the bound holder lineage"
+        )
+    if _proc_identity_state(holder_pid, holder_start_ticks) != "live":
+        raise IncarnationHomeError("replacement holder is not live")
+    if _proc_identity_state(terminal_pid, terminal_start_ticks) != "live":
+        raise IncarnationHomeError("replacement Kitty terminal is not live")
+    if _proc_parent_pid(holder_pid) != terminal_pid:
+        raise IncarnationHomeError("replacement holder is not a direct Kitty child")
+    if _proc_start_ticks(terminal_pid) != terminal_start_ticks:
+        raise IncarnationHomeError("replacement Kitty PID was reused")
+    if _proc_comm(terminal_pid) != "kitty":
+        raise IncarnationHomeError("replacement terminal is not Kitty")
+    observed_terminal_pid, observed_terminal_start_ticks, terminal_argv = _kitty_ancestor(
+        holder_pid
+    )
+    if (
+        observed_terminal_pid != terminal_pid
+        or observed_terminal_start_ticks != terminal_start_ticks
+    ):
+        raise IncarnationHomeError("replacement Kitty ancestry disagrees with reentry")
+    window_id, dedicated = _kitty_dedication(
+        holder_pid=holder_pid,
+        kitty_pid=terminal_pid,
+        terminal_argv=terminal_argv,
+    )
+    manifest, manifest_bytes, manifest_digest = _load_rebind_manifest(
+        manifest_path,
+        runtime_state_root=Path(context["runtime_state_root"]),
+    )
+    executable = _regular_file(codex_executable_path, "replacement Codex executable")
+    holder_environment = _proc_environ(holder_pid)
+    holder_codex_home = holder_environment.get("CODEX_HOME")
+    if holder_codex_home != manifest["codex_home"]:
+        raise IncarnationHomeError(
+            "replacement holder CODEX_HOME disagrees with its manifest"
+        )
+    holder_argv = _proc_argv(holder_pid)
+    if not holder_argv:
+        raise IncarnationHomeError("replacement holder argv is empty")
+    _post_exec_argv_value, post_exec_executable, post_exec_bytes = _post_exec_resolution(
+        executable,
+        [str(executable)],
+        path=holder_environment.get("PATH"),
+    )
+    observed_executable = Path(f"/proc/{holder_pid}/exe").resolve()
+    if observed_executable != post_exec_executable.resolve():
+        raise IncarnationHomeError(
+            "replacement Codex executable path disagrees with live holder"
+        )
+    executable_digest = sha256_bytes(executable.read_bytes())
+    post_exec_executable_digest = sha256_bytes(post_exec_bytes)
+    if _proc_exe_digest(holder_pid) != post_exec_executable_digest:
+        raise IncarnationHomeError("replacement Codex executable digest has drifted")
+    holder_parent_pid = _proc_parent_pid(holder_pid)
+    holder_parent_start_ticks = _proc_start_ticks(holder_parent_pid)
+    holder_parent_comm = _proc_comm(holder_parent_pid)
+    receipt: dict[str, Any] = {
+        "schema_version": HOLDER_RECEIPT_SCHEMA_VERSION,
+        "receipt_ref": str(receipt_path.resolve()),
+        "created_at": _utc_now(),
+        "lifecycle_role": "responsibility_holder",
+        "boot_id": _proc_boot_id(),
+        "holder": {
+            "pid": holder_pid,
+            "start_ticks": holder_start_ticks,
+            "parent_pid": holder_parent_pid,
+            "parent_start_ticks": holder_parent_start_ticks,
+            "parent_comm": holder_parent_comm,
+            "argv": holder_argv,
+            "argv_digest": sha256_bytes(canonical_bytes(holder_argv)),
+            "exe_digest": post_exec_executable_digest,
+        },
+        "runtime": {
+            "codex_executable": str(executable.resolve()),
+            "codex_executable_digest": executable_digest,
+            "incarnation_manifest": str(manifest_path.resolve()),
+            "incarnation_manifest_digest": manifest_digest,
+            "incarnation_manifest_snapshot_b64": base64.b64encode(
+                manifest_bytes
+            ).decode("ascii"),
+            "model": str(manifest["model_slug"]),
+            "reasoning_effort": str(manifest["reasoning_effort"]),
+            "ambient_codex_home": str(manifest["ambient_codex_home"]),
+            "incarnation_codex_home": str(manifest["codex_home"]),
+        },
+        "terminal": {
+            "binding": "kitty_ancestor_at_exec",
+            "required_comm": "kitty",
+            "pid": terminal_pid,
+            "start_ticks": terminal_start_ticks,
+            "argv": terminal_argv,
+            "window_id": window_id,
+            "dedicated": dedicated,
+        },
+        "replacement_reentry": {
+            "receipt_ref": str(holder_loss_reentry_path.resolve()),
+            "receipt_sha256": reentry_digest,
+            "duty_ref": reentry["duty_ref"],
+            "duty_sha256": reentry["duty_sha256"],
+            "failure_event_ref": reentry["failure_event_ref"],
+            "failure_event_sha256": reentry["failure_event_sha256"],
+            "goal_id": reentry["goal_id"],
+            "actor_id": reentry["actor_id"],
+            "session_id": reentry["session_id"],
+            "holder_pid": holder_pid,
+            "holder_start_ticks": holder_start_ticks,
+        },
+    }
+    _assert_safe_projection(receipt)
+    _write_new_json(receipt_path, receipt, "replacement holder terminal receipt")
     return receipt
 
 
@@ -2491,6 +3144,20 @@ def _load_holder_receipt_snapshot(
         or not all(isinstance(item, str) for item in holder["argv"])
     ):
         raise IncarnationHomeError("holder terminal receipt is incomplete")
+    replacement_reentry = receipt.get("replacement_reentry")
+    post_exec_rebound = "exe_digest" in holder and not any(
+        key in holder
+        for key in ("pre_exec_argv", "pre_exec_argv_digest", "pre_exec_exe_digest")
+    )
+    if post_exec_rebound and replacement_reentry is None:
+        raise IncarnationHomeError(
+            "post-exec rebound holder receipt requires replacement_reentry provenance"
+        )
+    if replacement_reentry is not None:
+        _validate_replacement_reentry_binding(
+            replacement_reentry,
+            holder=holder,
+        )
     pre_exec_argv = holder.get("pre_exec_argv")
     pre_exec_argv_digest = holder.get("pre_exec_argv_digest")
     pre_exec_exe_digest = holder.get("pre_exec_exe_digest")
@@ -3417,6 +4084,18 @@ def command_bind(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_rebind(args: argparse.Namespace) -> int:
+    receipt = _rebind_replacement_holder_receipt(
+        receipt_path=Path(args.output),
+        holder_loss_reentry_path=Path(args.holder_loss_reentry),
+        binding_context_path=Path(args.binding_context),
+        manifest_path=Path(args.manifest),
+        codex_executable_path=Path(args.codex_executable),
+    )
+    print(json.dumps(receipt, ensure_ascii=False, sort_keys=True))
+    return 0
+
+
 def command_status(args: argparse.Namespace) -> int:
     binding_path = Path(args.binding) if args.binding else None
     holder_receipt_path = (
@@ -4130,7 +4809,11 @@ def command_close(args: argparse.Namespace) -> int:
 
 
 def prepare_home(
-    *, ambient_home: Path, realization_path: Path, runtime_root: Path
+    *,
+    ambient_home: Path,
+    realization_path: Path,
+    runtime_root: Path,
+    capability_grants: Sequence[Path] = (),
 ) -> dict[str, Any]:
     ambient_home = _absolute_directory(ambient_home, "ambient Codex home")
     runtime_root = _absolute_directory(runtime_root, "runtime root")
@@ -4180,15 +4863,19 @@ def prepare_home(
         ambient_home / "config.toml", "ambient Codex config"
     ).read_bytes()
     config = _bound_config(ambient_config, model_slug, effort)
-    shared_sources: list[Path] = []
-    for source in sorted(ambient_home.iterdir(), key=lambda item: item.name):
-        if source.name in LOCAL_NAMES:
-            continue
-        if source.is_symlink():
-            raise IncarnationHomeError(
-                f"ambient shared state entry may not be a symlink: {source}"
-            )
-        shared_sources.append(source)
+    capability_projection = _build_capability_projection(
+        ambient_home=ambient_home,
+        ambient_home_identity=ambient_identity,
+        model_realization_id=str(realization.get("model_realization_id")),
+        incarnation_coordinate=coordinate,
+        capability_grants=capability_grants,
+    )
+    projected_entries = {
+        name: entry
+        for name, entry in capability_projection["entries"].items()
+        if entry["projection"] == "shared_link"
+    }
+    shared_names = sorted(projected_entries)
 
     incarnation_root.mkdir(mode=0o700, exist_ok=True)
     codex_home.mkdir(mode=0o700, exist_ok=True)
@@ -4212,30 +4899,57 @@ def prepare_home(
             for name in existing["shared_state_names"]
             if isinstance(name, str) and name not in LOCAL_NAMES and Path(name).name == name
         }
-    shared_names: list[str] = []
-    for source in shared_sources:
+    if incarnation_root.exists() and isinstance(
+        existing.get("capability_projection"), dict
+    ):
+        existing_entries = existing["capability_projection"].get("entries", {})
+        if isinstance(existing_entries, dict):
+            existing_entries_iter = existing_entries.values()
+        elif isinstance(existing_entries, list):
+            existing_entries_iter = existing_entries
+        else:
+            existing_entries_iter = ()
+        for entry in existing_entries_iter:
+            if (
+                isinstance(entry, dict)
+                and entry.get("projection") == "shared_link"
+                and isinstance(entry.get("name"), str)
+            ):
+                previous_shared_names.add(entry["name"])
+
+    for name in shared_names:
+        source = ambient_home / name
         if source.is_symlink():
             raise IncarnationHomeError(
-                f"ambient shared state entry may not be a symlink: {source}"
+                f"ambient capability entry may not be a symlink: {source}"
             )
         target = codex_home / source.name
         if target.is_symlink():
             if target.readlink() != source:
-                raise IncarnationHomeError(f"shared state link drift: {target}")
+                raise IncarnationHomeError(f"capability projection link drift: {target}")
         elif target.exists():
-            raise IncarnationHomeError(f"shared state target is not a symlink: {target}")
+            raise IncarnationHomeError(
+                f"capability projection target is not a symlink: {target}"
+            )
         else:
             target.symlink_to(source)
-        shared_names.append(source.name)
 
-    for name in sorted(previous_shared_names - set(shared_names)):
+    all_capability_names = set(capability_projection["entries"])
+    for name in sorted(
+        (previous_shared_names | all_capability_names) - set(shared_names)
+    ):
         target = codex_home / name
         source = ambient_home / name
+        if not target.exists() and not target.is_symlink():
+            continue
         if not target.is_symlink() or target.readlink() != source:
-            raise IncarnationHomeError(f"obsolete shared state link drift: {target}")
+            raise IncarnationHomeError(
+                f"obsolete capability projection link drift: {target}"
+            )
         target.unlink()
 
     manifest = {
+        "$schema": "schemas/external-codex-incarnation-home.schema.json",
         "schema_version": SCHEMA_VERSION,
         "model_realization_id": realization.get("model_realization_id"),
         "model_realization_ref": str(realization_path),
@@ -4249,7 +4963,8 @@ def prepare_home(
         "codex_home": str(codex_home),
         "config_digest": sha256_bytes(config),
         "shared_state_names": shared_names,
-        "top_level_posture": "ambient-home",
+        "capability_projection": capability_projection,
+        "top_level_posture": "incarnation-home",
         "child_posture": "incarnation-home-via-shell-environment-policy",
     }
     _write_exact(
@@ -4273,6 +4988,8 @@ def _load_manifest_snapshot(
         )
     if manifest.get("schema_version") != SCHEMA_VERSION:
         raise IncarnationHomeError("unsupported incarnation-home manifest")
+    if manifest.get("$schema") != "schemas/external-codex-incarnation-home.schema.json":
+        raise IncarnationHomeError("incarnation-home manifest schema binding is invalid")
     codex_home = _absolute_directory(Path(str(manifest.get("codex_home"))), "incarnation Codex home")
     ambient_home = _absolute_directory(
         Path(str(manifest.get("ambient_codex_home"))), "ambient Codex home"
@@ -4333,6 +5050,33 @@ def _load_manifest_snapshot(
         or scoped_config["features"].get("multi_agent") is not False
     ):
         raise IncarnationHomeError("scoped Codex config binding drift")
+    capability_projection = manifest.get("capability_projection")
+    manifest_entries = (
+        capability_projection.get("entries")
+        if isinstance(capability_projection, dict)
+        else None
+    )
+    manifest_entry_values = (
+        manifest_entries.values() if isinstance(manifest_entries, dict) else ()
+    )
+    expected_capability_projection = _build_capability_projection(
+        ambient_home=ambient_home,
+        ambient_home_identity=str(manifest.get("ambient_home_identity")),
+        model_realization_id=str(realization.get("model_realization_id")),
+        incarnation_coordinate=_incarnation_coordinate(
+            str(realization.get("model_realization_id")), fingerprint
+        ),
+        capability_grants=[
+            Path(str(grant.get("path")))
+            for entry in manifest_entry_values
+            if isinstance(entry, dict)
+            for grant in [entry.get("explicit_grant")]
+            if isinstance(grant, dict) and isinstance(grant.get("path"), str)
+        ],
+    )
+    if capability_projection != expected_capability_projection:
+        raise IncarnationHomeError("capability projection drift")
+
     shared_names = manifest.get("shared_state_names")
     if (
         not isinstance(shared_names, list)
@@ -4348,12 +5092,14 @@ def _load_manifest_snapshot(
     ):
         raise IncarnationHomeError("shared-state manifest is invalid")
     expected_shared_names = sorted(
-        entry.name
-        for entry in ambient_home.iterdir()
-        if entry.name not in LOCAL_NAMES
+        name
+        for name, entry in expected_capability_projection["entries"].items()
+        if entry["projection"] == "shared_link"
     )
     if sorted(shared_names) != expected_shared_names:
-        raise IncarnationHomeError("shared-state manifest no longer matches ambient home")
+        raise IncarnationHomeError(
+            "shared-state manifest no longer matches capability projection"
+        )
     expected_names = set(shared_names) | LOCAL_NAMES
     for entry in codex_home.iterdir():
         if entry.name not in expected_names:
@@ -4369,7 +5115,7 @@ def _load_manifest_snapshot(
             or not target.is_symlink()
             or target.readlink() != source
         ):
-            raise IncarnationHomeError(f"shared-state link drift: {target}")
+            raise IncarnationHomeError(f"capability projection link drift: {target}")
     for name in LOCAL_NAMES - {"config.toml"}:
         local = codex_home / name
         if local.is_symlink() or not local.is_dir():
@@ -5566,6 +6312,7 @@ def command_prepare(args: argparse.Namespace) -> int:
         ambient_home=Path(args.ambient_codex_home),
         realization_path=Path(args.model_realization),
         runtime_root=Path(args.runtime_root),
+        capability_grants=[Path(path) for path in (args.capability_grant or [])],
     )
     print(json.dumps(manifest, ensure_ascii=False, sort_keys=True))
     return 0
@@ -5726,7 +6473,7 @@ def command_payload_launch(args: argparse.Namespace) -> int:
             "package_relative": companion_relative_argument,
         }
     environment = dict(os.environ)
-    environment["CODEX_HOME"] = str(manifest["ambient_codex_home"])
+    environment["CODEX_HOME"] = str(manifest["codex_home"])
     if args.holder_receipt:
         _holder_receipt(
             receipt_path=Path(args.holder_receipt),
@@ -5777,7 +6524,7 @@ def command_launch(args: argparse.Namespace) -> int:
     command = Path(args.codex_executable)
     executable = _resolved_executable(command)
     environment = dict(os.environ)
-    environment["CODEX_HOME"] = str(manifest["ambient_codex_home"])
+    environment["CODEX_HOME"] = str(manifest["codex_home"])
     if terminal_title is not None:
         _binding_context_value, binding_context_bytes = _load_json_snapshot(
             Path(binding_context_argument), "terminal binding context"
@@ -6210,6 +6957,12 @@ def parser() -> argparse.ArgumentParser:
     prepare.add_argument("--ambient-codex-home", required=True)
     prepare.add_argument("--model-realization", required=True)
     prepare.add_argument("--runtime-root", required=True)
+    prepare.add_argument(
+        "--capability-grant",
+        action="append",
+        default=[],
+        help="owner-authored exact grant for one operator capability entry",
+    )
     prepare.set_defaults(handler=command_prepare)
     launch = subcommands.add_parser("launch")
     launch.add_argument("--manifest", required=True)
@@ -6258,6 +7011,19 @@ def parser() -> argparse.ArgumentParser:
     bind.add_argument("--binding-context", required=True)
     bind.add_argument("--output", required=True)
     bind.set_defaults(handler=command_bind)
+    rebind = subcommands.add_parser(
+        "rebind",
+        help=(
+            "derive one canonical holder receipt from an exact holder-loss "
+            "replacement evidence packet"
+        ),
+    )
+    rebind.add_argument("--holder-loss-reentry", required=True)
+    rebind.add_argument("--binding-context", required=True)
+    rebind.add_argument("--manifest", required=True)
+    rebind.add_argument("--codex-executable", required=True)
+    rebind.add_argument("--output", required=True)
+    rebind.set_defaults(handler=command_rebind)
     status = subcommands.add_parser("status")
     status.add_argument("--binding")
     status.add_argument("--holder-receipt")

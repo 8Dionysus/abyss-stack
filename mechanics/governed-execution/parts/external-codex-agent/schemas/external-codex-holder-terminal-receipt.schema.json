@@ -28,6 +28,16 @@
         },
         {
           "required": ["pid", "start_ticks", "parent_pid", "parent_start_ticks", "parent_comm", "pre_exec_argv", "pre_exec_argv_digest", "pre_exec_exe_digest", "argv", "argv_digest", "exe_digest"]
+        },
+        {
+          "required": ["pid", "start_ticks", "parent_pid", "parent_start_ticks", "parent_comm", "argv", "argv_digest", "exe_digest"],
+          "not": {
+            "anyOf": [
+              {"required": ["pre_exec_argv"]},
+              {"required": ["pre_exec_argv_digest"]},
+              {"required": ["pre_exec_exe_digest"]}
+            ]
+          }
         }
       ],
       "properties": {
@@ -88,8 +98,57 @@
         "dedicated": {"const": true}
       }
     },
-    "binding": {"$ref": "#/$defs/terminalBinding"}
+    "binding": {"$ref": "#/$defs/terminalBinding"},
+    "replacement_reentry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "receipt_ref",
+        "receipt_sha256",
+        "duty_ref",
+        "duty_sha256",
+        "failure_event_ref",
+        "failure_event_sha256",
+        "goal_id",
+        "actor_id",
+        "session_id",
+        "holder_pid",
+        "holder_start_ticks"
+      ],
+      "properties": {
+        "receipt_ref": {"type": "string", "pattern": "^/"},
+        "receipt_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "duty_ref": {"type": "string", "pattern": "^/"},
+        "duty_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "failure_event_ref": {"type": "string", "pattern": "^/"},
+        "failure_event_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "goal_id": {"type": "string", "minLength": 1},
+        "actor_id": {"type": "string", "minLength": 1},
+        "session_id": {"type": "string", "minLength": 1},
+        "holder_pid": {"type": "integer", "minimum": 1},
+        "holder_start_ticks": {"type": "integer", "minimum": 1}
+      }
+    }
   },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "holder": {
+            "required": ["exe_digest"],
+            "not": {
+              "anyOf": [
+                {"required": ["pre_exec_argv"]},
+                {"required": ["pre_exec_argv_digest"]},
+                {"required": ["pre_exec_exe_digest"]}
+              ]
+            }
+          }
+        }
+      },
+      "then": {"required": ["replacement_reentry"]}
+    }
+  ],
   "$defs": {
     "controlSocket": {
       "type": "object",

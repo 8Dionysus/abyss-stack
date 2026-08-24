@@ -212,6 +212,18 @@ Operations are:
   as an input migration; no Goal, thread, rollout, PR, disposition, or
   task-root coordinate is selected by source.
 
+  `aoa-external-codex-return return-route --route <absolute json>` is the
+  bridge-safe form of the same leaf. The route is a non-replacing,
+  digest-bound record of the already selected owner, handoff, canonical holder
+  receipt, and three output paths. It performs no Goal or terminal discovery;
+  it delegates only after every input digest, output identity, and alias check
+  passes. The route's owner, handoff, and holder digests are carried through
+  the return-attempt lock and reasserted against the exact directed-input bytes
+  loaded under that lock; an intervening mutation therefore fails closed before
+  delivery, authorization, or closure. A route or wrapper exit is not delivery
+  or closure evidence; the durable return, typed authorization, and exact-holder
+  closure receipts remain the claims that must be inspected.
+
 The operator-visible incarnation launcher has a separate lifecycle contour for
 the responsibility holder. `launch --holder-receipt <absolute json>` remains
 valid for the direct `exec` route: immediately before the Codex `exec`, it
@@ -246,6 +258,23 @@ the Goal, actor/incarnation/session, holder and Kitty PID/start ticks, Kitty
 window ID, TTY, title, socket, runtime state root, and closeout route. The
 `bind` command can materialize that binding from a legacy task-local receipt
 only with an explicit owner context.
+
+The `rebind` command is a narrow recovery adapter for a replacement physical
+holder after a pre-return CLI loss. It accepts only the exact
+`task_local_external_actor_holder_loss_reentry_v1` packet, validates its duty
+and observer-event digests, current holder/Kitty identities, direct holder
+lineage, scoped incarnation manifest, and executable digest, and publishes a
+new canonical holder receipt carrying the packet provenance. The rebind receipt
+proves only holder identity; it does not prove wake delivery, Goal activation,
+semantic acceptance, or closure.
+
+The payload holder publishes its lifecycle receipt only after the exact Kitty
+ancestor and dedicated-window handshake is ready. The runtime retries that
+causal identity observation for a bounded interval, preserving the exact
+holder PID/start ticks, Kitty PID/start ticks, window ID, and dedication proof;
+it does not turn a blind parent timeout into a successful launch. If the
+handshake never becomes ready, the launch fails closed and no live terminal
+binding is claimed.
 
 The canonical terminal observability surface is
 `status --binding <absolute json> [--output <absolute json>]`. It validates
@@ -769,6 +798,68 @@ This userspace contract does not claim survival of a direct, out-of-contract
 `SIGKILL` delivered to the supervisor itself. A kernel-enforced guarantee for
 that case requires a separately designed and admitted compatible cgroup
 containment route.
+
+## Incarnation-home capability projection
+
+`prepare` writes a v2 `incarnation-home.json` whose `$schema` points to
+`schemas/external-codex-incarnation-home.schema.json`. The manifest carries a
+model-neutral `capability_projection` with one typed entry for every non-local
+ambient-home entry. The projection's `entries` value is an object keyed by the
+exact ambient entry name, and each value carries `capability_class`,
+`projection`, `grantable`, and an `explicit_grant` value. `session_continuity` and `actor_tooling` entries are
+projected as shared links by default. `operator_control` and `unknown` entries
+are denied by default, so the runtime does not admit ambient app-server,
+hooks, plugin, queue, browser, or other operator-control state merely because
+the visible holder was launched from the operator's top-level home. The
+canonical visible holder itself uses the projected incarnation home; the
+ordinary actor-local `config.toml`, `cache`, `log`, `tmp`, and descendant binary
+remain real incarnation-local paths.
+
+An `--capability-grant` input is an exact
+`schemas/external-codex-capability-grant.schema.json` owner artifact for one
+operator-control entry. Admission requires the typed capability ID and
+effect, an exact ambient-home identity, model realization ID, incarnation
+coordinate, regular-file digest, and future expiry; duplicate-within-one-
+projection, stale, absent-entry, malformed, or mismatched grants fail closed.
+The grant is intentionally reusable by its exact subject until `expires_at`;
+this source slice has no stateful single-use or replay ledger. The grant binds
+the capability identity, ambient path, and grant artifact bytes. It does not
+bind mutable bytes inside a dynamic operator endpoint, so endpoint contents
+may change while the grant artifact, path, subject, and expiry remain valid.
+The resulting manifest stores the grant path and digest so grant-artifact
+refresh or mutation is detected. This is a runtime materialization and
+admission projection, not the semantic owner policy and not proof that the
+Codex app-server mutation itself enforces the grant.
+
+The explicit-grant relation is structural in the manifest: an operator-control
+entry may be `shared_link` only when its `explicit_grant` value is the complete
+grant projection object nested under that entry's ambient-name key. A denied
+entry has `explicit_grant: null`; there is no detached top-level
+`explicit_grants` collection or entry-local grant ID that can name a grant
+without carrying the relation. The loader still re-reads each referenced
+grant artifact and requires its subject, ambient entry, effect, expiry, and
+digest to reproduce the exact nested projection before materialization.
+
+The capability meaning consumed by the classifier is authored in
+`capability-classes.v1.json`, with an exact schema and digest recorded in the
+projection. Its `classes` value is an object whose keys are the unique authored
+class IDs, and its `entries` value is an object whose exact ambient-entry keys
+each name one owning class ID. Entry ownership is therefore structural and
+unambiguous for schema-only consumers, not only a loader-side uniqueness
+check. Entries absent from that registry resolve to an explicit
+`unknown`/denied/grantable result; adding a future capability family therefore
+does not require executable endpoint special cases. The registry schema and
+loader require the canonical `session_continuity`, `actor_tooling`, and
+`operator_control` classes with their exact admitted policy tuples: shared-link
+and non-grantable, shared-link and non-grantable, and denied and grantable,
+respectively. A future vocabulary ID may be added only as denied and
+non-grantable; its manifest entry is schema-valid but cannot create a shared
+link or consume the operator-control grant relation. Promoting a future class
+to an authority-bearing policy therefore requires a coordinated source change
+to the loader, registry schema, incarnation-home schema, and this contract.
+`operator_control` becomes a shared link only when the existing exact
+subject-bound explicit grant is present; changing its registry tuple alone
+cannot widen authority.
 
 ## Lifecycle and usage metering
 

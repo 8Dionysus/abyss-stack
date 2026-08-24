@@ -14,6 +14,7 @@ from types import SimpleNamespace
 from pathlib import Path
 
 import pytest
+from jsonschema import Draft202012Validator, ValidationError
 
 
 PART = Path(__file__).resolve().parents[1]
@@ -41,6 +42,37 @@ def _realization(path: Path) -> Path:
         "configuration_fingerprint": MODULE.sha256_bytes(
             MODULE.canonical_bytes(configuration)
         ),
+    }
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    return path
+
+
+def _capability_grant(
+    path: Path,
+    *,
+    ambient: Path,
+    realization: Path,
+    ambient_entry: str,
+    expires_at: str = "2099-01-01T00:00:00Z",
+) -> Path:
+    realization_payload = json.loads(realization.read_text(encoding="utf-8"))
+    payload = {
+        "$schema": "schemas/external-codex-capability-grant.schema.json",
+        "schema_version": MODULE.CAPABILITY_GRANT_SCHEMA_VERSION,
+        "grant_id": f"grant:test/{ambient_entry}",
+        "capability_id": f"codex.home.{ambient_entry}",
+        "capability_class": "operator_control",
+        "ambient_entry": ambient_entry,
+        "effect": "project_shared_link",
+        "subject": {
+            "ambient_home_identity": MODULE._ambient_home_identity(ambient),
+            "model_realization_id": realization_payload["model_realization_id"],
+            "incarnation_coordinate": MODULE._incarnation_coordinate(
+                realization_payload["model_realization_id"],
+                realization_payload["configuration_fingerprint"],
+            ),
+        },
+        "expires_at": expires_at,
     }
     path.write_text(json.dumps(payload), encoding="utf-8")
     return path
@@ -84,6 +116,59 @@ def _terminal_binding_fixture(
     terminal = binding["terminal"]
     assert isinstance(holder, dict) and isinstance(terminal, dict)
     return listener, binding, holder, terminal
+
+
+def _holder_loss_reentry_fixture(
+    tmp_path: Path,
+) -> tuple[Path, dict[str, object], dict[str, str]]:
+    duty = tmp_path / "duty.md"
+    duty.write_text("wake-return duty\n", encoding="utf-8")
+    failure_event = tmp_path / "observer-event.json"
+    failure_event.write_text('{"event":"holder_lost"}\n', encoding="utf-8")
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    runtime_state_root = tmp_path / "runtime-state"
+    runtime_state_root.mkdir()
+    closeout_route = tmp_path / "closeout.sh"
+    closeout_route.write_text("#!/bin/sh\n", encoding="utf-8")
+    receipt = {
+        "schema_version": MODULE.HOLDER_LOSS_REENTRY_SCHEMA_VERSION,
+        "goal_id": "goal:holder-loss",
+        "actor_id": "actor:holder-loss",
+        "role": "coder/executor",
+        "session_id": "session:holder-loss",
+        "workspace": str(workspace),
+        "duty_ref": str(duty),
+        "duty_sha256": MODULE.sha256_bytes(duty.read_bytes()),
+        "failure_event_ref": str(failure_event),
+        "failure_event_sha256": MODULE.sha256_bytes(failure_event.read_bytes()),
+        "prior_holder": {"pid": 11, "start_ticks": 111, "state": "lost_before_return"},
+        "current_holder": {"pid": 101, "start_ticks": 1001},
+        "terminal": {
+            "pid": 202,
+            "start_ticks": 2002,
+            "visible": True,
+            "operator_interactive": True,
+        },
+        "continuity": {
+            "same_actor": True,
+            "same_session": True,
+            "replacement_physical_incarnation": True,
+        },
+        "claim_limit": "replacement visible CLI holder only; return and closure remain separate",
+    }
+    path = tmp_path / "holder-loss-reentry.json"
+    path.write_bytes(MODULE.canonical_bytes(receipt) + b"\n")
+    context = {
+        "goal_ref": receipt["goal_id"],
+        "actor_ref": receipt["actor_id"],
+        "incarnation_ref": "incarnation:holder-loss",
+        "session_ref": receipt["session_id"],
+        "runtime_state_root": str(runtime_state_root),
+        "closeout_route": str(closeout_route),
+        "workspace": receipt["workspace"],
+    }
+    return path, receipt, context
 
 
 def test_prepared_home_binds_nested_default_without_rehoming_parent(tmp_path: Path) -> None:
@@ -136,6 +221,530 @@ def test_prepared_home_binds_nested_default_without_rehoming_parent(tmp_path: Pa
     assert argv[argv.index("--disable") + 1] == "multi_agent"
     assert manifest["ambient_codex_home"] == str(ambient)
     assert manifest["runtime_root"] == str(runtime_root)
+    assert manifest["top_level_posture"] == "incarnation-home"
+    Draft202012Validator(
+        json.loads(
+            (PART / "schemas" / "external-codex-incarnation-home.schema.json").read_text(
+                encoding="utf-8"
+            )
+        )
+    ).validate(manifest)
+
+
+def test_capability_projection_denies_ambient_operator_control_by_default(
+    tmp_path: Path,
+) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    (ambient / "auth.json").write_text("{}", encoding="utf-8")
+    (ambient / "sessions").mkdir()
+    (ambient / "skills").mkdir()
+    (ambient / "app-server-control").mkdir()
+    (ambient / "app-server-daemon").mkdir()
+    (ambient / "hooks.json").write_text("{}", encoding="utf-8")
+    (ambient / "future-capability").write_text("{}", encoding="utf-8")
+
+    manifest = MODULE.prepare_home(
+        ambient_home=ambient,
+        realization_path=_realization(tmp_path / "realization.json"),
+        runtime_root=runtime_root,
+    )
+
+    entries = manifest["capability_projection"]["entries"]
+    for name in ("auth.json", "sessions", "skills"):
+        assert entries[name]["projection"] == "shared_link"
+        assert entries[name]["grantable"] is False
+        assert (Path(manifest["codex_home"]) / name).is_symlink()
+    for name in ("app-server-control", "app-server-daemon", "hooks.json"):
+        assert entries[name]["capability_class"] == "operator_control"
+        assert entries[name]["projection"] == "denied"
+        assert entries[name]["grantable"] is True
+        assert not (Path(manifest["codex_home"]) / name).exists()
+    assert entries["future-capability"]["capability_class"] == "unknown"
+    assert entries["future-capability"]["projection"] == "denied"
+    assert entries["future-capability"]["grantable"] is True
+    assert manifest["shared_state_names"] == ["auth.json", "sessions", "skills"]
+    assert all(
+        entry["explicit_grant"] is None for entry in entries.values()
+    )
+
+
+def test_capability_class_registry_is_authored_data_with_explicit_unknown(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    registry = json.loads(
+        (PART / MODULE.CAPABILITY_CLASS_REGISTRY_NAME).read_text(encoding="utf-8")
+    )
+    registry["entries"]["custom-continuity"] = "session_continuity"
+    registry_path = tmp_path / MODULE.CAPABILITY_CLASS_REGISTRY_NAME
+    registry_path.write_text(json.dumps(registry), encoding="utf-8")
+    Draft202012Validator(
+        json.loads(
+            (PART / "schemas" / "external-codex-capability-classes.schema.json").read_text(
+                encoding="utf-8"
+            )
+        )
+    ).validate(registry)
+    monkeypatch.setattr(MODULE, "CAPABILITY_CLASS_REGISTRY_PATH", registry_path)
+
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    (ambient / "custom-continuity").mkdir()
+    (ambient / "future-capability").write_text("{}", encoding="utf-8")
+
+    manifest = MODULE.prepare_home(
+        ambient_home=ambient,
+        realization_path=_realization(tmp_path / "realization.json"),
+        runtime_root=runtime_root,
+    )
+    entries = manifest["capability_projection"]["entries"]
+    assert entries["custom-continuity"]["capability_class"] == "session_continuity"
+    assert entries["custom-continuity"]["projection"] == "shared_link"
+    assert entries["future-capability"]["capability_class"] == "unknown"
+    assert entries["future-capability"]["projection"] == "denied"
+    assert entries["future-capability"]["grantable"] is True
+    assert manifest["capability_projection"]["capability_class_registry"][
+        "path"
+    ] == str(registry_path)
+
+
+def test_capability_class_ids_are_unique_structural_keys(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    registry = json.loads(
+        (PART / MODULE.CAPABILITY_CLASS_REGISTRY_NAME).read_text(encoding="utf-8")
+    )
+    schema = json.loads(
+        (PART / "schemas" / "external-codex-capability-classes.schema.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    legacy_array_registry = dict(registry)
+    legacy_array_registry["classes"] = list(registry["classes"].values())
+    assert list(Draft202012Validator(schema).iter_errors(legacy_array_registry))
+
+    registry["classes"]["future_semantic"] = {
+        "projection": "denied",
+        "grantable": False,
+    }
+    registry["classes"]["future_semantic_next"] = {
+        "projection": "denied",
+        "grantable": False,
+    }
+    registry["entries"]["future-capability"] = "future_semantic"
+    registry["entries"]["future-capability-next"] = "future_semantic_next"
+    Draft202012Validator(schema).validate(registry)
+    registry_path = tmp_path / MODULE.CAPABILITY_CLASS_REGISTRY_NAME
+    registry_path.write_text(json.dumps(registry), encoding="utf-8")
+    monkeypatch.setattr(MODULE, "CAPABILITY_CLASS_REGISTRY_PATH", registry_path)
+
+    _metadata, definitions, _unknown = MODULE._load_capability_class_registry()
+    assert definitions["future-capability"]["capability_class"] == "future_semantic"
+    assert (
+        definitions["future-capability-next"]["capability_class"]
+        == "future_semantic_next"
+    )
+
+
+def test_capability_registry_schema_rejects_cross_class_duplicate_shape() -> None:
+    registry = json.loads(
+        (PART / MODULE.CAPABILITY_CLASS_REGISTRY_NAME).read_text(encoding="utf-8")
+    )
+    registry["classes"]["session_continuity"]["entries"] = ["shared-entry"]
+    registry["classes"]["actor_tooling"]["entries"] = ["shared-entry"]
+    schema = json.loads(
+        (PART / "schemas" / "external-codex-capability-classes.schema.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    assert list(Draft202012Validator(schema).iter_errors(registry))
+
+
+def test_capability_registry_loader_rejects_cross_class_duplicate_shape(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    registry = json.loads(
+        (PART / MODULE.CAPABILITY_CLASS_REGISTRY_NAME).read_text(encoding="utf-8")
+    )
+    registry["classes"]["session_continuity"]["entries"] = ["shared-entry"]
+    registry["classes"]["actor_tooling"]["entries"] = ["shared-entry"]
+    registry_path = tmp_path / MODULE.CAPABILITY_CLASS_REGISTRY_NAME
+    registry_path.write_text(json.dumps(registry), encoding="utf-8")
+    monkeypatch.setattr(MODULE, "CAPABILITY_CLASS_REGISTRY_PATH", registry_path)
+
+    with pytest.raises(
+        MODULE.IncarnationHomeError, match="definition is not exact"
+    ):
+        MODULE._load_capability_class_registry()
+
+
+def test_capability_class_registry_rejects_operator_control_policy_override(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    registry = json.loads(
+        (PART / MODULE.CAPABILITY_CLASS_REGISTRY_NAME).read_text(encoding="utf-8")
+    )
+    operator_control = registry["classes"]["operator_control"]
+    operator_control["projection"] = "shared_link"
+    registry_path = tmp_path / MODULE.CAPABILITY_CLASS_REGISTRY_NAME
+    registry_path.write_text(json.dumps(registry), encoding="utf-8")
+    schema = json.loads(
+        (PART / "schemas" / "external-codex-capability-classes.schema.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert list(Draft202012Validator(schema).iter_errors(registry))
+    monkeypatch.setattr(MODULE, "CAPABILITY_CLASS_REGISTRY_PATH", registry_path)
+
+    with pytest.raises(
+        MODULE.IncarnationHomeError, match="safe tuple"
+    ):
+        MODULE._load_capability_class_registry()
+
+
+def test_capability_class_registry_rejects_unsafe_future_authority_tuple(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    registry = json.loads(
+        (PART / MODULE.CAPABILITY_CLASS_REGISTRY_NAME).read_text(encoding="utf-8")
+    )
+    registry["classes"]["future_semantic"] = {
+        "projection": "shared_link",
+        "grantable": False,
+    }
+    registry_path = tmp_path / MODULE.CAPABILITY_CLASS_REGISTRY_NAME
+    registry_path.write_text(json.dumps(registry), encoding="utf-8")
+    schema = json.loads(
+        (PART / "schemas" / "external-codex-capability-classes.schema.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert list(Draft202012Validator(schema).iter_errors(registry))
+    monkeypatch.setattr(MODULE, "CAPABILITY_CLASS_REGISTRY_PATH", registry_path)
+
+    with pytest.raises(
+        MODULE.IncarnationHomeError, match="safe tuple"
+    ):
+        MODULE._load_capability_class_registry()
+
+
+def test_safe_future_registry_class_produces_schema_valid_manifest(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    registry = json.loads(
+        (PART / MODULE.CAPABILITY_CLASS_REGISTRY_NAME).read_text(encoding="utf-8")
+    )
+    registry["classes"]["future_semantic"] = {
+        "projection": "denied",
+        "grantable": False,
+    }
+    registry["entries"]["future-capability"] = "future_semantic"
+    registry_path = tmp_path / MODULE.CAPABILITY_CLASS_REGISTRY_NAME
+    registry_path.write_text(json.dumps(registry), encoding="utf-8")
+    registry_schema = json.loads(
+        (PART / "schemas" / "external-codex-capability-classes.schema.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    Draft202012Validator(registry_schema).validate(registry)
+    monkeypatch.setattr(MODULE, "CAPABILITY_CLASS_REGISTRY_PATH", registry_path)
+
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    (ambient / "future-capability").write_text("{}", encoding="utf-8")
+
+    manifest = MODULE.prepare_home(
+        ambient_home=ambient,
+        realization_path=_realization(tmp_path / "realization.json"),
+        runtime_root=runtime_root,
+    )
+    manifest_schema = json.loads(
+        (PART / "schemas" / "external-codex-incarnation-home.schema.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    Draft202012Validator(manifest_schema).validate(manifest)
+    entry = manifest["capability_projection"]["entries"]["future-capability"]
+    assert entry == {
+        "capability_class": "future_semantic",
+        "projection": "denied",
+        "grantable": False,
+        "explicit_grant": None,
+    }
+
+
+def test_capability_projection_reuses_subject_grant_without_binding_endpoint_bytes(
+    tmp_path: Path,
+) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    (ambient / "app-server-control").mkdir()
+    realization = _realization(tmp_path / "realization.json")
+    grant = _capability_grant(
+        tmp_path / "grant.json",
+        ambient=ambient,
+        realization=realization,
+        ambient_entry="app-server-control",
+    )
+    Draft202012Validator(
+        json.loads(
+            (PART / "schemas" / "external-codex-capability-grant.schema.json").read_text(
+                encoding="utf-8"
+            )
+        )
+    ).validate(json.loads(grant.read_text(encoding="utf-8")))
+
+    manifest = MODULE.prepare_home(
+        ambient_home=ambient,
+        realization_path=realization,
+        runtime_root=runtime_root,
+        capability_grants=[grant],
+    )
+    control_link = Path(manifest["codex_home"]) / "app-server-control"
+    assert control_link.is_symlink()
+    projection = manifest["capability_projection"]
+    granted_entry = projection["entries"]["app-server-control"]
+    assert granted_entry["capability_class"] == "operator_control"
+    assert granted_entry["grantable"] is True
+    assert granted_entry["explicit_grant"]["grant_id"] == (
+        "grant:test/app-server-control"
+    )
+    manifest_path = Path(manifest["codex_home"]).parent / "incarnation-home.json"
+    MODULE._load_manifest(manifest_path)
+
+    (ambient / "app-server-control" / "dynamic-state.json").write_text(
+        "changed-endpoint-state", encoding="utf-8"
+    )
+    MODULE._load_manifest(manifest_path)
+    second_manifest = MODULE.prepare_home(
+        ambient_home=ambient,
+        realization_path=realization,
+        runtime_root=runtime_root,
+        capability_grants=[grant],
+    )
+    assert second_manifest["capability_projection"]["entries"][
+        "app-server-control"
+    ]["explicit_grant"]["grant_id"] == "grant:test/app-server-control"
+
+    stale_payload = json.loads(grant.read_text(encoding="utf-8"))
+    stale_payload["expires_at"] = "2000-01-01T00:00:00Z"
+    grant.write_text(json.dumps(stale_payload), encoding="utf-8")
+    with pytest.raises(MODULE.IncarnationHomeError, match="stale or expired"):
+        MODULE._load_manifest(Path(manifest["codex_home"]).parent / "incarnation-home.json")
+
+
+def test_manifest_schema_requires_explicit_grant_for_shared_operator_entry(
+    tmp_path: Path,
+) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    (ambient / "app-server-control").mkdir()
+    realization = _realization(tmp_path / "realization.json")
+    grant = _capability_grant(
+        tmp_path / "grant.json",
+        ambient=ambient,
+        realization=realization,
+        ambient_entry="app-server-control",
+    )
+    manifest = MODULE.prepare_home(
+        ambient_home=ambient,
+        realization_path=realization,
+        runtime_root=runtime_root,
+        capability_grants=[grant],
+    )
+    forged = json.loads(json.dumps(manifest))
+    forged["capability_projection"]["entries"]["app-server-control"][
+        "explicit_grant"
+    ] = None
+    manifest_schema = json.loads(
+        (PART / "schemas" / "external-codex-incarnation-home.schema.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert list(Draft202012Validator(manifest_schema).iter_errors(forged))
+
+    manifest_path = Path(manifest["codex_home"]).parent / "incarnation-home.json"
+    manifest_path.write_text(json.dumps(forged), encoding="utf-8")
+    with pytest.raises(MODULE.IncarnationHomeError, match="projection drift"):
+        MODULE._load_manifest(manifest_path)
+
+    forged = json.loads(json.dumps(manifest))
+    forged["capability_projection"]["entries"]["app-server-control"][
+        "explicit_grant"
+    ]["grant_id"] = "forged-without-grant"
+    assert not list(Draft202012Validator(manifest_schema).iter_errors(forged))
+    manifest_path.write_text(json.dumps(forged), encoding="utf-8")
+    with pytest.raises(MODULE.IncarnationHomeError, match="projection drift"):
+        MODULE._load_manifest(manifest_path)
+
+
+def test_capability_projection_rejects_replayed_grant_subject(
+    tmp_path: Path,
+) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    (ambient / "future-capability").write_text("{}", encoding="utf-8")
+    realization = _realization(tmp_path / "realization.json")
+    grant = _capability_grant(
+        tmp_path / "grant.json",
+        ambient=ambient,
+        realization=realization,
+        ambient_entry="future-capability",
+    )
+    manifest = MODULE.prepare_home(
+        ambient_home=ambient,
+        realization_path=realization,
+        runtime_root=runtime_root,
+        capability_grants=[grant],
+    )
+    grant_payload = json.loads(grant.read_text(encoding="utf-8"))
+    grant_payload["subject"]["incarnation_coordinate"] = "sha256:" + "0" * 64
+    grant.write_text(json.dumps(grant_payload), encoding="utf-8")
+
+    with pytest.raises(
+        MODULE.IncarnationHomeError, match="subject does not match incarnation"
+    ):
+        MODULE._load_manifest(Path(manifest["codex_home"]).parent / "incarnation-home.json")
+
+
+@pytest.mark.parametrize(
+    "schema_name",
+    [
+        "external-codex-incarnation-home.schema.json",
+        "external-codex-capability-grant.schema.json",
+        "external-codex-capability-classes.schema.json",
+    ],
+)
+def test_capability_projection_schemas_are_valid_json(schema_name: str) -> None:
+    schema = json.loads(
+        (PART / "schemas" / schema_name).read_text(encoding="utf-8")
+    )
+    assert schema["$schema"] == "https://json-schema.org/draft/2020-12/schema"
+    assert schema["additionalProperties"] is False
+    Draft202012Validator.check_schema(schema)
+
+
+def test_holder_schema_and_loader_reject_rebind_post_exec_identity_without_provenance(
+    tmp_path: Path,
+) -> None:
+    schema = json.loads(
+        (PART / "schemas" / "external-codex-holder-terminal-receipt.schema.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    receipt_path = tmp_path / "rebound-holder.json"
+    receipt = {
+        "schema_version": MODULE.HOLDER_RECEIPT_SCHEMA_VERSION,
+        "receipt_ref": str(receipt_path.resolve()),
+        "created_at": "2026-08-23T00:00:00Z",
+        "lifecycle_role": "responsibility_holder",
+        "boot_id": "183fe056-94d4-4d38-8967-2892c7a924ae",
+        "holder": {
+            "pid": 101,
+            "start_ticks": 1001,
+            "parent_pid": 202,
+            "parent_start_ticks": 2002,
+            "parent_comm": "kitty",
+            "argv": ["/usr/bin/codex", "resume"],
+            "argv_digest": "sha256:" + "1" * 64,
+            "exe_digest": "sha256:" + "2" * 64,
+        },
+        "runtime": {
+            "codex_executable": "/usr/bin/codex",
+            "codex_executable_digest": "sha256:" + "2" * 64,
+            "incarnation_manifest": "/tmp/incarnation-home.json",
+            "incarnation_manifest_digest": "sha256:" + "3" * 64,
+            "model": "gpt-5.6-luna",
+            "reasoning_effort": "max",
+            "ambient_codex_home": "/home/dionysus/.codex",
+            "incarnation_codex_home": "/tmp/codex-home",
+        },
+        "terminal": {
+            "binding": "kitty_ancestor_at_exec",
+            "required_comm": "kitty",
+            "pid": 202,
+            "start_ticks": 2002,
+            "argv": ["/usr/bin/kitty"],
+            "window_id": "1",
+            "dedicated": True,
+        },
+    }
+    with pytest.raises(ValidationError, match="replacement_reentry"):
+        Draft202012Validator(schema).validate(receipt)
+    receipt_path.write_bytes(MODULE.canonical_bytes(receipt) + b"\n")
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="requires replacement_reentry provenance",
+    ):
+        MODULE._load_holder_receipt_snapshot(receipt_path)
+
+
+def test_holder_loss_reentry_is_exactly_bound_to_source_evidence(
+    tmp_path: Path,
+) -> None:
+    path, receipt, context = _holder_loss_reentry_fixture(tmp_path)
+    loaded, raw, digest = MODULE._load_holder_loss_reentry(
+        path,
+        expected_context=context,
+        expected_holder=(101, 1001),
+        expected_terminal=(202, 2002),
+    )
+    assert loaded == receipt
+    assert raw == path.read_bytes()
+    assert digest == MODULE.sha256_bytes(raw)
+
+    receipt["goal_id"] = "goal:wrong"
+    path.write_bytes(MODULE.canonical_bytes(receipt) + b"\n")
+    with pytest.raises(MODULE.IncarnationHomeError, match="Goal identity"):
+        MODULE._load_holder_loss_reentry(path, expected_context=context)
+
+
+def test_replacement_reentry_binding_rejects_provenance_drift(
+    tmp_path: Path,
+) -> None:
+    path, receipt, _context = _holder_loss_reentry_fixture(tmp_path)
+    binding = {
+        "receipt_ref": str(path),
+        "receipt_sha256": MODULE.sha256_bytes(path.read_bytes()),
+        "duty_ref": receipt["duty_ref"],
+        "duty_sha256": receipt["duty_sha256"],
+        "failure_event_ref": receipt["failure_event_ref"],
+        "failure_event_sha256": receipt["failure_event_sha256"],
+        "goal_id": receipt["goal_id"],
+        "actor_id": receipt["actor_id"],
+        "session_id": receipt["session_id"],
+        "holder_pid": 101,
+        "holder_start_ticks": 1001,
+    }
+    assert MODULE._validate_replacement_reentry_binding(
+        binding,
+        holder={"pid": 101, "start_ticks": 1001},
+    ) == binding
+    binding["failure_event_sha256"] = "sha256:" + "0" * 64
+    with pytest.raises(MODULE.IncarnationHomeError, match="failure_event_sha256"):
+        MODULE._validate_replacement_reentry_binding(
+            binding,
+            holder={"pid": 101, "start_ticks": 1001},
+        )
 
 
 def test_preparation_rejects_realization_fingerprint_drift(tmp_path: Path) -> None:
@@ -437,6 +1046,108 @@ def test_load_manifest_revalidates_realization_and_derived_home(tmp_path: Path) 
         MODULE._load_manifest(manifest_path)
 
 
+def test_rebind_manifest_uses_full_manifest_validation(tmp_path: Path) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    realization = _realization(tmp_path / "realization.json")
+    manifest = MODULE.prepare_home(
+        ambient_home=ambient,
+        realization_path=realization,
+        runtime_root=runtime_root,
+    )
+    manifest_path = Path(manifest["codex_home"]).parent / "incarnation-home.json"
+
+    payload = json.loads(realization.read_text(encoding="utf-8"))
+    payload["configuration"]["runtime"]["model_slug"] = "gpt-5.6-other"
+    payload["configuration_fingerprint"] = MODULE.sha256_bytes(
+        MODULE.canonical_bytes(payload["configuration"])
+    )
+    realization.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(MODULE.IncarnationHomeError, match="binding drift"):
+        MODULE._load_rebind_manifest(
+            manifest_path,
+            runtime_state_root=runtime_root,
+        )
+
+
+def test_rebind_receipt_binds_holder_environment_and_manifest_snapshot(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    reentry_path, reentry, context = _holder_loss_reentry_fixture(tmp_path)
+    holder_pid = os.getpid()
+    terminal_pid = 202
+    reentry["current_holder"] = {"pid": holder_pid, "start_ticks": 1001}
+    reentry_path.write_bytes(MODULE.canonical_bytes(reentry) + b"\n")
+
+    context_path = tmp_path / "binding-context.json"
+    context_path.write_bytes(MODULE.canonical_bytes(context) + b"\n")
+    ambient = tmp_path / "ambient"
+    runtime_root = Path(context["runtime_state_root"])
+    ambient.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    manifest = MODULE.prepare_home(
+        ambient_home=ambient,
+        realization_path=_realization(tmp_path / "realization.json"),
+        runtime_root=runtime_root,
+    )
+    manifest_path = Path(manifest["codex_home"]).parent / "incarnation-home.json"
+    executable = Path("/proc/self/exe").resolve()
+    executable_digest = MODULE.sha256_bytes(executable.read_bytes())
+    holder_argv = [str(executable), "exec"]
+    output_path = tmp_path / "rebound-holder.json"
+
+    monkeypatch.setenv("CODEX_HOME", str(tmp_path / "wrong-ambient"))
+    monkeypatch.setattr(MODULE, "_descends_from", lambda *_: True)
+    monkeypatch.setattr(MODULE, "_proc_identity_state", lambda *_: "live")
+    monkeypatch.setattr(
+        MODULE,
+        "_proc_parent_pid",
+        lambda pid: terminal_pid if pid == holder_pid else 1,
+    )
+    monkeypatch.setattr(
+        MODULE,
+        "_proc_start_ticks",
+        lambda pid: {holder_pid: 1001, terminal_pid: 2002}[pid],
+    )
+    monkeypatch.setattr(MODULE, "_proc_comm", lambda _pid: "kitty")
+    monkeypatch.setattr(
+        MODULE,
+        "_kitty_ancestor",
+        lambda _pid: (terminal_pid, 2002, ["/usr/bin/kitty", "--title", "holder"]),
+    )
+    monkeypatch.setattr(MODULE, "_kitty_dedication", lambda **_: ("1", True))
+    monkeypatch.setattr(
+        MODULE,
+        "_proc_environ",
+        lambda _pid: {
+            "CODEX_HOME": str(manifest["codex_home"]),
+            "PATH": "/usr/bin:/bin",
+        },
+    )
+    monkeypatch.setattr(MODULE, "_proc_argv", lambda _pid: holder_argv)
+    monkeypatch.setattr(MODULE, "_proc_exe_digest", lambda _pid: executable_digest)
+
+    receipt = MODULE._rebind_replacement_holder_receipt(
+        receipt_path=output_path,
+        holder_loss_reentry_path=reentry_path,
+        binding_context_path=context_path,
+        manifest_path=manifest_path,
+        codex_executable_path=executable,
+    )
+
+    assert receipt["holder"]["argv"] == holder_argv
+    assert receipt["holder"]["exe_digest"] == executable_digest
+    assert receipt["runtime"]["codex_executable_digest"] == executable_digest
+    assert base64.b64decode(
+        receipt["runtime"]["incarnation_manifest_snapshot_b64"]
+    ) == manifest_path.read_bytes()
+    assert json.loads(output_path.read_text(encoding="utf-8")) == receipt
+
+
 def test_load_manifest_revalidates_realization_identifier(tmp_path: Path) -> None:
     ambient = tmp_path / "ambient"
     runtime_root = tmp_path / "runtime"
@@ -526,7 +1237,9 @@ def test_load_manifest_rejects_shared_state_link_drift(tmp_path: Path) -> None:
     (actor_home / "auth.json").symlink_to(tmp_path / "replacement.json")
     (tmp_path / "replacement.json").write_text("{}", encoding="utf-8")
 
-    with pytest.raises(MODULE.IncarnationHomeError, match="shared-state link drift"):
+    with pytest.raises(
+        MODULE.IncarnationHomeError, match="capability projection link drift"
+    ):
         MODULE._load_manifest(manifest_path)
 
 
@@ -719,7 +1432,7 @@ def test_direct_launch_records_the_actual_responsibility_holder_before_exec(
     ) == manifest_snapshot
     assert receipt["runtime"]["model"] == "gpt-5.6-luna"
     assert receipt["runtime"]["reasoning_effort"] == "max"
-    assert captured["environment"]["CODEX_HOME"] == str(ambient)
+    assert captured["environment"]["CODEX_HOME"] == str(manifest["codex_home"])
     assert captured["path"] == "/usr/bin/bwrap"
     assert captured["payload_argv"][0] == sys.executable
     assert captured["payload_argv"][1] == str(Path(MODULE.__file__).resolve())
@@ -814,7 +1527,7 @@ def test_payload_launch_binds_receipt_to_payload_process(
     exec_path, exec_argv, environment = observed["exec"]
     assert exec_path == str(payload)
     assert exec_argv == args.codex_arguments
-    assert environment["CODEX_HOME"] == str(ambient)
+    assert environment["CODEX_HOME"] == str(manifest["codex_home"])
 
 
 @pytest.mark.parametrize(("decision", "exec_expected"), [("admit", True), ("reject", False)])
@@ -987,7 +1700,7 @@ def test_payload_launch_uses_private_companion_after_host_copy_disappears(
     exec_path, exec_argv, environment = observed["exec"]
     assert exec_path == str(payload)
     assert exec_argv == args.codex_arguments
-    assert environment["CODEX_HOME"] == str(ambient)
+    assert environment["CODEX_HOME"] == str(manifest["codex_home"])
 
 
 def test_payload_launch_accepts_shebang_package_relative_companion(
@@ -1203,6 +1916,37 @@ def test_holder_terminal_binds_first_kitty_ancestor_through_wrapper(
         kitty_pid + 100,
         [f"process-{kitty_pid}"],
     )
+
+
+def test_holder_terminal_binding_waits_for_causal_kitty_readiness(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    attempts = 0
+
+    def transient_ancestor(holder_pid: int) -> tuple[int, int, list[str]]:
+        nonlocal attempts
+        assert holder_pid == 7001
+        attempts += 1
+        if attempts < 3:
+            raise MODULE.IncarnationHomeError("process ancestry is transient")
+        return 7003, 7103, ["kitty", "--detach"]
+
+    monkeypatch.setattr(MODULE, "_kitty_ancestor", transient_ancestor)
+    monkeypatch.setattr(
+        MODULE,
+        "_kitty_dedication",
+        lambda *, holder_pid, kitty_pid, terminal_argv: ("7", True),
+    )
+    monkeypatch.setattr(MODULE.time, "sleep", lambda _seconds: None)
+
+    assert MODULE._wait_for_visible_terminal_binding(holder_pid=7001) == (
+        7003,
+        7103,
+        ["kitty", "--detach"],
+        "7",
+        True,
+    )
+    assert attempts == 3
 
 
 def test_holder_receipt_rejects_detached_kitty_route(tmp_path: Path) -> None:
@@ -1487,6 +2231,11 @@ def test_holder_identity_uses_bound_manifest_snapshot_after_path_refresh(
             "parent_pid": parent_pid,
             "parent_start_ticks": 12,
             "parent_comm": "bwrap",
+            "pre_exec_argv": holder_argv,
+            "pre_exec_argv_digest": MODULE.sha256_bytes(
+                MODULE.canonical_bytes(holder_argv)
+            ),
+            "pre_exec_exe_digest": executable_digest,
             "argv": holder_argv,
             "argv_digest": MODULE.sha256_bytes(MODULE.canonical_bytes(holder_argv)),
             "exe_digest": executable_digest,
@@ -1666,10 +2415,15 @@ def test_live_close_uses_holder_bound_companion_after_host_removal(
             "parent_start_ticks": 12,
             "parent_comm": "bwrap",
             "argv": holder_argv,
-                "argv_digest": MODULE.sha256_bytes(
-                    MODULE.canonical_bytes(holder_argv)
-                ),
-                "exe_digest": MODULE.sha256_bytes(executable_bytes),
+            "pre_exec_argv": holder_argv,
+            "pre_exec_argv_digest": MODULE.sha256_bytes(
+                MODULE.canonical_bytes(holder_argv)
+            ),
+            "pre_exec_exe_digest": MODULE.sha256_bytes(executable_bytes),
+            "argv_digest": MODULE.sha256_bytes(
+                MODULE.canonical_bytes(holder_argv)
+            ),
+            "exe_digest": MODULE.sha256_bytes(executable_bytes),
         },
         "runtime": {
             "codex_executable": str(executable),
@@ -2754,6 +3508,11 @@ def test_identity_bound_close_records_already_gone_without_reopening_manifest(
             "parent_pid": 987654322,
             "parent_start_ticks": 12,
             "parent_comm": "kitty",
+            "pre_exec_argv": ["/usr/bin/codex", "exec"],
+            "pre_exec_argv_digest": MODULE.sha256_bytes(
+                MODULE.canonical_bytes(["/usr/bin/codex", "exec"])
+            ),
+            "pre_exec_exe_digest": "sha256:" + "0" * 64,
             "argv": ["/usr/bin/codex", "exec"],
             "argv_digest": MODULE.sha256_bytes(
                 MODULE.canonical_bytes(["/usr/bin/codex", "exec"])

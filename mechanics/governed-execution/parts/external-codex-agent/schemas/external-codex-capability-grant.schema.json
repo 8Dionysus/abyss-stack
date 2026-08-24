@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/8Dionysus/abyss-stack/main/mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-capability-grant.schema.json",
+  "title": "One reusable owner-authored ambient capability projection grant",
+  "description": "A subject-bound grant is reusable until expires_at. It binds the capability identity, ambient path, and grant artifact bytes; it does not bind mutable target endpoint contents.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schema_version",
+    "grant_id",
+    "capability_id",
+    "capability_class",
+    "ambient_entry",
+    "effect",
+    "subject",
+    "expires_at"
+  ],
+  "properties": {
+    "$schema": {"const": "schemas/external-codex-capability-grant.schema.json"},
+    "schema_version": {"const": "abyss_stack_codex_capability_grant_v1"},
+    "grant_id": {"type": "string", "minLength": 1},
+    "capability_id": {"type": "string", "minLength": 1},
+    "capability_class": {"const": "operator_control"},
+    "ambient_entry": {
+      "type": "string",
+      "pattern": "^(?!\\.\\.?$)[^/]+$",
+      "minLength": 1
+    },
+    "effect": {"const": "project_shared_link"},
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ambient_home_identity", "model_realization_id", "incarnation_coordinate"],
+      "properties": {
+        "ambient_home_identity": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "model_realization_id": {"type": "string", "minLength": 1},
+        "incarnation_coordinate": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      }
+    },
+    "expires_at": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The end of the reusable authorization window."
+    }
+  }
+}

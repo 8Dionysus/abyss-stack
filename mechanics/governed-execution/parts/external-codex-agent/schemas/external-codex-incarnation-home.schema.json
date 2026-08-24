@@ -1,0 +1,235 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/8Dionysus/abyss-stack/main/mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-incarnation-home.schema.json",
+  "title": "Bound Codex incarnation home and semantic capability projection",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schema_version",
+    "model_realization_id",
+    "model_realization_ref",
+    "configuration_fingerprint",
+    "model_slug",
+    "reasoning_effort",
+    "runtime_version",
+    "ambient_codex_home",
+    "ambient_home_identity",
+    "runtime_root",
+    "codex_home",
+    "config_digest",
+    "shared_state_names",
+    "capability_projection",
+    "top_level_posture",
+    "child_posture"
+  ],
+  "properties": {
+    "$schema": {"const": "schemas/external-codex-incarnation-home.schema.json"},
+    "schema_version": {"const": "abyss_stack_codex_incarnation_home_v2"},
+    "model_realization_id": {"type": "string", "minLength": 1},
+    "model_realization_ref": {"$ref": "#/$defs/absolutePath"},
+    "configuration_fingerprint": {"$ref": "#/$defs/digest"},
+    "model_slug": {"type": "string", "minLength": 1},
+    "reasoning_effort": {"type": "string", "minLength": 1},
+    "runtime_version": {"type": "string", "minLength": 1},
+    "ambient_codex_home": {"$ref": "#/$defs/absolutePath"},
+    "ambient_home_identity": {"$ref": "#/$defs/digest"},
+    "runtime_root": {"$ref": "#/$defs/absolutePath"},
+    "codex_home": {"$ref": "#/$defs/absolutePath"},
+    "config_digest": {"$ref": "#/$defs/digest"},
+    "shared_state_names": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/name"}
+    },
+    "capability_projection": {"$ref": "#/$defs/capabilityProjection"},
+    "top_level_posture": {"const": "incarnation-home"},
+    "child_posture": {"const": "incarnation-home-via-shell-environment-policy"}
+  },
+  "$defs": {
+    "absolutePath": {"type": "string", "pattern": "^/", "minLength": 2},
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "name": {
+      "type": "string",
+      "pattern": "^(?!\\.\\.?$)[^/]+$",
+      "minLength": 1
+    },
+    "capabilityProjection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "default_policy",
+        "capability_class_registry",
+        "entries"
+      ],
+      "properties": {
+        "schema_version": {"const": "abyss_stack_codex_capability_projection_v2"},
+        "default_policy": {"const": "deny_ambient_operator_control"},
+        "capability_class_registry": {
+          "$ref": "#/$defs/capabilityClassRegistry"
+        },
+        "entries": {
+          "type": "object",
+          "propertyNames": {"$ref": "#/$defs/name"},
+          "additionalProperties": {"$ref": "#/$defs/capabilityEntry"}
+        }
+      }
+    },
+    "capabilityEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capability_class",
+        "projection",
+        "grantable",
+        "explicit_grant"
+      ],
+      "properties": {
+        "capability_class": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "projection": {"enum": ["shared_link", "denied"]},
+        "grantable": {"type": "boolean"},
+        "explicit_grant": {
+          "type": ["object", "null"]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "capability_class": {
+                "enum": ["session_continuity", "actor_tooling"]
+              }
+            },
+            "required": ["capability_class"]
+          },
+          "then": {
+            "properties": {
+              "projection": {"const": "shared_link"},
+              "grantable": {"const": false},
+              "explicit_grant": {"type": "null"}
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "capability_class": {"const": "operator_control"}
+            },
+            "required": ["capability_class"]
+          },
+          "then": {
+            "properties": {
+              "grantable": {"const": true}
+            },
+            "oneOf": [
+              {
+                "properties": {
+                  "projection": {"const": "denied"},
+                  "explicit_grant": {"type": "null"}
+                }
+              },
+              {
+                "properties": {
+                  "projection": {"const": "shared_link"},
+                  "explicit_grant": {"$ref": "#/$defs/grantProjection"}
+                }
+              }
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "capability_class": {"const": "unknown"}
+            },
+            "required": ["capability_class"]
+          },
+          "then": {
+            "properties": {
+              "projection": {"const": "denied"},
+              "grantable": {"const": true},
+              "explicit_grant": {"type": "null"}
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "capability_class": {
+                "not": {
+                  "enum": [
+                    "session_continuity",
+                    "actor_tooling",
+                    "operator_control",
+                    "unknown"
+                  ]
+                }
+              }
+            },
+            "required": ["capability_class"]
+          },
+          "then": {
+            "properties": {
+              "projection": {"const": "denied"},
+              "grantable": {"const": false},
+              "explicit_grant": {"type": "null"}
+            }
+          }
+        }
+      ]
+    },
+    "capabilityClassRegistry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "schema_version"],
+      "properties": {
+        "path": {"$ref": "#/$defs/absolutePath"},
+        "sha256": {"$ref": "#/$defs/digest"},
+        "schema_version": {
+          "const": "abyss_stack_codex_capability_class_registry_v1"
+        }
+      }
+    },
+    "grantProjection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "grant_id",
+        "capability_id",
+        "capability_class",
+        "effect",
+        "subject",
+        "expires_at",
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "grant_id": {"type": "string", "minLength": 1},
+        "capability_id": {"type": "string", "minLength": 1},
+        "capability_class": {"const": "operator_control"},
+        "effect": {"const": "project_shared_link"},
+        "subject": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "ambient_home_identity",
+            "model_realization_id",
+            "incarnation_coordinate"
+          ],
+          "properties": {
+            "ambient_home_identity": {"$ref": "#/$defs/digest"},
+            "model_realization_id": {"type": "string", "minLength": 1},
+            "incarnation_coordinate": {"$ref": "#/$defs/digest"}
+          }
+        },
+        "expires_at": {"type": "string", "minLength": 1},
+        "path": {"$ref": "#/$defs/absolutePath"},
+        "sha256": {"$ref": "#/$defs/digest"}
+      }
+    }
+  }
+}

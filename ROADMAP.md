@@ -239,13 +239,22 @@ The current direction is:
 - Current posture:
   a source-local candidate binds exact Luna/Sol realizations to one SDK
   incarnation and launches a separate persistent Codex process for bounded
-  landing-oriented work. Fake-process fixtures prove transport, drift
-  containment, exact-thread resume, and separately bound review; they do not
-  prove model fit or deployment.
+  landing-oriented work. Its v2 incarnation home now consumes an
+  owner-authored capability-class registry whose canonical policy tuples are
+  enforced by the loader and schemas; future vocabulary IDs remain denied and
+  non-grantable. It projects session continuity and actor tooling explicitly,
+  denies unknown/ambient operator state by default, and admits reusable
+  subject-bound grants only through a bounded expiry window. Mutable dynamic
+  endpoint contents are not grant-bound. It waits for
+  the causal visible-terminal binding before receipt publication. Fake-process fixtures prove transport, drift
+  containment, exact-thread resume, projection, and separately bound review;
+  they do not prove model fit, installed activation, live protection, or
+  deployment.
 - Next honest move:
-  run Sol max, Luna max, and Luna xhigh against one fixed owner-pinned landing
-  packet in clean isolated worktrees, preserve comparable receipts, and route
-  them to `aoa-evals` before any center admission.
+  validate the installed schema/projection and visible-launch route in a clean
+  owner-pinned canary, then run Sol max, Luna max, and Luna xhigh against one
+  fixed landing packet in clean isolated worktrees; preserve comparable
+  receipts and route them to `aoa-evals` before any center admission.
 - Guardrail:
   do not substitute built-in Codex spawn or TUI injection for this contract,
   and do not infer quality, acceptance, landing, or external-effect permission

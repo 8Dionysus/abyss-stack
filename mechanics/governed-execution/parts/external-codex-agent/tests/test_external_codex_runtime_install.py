@@ -120,6 +120,10 @@ def make_sources(tmp_path: Path) -> tuple[Path, Path, Path, Path]:
         PART_ROOT / "external_codex_static_bootstrap.S",
         part / "external_codex_static_bootstrap.S",
     )
+    shutil.copyfile(
+        PART_ROOT / runtime_install.CAPABILITY_CLASS_REGISTRY_NAME,
+        part / runtime_install.CAPABILITY_CLASS_REGISTRY_NAME,
+    )
     profile_path = part / "runtime-profile.v1.json"
     (schemas / "external-codex-test.schema.json").write_text("{}\n", encoding="utf-8")
     (schemas / "external-codex-actor-input-envelope.schema.json").write_text(
@@ -132,6 +136,10 @@ def make_sources(tmp_path: Path) -> tuple[Path, Path, Path, Path]:
         "external-codex-holder-terminal-closure.schema.json",
     ):
         (schemas / schema_name).write_text("{}\n", encoding="utf-8")
+    shutil.copyfile(
+        PART_ROOT / "schemas" / "external-codex-capability-classes.schema.json",
+        schemas / "external-codex-capability-classes.schema.json",
+    )
     package = sdk / "src/aoa_sdk"
     (package / "contracts").mkdir(parents=True)
     (package / "__init__.py").write_text("MARKER = 'exact-sdk'\n", encoding="utf-8")
@@ -759,8 +767,12 @@ def test_content_addressed_install_and_wrapper_use_exact_sdk(tmp_path: Path) -> 
         "external-codex-holder-terminal-join.schema.json",
         "external-codex-holder-terminal-closure-authorization.schema.json",
         "external-codex-holder-terminal-closure.schema.json",
+        "external-codex-capability-classes.schema.json",
     ):
         assert (release_root / "runtime/schemas" / schema_name).is_file()
+    assert (
+        release_root / "runtime" / runtime_install.CAPABILITY_CLASS_REGISTRY_NAME
+    ).is_file()
     for directory in (release_root / "sdk/src").rglob("*"):
         if directory.is_dir():
             directory.chmod(0o755)

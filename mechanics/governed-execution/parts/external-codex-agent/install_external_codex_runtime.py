@@ -51,6 +51,7 @@ RUNTIME_FILES = (
     "schema_validation.py",
     "external_codex_static_bootstrap.S",
     "external_codex_supervisor.py",
+    "capability-classes.v1.json",
     "legacy-owner-admission-migrations.v1.json",
     "prepare_landing_study.py",
     "runtime-profile.v1.json",
@@ -79,6 +80,7 @@ WRAPPER_MATERIAL_RUNTIME_ROOT = Path("/__aoa_external_codex_runtime__")
 WRAPPER_MATERIAL_ACTIVE_PATH = WRAPPER_MATERIAL_RUNTIME_ROOT / "active.json"
 WRAPPER_MATERIAL_ACTIVE_DIGEST = "sha256:" + "0" * 64
 WRAPPER_EMBEDDED_PAYLOAD_NAME = "external-codex-bootstrap-payload.py"
+CAPABILITY_CLASS_REGISTRY_NAME = "capability-classes.v1.json"
 LEGACY_OWNER_MIGRATION_CATALOG_NAME = "legacy-owner-admission-migrations.v1.json"
 LEGACY_OWNER_MIGRATION_CATALOG_SCHEMA_VERSION = (
     "abyss_stack_external_codex_legacy_owner_migration_catalog_v1"

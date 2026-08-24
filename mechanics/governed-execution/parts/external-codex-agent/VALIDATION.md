@@ -39,6 +39,44 @@ python scripts/generate_decision_indexes.py --check
 python scripts/validate_nested_agents.py
 ```
 
+## Incarnation-home projection and visible binding
+
+The focused home suite covers the v2 manifest/schema binding, the
+owner-authored capability-class registry and its explicit unknown path, default
+projection of session continuity and actor tooling, deny-by-default ambient
+operator-control and unknown entries, exact subject-bound operator grants,
+canonical class policy enforcement, rejection of an operator-control policy
+override and unsafe future shared-link tuple, schema-coherent denied future
+vocabulary entries,
+grant expiry and artifact drift, intentional same-subject grant reuse until
+expiry, acceptance of mutable dynamic endpoint contents without target-content
+binding, and cleanup of links left by the previous broad projection. The same
+suite verifies that the visible holder retries the causal Kitty
+ancestry/dedication handshake before publishing its holder receipt and fails
+closed when the exact terminal binding is not ready. These tests prove source
+behavior only; they do not prove installed-release parity, host
+trust/admission, a live visible canary, app-server effect enforcement, wake
+delivery, holder closure, owner acceptance, or Goal acceptance.
+
+The F4 residual regressions also prove that duplicate future class IDs cannot
+be represented in the registry schema because class IDs are object keys, and
+that a shared operator-control entry is schema-invalid without its nested
+`explicit_grant`. A forged grant projection with altered metadata may remain
+descriptive-schema-valid, but manifest loading recomputes the exact
+subject/entry/artifact relation and rejects it; this is the runtime admission
+boundary, not evidence of trust admission or app-server enforcement.
+
+The wake/return repair adds deterministic coverage for the explicit
+holder-loss reentry packet: source duty/event digests, same-actor/session
+continuity, replacement holder identity, and provenance drift are rejected
+fail-closed. Return-route tests prove strict input-digest binding, including an
+intervening valid-input mutation after route preflight and before delegated
+dispatch, output-path non-aliasing, and delegation without Goal or terminal
+selection. The holder tests also reject a rebound-shaped post-exec receipt when
+its replacement provenance is missing. These checks still do not claim a live
+app-server delivery, holder closure, semantic acceptance, or installed-release
+parity.
+
 The focused external-return tests also cover the separate Goal pause contour:
 an exact active owner-bound Goal is refused before `thread/goal/set` when the
 app-server adapter lacks an `atomic_goal_transition` method with a

@@ -30,6 +30,7 @@ from typing import Any, Callable, Sequence
 SCHEMA_VERSION = "abyss_stack_external_codex_return_v1"
 RETURN_OWNER_SCHEMA_VERSION = "abyss_stack_external_codex_return_owner_v1"
 LEGACY_RETURN_OWNER_SCHEMA_VERSION = "task_local_external_actor_return_owner_v1"
+RETURN_ROUTE_SCHEMA_VERSION = "abyss_stack_external_codex_return_route_v1"
 RETURN_RECEIPT_SCHEMA_VERSION = "abyss_stack_external_codex_return_receipt_v1"
 RETURN_RESPONSE_SCHEMA_VERSION = "abyss_stack_external_codex_return_response_v1"
 DETACHED_SCHEMA_VERSION = "abyss_stack_external_codex_return_detached_v1"
@@ -1867,6 +1868,86 @@ def _bind_return_attempt(inputs: dict[str, Any]) -> dict[str, Any]:
     return bound
 
 
+def _load_return_route(path: Path) -> dict[str, str]:
+    """Validate one typed bridge route without selecting any Goal identity."""
+
+    route_path = _regular_file(path, "canonical return route")
+    route, _raw = _load_json_file(route_path, "canonical return route")
+    required = {
+        "schema_version",
+        "owner_ref",
+        "owner_sha256",
+        "handoff_ref",
+        "handoff_sha256",
+        "holder_receipt_ref",
+        "holder_receipt_sha256",
+        "return_receipt_ref",
+        "authorization_ref",
+        "closure_receipt_ref",
+    }
+    if set(route) != required:
+        raise ExternalCodexReturnError("canonical return route fields are not exact")
+    if route.get("schema_version") != RETURN_ROUTE_SCHEMA_VERSION:
+        raise ExternalCodexReturnError("unsupported canonical return route schema")
+    values: dict[str, str] = {}
+    for key in (
+        "owner_ref",
+        "handoff_ref",
+        "holder_receipt_ref",
+        "return_receipt_ref",
+        "authorization_ref",
+        "closure_receipt_ref",
+    ):
+        value = route.get(key)
+        if not isinstance(value, str) or not value.startswith("/"):
+            raise ExternalCodexReturnError(
+                f"canonical return route {key} must be an absolute path"
+            )
+        values[key] = value
+    for key in ("owner_sha256", "handoff_sha256", "holder_receipt_sha256"):
+        value = route.get(key)
+        if not _is_sha256_digest(value):
+            raise ExternalCodexReturnError(
+                f"canonical return route {key} is not a sha256 digest"
+            )
+        values[key] = value
+    owner_path = _regular_file(Path(values["owner_ref"]), "return owner")
+    handoff_path = _regular_file(Path(values["handoff_ref"]), "handoff")
+    holder_path = _regular_file(
+        Path(values["holder_receipt_ref"]), "holder terminal receipt"
+    )
+    for path_value, digest_key, label in (
+        (owner_path, "owner_sha256", "return owner"),
+        (handoff_path, "handoff_sha256", "handoff"),
+        (holder_path, "holder_receipt_sha256", "holder terminal receipt"),
+    ):
+        if _sha256_bytes(path_value.read_bytes()) != values[digest_key]:
+            raise ExternalCodexReturnError(f"canonical return route {label} digest has drifted")
+    output_paths = [
+        (_validate_output_path(Path(values["return_receipt_ref"]), "return receipt"), "return receipt"),
+        (
+            _validate_output_path(
+                Path(values["authorization_ref"]), "terminal closure authorization"
+            ),
+            "terminal closure authorization",
+        ),
+        (
+            _validate_output_path(Path(values["closure_receipt_ref"]), "closure receipt"),
+            "closure receipt",
+        ),
+    ]
+    _validate_distinct_output_paths(
+        [
+            (route_path, "canonical return route"),
+            (owner_path, "return owner"),
+            (handoff_path, "handoff"),
+            (holder_path, "holder terminal receipt"),
+            *output_paths,
+        ]
+    )
+    return values
+
+
 def _return_reservation(
     path: Path,
     *,
@@ -1900,16 +1981,56 @@ def _return_reservation(
     return reservation
 
 
+def _assert_expected_route_digest(
+    args: argparse.Namespace,
+    *,
+    input_name: str,
+    actual_digest: str,
+    label: str,
+) -> None:
+    """Reassert a route-bound input digest after the return lock is held."""
+
+    expected = getattr(args, f"expected_{input_name}_sha256", None)
+    if expected is None:
+        return
+    if not isinstance(expected, str) or not _is_sha256_digest(expected):
+        raise ExternalCodexReturnError(
+            f"canonical return route {label} expected digest is invalid"
+        )
+    if actual_digest != expected:
+        raise ExternalCodexReturnError(
+            f"canonical return route {label} digest drifted at locked directed-input boundary"
+        )
+
+
 def _load_return_inputs(args: argparse.Namespace) -> dict[str, Any]:
     owner_path = _regular_file(Path(args.return_owner), "return owner")
     owner_value, owner_bytes = _load_json_file(owner_path, "return owner")
     owner_digest = _sha256_bytes(owner_bytes)
+    _assert_expected_route_digest(
+        args,
+        input_name="owner",
+        actual_digest=owner_digest,
+        label="return owner",
+    )
     owner = validate_return_owner(owner_value)
     handoff_path = _regular_file(Path(args.handoff), "handoff")
     holder_path = _regular_file(Path(args.holder_receipt), "holder receipt")
     closure_path = _validate_output_path(Path(args.closure_receipt), "closure receipt")
     handoff, handoff_bytes, handoff_digest, holder, holder_bytes, holder_digest = (
         _load_handoff_context(handoff_path, holder_path, closure_path)
+    )
+    _assert_expected_route_digest(
+        args,
+        input_name="handoff",
+        actual_digest=handoff_digest,
+        label="handoff",
+    )
+    _assert_expected_route_digest(
+        args,
+        input_name="holder_receipt",
+        actual_digest=holder_digest,
+        label="holder terminal receipt",
     )
     _validate_handoff_owner(handoff, owner)
     authorization_path = _validate_output_path(
@@ -2924,6 +3045,29 @@ def command_return(args: argparse.Namespace) -> int:
         return _command_return_detached(args, lock)
 
 
+def command_return_route(args: argparse.Namespace) -> int:
+    """Run the canonical return from one pre-bound, digest-checked route."""
+
+    route = _load_return_route(Path(args.route))
+    return command_return(
+        SimpleNamespace(
+            return_owner=route["owner_ref"],
+            handoff=route["handoff_ref"],
+            holder_receipt=route["holder_receipt_ref"],
+            return_receipt=route["return_receipt_ref"],
+            authorization=route["authorization_ref"],
+            closure_receipt=route["closure_receipt_ref"],
+            expected_owner_sha256=route["owner_sha256"],
+            expected_handoff_sha256=route["handoff_sha256"],
+            expected_holder_receipt_sha256=route["holder_receipt_sha256"],
+            detach=False,
+            detached_receipt=None,
+            detached_result=None,
+            detached_log=None,
+        )
+    )
+
+
 def command_pause(args: argparse.Namespace) -> int:
     response = run_pause(args)
     print(json.dumps(response, ensure_ascii=False, sort_keys=True))
@@ -3156,6 +3300,12 @@ def parser() -> argparse.ArgumentParser:
     pause_parser.add_argument("--pause-owner", required=True)
     pause_parser.add_argument("--pause-receipt", required=True)
     pause_parser.set_defaults(handler=command_pause)
+    route_parser = subcommands.add_parser(
+        "return-route",
+        help="deliver and close from one exact digest-bound return route",
+    )
+    route_parser.add_argument("--route", required=True)
+    route_parser.set_defaults(handler=command_return_route)
     return_parser = subcommands.add_parser(
         "return",
         help="deliver the handoff, authorize typed close, and close the exact holder",
