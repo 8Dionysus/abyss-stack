@@ -53,7 +53,8 @@ projection names them; recursive no-follow validation rejects hard links,
 ambient inode aliases, special files, and replacement races. Shared links
 remain exact and undeclared top-level state fails closed. The realization-
 scoped v2 path remains a compatibility route only for an already marked home
-and cannot satisfy canonical launch without the typed holder binding.
+and no v2 manifest can satisfy canonical launch, regardless of typed holder
+binding or denied-state provenance.
 
 The canonical external return leaf now owns the transport bridge around that
 typed lifecycle. It accepts an explicit owner binding, uses the current local

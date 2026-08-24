@@ -325,7 +325,8 @@
       ]
     },
     {
-      "title": "Readable legacy v2 incarnation home",
+      "title": "Readable and migration-only legacy v2 incarnation home",
+      "description": "This shape is schema-valid for compatibility reads and preparation migration only; canonical launch admission rejects every v2 manifest.",
       "properties": {
         "schema_version": {
           "const": "abyss_stack_codex_incarnation_home_v2"

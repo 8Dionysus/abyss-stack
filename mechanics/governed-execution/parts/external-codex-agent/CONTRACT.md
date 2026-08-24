@@ -823,16 +823,24 @@ derived holder coordinate below the realization root, and the same binding is
 carried into the holder receipt. A non-replacing `holder-claim.json` is then
 published beside the manifest and remains the durable single-lifecycle
 reservation: a mismatched context, reassignment, simultaneous launch, or
-sequential reuse fails closed. Distinct contexts therefore receive distinct
+sequential reuse fails closed. Once that claim exists, the home is frozen
+against every later `prepare`: no config, capability projection, denied-state
+provenance, permission, or manifest rewrite is permitted, so ambient changes
+and newly supplied grants cannot widen a live holder. Canonical claim
+publication and preparation share the runtime-owned lock to close the
+publication/re-preparation race. Distinct contexts therefore receive distinct
 mutable homes, manifests, configs, databases, credentials, temporary paths,
 and receipt reservations. For compatibility, a realization-scoped legacy v2
 `codex-home` remains loadable and preparable only when its existing ownership
 marker is present. A v2 marker without typed binding remains a
 readable/preparation compatibility shape and cannot satisfy canonical launch.
 A v2 marker with an older typed binding is also readable for migration, but
-canonical launch rejects it until `prepare` rewrites the home as v3 with
-denied-state provenance; current typed holder requirements are therefore not
-weakened by the compatibility route.
+canonical launch rejects every v2 manifest, whether or not it carries typed
+holder data or denied-state provenance, until `prepare` rewrites the home as
+v3. A provenance-bearing v2 marker is not a schema-valid compatibility shape
+and is rejected by the loader on the non-canonical route as well. Current
+typed holder requirements are therefore not weakened by the compatibility
+route.
 
 The projection derives `actor_local_state_names` from every current capability
 entry whose typed projection is `denied`. An entry in that derived set may be
@@ -853,8 +861,9 @@ records only the current denied projection: each name has the ambient entry's
 current device/inode identity, when present, and a digest of the admitted local
 tree. After an ambient unlink/replace, the loader permits the existing local
 tree only when its digest is unchanged; a new or altered local tree is denied.
-Legacy v2 manifests remain schema-valid without this field, but typed v2
-manifests cannot pass canonical launch until migration produces v3. The loader
+Legacy v2 manifests remain schema-valid without this field on the explicit
+compatibility branch, but no v2 manifest can pass canonical launch until
+migration produces v3. The loader
 recomputes the exact denied set for older untyped v2 reads when that optional
 field is absent.
 

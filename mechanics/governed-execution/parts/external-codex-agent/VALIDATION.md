@@ -73,9 +73,14 @@ adversarial fixtures also verify that ambient bytes and config mode remain
 unchanged. Distinct contexts receive separate manifest, config, cache, log,
 tmp, and descendant-binary coordinates. Synchronized first preparation is
 serializable and idempotent, while a failed or stale tokened preparer is
-recoverable without deleting another attempt's root. Legacy v2 manifests are
-schema-valid on their explicit compatibility route; holder-bound v2 manifests
-are rejected by canonical loading until preparation migrates them to v3.
+recoverable without deleting another attempt's root. A published holder claim
+freezes the home against re-preparation before any config, projection,
+provenance, permission, or manifest effect. Legacy v2 manifests are
+schema-valid on their explicit compatibility route; every v2 manifest,
+including typed and provenance-bearing variants, is rejected by canonical
+loading until preparation migrates it to v3, and provenance-bearing v2 is
+rejected even on the non-canonical loader route because the public v2 branch
+forbids that field.
 Incomplete holder receipts missing `runtime_state_root` or `closeout_route`
 are rejected by both the receipt schema and runtime binding validator. These
 are source and fixture claims; they

@@ -2636,6 +2636,23 @@ def _holder_claim_path(manifest_path: Path) -> Path:
     return manifest_path.with_name(HOLDER_CLAIM_FILE_NAME)
 
 
+def _reject_claimed_home_repreparation(manifest_path: Path) -> None:
+    """Freeze a home as soon as its durable holder claim is published."""
+
+    claim_path = _holder_claim_path(manifest_path)
+    try:
+        os.lstat(claim_path)
+    except FileNotFoundError:
+        return
+    except OSError as exc:
+        raise IncarnationHomeError(
+            f"holder claim cannot be inspected before re-preparation: {claim_path}"
+        ) from exc
+    raise IncarnationHomeError(
+        "holder-claimed incarnation home is frozen against re-preparation"
+    )
+
+
 def _reserve_holder_claim(
     *,
     manifest_path: Path,
@@ -5497,6 +5514,39 @@ def _incarnation_preparation_lock(
                 os.close(lock_fd)
 
 
+def _reserve_holder_claim_for_launch(
+    *,
+    manifest_path: Path,
+    manifest: dict[str, Any],
+    manifest_digest: str,
+    binding_context_digest: str,
+    holder_receipt_path: Path,
+) -> tuple[Path, str]:
+    """Publish a launch claim under the same lock that freezes preparation."""
+
+    runtime_root_value = manifest.get("runtime_root")
+    ambient_home_value = manifest.get("ambient_codex_home")
+    if not isinstance(runtime_root_value, str) or not isinstance(
+        ambient_home_value, str
+    ):
+        raise IncarnationHomeError(
+            "holder claim launch lock lacks runtime and ambient roots"
+        )
+    runtime_root = _absolute_directory(Path(runtime_root_value), "runtime root")
+    ambient_home = _absolute_directory(
+        Path(ambient_home_value), "ambient Codex home"
+    )
+    ambient_identities = _ambient_inode_identities(ambient_home)
+    with _incarnation_preparation_lock(runtime_root, ambient_identities):
+        return _reserve_holder_claim(
+            manifest_path=manifest_path,
+            manifest=manifest,
+            manifest_digest=manifest_digest,
+            binding_context_digest=binding_context_digest,
+            holder_receipt_path=holder_receipt_path,
+        )
+
+
 def _preparation_owner_record(
     *,
     ambient_home: Path,
@@ -5894,6 +5944,7 @@ def _prepare_home_impl(
                     raise IncarnationHomeError("incarnation holder binding drift")
                 if existing_holder_binding.get("binding_digest") != holder_context_digest:
                     raise IncarnationHomeError("incarnation holder binding digest drift")
+            _reject_claimed_home_repreparation(existing_marker)
 
     # Validate ambient inputs before creating a new content-addressed root. A
     # failed first preparation must not leave an unowned directory that blocks
@@ -6301,6 +6352,15 @@ def _load_manifest_snapshot(
         raise IncarnationHomeError("unsupported incarnation-home manifest")
     if manifest.get("$schema") != "schemas/external-codex-incarnation-home.schema.json":
         raise IncarnationHomeError("incarnation-home manifest schema binding is invalid")
+    if manifest_schema_version == LEGACY_SCHEMA_VERSION:
+        if require_holder_binding:
+            raise IncarnationHomeError(
+                "legacy v2 incarnation-home manifest requires migration before canonical launch"
+            )
+        if "denied_state_provenance" in manifest:
+            raise IncarnationHomeError(
+                "legacy v2 incarnation-home manifest cannot carry denied-state provenance"
+            )
     holder_binding_value = manifest.get("holder_binding")
     if holder_binding_value is None:
         if require_holder_binding or manifest_schema_version == SCHEMA_VERSION:
@@ -6317,14 +6377,6 @@ def _load_manifest_snapshot(
     else:
         holder_binding = _validate_holder_binding_manifest_record(holder_binding_value)
         holder_coordinate = holder_binding["coordinate"]
-        if (
-            manifest_schema_version == LEGACY_SCHEMA_VERSION
-            and require_holder_binding
-            and "denied_state_provenance" not in manifest
-        ):
-            raise IncarnationHomeError(
-                "legacy typed v2 incarnation-home manifest requires migration"
-            )
     if binding_context is not None:
         binding_context = _validate_holder_binding_context(binding_context)
         if binding_context_digest is None:
@@ -8000,7 +8052,7 @@ def command_launch(args: argparse.Namespace) -> int:
         )
         _require_unoccupied_launch_gate_path(launch_gate_path)
         launch_gate_token = secrets.token_hex(32)
-        holder_claim_path, holder_claim_digest = _reserve_holder_claim(
+        holder_claim_path, holder_claim_digest = _reserve_holder_claim_for_launch(
             manifest_path=manifest_path,
             manifest=manifest,
             manifest_digest=manifest_digest,
@@ -8287,7 +8339,7 @@ def command_launch(args: argparse.Namespace) -> int:
                 pass
             if rejected_cleanup_error is not None:
                 raise rejected_cleanup_error
-    holder_claim_path, holder_claim_digest = _reserve_holder_claim(
+    holder_claim_path, holder_claim_digest = _reserve_holder_claim_for_launch(
         manifest_path=manifest_path,
         manifest=manifest,
         manifest_digest=manifest_digest,

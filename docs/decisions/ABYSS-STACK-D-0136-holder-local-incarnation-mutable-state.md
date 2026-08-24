@@ -68,14 +68,18 @@ context. The digest of that context selects a holder-local directory below the
 realization coordinate and is carried into the manifest and holder receipt. A
 persistent non-replacing claim reserves the home for one responsibility
 lifecycle, so a mismatched, reassigned, overlapping, or sequential launch is
-rejected. A missing typed binding remains valid only for an existing legacy v2
-ownership marker and cannot satisfy canonical launch. Preparation attempts are
-serialized by one runtime-root lock; an unpublished root is owned by an exact
-token before materialization, and only a tokened unmarked root can be rolled
-back or recovered as stale. Legacy v2 remains schema-valid on its explicit
-read/migration route, while holder-bound v2 cannot pass canonical launch until
-preparation rewrites it to v3. Holder receipts require the complete runtime
-binding, including `runtime_state_root` and `closeout_route`.
+rejected. Once published, the claim freezes the home against every later
+preparation: ambient changes and newly supplied grants cannot rewrite or widen
+the live holder. Claim publication and preparation share one runtime-root lock;
+an unpublished root is owned by an exact token before materialization, and only
+a tokened unmarked root can be rolled back or recovered as stale. A missing
+typed binding remains valid only for an existing legacy v2 ownership marker and
+cannot satisfy canonical launch. Every v2 manifest, including one carrying
+typed binding data or denied-state provenance, is rejected by canonical launch
+until preparation rewrites it to v3; a provenance-bearing v2 marker is not a
+schema-valid compatibility shape and is rejected by the loader on any route.
+Holder receipts require the complete runtime binding, including
+`runtime_state_root` and `closeout_route`.
 
 ## Rationale
 
@@ -88,8 +92,9 @@ putting actor, task, Goal, version, or path identity into policy.
 
 ## Consequences
 
-- Positive: repeated prepare accepts legitimate denied local state without
-  converting it into shared authority.
+- Positive: repeated prepare accepts legitimate denied local state before a
+  claim, while a published claim freezes the complete home against later
+  configuration, projection, permission, provenance, and manifest changes.
 - Positive: distinct holders retain separate mutable databases, sidecars, and
   lock directories while preserving realization-bound grants.
 - Tradeoff: callers creating a new home must supply the owner-defined typed

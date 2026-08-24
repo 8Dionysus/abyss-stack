@@ -142,12 +142,16 @@ and replay only through their matching legacy wake reservation. A retry after a 
   holder, task, and run references; its digest and a derived holder coordinate
   are recorded in the manifest and holder receipt. A non-replacing holder
   claim reserves that home for one responsibility lifecycle, so mismatched,
-  reassigned, overlapping, and sequential reuse fail closed. The
-  realization-scoped legacy path remains a compatibility read/preparation
-  route only for a marked older v2 home. A legacy v2 holder-bound manifest is
-  readable for migration but cannot satisfy canonical launch until preparation
-  rewrites it as v3. Every first preparation is serialized by the runtime-owned
-  preparation lock and claims an unpublished root with an exact owner token;
+  reassigned, overlapping, and sequential reuse fail closed. The published
+  claim freezes the complete home against every later preparation, so ambient
+  changes or newly supplied grants cannot rewrite or widen a live holder;
+  canonical claim publication and preparation use the same runtime-owned lock.
+  The realization-scoped legacy path remains a compatibility read/preparation
+route only for a marked older v2 home. Every v2 manifest—including one with
+typed holder data or denied-state provenance—is rejected by canonical launch
+until preparation rewrites it as v3. Every first preparation is serialized by
+  the runtime-owned preparation lock and claims an unpublished root with an
+  exact owner token;
 - exposes the installed `aoa-external-codex-return` leaf for the final external
   return contour. The leaf receives an explicit return-owner binding and exact
   handoff/holder paths, uses a connectable local Codex app-server as a

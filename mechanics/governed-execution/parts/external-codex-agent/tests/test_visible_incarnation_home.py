@@ -576,8 +576,13 @@ def test_legacy_v2_manifest_shape_is_schema_valid_without_typed_binding(
     Draft202012Validator(schema).validate(legacy_manifest)
 
 
-def test_holder_bound_legacy_v2_manifest_requires_migration_before_launch(
-    tmp_path: Path,
+@pytest.mark.parametrize(
+    "include_provenance",
+    [False, True],
+    ids=["typed-without-provenance", "typed-with-provenance"],
+)
+def test_canonical_launch_rejects_every_typed_legacy_v2_manifest(
+    tmp_path: Path, include_provenance: bool
 ) -> None:
     ambient = tmp_path / "ambient"
     runtime_root = tmp_path / "runtime"
@@ -595,7 +600,8 @@ def test_holder_bound_legacy_v2_manifest_requires_migration_before_launch(
     manifest_path = Path(manifest["codex_home"]).parent / "incarnation-home.json"
     legacy_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     legacy_manifest["schema_version"] = MODULE.LEGACY_SCHEMA_VERSION
-    legacy_manifest.pop("denied_state_provenance")
+    if not include_provenance:
+        legacy_manifest.pop("denied_state_provenance")
     manifest_path.write_text(json.dumps(legacy_manifest), encoding="utf-8")
 
     schema = json.loads(
@@ -603,18 +609,93 @@ def test_holder_bound_legacy_v2_manifest_requires_migration_before_launch(
             encoding="utf-8"
         )
     )
-    Draft202012Validator(schema).validate(legacy_manifest)
-    context_digest = MODULE.sha256_bytes(MODULE.canonical_bytes(context))
+    schema_errors = list(Draft202012Validator(schema).iter_errors(legacy_manifest))
+    assert bool(schema_errors) is include_provenance
+    context_path = _holder_binding_context_path(
+        tmp_path, runtime_root, "legacy-typed-migration"
+    )
     with pytest.raises(
         MODULE.IncarnationHomeError,
-        match="legacy typed v2 incarnation-home manifest requires migration",
+        match="legacy v2 incarnation-home manifest requires migration before canonical launch",
     ):
-        MODULE._load_manifest_snapshot(
-            manifest_path,
-            binding_context=context,
-            binding_context_digest=context_digest,
-            require_holder_binding=True,
+        MODULE.command_launch(
+            MODULE.argparse.Namespace(
+                manifest=str(manifest_path),
+                codex_executable=str(tmp_path / "codex-never-reached"),
+                holder_receipt=str(tmp_path / "holder.json"),
+                binding_context=str(context_path),
+                terminal_title=None,
+                control_socket=None,
+                codex_arguments=["exec"],
+            )
         )
+    if include_provenance:
+        with pytest.raises(
+            MODULE.IncarnationHomeError,
+            match="legacy v2 incarnation-home manifest cannot carry denied-state provenance",
+        ):
+            MODULE._load_manifest_snapshot(manifest_path)
+
+
+def test_claimed_home_rejects_repreparation_before_any_projection_effect(
+    tmp_path: Path,
+) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    ambient_config = ambient / "config.toml"
+    ambient_config.write_text('model = "sol"\n', encoding="utf-8")
+    ambient_config.chmod(0o640)
+    (ambient / "app-server-control").mkdir()
+    realization = _realization(tmp_path / "realization.json")
+    context = _holder_binding_context(runtime_root, "claimed-freeze")
+    manifest = _ORIGINAL_PREPARE_HOME(
+        ambient_home=ambient,
+        realization_path=realization,
+        runtime_root=runtime_root,
+        binding_context=context,
+    )
+    actor_home = Path(manifest["codex_home"])
+    manifest_path = actor_home.parent / "incarnation-home.json"
+    context_digest = MODULE.sha256_bytes(MODULE.canonical_bytes(context))
+    claim_path, claim_digest = MODULE._reserve_holder_claim(
+        manifest_path=manifest_path,
+        manifest=manifest,
+        manifest_digest=MODULE.sha256_bytes(manifest_path.read_bytes()),
+        binding_context_digest=context_digest,
+        holder_receipt_path=tmp_path / "holder.json",
+    )
+    grant = _capability_grant(
+        tmp_path / "grant.json",
+        ambient=ambient,
+        realization=realization,
+        ambient_entry="app-server-control",
+    )
+    before_manifest = manifest_path.read_bytes()
+    before_config = (actor_home / "config.toml").read_bytes()
+    before_config_mode = stat.S_IMODE((actor_home / "config.toml").stat().st_mode)
+    before_ambient_mode = stat.S_IMODE(ambient_config.stat().st_mode)
+    ambient_config.write_text('model = "ambient-changed"\n', encoding="utf-8")
+
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="holder-claimed incarnation home is frozen against re-preparation",
+    ):
+        _ORIGINAL_PREPARE_HOME(
+            ambient_home=ambient,
+            realization_path=realization,
+            runtime_root=runtime_root,
+            capability_grants=[grant],
+            binding_context=context,
+        )
+
+    assert manifest_path.read_bytes() == before_manifest
+    assert (actor_home / "config.toml").read_bytes() == before_config
+    assert stat.S_IMODE((actor_home / "config.toml").stat().st_mode) == before_config_mode
+    assert stat.S_IMODE(ambient_config.stat().st_mode) == before_ambient_mode
+    assert not (actor_home / "app-server-control").exists()
+    assert claim_digest == MODULE.sha256_bytes(claim_path.read_bytes())
 
 
 def test_two_synchronized_first_prepares_are_serializable_and_idempotent(
