@@ -894,6 +894,10 @@ Migration copies every legacy actor-local directory mode, including the
 top-level cache/log/tmp/descendant-bin roots, through a retained no-follow
 target descriptor and verifies the mode before publishing the typed manifest;
 the exact mode is part of idempotent retry validation.
+The first typed target also receives the locked, validated legacy capability
+projection, so a denied row remains bounded and explicit when its ambient entry
+disappears before migration; absent and unchanged local shadows are handled by
+the same denied-state provenance check.
 
 The projection derives `actor_local_state_names` from every current capability
 entry whose typed projection is `denied`. An entry in that derived set may be

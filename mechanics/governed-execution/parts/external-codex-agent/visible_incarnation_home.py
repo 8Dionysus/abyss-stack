@@ -8764,6 +8764,7 @@ def _prepare_home_impl(
     _migration_source_expected_names: set[str] | None = None,
     _migration_source_actor_local_names: Sequence[str] = (),
     _migration_source_manifest_digest: str | None = None,
+    _migration_previous_capability_projection: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     if holder_namespace is not None:
         raise IncarnationHomeError(
@@ -8882,9 +8883,12 @@ def _prepare_home_impl(
         incarnation_coordinate=coordinate,
         capability_grants=capability_grants,
     )
+    previous_capability_projection = existing.get("capability_projection")
+    if previous_capability_projection is None:
+        previous_capability_projection = _migration_previous_capability_projection
     capability_projection = _preserve_disappeared_denied_projection_entries(
         capability_projection,
-        existing.get("capability_projection"),
+        previous_capability_projection,
     )
     projected_entries = {
         name: entry
@@ -9829,6 +9833,9 @@ def migrate_legacy_home(
                 _migration_source_expected_names=source_expected_names,
                 _migration_source_actor_local_names=source_actor_local_names,
                 _migration_source_manifest_digest=legacy_digest,
+                _migration_previous_capability_projection=locked_legacy.get(
+                    "capability_projection"
+                ),
             )
     except BaseException:
         _rollback_unpublished_home(owner_token=owner_token)

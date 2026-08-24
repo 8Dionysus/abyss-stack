@@ -1658,7 +1658,9 @@ def test_explicit_legacy_migration_carries_local_state_into_typed_v3(
     runtime_root.mkdir()
     (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
     denied_name = _unknown_fixture_name(tmp_path)
+    absent_denied_name = _unknown_fixture_name(tmp_path / "absent-denied")
     (ambient / denied_name).write_bytes(b"ambient-denied-state")
+    (ambient / absent_denied_name).write_bytes(b"ambient-denied-absent")
     realization = _realization(tmp_path / "realization.json")
     realization_payload = json.loads(realization.read_text(encoding="utf-8"))
     coordinate = MODULE._incarnation_coordinate(
@@ -1695,6 +1697,8 @@ def test_explicit_legacy_migration_carries_local_state_into_typed_v3(
     }
     for name, mode in source_modes.items():
         (legacy_home / name).chmod(mode)
+    (ambient / denied_name).unlink()
+    (ambient / absent_denied_name).unlink()
     legacy_manifest_path = legacy_home.parent / "incarnation-home.json"
     context = _holder_binding_context(runtime_root, "explicit-legacy-migration")
 
@@ -1724,6 +1728,9 @@ def test_explicit_legacy_migration_carries_local_state_into_typed_v3(
         legacy_manifest_path.read_bytes()
     )
     assert (migrated_home / denied_name).read_bytes() == b"legacy-denied-state"
+    assert denied_name in migrated["actor_local_state_names"]
+    assert absent_denied_name in migrated["actor_local_state_names"]
+    assert not (migrated_home / absent_denied_name).exists()
     assert (migrated_home / "cache" / "legacy-cache").read_bytes() == (
         b"legacy-cache"
     )
