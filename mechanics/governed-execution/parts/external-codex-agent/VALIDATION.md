@@ -492,7 +492,10 @@ process/start-tick, window, TTY, title, runtime-root, and closeout binding, and
 starts Kitty in socket-only mode. Focused observability tests prove safe
 allowlist projection from an environment-bearing Kitty payload, read-only
 status with unchanged socket permissions, PID/start-tick reuse protection,
-stale/missing state, and exact directed-input targeting; no status output
+stale/missing state, and exact directed-input targeting; adversarial directed-
+input tests replace the control-socket pathname before and during the external
+client invocation and prove that rejection is fail-closed and delivery remains
+on the retained original inode; no status output
 contains environment, command line, token, or credential fields. The installed
 `join` route proves a returned responsibility without wake delivery and creates
 typed `join_completed` authorization; the wake route creates the parallel

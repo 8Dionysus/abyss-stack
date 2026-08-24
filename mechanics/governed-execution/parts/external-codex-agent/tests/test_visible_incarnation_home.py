@@ -11,6 +11,7 @@ import socket
 import stat
 import subprocess
 import sys
+import threading
 import tomllib
 from types import SimpleNamespace
 from pathlib import Path
@@ -8551,12 +8552,10 @@ def test_directed_input_uses_bound_socket_and_window_only(
         MODULE, "_proc_exe_digest", lambda _pid: holder["exe_digest"]
     )
 
-    def fake_run(argv: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
-        calls["argv"] = argv
-        calls["kwargs"] = kwargs
-        return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
+    def fake_send(**kwargs: object) -> None:
+        calls.update(kwargs)
 
-    monkeypatch.setattr(MODULE.subprocess, "run", fake_run)
+    monkeypatch.setattr(MODULE, "_send_text_through_bound_socket", fake_send)
     try:
         assert MODULE.command_send_text(
             MODULE.argparse.Namespace(
@@ -8567,17 +8566,138 @@ def test_directed_input_uses_bound_socket_and_window_only(
                 text="status\n",
             )
         ) == 0
-        argv = calls["argv"]
-        assert isinstance(argv, list)
-        assert argv[argv.index("--to") + 1] == terminal["control_socket"]["address"]
-        assert argv[argv.index("--match") + 1] == "id:7"
-        assert "send-text" in argv
-        assert "--stdin" in argv
-        assert not {"focus-window", "move-window", "close-window"}.intersection(argv)
-        assert calls["kwargs"]["input"] == "status\n"
+        assert calls["kitty_executable"] == "/usr/bin/kitty"
+        assert calls["socket_record"] == terminal["control_socket"]
+        assert calls["window_id"] == terminal["window_id"]
+        assert calls["text"] == "status\n"
         assert "env" not in capsys.readouterr().out.casefold()
     finally:
         listener.close()
+
+
+def test_directed_input_rejects_socket_replacement_before_external_invocation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    socket_path = tmp_path / "kitty.sock"
+    original = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    original.bind(str(socket_path))
+    original.listen(1)
+    os.chmod(socket_path, 0o600)
+    original_stat = socket_path.stat()
+    record = {
+        "address": f"unix:{socket_path}",
+        "device": original_stat.st_dev,
+        "inode": original_stat.st_ino,
+        "mode": 0o600,
+    }
+    replacement = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    calls: list[object] = []
+    try:
+        socket_path.unlink()
+        replacement.bind(str(socket_path))
+        replacement.listen(1)
+        os.chmod(socket_path, 0o600)
+
+        monkeypatch.setattr(
+            MODULE.subprocess,
+            "run",
+            lambda *args, **kwargs: calls.append((args, kwargs))
+            or subprocess.CompletedProcess([], 0, stdout="", stderr=""),
+        )
+        with pytest.raises(MODULE.IncarnationHomeError, match="inode identity"):
+            MODULE._send_text_through_bound_socket(
+                kitty_executable="/usr/bin/kitty",
+                socket_record=record,
+                window_id="7",
+                text="secret\n",
+            )
+        assert calls == []
+        replacement.setblocking(False)
+        with pytest.raises(BlockingIOError):
+            replacement.accept()
+    finally:
+        original.close()
+        replacement.close()
+
+
+def test_directed_input_keeps_original_inode_when_path_replaced_during_invocation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    socket_path = tmp_path / "kitty.sock"
+    original = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    original.bind(str(socket_path))
+    original.listen(1)
+    os.chmod(socket_path, 0o600)
+    original_stat = socket_path.stat()
+    record = {
+        "address": f"unix:{socket_path}",
+        "device": original_stat.st_dev,
+        "inode": original_stat.st_ino,
+        "mode": 0o600,
+    }
+    replacement: socket.socket | None = None
+    received = bytearray()
+    received_done = threading.Event()
+
+    def receive_original() -> None:
+        connection, _ = original.accept()
+        with connection:
+            while True:
+                payload = connection.recv(4096)
+                if not payload:
+                    break
+                received.extend(payload)
+        received_done.set()
+
+    receiver = threading.Thread(target=receive_original, daemon=True)
+    receiver.start()
+    calls: dict[str, object] = {}
+
+    def fake_run(argv: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        calls["argv"] = argv
+        calls["kwargs"] = kwargs
+        nonlocal replacement
+        socket_path.unlink()
+        replacement = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        replacement.bind(str(socket_path))
+        replacement.listen(1)
+        os.chmod(socket_path, 0o600)
+        endpoint = argv[argv.index("--to") + 1]
+        assert isinstance(endpoint, str) and endpoint.startswith("unix:@")
+        client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        client.connect("\0" + endpoint.removeprefix("unix:@"))
+        client.sendall(b"kitty-send-text-frame")
+        client.shutdown(socket.SHUT_WR)
+        client.close()
+        return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(MODULE.subprocess, "run", fake_run)
+    try:
+        MODULE._send_text_through_bound_socket(
+            kitty_executable="/usr/bin/kitty",
+            socket_record=record,
+            window_id="7",
+            text="secret\n",
+        )
+        assert received_done.wait(timeout=1)
+        assert bytes(received) == b"kitty-send-text-frame"
+        assert isinstance(replacement, socket.socket)
+        replacement.setblocking(False)
+        with pytest.raises(BlockingIOError):
+            replacement.accept()
+        argv = calls["argv"]
+        assert isinstance(argv, list)
+        assert argv[argv.index("--to") + 1].startswith("unix:@")
+        assert argv[argv.index("--to") + 1] != record["address"]
+        assert argv[argv.index("--match") + 1] == "id:7"
+        assert "send-text" in argv
+        assert "--stdin" in argv
+        assert calls["kwargs"]["input"] == "secret\n"
+    finally:
+        original.close()
+        if replacement is not None:
+            replacement.close()
+        receiver.join(timeout=1)
 
 
 def test_directed_input_rechecks_bound_holder_identity_before_send(

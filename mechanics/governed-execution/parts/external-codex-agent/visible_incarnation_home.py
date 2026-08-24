@@ -20,14 +20,17 @@ import hashlib
 import json
 import os
 import re
+import select
 import secrets
 import shlex
 import shutil
 import signal
+import socket
 import stat
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import tomllib
 from datetime import UTC, datetime
@@ -3259,6 +3262,163 @@ def _secure_control_socket(
         "device": observed.st_dev,
         "inode": observed.st_ino,
     }
+
+
+def _send_text_through_bound_socket(
+    *,
+    kitty_executable: str,
+    socket_record: dict[str, object],
+    window_id: object,
+    text: str,
+) -> None:
+    """Deliver directed input through the inode admitted before the effect.
+
+    Kitty accepts a Unix socket address, but opening the recorded pathname in
+    a child process would leave a pathname-replacement race between validation
+    and delivery. The runtime therefore connects to the admitted pathname
+    itself, revalidates that the pathname still names the same socket, and
+    gives Kitty a fresh abstract endpoint whose lifetime is held by this
+    process. The relay never re-opens the recorded pathname.
+    """
+
+    address = str(socket_record["address"])
+    expected_device = socket_record.get("device")
+    expected_inode = socket_record.get("inode")
+    if not isinstance(expected_device, int) or not isinstance(expected_inode, int):
+        raise IncarnationHomeError("bound control socket identity is incomplete")
+
+    _secure_control_socket(
+        address,
+        harden=False,
+        expected_device=expected_device,
+        expected_inode=expected_inode,
+    )
+    path = _socket_path(address)
+    retained_peer = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    relay_listener: socket.socket | None = None
+    cancel_reader: socket.socket | None = None
+    cancel_writer: socket.socket | None = None
+    bridge_thread: threading.Thread | None = None
+    bridge_done = threading.Event()
+    bridge_accepted = threading.Event()
+    bridge_payload = threading.Event()
+    cancelled = threading.Event()
+    bridge_errors: list[BaseException] = []
+    abstract_raw = "\0aoa-send-text-" + secrets.token_hex(16)
+    abstract_address = "unix:@" + abstract_raw.removeprefix("\0")
+
+    try:
+        try:
+            retained_peer.connect(str(path))
+        except OSError as exc:
+            raise IncarnationHomeError(
+                "bound control socket could not be opened before directed input"
+            ) from exc
+        _secure_control_socket(
+            address,
+            harden=False,
+            expected_device=expected_device,
+            expected_inode=expected_inode,
+        )
+
+        relay_listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        relay_listener.bind(abstract_raw)
+        relay_listener.listen(1)
+        cancel_reader, cancel_writer = socket.socketpair()
+
+        def bridge() -> None:
+            client: socket.socket | None = None
+            try:
+                assert relay_listener is not None
+                client, _ = relay_listener.accept()
+                bridge_accepted.set()
+                while not cancelled.is_set():
+                    readable, _writable, _exceptional = select.select(
+                        [client, cancel_reader], [], []
+                    )
+                    if cancel_reader in readable:
+                        break
+                    if client not in readable:
+                        continue
+                    payload = client.recv(64 * 1024)
+                    if not payload:
+                        break
+                    bridge_payload.set()
+                    retained_peer.sendall(payload)
+                if not cancelled.is_set():
+                    retained_peer.shutdown(socket.SHUT_WR)
+            except BaseException as exc:  # pragma: no cover - asserted through caller
+                if not cancelled.is_set():
+                    bridge_errors.append(exc)
+            finally:
+                if client is not None:
+                    client.close()
+                bridge_done.set()
+
+        bridge_thread = threading.Thread(
+            target=bridge,
+            name="aoa-bound-control-socket-relay",
+            daemon=True,
+        )
+        bridge_thread.start()
+        try:
+            completed = subprocess.run(
+                [
+                    kitty_executable,
+                    "@",
+                    "--to",
+                    abstract_address,
+                    "send-text",
+                    "--match",
+                    f"id:{window_id}",
+                    "--stdin",
+                ],
+                input=text,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            raise IncarnationHomeError("directed terminal input failed") from exc
+        if completed.returncode != 0:
+            raise IncarnationHomeError("directed terminal input returned an error")
+        if not bridge_done.wait(timeout=1):
+            raise IncarnationHomeError("directed terminal input relay did not complete")
+    finally:
+        cancelled.set()
+        if cancel_writer is not None:
+            try:
+                cancel_writer.send(b"x")
+            except OSError:
+                pass
+        if relay_listener is not None:
+            try:
+                waker = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                try:
+                    waker.connect(abstract_raw)
+                finally:
+                    waker.close()
+            except OSError:
+                pass
+            relay_listener.close()
+        if bridge_thread is not None:
+            bridge_thread.join(timeout=1)
+        if cancel_reader is not None:
+            cancel_reader.close()
+        if cancel_writer is not None:
+            cancel_writer.close()
+        retained_peer.close()
+    if bridge_thread is not None and bridge_thread.is_alive():
+        raise IncarnationHomeError("directed terminal input relay did not terminate")
+    if bridge_errors:
+        raise IncarnationHomeError("directed terminal input relay failed") from bridge_errors[0]
+    if (
+        not bridge_accepted.is_set()
+        or not bridge_payload.is_set()
+        or not bridge_done.is_set()
+    ):
+        raise IncarnationHomeError("directed terminal input was not delivered to the bound socket")
 
 
 def _allocate_control_socket() -> str:
@@ -6923,28 +7083,12 @@ def command_send_text(args: argparse.Namespace) -> int:
         expected_inode=socket_record["inode"],
     )
     _revalidate_bound_holder_identity(holder)
-    try:
-        completed = subprocess.run(
-            [
-                args.kitty_executable,
-                "@",
-                "--to",
-                str(socket_record["address"]),
-                "send-text",
-                "--match",
-                f"id:{terminal['window_id']}",
-                "--stdin",
-            ],
-            input=args.text,
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        raise IncarnationHomeError("directed terminal input failed") from exc
-    if completed.returncode != 0:
-        raise IncarnationHomeError("directed terminal input returned an error")
+    _send_text_through_bound_socket(
+        kitty_executable=args.kitty_executable,
+        socket_record=socket_record,
+        window_id=terminal["window_id"],
+        text=args.text,
+    )
     result = {
         "schema_version": TERMINAL_BINDING_SCHEMA_VERSION,
         "sent": True,

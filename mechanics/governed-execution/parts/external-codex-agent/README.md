@@ -55,7 +55,11 @@ The controller:
   allowlist. Its output excludes raw Kitty `ls` payloads, environment, command
   lines, tokens, and credentials; compositor visibility remains explicitly
   unknown. `send-text` is a separately invoked terminal transport, not A2A
-  responsibility transfer. The holder receipt also binds the kernel boot ID
+  responsibility transfer. It retains an inode-bound connection to the
+  admitted control socket and exposes Kitty only a fresh abstract relay
+  endpoint, so pathname replacement before admission fails closed and
+  replacement during delivery cannot receive the payload. The holder receipt
+  also binds the kernel boot ID
   alongside each process start tick. The closer publishes a
   recoverable sidecar reservation before signaling. The sidecar records the
   signal attempt before TERM and recovery never repeats an existing attempt;

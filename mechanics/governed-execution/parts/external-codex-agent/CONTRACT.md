@@ -305,6 +305,14 @@ credentials, or credential-shaped fields; unknown compositor visibility
 remains `unknown`. Status is read-only and has no desktop effect.
 `send-text` is a separate explicitly invoked operator transport targeting
 the exact bound socket and window; it is not A2A responsibility transfer.
+Before invoking the external Kitty client, the transport connects to and
+revalidates the recorded socket device/inode, then relays the client bytes
+through that retained peer using a fresh process-owned abstract endpoint.
+Replacing the recorded pathname before that boundary fails closed; replacing
+it after the boundary cannot redirect bytes to the replacement socket. A
+successful receipt is emitted only after the external client connected and the
+relay completed payload delivery, and it continues to report the admitted
+pathname/device/inode rather than the relay endpoint.
 These terminal surfaces do not replace the governed JSONL runtime or owner
 acceptance. After either a wake bridge has recorded confirmed handoff delivery
 or a non-waking join has recorded a validated returned responsibility, the
