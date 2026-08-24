@@ -1749,6 +1749,57 @@ def test_legacy_migration_rejects_child_inserted_after_directory_listing(
     assert not (target_home / "cache" / "late-child").exists()
 
 
+def test_legacy_migration_rejects_aba_source_write(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ambient = tmp_path / "ambient"
+    source_home = tmp_path / "legacy-home"
+    target_home = tmp_path / "typed-home"
+    ambient.mkdir()
+    source_home.mkdir(mode=0o700)
+    target_home.mkdir(mode=0o700)
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    (source_home / "config.toml").write_text(
+        'model = "sol"\n', encoding="utf-8"
+    )
+    for name in MODULE.LOCAL_NAMES - {"config.toml"}:
+        (source_home / name).mkdir(mode=0o700)
+    source_file = source_home / "cache" / "aba-child"
+    source_file.write_bytes(b"A")
+    original_read = MODULE._read_descriptor_bytes
+    raced = False
+
+    def write_and_restore(
+        descriptor: int, label: str
+    ) -> bytes:
+        nonlocal raced
+        content = original_read(descriptor, label)
+        if label == "legacy actor-local state cache/aba-child" and not raced:
+            source_file.write_bytes(b"B")
+            source_file.write_bytes(b"A")
+            raced = True
+        return content
+
+    monkeypatch.setattr(MODULE, "_read_descriptor_bytes", write_and_restore)
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="legacy actor-local state changed",
+    ):
+        MODULE._copy_legacy_actor_local_state(
+            source_home=source_home,
+            target_home=target_home,
+            source_expected_names=set(MODULE.LOCAL_NAMES),
+            source_actor_local_names=(),
+            target_actor_local_names=set(),
+            ambient_home=ambient,
+            ambient_identities=MODULE._ambient_inode_identities(ambient),
+        )
+
+    assert raced
+    assert source_file.read_bytes() == b"A"
+    assert not (target_home / "cache" / "aba-child").exists()
+
+
 def test_legacy_migration_rejects_preexisting_typed_home_before_copy(
     tmp_path: Path,
 ) -> None:

@@ -974,6 +974,20 @@ def _actor_local_identity_mode(observed: os.stat_result) -> tuple[int, int, int]
     return observed.st_dev, observed.st_ino, observed.st_mode
 
 
+def _actor_local_source_version(observed: os.stat_result) -> tuple[int, ...]:
+    """Return a kernel-owned source version that cannot be restored by a rewrite."""
+
+    return (
+        observed.st_dev,
+        observed.st_ino,
+        observed.st_mode,
+        observed.st_nlink,
+        observed.st_size,
+        observed.st_mtime_ns,
+        observed.st_ctime_ns,
+    )
+
+
 def _open_stable_actor_local_path_descriptor(
     target: Path, name: str
 ) -> tuple[int, os.stat_result, os.stat_result]:
@@ -1324,8 +1338,9 @@ def _local_tree_content_digest(
     name: str,
     *,
     ambient_identities: set[tuple[int, int]] | None = None,
+    include_source_version: bool = False,
 ) -> str | None:
-    """Digest one local tree's bytes and modes through retained descriptors."""
+    """Digest one local tree through retained descriptors and stable reads."""
 
     if not target.exists() and not target.is_symlink():
         return None
@@ -1369,9 +1384,17 @@ def _local_tree_content_digest(
                 )
             if _actor_local_identity_mode(read_opened) != _actor_local_identity_mode(
                 current
+            ) or _actor_local_source_version(read_opened) != _actor_local_source_version(
+                current
             ):
                 raise IncarnationHomeError(f"actor-local capability entry changed: {label}")
+            source_version = _actor_local_source_version(read_opened)
             content = _read_descriptor_bytes(read_descriptor, label)
+            after_first_read = os.fstat(read_descriptor)
+            if _actor_local_source_version(after_first_read) != source_version:
+                raise IncarnationHomeError(
+                    f"actor-local capability entry changed while reading: {label}"
+                )
             repeated_content = _read_descriptor_bytes(read_descriptor, label)
             if repeated_content != content:
                 raise IncarnationHomeError(
@@ -1380,7 +1403,7 @@ def _local_tree_content_digest(
             after_read = os.fstat(read_descriptor)
             if _actor_local_identity_mode(after_read) != _actor_local_identity_mode(
                 current
-            ):
+            ) or _actor_local_source_version(after_read) != source_version:
                 raise IncarnationHomeError(
                     f"actor-local capability entry changed while reading: {label}"
                 )
@@ -1401,7 +1424,12 @@ def _local_tree_content_digest(
         child_name: str | None,
     ) -> None:
         current = os.fstat(descriptor)
-        if _actor_local_identity_mode(current) != _actor_local_identity_mode(opened):
+        if (
+            _actor_local_identity_mode(current)
+            != _actor_local_identity_mode(opened)
+            or _actor_local_source_version(current)
+            != _actor_local_source_version(opened)
+        ):
             raise IncarnationHomeError(
                 f"actor-local capability entry changed during content validation: {relative}"
             )
@@ -1418,27 +1446,29 @@ def _local_tree_content_digest(
                 child_name=child_name,
                 label=relative,
             )
-            rows.append(
-                {
-                    "path": relative,
-                    "kind": "file",
-                    "mode": stat.S_IMODE(current.st_mode),
-                    "content_digest": sha256_bytes(content),
-                }
-            )
+            row: dict[str, object] = {
+                "path": relative,
+                "kind": "file",
+                "mode": stat.S_IMODE(current.st_mode),
+                "content_digest": sha256_bytes(content),
+            }
+            if include_source_version:
+                row["source_version"] = list(_actor_local_source_version(current))
+            rows.append(row)
         elif stat.S_ISDIR(current.st_mode):
             if identity in visited_directories:
                 raise IncarnationHomeError(
                     f"actor-local capability directory is aliased: {relative}"
                 )
             visited_directories.add(identity)
-            rows.append(
-                {
-                    "path": relative,
-                    "kind": "directory",
-                    "mode": stat.S_IMODE(current.st_mode),
-                }
-            )
+            row = {
+                "path": relative,
+                "kind": "directory",
+                "mode": stat.S_IMODE(current.st_mode),
+            }
+            if include_source_version:
+                row["source_version"] = list(_actor_local_source_version(current))
+            rows.append(row)
             try:
                 children = sorted(os.listdir(descriptor))
                 after_listing = os.fstat(descriptor)
@@ -1446,8 +1476,11 @@ def _local_tree_content_digest(
                 raise IncarnationHomeError(
                     f"actor-local capability directory cannot be enumerated: {relative}"
                 ) from exc
-            if _actor_local_identity_mode(after_listing) != _actor_local_identity_mode(
-                current
+            if (
+                _actor_local_identity_mode(after_listing)
+                != _actor_local_identity_mode(current)
+                or _actor_local_source_version(after_listing)
+                != _actor_local_source_version(current)
             ):
                 raise IncarnationHomeError(
                     f"actor-local capability directory changed during content validation: {relative}"
@@ -1473,6 +1506,12 @@ def _local_tree_content_digest(
         else:
             raise IncarnationHomeError(
                 f"actor-local capability entry is not a regular file or directory: {relative}"
+            )
+        if _actor_local_source_version(os.fstat(descriptor)) != _actor_local_source_version(
+            current
+        ):
+            raise IncarnationHomeError(
+                f"actor-local capability entry changed during content validation: {relative}"
             )
         if parent_fd is None:
             _revalidate_actor_local_path(target, descriptor, initial, relative)
@@ -2509,6 +2548,7 @@ def _copy_legacy_actor_local_state(
             source_home / name,
             name,
             ambient_identities=ambient_identities,
+            include_source_version=True,
         )
         for name in source_names
         if name != "config.toml"
@@ -2535,6 +2575,10 @@ def _copy_legacy_actor_local_state(
             != _actor_local_identity_mode(second_stat)
             or _actor_local_identity_mode(first_stat)
             != _actor_local_identity_mode(expected)
+            or _actor_local_source_version(first_stat)
+            != _actor_local_source_version(second_stat)
+            or _actor_local_source_version(first_stat)
+            != _actor_local_source_version(expected)
         ):
             raise IncarnationHomeError(
                 f"legacy actor-local state directory changed during migration: {label}"
@@ -2601,7 +2645,12 @@ def _copy_legacy_actor_local_state(
         label: str,
     ) -> None:
         current = os.fstat(descriptor)
-        if _actor_local_identity_mode(current) != _actor_local_identity_mode(opened):
+        if (
+            _actor_local_identity_mode(current)
+            != _actor_local_identity_mode(opened)
+            or _actor_local_source_version(current)
+            != _actor_local_source_version(opened)
+        ):
             raise IncarnationHomeError(
                 f"legacy actor-local state changed during migration: {label}"
             )
@@ -2634,19 +2683,33 @@ def _copy_legacy_actor_local_state(
                         label=label,
                         ambient_identities=ambient_identities,
                     )
-                if _actor_local_identity_mode(read_opened) != _actor_local_identity_mode(
-                    current
+                if (
+                    _actor_local_identity_mode(read_opened)
+                    != _actor_local_identity_mode(current)
+                    or _actor_local_source_version(read_opened)
+                    != _actor_local_source_version(current)
                 ):
                     raise IncarnationHomeError(
                         f"legacy actor-local state changed during migration: {label}"
                     )
+                source_version = _actor_local_source_version(read_opened)
                 content = _read_descriptor_bytes(read_descriptor, label)
+                after_first_read = os.fstat(read_descriptor)
+                if _actor_local_source_version(after_first_read) != source_version:
+                    raise IncarnationHomeError(
+                        f"legacy actor-local state changed while reading: {label}"
+                    )
                 repeated_content = _read_descriptor_bytes(read_descriptor, label)
                 if repeated_content != content:
                     raise IncarnationHomeError(
                         f"legacy actor-local state changed while reading: {label}"
                     )
                 content = repeated_content
+                after_read = os.fstat(read_descriptor)
+                if _actor_local_source_version(after_read) != source_version:
+                    raise IncarnationHomeError(
+                        f"legacy actor-local state changed while reading: {label}"
+                    )
             finally:
                 if read_descriptor is not None:
                     os.close(read_descriptor)
@@ -2736,6 +2799,7 @@ def _copy_legacy_actor_local_state(
             source_home / name,
             name,
             ambient_identities=ambient_identities,
+            include_source_version=True,
         )
         for name in source_names
         if name != "config.toml"

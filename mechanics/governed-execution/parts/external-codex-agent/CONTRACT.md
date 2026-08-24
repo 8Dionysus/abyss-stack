@@ -943,6 +943,13 @@ A migrated v3 manifest may additionally carry
 the migration and is not accepted as a substitute for the complete typed
 holder binding.
 
+Migration binds every copied source tree row to the retained inode's
+kernel-owned source version, including device, inode, mode, link count, size,
+mtime, and ctime. The source version is checked before and after each read and
+across stable directory enumeration, and the initial and final source
+snapshots include it. A source write that changes A to B and restores A is
+therefore rejected rather than admitted as an unchanged endpoint snapshot.
+
 All preparation attempts in one runtime state root hold the persistent
 `.incarnation-home.lock`. The lock must itself be a runtime-owned, single-link
 regular file; its identity, type, and link count are checked before any mode

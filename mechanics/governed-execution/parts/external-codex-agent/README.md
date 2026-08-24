@@ -173,7 +173,10 @@ its isolated actor-local trees into a distinct typed v3 home, regenerates the
 bound config, and leaves the v2 source untouched. The resulting v3 manifest
 records the exact legacy manifest digest; a retry may return that target only
 after revalidating its bytes, modes, projection, and source state as an exact
-idempotent match. A pre-existing typed target with any other state is rejected
+idempotent match. Each copied legacy file and directory is also bound to its
+retained inode's kernel-owned source version, including size, mtime, and ctime;
+version drift is rejected before publication, so an A-B-A write cannot pass
+the endpoint snapshot checks. A pre-existing typed target with any other state is rejected
 before copy or mutation. Every first preparation is
 serialized by
   the runtime-owned preparation lock and claims an unpublished root with an

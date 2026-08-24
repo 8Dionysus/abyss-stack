@@ -99,6 +99,9 @@ home, regenerates the bound config, and leaves the v2 source untouched.
 The migrated manifest binds the exact legacy-manifest digest; retries accept
 only an exact byte/mode/projection/source-state match, and a pre-existing typed
 target with divergent state is rejected before copy or mutation.
+Migration also binds each copied source tree row to the retained inode's
+kernel-owned version (including size, mtime, and ctime) and rejects version
+drift before publication, including a deterministic A-B-A source write.
 Provenance-bearing v2 is rejected even on the non-canonical loader route because
 the public v2 branch forbids that field. A multiply linked preparation lock is
 rejected before any
