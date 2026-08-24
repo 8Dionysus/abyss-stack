@@ -10764,32 +10764,14 @@ def _adjacent_code_mode_host(
     )
 
 
-def _effective_execute_access(info: os.stat_result) -> bool:
-    """Return whether the launching identity can execute a retained file."""
+def _effective_execute_access(descriptor: int) -> bool:
+    """Use ACL-aware kernel access checks against a retained source inode."""
 
-    mode = stat.S_IMODE(info.st_mode)
-    if not mode & 0o111:
-        return False
-    effective_uid_reader = getattr(os, "geteuid", None) or getattr(
-        os, "getuid", None
+    return os.access(
+        f"/proc/self/fd/{descriptor}",
+        os.X_OK,
+        effective_ids=True,
     )
-    effective_gid_reader = getattr(os, "getegid", None) or getattr(
-        os, "getgid", None
-    )
-    if effective_uid_reader is None or effective_gid_reader is None:
-        return False
-    effective_uid = effective_uid_reader()
-    if effective_uid == 0:
-        return True
-    if effective_uid == info.st_uid:
-        return bool(mode & 0o100)
-    effective_groups = {effective_gid_reader()}
-    supplementary_group_reader = getattr(os, "getgroups", None)
-    if supplementary_group_reader is not None:
-        effective_groups.update(supplementary_group_reader())
-    if info.st_gid in effective_groups:
-        return bool(mode & 0o010)
-    return bool(mode & 0o001)
 
 
 def _copy_package_file(
@@ -10836,7 +10818,7 @@ def _copy_package_file(
                 f"package snapshot source changed while reading: {source}"
             )
         content = b"".join(chunks)
-        target_mode = 0o500 if _effective_execute_access(before) else 0o400
+        target_mode = 0o500 if _effective_execute_access(source_fd) else 0o400
         target_flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
         if hasattr(os, "O_NOFOLLOW"):
             target_flags |= os.O_NOFOLLOW

@@ -6640,19 +6640,43 @@ def test_package_snapshot_mode_comes_from_retained_source_descriptor(
     assert records[target][3] == 0o500
 
 
-def test_package_snapshot_mode_does_not_promote_inapplicable_execute_bit(
+def test_package_snapshot_mode_uses_acl_aware_retained_descriptor(
+    tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    info = SimpleNamespace(
-        st_mode=stat.S_IFREG | 0o401,
-        st_uid=41001,
-        st_gid=42001,
-    )
-    monkeypatch.setattr(MODULE.os, "geteuid", lambda: info.st_uid)
-    monkeypatch.setattr(MODULE.os, "getegid", lambda: 43001)
-    monkeypatch.setattr(MODULE.os, "getgroups", lambda: [])
+    source = tmp_path / "source"
+    source.write_bytes(b"owner-class-denies-execute")
+    source.chmod(0o401)
+    target = tmp_path / "target" / "codex"
+    target.parent.mkdir()
+    access_calls: list[tuple[object, int, dict[str, object]]] = []
+    original_access = MODULE.os.access
 
-    assert not MODULE._effective_execute_access(info)
+    def deny_descriptor_execute(
+        path: str | bytes | os.PathLike[str] | os.PathLike[bytes],
+        mode: int,
+        *args: object,
+        **kwargs: object,
+    ) -> bool:
+        access_calls.append((path, mode, kwargs))
+        if str(path).startswith("/proc/self/fd/") and mode == MODULE.os.X_OK:
+            return False
+        return original_access(path, mode, *args, **kwargs)
+
+    monkeypatch.setattr(MODULE.os, "access", deny_descriptor_execute)
+    records: dict[Path, tuple[int, int, str, int]] = {}
+    MODULE._copy_package_file(source, target, records=records)
+
+    assert stat.S_IMODE(target.stat().st_mode) == 0o400
+    descriptor_calls = [
+        (path, kwargs)
+        for path, mode, kwargs in access_calls
+        if mode == MODULE.os.X_OK
+    ]
+    assert len(descriptor_calls) == 1
+    descriptor_path, descriptor_kwargs = descriptor_calls[0]
+    assert str(descriptor_path).startswith("/proc/self/fd/")
+    assert descriptor_kwargs == {"effective_ids": True}
 
 
 def test_shebang_snapshot_preserves_effective_companion_execute_mode(
@@ -6668,7 +6692,6 @@ def test_shebang_snapshot_preserves_effective_companion_execute_mode(
     companion = executable.parent / MODULE.CODE_MODE_HOST_NAME
     companion.write_bytes(b"group-executable-companion")
     companion.chmod(0o450)
-    companion_info = companion.stat()
     original_access = MODULE.os.access
 
     def allow_companion_execute(
@@ -6677,14 +6700,13 @@ def test_shebang_snapshot_preserves_effective_companion_execute_mode(
         *args: object,
         **kwargs: object,
     ) -> bool:
-        if Path(path) == companion and mode == MODULE.os.X_OK:
+        if mode == MODULE.os.X_OK and (
+            Path(path) == companion or str(path).startswith("/proc/self/fd/")
+        ):
             return True
         return original_access(path, mode, *args, **kwargs)
 
     monkeypatch.setattr(MODULE.os, "access", allow_companion_execute)
-    monkeypatch.setattr(MODULE.os, "geteuid", lambda: companion_info.st_uid + 1)
-    monkeypatch.setattr(MODULE.os, "getegid", lambda: companion_info.st_gid)
-    monkeypatch.setattr(MODULE.os, "getgroups", lambda: [])
     (
         snapshot_fd,
         _snapshot_exec_path,
