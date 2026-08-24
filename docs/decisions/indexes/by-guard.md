@@ -528,6 +528,10 @@
 
 - [ABYSS-STACK-D-0125 Decouple Codex Availability From MCP Recovery](../ABYSS-STACK-D-0125-decouple-codex-availability-from-mcp-recovery.md) (`docs/decisions/ABYSS-STACK-D-0125-decouple-codex-availability-from-mcp-recovery.md`)
 
+## fail-closed delivery
+
+- [ABYSS-STACK-D-0136 Canonical KAG Cold-CAS Binding](../ABYSS-STACK-D-0136-canonical-kag-cold-cas-binding.md) (`docs/decisions/ABYSS-STACK-D-0136-canonical-kag-cold-cas-binding.md`)
+
 ## fail-closed freshness
 
 - [ABYSS-STACK-D-0089 Decision Cache Effect Isolation](../ABYSS-STACK-D-0089-decision-cache-effect-isolation.md) (`docs/decisions/ABYSS-STACK-D-0089-decision-cache-effect-isolation.md`)
@@ -865,6 +869,10 @@
 
 - [ABYSS-STACK-D-0075 AoA KAG MCP Access Plane](../ABYSS-STACK-D-0075-aoa-kag-mcp-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0075-aoa-kag-mcp-access-plane.md`)
 
+## public-safe projection
+
+- [ABYSS-STACK-D-0136 Canonical KAG Cold-CAS Binding](../ABYSS-STACK-D-0136-canonical-kag-cold-cas-binding.md) (`docs/decisions/ABYSS-STACK-D-0136-canonical-kag-cold-cas-binding.md`)
+
 ## read-only canary
 
 - [ABYSS-STACK-D-0096 Fail-Closed MCP Protocol Migration Lab](../ABYSS-STACK-D-0096-fail-closed-mcp-protocol-migration-lab.md) (`docs/decisions/ABYSS-STACK-D-0096-fail-closed-mcp-protocol-migration-lab.md`)
@@ -1026,6 +1034,10 @@
 - [ABYSS-STACK-D-0042 Source Structure Validator Module](../ABYSS-STACK-D-0042-source-structure-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0042-source-structure-validator-module.md`)
 - [ABYSS-STACK-D-0045 Questbook Surface Validator Module](../ABYSS-STACK-D-0045-questbook-surface-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0045-questbook-surface-validator-module.md`)
 - [ABYSS-STACK-D-0063 Root Validator Wrapper Tail Removal](../ABYSS-STACK-D-0063-root-validator-wrapper-tail-removal.md) (`docs/decisions/ABYSS-STACK-D-0063-root-validator-wrapper-tail-removal.md`)
+
+## source-owned authority
+
+- [ABYSS-STACK-D-0136 Canonical KAG Cold-CAS Binding](../ABYSS-STACK-D-0136-canonical-kag-cold-cas-binding.md) (`docs/decisions/ABYSS-STACK-D-0136-canonical-kag-cold-cas-binding.md`)
 
 ## source-return route
 

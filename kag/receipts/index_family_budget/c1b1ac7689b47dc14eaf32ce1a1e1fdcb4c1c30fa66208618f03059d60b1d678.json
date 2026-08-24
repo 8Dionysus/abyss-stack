@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 29912677,
+  "allowed_tracked_bytes": 38190967,
+  "approved_by": "repository-owner",
+  "base_ref": "efa14a2c0cbd4ab2d3b4044f851742f323f27c96",
+  "changed_generated_bytes": 29912677,
+  "changed_generated_files": 329,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "c1b1ac7689b47dc14eaf32ce1a1e1fdcb4c1c30fa66208618f03059d60b1d678",
+  "reason": "negotiate cold-CAS owner contract and short-circuit exact text lanes",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 38190967,
+  "tracked_bytes_max": 24117248
+}

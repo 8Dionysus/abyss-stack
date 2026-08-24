@@ -21,6 +21,9 @@ That separation is what allows `abyss-stack` to be Fedora-first while still usab
 - `AOA_EVALS_ROOT` — optional source root used to mirror public-safe `aoa-evals` eval-selection and export-contract surfaces into the runtime tree
 - `AOA_PLAYBOOKS_ROOT` — optional source root used to mirror public-safe `aoa-playbooks` activation and composition advisory surfaces into the runtime tree
 - `AOA_KAG_ROOT` — optional source root used to mirror public-safe `aoa-kag` derived retrieval and regrounding surfaces into the runtime tree
+- `AOA_KAG_ARTIFACT_ROOT` — optional absolute owner-approved v4 cold-CAS root
+  passed to canonical `aoa-kag` reads; when set, shadow-Git fallback is
+  disabled and the owner loader must prove complete delivery
 - `AOA_TECHNIQUES_ROOT` — optional source root used when sibling routing checks need reusable technique surfaces
 - `AOA_AOA_ROOT` — optional source root for the `Agents-of-Abyss` center repository
 - `AOA_SDK_ROOT` — optional source root for SDK examples used by runtime repair dry-runs

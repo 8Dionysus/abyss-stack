@@ -33,6 +33,11 @@ available when a projection or tiered owner family is absent, stale, damaged,
 partial, unavailable, or incomplete, and the result reports the route actually
 used. MCP never performs an unbounded artifact download inside a request.
 
+The canonical adapter accepts `AOA_KAG_ARTIFACT_ROOT` as an authored,
+owner-approved absolute v4 cold-CAS binding. A configured root is passed to the
+`aoa-kag` loader with shadow-Git fallback disabled; it does not admit or
+rewrite the artifact trust verdict.
+
 Canonical fallback reads the tracked portable-v3 family manifest and bounded
 JSONL shards directly; the seven v2 monolith paths remain logical compatibility
 coordinates and are not required to exist in Git.

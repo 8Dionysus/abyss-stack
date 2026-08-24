@@ -44,6 +44,7 @@ class AoAKagMCPState:
 
     workspace_root: Path
     aoa_kag_root: Path
+    artifact_root: Path | None
     canonical_provider_root: Path | None
     provider_map_path: Path
     readiness_path: Path
@@ -54,6 +55,7 @@ class AoAKagMCPState:
         cls,
         workspace_root: str | Path | None = None,
         aoa_kag_root: str | Path | None = None,
+        artifact_root: str | Path | None = None,
         canonical_provider_root: str | Path | None = None,
         provider_map_path: str | Path | None = None,
         readiness_path: str | Path | None = None,
@@ -73,6 +75,15 @@ class AoAKagMCPState:
         ).expanduser()
         if not kag_root.is_absolute():
             kag_root = workspace / kag_root
+
+        artifact_root_value = artifact_root or os.environ.get("AOA_KAG_ARTIFACT_ROOT")
+        if artifact_root_value:
+            configured_artifact_root = Path(artifact_root_value).expanduser()
+            if not configured_artifact_root.is_absolute():
+                raise ValueError("AOA_KAG_ARTIFACT_ROOT must be an absolute path")
+            configured_artifact_root = configured_artifact_root.resolve()
+        else:
+            configured_artifact_root = None
 
         canonical_root_value = canonical_provider_root or os.environ.get(
             "AOA_KAG_CANONICAL_PROVIDER_ROOT"
@@ -115,6 +126,7 @@ class AoAKagMCPState:
         return cls(
             workspace_root=workspace,
             aoa_kag_root=kag_root.resolve(),
+            artifact_root=configured_artifact_root,
             canonical_provider_root=canonical_root,
             provider_map_path=provider_map.resolve(),
             readiness_path=readiness.resolve(),

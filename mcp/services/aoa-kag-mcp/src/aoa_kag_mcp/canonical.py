@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import inspect
 import json
 import sys
 import threading
@@ -86,8 +87,46 @@ class CanonicalRepoKag:
                 self._cache.move_to_end(repo)
                 return cached[1]
         module = self._query_module()
-        source_index, family = module.load_family(self.state.provider_root(repo))
-        query = module.RepoKagQuery(source_index, family)
+        provider_root = self.state.provider_root(repo)
+        if self.state.artifact_root is None:
+            # Keep the pre-v4 portable loader ABI available for owners whose
+            # query module has not adopted the optional delivery arguments.
+            loaded = module.load_family(provider_root)
+        else:
+            load_parameters = inspect.signature(module.load_family).parameters
+            query_parameters = inspect.signature(module.RepoKagQuery).parameters
+            accepts_loader_keywords = any(
+                parameter.kind is inspect.Parameter.VAR_KEYWORD
+                for parameter in load_parameters.values()
+            )
+            if not (
+                {
+                    "artifact_root",
+                    "allow_shadow_git",
+                }.issubset(load_parameters)
+                or accepts_loader_keywords
+            ):
+                raise RuntimeError(
+                    "configured canonical KAG artifact delivery requires the "
+                    "owner v4 loader keyword interface"
+                )
+            if "repo_root" not in query_parameters:
+                raise RuntimeError(
+                    "configured canonical KAG artifact delivery requires the "
+                    "owner v4 RepoKagQuery interface"
+                )
+            loaded = module.load_family(
+                provider_root,
+                artifact_root=self.state.artifact_root,
+                allow_shadow_git=False,
+            )
+        if not isinstance(loaded, (tuple, list)) or len(loaded) < 2:
+            raise RuntimeError("canonical KAG load_family returned an invalid family")
+        source_index, family = loaded[0], loaded[1]
+        if self.state.artifact_root is None:
+            query = module.RepoKagQuery(source_index, family)
+        else:
+            query = module.RepoKagQuery(source_index, family, repo_root=provider_root)
         with self._lock:
             self._cache[repo] = (identity, query)
             self._cache.move_to_end(repo)
