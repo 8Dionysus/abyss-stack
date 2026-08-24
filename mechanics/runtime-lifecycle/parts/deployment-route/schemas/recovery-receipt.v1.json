@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://abyss-stack.invalid/schemas/owner-source-activate-receipt-v1",
-  "title": "Abyss Stack owner-source activation receipt v1",
+  "$id": "https://abyss-stack.invalid/schemas/owner-source-activation-recovery-v1",
+  "title": "Abyss Stack owner-source activation recovery journal v1",
   "type": "object",
   "additionalProperties": false,
   "$defs": {
@@ -42,13 +42,27 @@
       ]
     },
     "receiptReference": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["path", "sha256"],
-      "properties": {
-        "path": {"$ref": "#/$defs/absolutePath"},
-        "sha256": {"$ref": "#/$defs/hex64"}
-      }
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "sha256"],
+          "properties": {
+            "path": {"$ref": "#/$defs/absolutePath"},
+            "sha256": {"$ref": "#/$defs/hex64"},
+            "status": {"const": "complete"}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "status"],
+          "properties": {
+            "path": {"$ref": "#/$defs/absolutePath"},
+            "status": {"const": "not_written"}
+          }
+        }
+      ]
     },
     "admission": {
       "type": "object",
@@ -69,16 +83,10 @@
     "atomicity": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "same_filesystem",
-        "switch",
-        "destination_identity_checked",
-        "journal"
-      ],
+      "required": ["same_filesystem", "switch", "journal"],
       "properties": {
         "same_filesystem": {"const": true},
         "switch": {"const": "relative-symlink-os-replace"},
-        "destination_identity_checked": {"const": true},
         "journal": {"const": "durable-before-switch"}
       }
     }
@@ -87,7 +95,9 @@
     "schema_version",
     "status",
     "operation_id",
-    "activated_at",
+    "prepare_operation_id",
+    "created_at",
+    "updated_at",
     "owner_repo",
     "prepare_receipt",
     "source",
@@ -96,31 +106,65 @@
     "activated_release",
     "predecessor",
     "admission",
-    "recovery_journal",
+    "activation_receipt_path",
+    "rollback_receipt_path",
     "atomicity",
-    "dependency_posture",
-    "effects",
     "claim_ceiling",
     "receipt_digest"
   ],
   "properties": {
-    "schema_version": {"const": "abyss_stack_owner_source_activate_receipt_v1"},
-    "status": {"const": "activated"},
+    "schema_version": {"const": "abyss_stack_owner_source_activation_recovery_v1"},
+    "status": {"enum": ["intent_written", "switch_complete", "finalized", "rolled_back"]},
     "operation_id": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
-    "activated_at": {"type": "string", "format": "date-time"},
+    "prepare_operation_id": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
+    "created_at": {"type": "string", "format": "date-time"},
+    "updated_at": {"type": "string", "format": "date-time"},
+    "switched_at": {"type": "string", "format": "date-time"},
     "owner_repo": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"},
-    "prepare_receipt": {"$ref": "#/$defs/receiptReference"},
+    "prepare_receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"$ref": "#/$defs/absolutePath"},
+        "sha256": {"$ref": "#/$defs/hex64"}
+      }
+    },
     "source": {"$ref": "#/$defs/source"},
     "destination": {"$ref": "#/$defs/absolutePath"},
     "release_root": {"$ref": "#/$defs/absolutePath"},
     "activated_release": {"$ref": "#/$defs/absolutePath"},
     "predecessor": {"$ref": "#/$defs/snapshot"},
     "admission": {"$ref": "#/$defs/admission"},
-    "recovery_journal": {"$ref": "#/$defs/receiptReference"},
+    "activation_receipt_path": {"$ref": "#/$defs/absolutePath"},
+    "rollback_receipt_path": {"$ref": "#/$defs/absolutePath"},
+    "activation_receipt": {"$ref": "#/$defs/receiptReference"},
+    "rollback_receipt": {"$ref": "#/$defs/receiptReference"},
     "atomicity": {"$ref": "#/$defs/atomicity"},
-    "dependency_posture": {"const": "source_only_no_install"},
-    "effects": {"type": "array", "items": {"type": "string"}},
-    "claim_ceiling": {"const": "source_activation_only_no_runtime_claim"},
+    "claim_ceiling": {"const": "source_activation_recovery_only_no_runtime_claim"},
     "receipt_digest": {"$ref": "#/$defs/hex64"}
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": ["status"],
+        "properties": {"status": {"enum": ["switch_complete", "finalized"]}}
+      },
+      "then": {"required": ["switched_at"]}
+    },
+    {
+      "if": {
+        "required": ["status"],
+        "properties": {"status": {"const": "finalized"}}
+      },
+      "then": {"required": ["activation_receipt"]}
+    },
+    {
+      "if": {
+        "required": ["status"],
+        "properties": {"status": {"const": "rolled_back"}}
+      },
+      "then": {"required": ["rollback_receipt"]}
+    }
+  ]
 }

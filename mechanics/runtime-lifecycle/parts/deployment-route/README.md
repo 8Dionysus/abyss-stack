@@ -12,7 +12,8 @@ separate from Configs projection and runtime lifecycle start/stop.
 
 `runtime-lifecycle` owns the transactional destination mechanics: clean-source
 identity checks, self-contained release staging, same-filesystem atomic symlink
-replacement, deployment locking, and predecessor rollback receipts.
+replacement, deployment locking, durable activation recovery, and predecessor
+rollback receipts.
 
 The source owner owns the source commit/tree. `abyss-machine` owns artifact
 classes, signatures, SBOM/provenance, registries, and admission policy. A route
@@ -47,13 +48,23 @@ The route emits and persists typed JSON receipts:
 
 - `prepare`: `abyss_stack_owner_source_prepare_receipt_v1`;
 - `activate`: `abyss_stack_owner_source_activate_receipt_v1`;
-- `rollback`: `abyss_stack_owner_source_rollback_receipt_v1`.
+- `rollback`: `abyss_stack_owner_source_rollback_receipt_v1`;
+- activation also persists an `abyss_stack_owner_source_activation_recovery_v1`
+  journal before the destination switch.
 
 The release is a self-contained Git clone under an immutable-by-identity
 release directory. The destination is switched with a relative symlink and
 `os.replace` only after the current predecessor identity is rechecked while a
-non-blocking deployment lock is held. Rollback never deletes a release; it
-restores the exact predecessor symlink or the exact absent state.
+non-blocking deployment lock is held. The durable journal records intent before
+the switch and permits deterministic `recover --action finalize|rollback` after
+switch or receipt-write interruption. Rollback never deletes a release; it
+restores the exact predecessor symlink or the exact absent state, rechecking its
+recorded ref, tree, and clean mutable state.
+
+Ignored cache paths are excluded from Git's source identity check and are not
+copied into a self-contained release. Tracked edits and non-ignored untracked
+content remain hard failures; ignored content is never part of the immutable
+release identity.
 
 ### Must not claim
 
@@ -69,8 +80,10 @@ same-filesystem preflight only and creates no route state.
 Focused tests use temporary Git repositories and disposable destinations. They
 cover happy-path prepare/activate/rollback plus dirty source, wrong identity,
 stale admission, stale staging, non-symlink destination, cross-device
-preflight, concurrent lock, destination race, and receipt tampering. No live
-`/srv/AbyssOS` root is used by the tests.
+preflight, concurrent lock, destination race, predecessor and activated
+release ref/tree/clean tamper, ignored-cache packaging, nested emitted schema
+instances, malformed journals, and interruption/retry recovery at each
+activation boundary. No live `/srv/AbyssOS` root is used by the tests.
 
 ```bash
 scripts/aoa-deploy-owner-package --help
@@ -102,3 +115,16 @@ scripts/aoa-deploy-owner-package prepare \
 The non-dry `prepare`, `activate`, and `rollback` commands are deliberately
 operator-facing mutation commands. A source-only handoff should stop after
 focused validation and preserve the receipts for the later holder.
+
+If activation reports `activation_recovery_required`, use the recorded journal
+as the only continuation point:
+
+```bash
+scripts/aoa-deploy-owner-package recover \
+  --recovery-journal /absolute/path/to/activate-<prepare-operation-id>.recovery.json \
+  --action finalize
+```
+
+Use `--action rollback` when the destination must return to the recorded
+predecessor. Both actions are idempotent and remain source-only; neither
+installs dependencies, starts services, or proves runtime health.

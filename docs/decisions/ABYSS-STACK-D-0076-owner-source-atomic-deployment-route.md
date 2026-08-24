@@ -11,7 +11,7 @@
 - Surface classes: runtime topology, source/runtime boundary, deployment route
 - Stack lanes: runtime lifecycle, source checkout, operator deployment
 - Mechanic parents: runtime-lifecycle
-- Guard families: clean source identity, atomic switch, predecessor rollback, deployment lock
+- Guard families: clean source identity, ignored-cache boundary, atomic switch, durable activation recovery, predecessor rollback, deployment lock
 - Posture: accepted owner-source deployment rationale
 
 ## Context
@@ -21,7 +21,9 @@ an exact reviewed owner checkout without mutating the shared source checkout or
 the installed runtime during source work. Existing Configs sync is a
 non-destructive mirror boundary, while the existing managed checkout route can
 reset and clean a destination in place. Neither provides the required
-transactional identity and rollback boundary for this duty.
+transactional identity and rollback boundary for this duty. The route must also
+remain recoverable when the process stops after durable intent, after the
+symlink switch, or while writing a receipt.
 
 The source owner, the host artifact-trust owner, and the runtime/deployment
 owner are different responsibilities. A source commit/tree check, artifact
@@ -43,10 +45,14 @@ Choose option 3.
 `abyss-stack` owns the route implementation under
 `mechanics/runtime-lifecycle/parts/deployment-route/`. It stages a full
 non-alternating Git clone for an exact clean commit/tree under a versioned
-release identity. It refuses dirty source or destination state, stale or
-mismatched admission, incomplete staging, cross-device paths, concurrent
-deployment, and predecessor identity drift. Activation uses a same-filesystem
-relative symlink plus `os.replace`; rollback restores the recorded predecessor
+release identity. It refuses dirty source or destination state, stale or mismatched
+admission, incomplete staging, cross-device paths, concurrent deployment, and
+predecessor or activated-release ref/tree/clean drift. Ignored cache content is
+outside the source identity and is excluded from the self-contained clone;
+tracked and non-ignored untracked content remains a hard failure. Activation
+writes a durable recovery journal before the same-filesystem relative symlink
+plus `os.replace` switch. A journaled interruption can be deterministically
+finalized or rolled back, and rollback restores the recorded predecessor
 without deleting releases.
 
 The route admission is an input contract, not an `abyss-machine` artifact
@@ -68,9 +74,12 @@ transactional, inspectable, and repeatable.
 
 The self-contained clone avoids coupling an installed release to the mutable
 object store of the source checkout. The lock and predecessor check make a
-prepared receipt single-use against the observed destination state. Typed
-receipts make the authority ceiling explicit so source preparation cannot be
-mistaken for runtime proof.
+prepared receipt single-use against the observed destination state. The
+durable intent/switch/receipt sequence makes an active destination explicit
+instead of allowing a plain rejection with an unjournaled new target. Typed
+receipts, including nested source snapshots and recovery states, make the
+authority ceiling explicit so source preparation cannot be mistaken for
+runtime proof.
 
 ## Consequences
 
@@ -80,10 +89,19 @@ mistaken for runtime proof.
   the separate artifact-trust decision where applicable.
 - Release directories are retained for rollback and require bounded storage
   management by the owning deployment operator.
-- The route adds a root wrapper, mechanic-local tests, receipt schemas, and
-  validation topology entries.
+- The route adds a root wrapper, mechanic-local tests, nested receipt schemas,
+  a recovery-journal schema, and validation topology entries.
 - Configs sync remains the source/runtime mirror route for ordinary stack
   changes; this route is not a replacement for it.
+
+Schema compatibility is intentionally explicit: the existing admission,
+prepare, activate, and rollback schema identifiers remain v1 route contracts,
+but their emitted nested objects are now closed and identity-bound. Activation
+receipts emitted by this route require the recovery-journal binding; an older
+receipt without that binding is not accepted as a new rollback-capable receipt.
+The recovery journal is a separate v1 contract because it records durable
+intermediate states rather than pretending that an activation receipt exists
+before its write completes.
 
 ## Source surfaces
 
@@ -92,6 +110,7 @@ mistaken for runtime proof.
 - `mechanics/runtime-lifecycle/parts/deployment-route/README.md`
 - `mechanics/runtime-lifecycle/parts/deployment-route/aoa_deploy_owner_package.py`
 - `mechanics/runtime-lifecycle/parts/deployment-route/schemas/`
+- `mechanics/runtime-lifecycle/parts/deployment-route/schemas/recovery-receipt.v1.json`
 - `mechanics/runtime-lifecycle/parts/deployment-route/tests/test_deployment_route.py`
 - `docs/install/DEPLOYMENT.md`
 - `scripts/aoa-sync-configs`

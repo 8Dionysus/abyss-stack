@@ -3,21 +3,115 @@
   "$id": "https://abyss-stack.invalid/schemas/owner-source-rollback-receipt-v1",
   "title": "Abyss Stack owner-source rollback receipt v1",
   "type": "object",
+  "additionalProperties": false,
+  "$defs": {
+    "hex40": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "hex64": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "absolutePath": {"type": "string", "pattern": "^/"},
+    "snapshot": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": {"kind": {"const": "absent"}}
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "link_text", "target", "source_ref", "source_tree"],
+          "properties": {
+            "kind": {"const": "symlink"},
+            "link_text": {"type": "string", "minLength": 1},
+            "target": {"$ref": "#/$defs/absolutePath"},
+            "source_ref": {"$ref": "#/$defs/hex40"},
+            "source_tree": {"$ref": "#/$defs/hex40"}
+          }
+        }
+      ]
+    },
+    "completeReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"$ref": "#/$defs/absolutePath"},
+        "sha256": {"$ref": "#/$defs/hex64"},
+        "status": {"const": "complete"}
+      }
+    },
+    "activationReference": {
+      "oneOf": [
+        {"$ref": "#/$defs/completeReference"},
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "status"],
+          "properties": {
+            "path": {"$ref": "#/$defs/absolutePath"},
+            "status": {"const": "not_written"}
+          }
+        }
+      ]
+    },
+    "atomicity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "same_filesystem",
+        "switch",
+        "destination_identity_checked",
+        "predecessor_identity_checked"
+      ],
+      "properties": {
+        "same_filesystem": {"const": true},
+        "switch": {"const": "relative-symlink-os-replace"},
+        "destination_identity_checked": {"const": true},
+        "predecessor_identity_checked": {"const": true}
+      }
+    }
+  },
   "required": [
     "schema_version",
     "status",
     "operation_id",
+    "rolled_back_at",
     "owner_repo",
     "activation_receipt",
+    "recovery_journal",
     "destination",
     "release_root",
+    "removed_activation",
     "restored_predecessor",
+    "restored_target",
+    "atomicity",
+    "dependency_posture",
+    "effects",
     "claim_ceiling",
     "receipt_digest"
   ],
   "properties": {
     "schema_version": {"const": "abyss_stack_owner_source_rollback_receipt_v1"},
     "status": {"const": "rolled_back"},
-    "receipt_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+    "operation_id": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
+    "rolled_back_at": {"type": "string", "format": "date-time"},
+    "owner_repo": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"},
+    "activation_receipt": {"$ref": "#/$defs/activationReference"},
+    "recovery_journal": {"$ref": "#/$defs/completeReference"},
+    "destination": {"$ref": "#/$defs/absolutePath"},
+    "release_root": {"$ref": "#/$defs/absolutePath"},
+    "removed_activation": {"$ref": "#/$defs/absolutePath"},
+    "restored_predecessor": {"$ref": "#/$defs/snapshot"},
+    "restored_target": {
+      "oneOf": [
+        {"$ref": "#/$defs/absolutePath"},
+        {"type": "null"}
+      ]
+    },
+    "atomicity": {"$ref": "#/$defs/atomicity"},
+    "dependency_posture": {"const": "source_only_no_install"},
+    "effects": {"type": "array", "items": {"type": "string"}},
+    "claim_ceiling": {"const": "source_activation_rollback_only_no_runtime_claim"},
+    "receipt_digest": {"$ref": "#/$defs/hex64"}
   }
 }

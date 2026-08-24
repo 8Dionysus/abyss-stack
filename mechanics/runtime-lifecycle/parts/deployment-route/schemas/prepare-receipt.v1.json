@@ -3,6 +3,71 @@
   "$id": "https://abyss-stack.invalid/schemas/owner-source-prepare-receipt-v1",
   "title": "Abyss Stack owner-source prepare receipt v1",
   "type": "object",
+  "additionalProperties": false,
+  "$defs": {
+    "hex40": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "hex64": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "absolutePath": {"type": "string", "pattern": "^/"},
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["root", "ref", "tree", "dirty"],
+      "properties": {
+        "root": {"$ref": "#/$defs/absolutePath"},
+        "ref": {"$ref": "#/$defs/hex40"},
+        "tree": {"$ref": "#/$defs/hex40"},
+        "dirty": {"const": false}
+      }
+    },
+    "snapshot": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": {"kind": {"const": "absent"}}
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "link_text", "target", "source_ref", "source_tree"],
+          "properties": {
+            "kind": {"const": "symlink"},
+            "link_text": {"type": "string", "minLength": 1},
+            "target": {"$ref": "#/$defs/absolutePath"},
+            "source_ref": {"$ref": "#/$defs/hex40"},
+            "source_tree": {"$ref": "#/$defs/hex40"}
+          }
+        }
+      ]
+    },
+    "admission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "admission_id", "authority_ceiling"],
+      "properties": {
+        "path": {"$ref": "#/$defs/absolutePath"},
+        "sha256": {"$ref": "#/$defs/hex64"},
+        "admission_id": {"type": "string", "minLength": 1},
+        "authority_ceiling": {
+          "enum": [
+            "disposable-source-package-canary",
+            "installed-source-package-activation"
+          ]
+        }
+      }
+    },
+    "atomicity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["same_filesystem", "staging", "switch"],
+      "properties": {
+        "same_filesystem": {"const": true},
+        "staging": {"const": "self-contained-git-clone"},
+        "switch": {"const": "relative-symlink-os-replace"}
+      }
+    }
+  },
   "required": [
     "schema_version",
     "status",
@@ -11,18 +76,53 @@
     "source",
     "destination",
     "release_root",
-    "release_path",
     "predecessor",
     "admission",
     "atomicity",
     "dependency_posture",
-    "claim_ceiling",
-    "receipt_digest"
+    "effects",
+    "claim_ceiling"
   ],
   "properties": {
     "schema_version": {"const": "abyss_stack_owner_source_prepare_receipt_v1"},
     "status": {"enum": ["prepared", "dry_run"]},
+    "operation_id": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
+    "prepared_at": {"type": "string", "format": "date-time"},
+    "expires_at": {"type": "string", "format": "date-time"},
+    "owner_repo": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"},
+    "source": {"$ref": "#/$defs/source"},
+    "destination": {"$ref": "#/$defs/absolutePath"},
+    "release_root": {"$ref": "#/$defs/absolutePath"},
+    "release_path": {"$ref": "#/$defs/absolutePath"},
+    "predecessor": {"$ref": "#/$defs/snapshot"},
+    "admission": {"$ref": "#/$defs/admission"},
+    "atomicity": {"$ref": "#/$defs/atomicity"},
     "dependency_posture": {"const": "source_only_no_install"},
-    "receipt_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
-  }
+    "effects": {"type": "array", "items": {"type": "string"}},
+    "claim_ceiling": {"enum": ["preflight_only", "prepared_not_activated"]},
+    "receipt_digest": {"$ref": "#/$defs/hex64"}
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": ["status"],
+        "properties": {"status": {"const": "prepared"}}
+      },
+      "then": {
+        "required": ["prepared_at", "expires_at", "release_path", "receipt_digest"],
+        "properties": {"claim_ceiling": {"const": "prepared_not_activated"}}
+      }
+    },
+    {
+      "if": {
+        "required": ["status"],
+        "properties": {"status": {"const": "dry_run"}}
+      },
+      "then": {
+        "required": ["claim_ceiling"],
+        "properties": {"claim_ceiling": {"const": "preflight_only"}},
+        "not": {"required": ["receipt_digest"]}
+      }
+    }
+  ]
 }

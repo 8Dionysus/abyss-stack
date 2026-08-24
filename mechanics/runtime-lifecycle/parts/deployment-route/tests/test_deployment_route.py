@@ -1,13 +1,17 @@
 from __future__ import annotations
 
+import argparse
+from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 import importlib.util
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
 import sys
 
+from jsonschema import Draft202012Validator, ValidationError
 import pytest
 
 
@@ -20,6 +24,7 @@ MODULE_PATH = (
     / "deployment-route"
     / "aoa_deploy_owner_package.py"
 )
+SCHEMA_ROOT = MODULE_PATH.parent / "schemas"
 SPEC = importlib.util.spec_from_file_location("aoa_deploy_owner_package", MODULE_PATH)
 assert SPEC and SPEC.loader
 ROUTE = importlib.util.module_from_spec(SPEC)
@@ -145,11 +150,51 @@ def output(result: subprocess.CompletedProcess[str]) -> dict[str, object]:
     return json.loads(result.stdout)
 
 
+def validate_instance(path: Path, schema_name: str) -> dict[str, object]:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    schema = json.loads((SCHEMA_ROOT / schema_name).read_text(encoding="utf-8"))
+    Draft202012Validator(schema).validate(payload)
+    return payload
+
+
+def direct_activate(prepared: dict[str, object]) -> dict[str, object]:
+    return ROUTE.activate(argparse.Namespace(prepare_receipt=prepared["receipt_path"]))
+
+
+def two_release_fixture(tmp_path: Path) -> tuple[dict[str, Path | str], Path, dict[str, object]]:
+    fixture = route_fixture(tmp_path)
+    first_prepare = output(invoke(*prepare_command(fixture)))
+    first_activate = output(invoke("activate", "--prepare-receipt", first_prepare["receipt_path"]))
+    first_release = Path(first_prepare["release_path"])
+    ref, tree = commit_repo(Path(fixture["source"]), "two\n")
+    fixture["ref"] = ref
+    fixture["tree"] = tree
+    fixture["admission"] = write_admission(
+        tmp_path,
+        source=Path(fixture["source"]),
+        ref=ref,
+        tree=tree,
+        destination=Path(fixture["destination"]),
+        name="second-admission.json",
+    )
+    second_prepare = output(invoke(*prepare_command(fixture)))
+    second_activate = output(invoke("activate", "--prepare-receipt", second_prepare["receipt_path"]))
+    assert first_activate["status"] == "activated"
+    return fixture, first_release, second_activate
+
+
 def test_dry_run_is_source_only_and_creates_no_route_state(tmp_path: Path) -> None:
     fixture = route_fixture(tmp_path)
     result = invoke(*prepare_command(fixture, "--dry-run"))
     payload = output(result)
 
+    admission_payload = json.loads(Path(fixture["admission"]).read_text(encoding="utf-8"))
+    Draft202012Validator(
+        json.loads((SCHEMA_ROOT / "admission.v1.json").read_text(encoding="utf-8"))
+    ).validate(admission_payload)
+    Draft202012Validator(
+        json.loads((SCHEMA_ROOT / "prepare-receipt.v1.json").read_text(encoding="utf-8"))
+    ).validate(payload)
     assert payload["status"] == "dry_run"
     assert payload["dependency_posture"] == "source_only_no_install"
     assert payload["effects"] == []
@@ -161,7 +206,11 @@ def test_dry_run_is_source_only_and_creates_no_route_state(tmp_path: Path) -> No
 def test_prepare_activate_and_rollback_preserve_predecessor(tmp_path: Path) -> None:
     fixture = route_fixture(tmp_path)
     first_prepare = output(invoke(*prepare_command(fixture)))
+    validate_instance(Path(first_prepare["receipt_path"]), "prepare-receipt.v1.json")
     first_activate = output(invoke("activate", "--prepare-receipt", first_prepare["receipt_path"]))
+    validate_instance(Path(first_activate["receipt_path"]), "activate-receipt.v1.json")
+    recovery_path = next(Path(fixture["receipt_dir"]).glob("activate-*.recovery.json"))
+    validate_instance(recovery_path, "recovery-receipt.v1.json")
     first_release = Path(first_prepare["release_path"])
     assert Path(fixture["destination"]).is_symlink()
     assert Path(fixture["destination"]).resolve() == first_release
@@ -186,6 +235,9 @@ def test_prepare_activate_and_rollback_preserve_predecessor(tmp_path: Path) -> N
     assert second_activate["claim_ceiling"] == "source_activation_only_no_runtime_claim"
 
     rolled_back = output(invoke("rollback", "--activation-receipt", second_activate["receipt_path"]))
+    validate_instance(Path(second_activate["receipt_path"]), "activate-receipt.v1.json")
+    validate_instance(Path(rolled_back["receipt_path"]), "rollback-receipt.v1.json")
+    validate_instance(recovery_path, "recovery-receipt.v1.json")
     assert rolled_back["status"] == "rolled_back"
     assert Path(fixture["destination"]).resolve() == first_release
     assert first_release.is_dir()
@@ -283,6 +335,253 @@ def test_activation_rejects_destination_race_and_receipt_tampering(tmp_path: Pat
     result = invoke("activate", "--prepare-receipt", prepared["receipt_path"])
     assert result.returncode == 2
     assert json.loads(result.stderr)["error"]["code"] == "receipt_digest_mismatch"
+
+
+def test_rollback_revalidates_recorded_predecessor_identity(tmp_path: Path) -> None:
+    fixture, first_release, second_activate = two_release_fixture(tmp_path)
+    run_git(first_release, "config", "user.email", "tamper@example.invalid")
+    run_git(first_release, "config", "user.name", "tamper")
+    (first_release / "payload.txt").write_text("predecessor tamper\n", encoding="utf-8")
+    run_git(first_release, "add", "payload.txt")
+    run_git(first_release, "commit", "-qm", "tamper predecessor identity")
+
+    result = invoke("rollback", "--activation-receipt", second_activate["receipt_path"])
+
+    assert result.returncode == 2
+    assert json.loads(result.stderr)["error"]["code"] == "predecessor_ref_mismatch"
+    assert Path(fixture["destination"]).resolve() == Path(second_activate["activated_release"])
+
+
+def test_rollback_revalidates_activated_release_identity(tmp_path: Path) -> None:
+    fixture, _, second_activate = two_release_fixture(tmp_path)
+    activated_release = Path(second_activate["activated_release"])
+    run_git(activated_release, "config", "user.email", "tamper@example.invalid")
+    run_git(activated_release, "config", "user.name", "tamper")
+    (activated_release / "payload.txt").write_text("activated ref tamper\n", encoding="utf-8")
+    run_git(activated_release, "add", "payload.txt")
+    run_git(activated_release, "commit", "-qm", "tamper activated identity")
+
+    result = invoke("rollback", "--activation-receipt", second_activate["receipt_path"])
+
+    assert result.returncode == 2
+    assert json.loads(result.stderr)["error"]["code"] == "activated_release_ref_mismatch"
+    assert Path(fixture["destination"]).resolve() == activated_release
+
+
+def test_rollback_rejects_dirty_activated_release(tmp_path: Path) -> None:
+    fixture, _, second_activate = two_release_fixture(tmp_path)
+    activated_release = Path(second_activate["activated_release"])
+    (activated_release / "payload.txt").write_text("tampered\n", encoding="utf-8")
+
+    result = invoke("rollback", "--activation-receipt", second_activate["receipt_path"])
+
+    assert result.returncode == 2
+    assert json.loads(result.stderr)["error"]["code"] == "activated_release_dirty"
+    assert Path(fixture["destination"]).resolve() == activated_release
+
+
+@pytest.mark.parametrize(
+    ("tampered_field", "expected_code"),
+    [("predecessor", "predecessor_tree_mismatch"), ("source", "activated_release_tree_mismatch")],
+)
+def test_rollback_rejects_tampered_recorded_tree(
+    tmp_path: Path, tampered_field: str, expected_code: str
+) -> None:
+    fixture, _, second_activate = two_release_fixture(tmp_path)
+    activation_path = Path(second_activate["receipt_path"])
+    activation = json.loads(activation_path.read_text(encoding="utf-8"))
+    activation.pop("receipt_digest")
+    if tampered_field == "predecessor":
+        activation["predecessor"]["source_tree"] = "0" * 40
+    else:
+        activation["source"]["tree"] = "0" * 40
+    ROUTE._write_json(activation_path, activation)
+
+    result = invoke("rollback", "--activation-receipt", str(activation_path))
+
+    assert result.returncode == 2
+    assert json.loads(result.stderr)["error"]["code"] == expected_code
+    assert Path(fixture["destination"]).resolve() == Path(second_activate["activated_release"])
+
+
+def test_ignored_cache_is_excluded_from_source_identity_and_package(tmp_path: Path) -> None:
+    fixture = route_fixture(tmp_path)
+    source = Path(fixture["source"])
+    (source / ".gitignore").write_text("ignored-cache/\n", encoding="utf-8")
+    run_git(source, "add", ".gitignore")
+    run_git(source, "commit", "-qm", "ignore local cache")
+    ref = run_git(source, "rev-parse", "HEAD")
+    tree = run_git(source, "rev-parse", "HEAD^{tree}")
+    fixture["ref"] = ref
+    fixture["tree"] = tree
+    fixture["admission"] = write_admission(
+        tmp_path,
+        source=source,
+        ref=ref,
+        tree=tree,
+        destination=Path(fixture["destination"]),
+        name="ignored-cache-admission.json",
+    )
+    ignored = source / "ignored-cache"
+    ignored.mkdir()
+    (ignored / "cache.bin").write_text("cache\n", encoding="utf-8")
+    assert "ignored-cache" in run_git(source, "status", "--porcelain=v1", "--ignored", "--untracked-files=all")
+
+    prepared = output(invoke(*prepare_command(fixture)))
+    release_path = Path(prepared["release_path"])
+    assert not (release_path / "ignored-cache").exists()
+    assert not (release_path / ".git" / "objects" / "info" / "alternates").exists()
+    activated = output(invoke("activate", "--prepare-receipt", prepared["receipt_path"]))
+    validate_instance(Path(activated["receipt_path"]), "activate-receipt.v1.json")
+    assert Path(fixture["destination"]).resolve() == release_path
+
+
+def test_tracked_mutation_is_not_hidden_by_ignored_cache_policy(tmp_path: Path) -> None:
+    fixture = route_fixture(tmp_path)
+    (Path(fixture["source"]) / "payload.txt").write_text("tracked mutation\n", encoding="utf-8")
+
+    result = invoke(*prepare_command(fixture, "--dry-run"))
+
+    assert result.returncode == 2
+    assert json.loads(result.stderr)["error"]["code"] == "dirty_source"
+
+
+@pytest.mark.parametrize(
+    "interruption",
+    ["durable_intent", "switch", "switch_receipt", "activation_receipt", "final_journal"],
+)
+def test_activation_interruption_is_durable_and_recoverable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, interruption: str
+) -> None:
+    fixture = route_fixture(tmp_path)
+    prepared = output(invoke(*prepare_command(fixture)))
+    original_write = ROUTE._write_json
+    original_replace = ROUTE.os.replace
+    fired = False
+
+    def injected_write(path: Path, payload: dict[str, object]) -> dict[str, object]:
+        nonlocal fired
+        if (
+            not fired
+            and interruption == "final_journal"
+            and path.name.endswith(".recovery.json")
+            and payload.get("status") == "finalized"
+        ):
+            fired = True
+            raise ROUTE.DeploymentError("injected_final_journal_write", "test interruption")
+        result = original_write(path, payload)
+        if fired:
+            return result
+        if interruption == "durable_intent" and path.name.endswith(".recovery.json") and payload.get("status") == "intent_written":
+            fired = True
+            raise ROUTE.DeploymentError("injected_after_intent", "test interruption")
+        if interruption == "switch_receipt" and path.name.endswith(".recovery.json") and payload.get("status") == "switch_complete":
+            fired = True
+            raise ROUTE.DeploymentError("injected_after_switch_receipt", "test interruption")
+        return result
+
+    def injected_receipt_write(path: Path, payload: dict[str, object]) -> dict[str, object]:
+        nonlocal fired
+        if (
+            not fired
+            and interruption == "activation_receipt"
+            and path.name.startswith("activate-")
+            and not path.name.endswith(".recovery.json")
+        ):
+            fired = True
+            raise ROUTE.DeploymentError("injected_activation_receipt_write", "test interruption")
+        return original_write(path, payload)
+
+    def injected_replace(source: Path, destination: Path) -> None:
+        nonlocal fired
+        if not fired and interruption == "switch" and Path(source).name.endswith(".switch"):
+            fired = True
+            raise OSError("injected switch interruption")
+        original_replace(source, destination)
+
+    if interruption == "activation_receipt":
+        monkeypatch.setattr(ROUTE, "_write_json", injected_receipt_write)
+    else:
+        monkeypatch.setattr(ROUTE, "_write_json", injected_write)
+    if interruption == "switch":
+        monkeypatch.setattr(ROUTE.os, "replace", injected_replace)
+
+    if interruption == "final_journal":
+        activated = direct_activate(prepared)
+        assert activated["status"] == "activated"
+    else:
+        with pytest.raises(ROUTE.DeploymentError) as raised:
+            direct_activate(prepared)
+        assert raised.value.code == "activation_recovery_required"
+        assert raised.value.context["recovery_required"] is True
+    journals = list(Path(fixture["receipt_dir"]).glob("activate-*.recovery.json"))
+    assert len(journals) == 1
+    journal_path = journals[0]
+    validate_instance(journal_path, "recovery-receipt.v1.json")
+
+    if interruption in {"durable_intent", "switch"}:
+        assert not os.path.lexists(fixture["destination"])
+        rolled_back = output(invoke("recover", "--recovery-journal", str(journal_path), "--action", "rollback"))
+        assert rolled_back["activation_receipt"]["status"] == "not_written"
+    else:
+        assert Path(fixture["destination"]).resolve() == Path(prepared["release_path"])
+        finalized = output(invoke("recover", "--recovery-journal", str(journal_path), "--action", "finalize"))
+        validate_instance(Path(finalized["receipt_path"]), "activate-receipt.v1.json")
+        if interruption == "final_journal":
+            assert finalized["receipt_path"] == activated["receipt_path"]
+        finalized_retry = output(invoke("recover", "--recovery-journal", str(journal_path), "--action", "finalize"))
+        assert finalized_retry["receipt_path"] == finalized["receipt_path"]
+        rolled_back = output(invoke("rollback", "--activation-receipt", finalized["receipt_path"]))
+
+    validate_instance(Path(rolled_back["receipt_path"]), "rollback-receipt.v1.json")
+    validate_instance(journal_path, "recovery-receipt.v1.json")
+    retry = output(invoke("recover", "--recovery-journal", str(journal_path), "--action", "rollback"))
+    assert retry["receipt_path"] == rolled_back["receipt_path"]
+
+
+def test_tampered_recovery_journal_is_rejected_before_repair(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    fixture = route_fixture(tmp_path)
+    prepared = output(invoke(*prepare_command(fixture)))
+    original_write = ROUTE._write_json
+
+    def fail_after_intent(path: Path, payload: dict[str, object]) -> dict[str, object]:
+        result = original_write(path, payload)
+        if path.name.endswith(".recovery.json") and payload.get("status") == "intent_written":
+            raise ROUTE.DeploymentError("injected_after_intent", "test interruption")
+        return result
+
+    monkeypatch.setattr(ROUTE, "_write_json", fail_after_intent)
+    with pytest.raises(ROUTE.DeploymentError):
+        direct_activate(prepared)
+    journal_path = next(Path(fixture["receipt_dir"]).glob("activate-*.recovery.json"))
+    tampered = json.loads(journal_path.read_text(encoding="utf-8"))
+    tampered["source"]["ref"] = "0" * 40
+    journal_path.write_text(json.dumps(tampered), encoding="utf-8")
+
+    result = invoke("recover", "--recovery-journal", str(journal_path), "--action", "finalize")
+
+    assert result.returncode == 2
+    assert json.loads(result.stderr)["error"]["code"] == "receipt_digest_mismatch"
+    assert not os.path.lexists(fixture["destination"])
+
+
+def test_nested_receipt_contract_rejects_malformed_emitted_instances(tmp_path: Path) -> None:
+    fixture = route_fixture(tmp_path)
+    prepared = output(invoke(*prepare_command(fixture)))
+    prepare_schema = json.loads((SCHEMA_ROOT / "prepare-receipt.v1.json").read_text(encoding="utf-8"))
+    malformed_prepare = deepcopy(prepared)
+    del malformed_prepare["source"]["tree"]
+    with pytest.raises(ValidationError):
+        Draft202012Validator(prepare_schema).validate(malformed_prepare)
+
+    activated = output(invoke("activate", "--prepare-receipt", prepared["receipt_path"]))
+    recovery_path = next(Path(fixture["receipt_dir"]).glob("activate-*.recovery.json"))
+    recovery = json.loads(recovery_path.read_text(encoding="utf-8"))
+    recovery["atomicity"]["switch"] = "non-atomic"
+    recovery_schema = json.loads((SCHEMA_ROOT / "recovery-receipt.v1.json").read_text(encoding="utf-8"))
+    with pytest.raises(ValidationError):
+        Draft202012Validator(recovery_schema).validate(recovery)
+    validate_instance(Path(activated["receipt_path"]), "activate-receipt.v1.json")
 
 
 def test_cross_device_preflight_is_rejected_when_tmpfs_is_distinct(tmp_path: Path) -> None:

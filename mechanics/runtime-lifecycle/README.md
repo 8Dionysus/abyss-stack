@@ -63,8 +63,10 @@ logs/status, and user-unit helpers live under their owning
 and examples live in `mechanics/runtime-lifecycle/parts/status-readouts/`, with
 regression coverage in `mechanics/runtime-lifecycle/parts/status-readouts/tests/`.
 Owner-source package staging and the later operator-controlled atomic symlink
-route live in `mechanics/runtime-lifecycle/parts/deployment-route/`; that route
-does not project Configs, install dependencies, or start services.
+route live in `mechanics/runtime-lifecycle/parts/deployment-route/`; its
+activation recovery journal supports deterministic finalize/rollback after a
+switch interruption, and the route does not project Configs, install
+dependencies, or start services.
 Source/runtime parity now routes through
 `mechanics/runtime-lifecycle/parts/config-sync-boundary/docs/SOURCE_RUNTIME_PARITY_PACKET.md`,
 and live runtime cutover inspection routes through

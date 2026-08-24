@@ -1,11 +1,11 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
   "decision_count": 76,
-  "edge_count": 1655,
+  "edge_count": 1658,
   "edge_type_counts": {
-    "CITES_SOURCE_SURFACE": 661,
+    "CITES_SOURCE_SURFACE": 662,
     "DATED": 76,
-    "GUARDED_BY": 197,
+    "GUARDED_BY": 199,
     "HAS_STATUS": 76,
     "HAS_SURFACE_CLASS": 185,
     "IN_STACK_LANE": 151,
@@ -7828,6 +7828,11 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0076",
+      "target": "source_surface:mechanics/runtime-lifecycle/parts/deployment-route/schemas/recovery-receipt.v1.json",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
       "target": "source_surface:mechanics/runtime-lifecycle/parts/deployment-route/tests/test_deployment_route.py",
       "type": "CITES_SOURCE_SURFACE"
     },
@@ -7859,6 +7864,16 @@
     {
       "source": "decision:ABYSS-STACK-D-0076",
       "target": "guard_family:deployment%20lock",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
+      "target": "guard_family:durable%20activation%20recovery",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
+      "target": "guard_family:ignored-cache%20boundary",
       "type": "GUARDED_BY"
     },
     {
@@ -8293,15 +8308,15 @@
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 700,
+  "node_count": 703,
   "node_type_counts": {
     "date": 19,
     "decision": 76,
-    "guard_family": 77,
+    "guard_family": 79,
     "mechanic_parent": 10,
     "owner_surface": 38,
     "repo": 1,
-    "source_surface": 396,
+    "source_surface": 397,
     "stack_lane": 25,
     "status": 2,
     "surface_class": 56
@@ -9253,6 +9268,11 @@
       "type": "guard_family"
     },
     {
+      "id": "guard_family:durable%20activation%20recovery",
+      "label": "durable activation recovery",
+      "type": "guard_family"
+    },
+    {
       "id": "guard_family:entry%20contract",
       "label": "entry contract",
       "type": "guard_family"
@@ -9290,6 +9310,11 @@
     {
       "id": "guard_family:host%20evidence%20posture",
       "label": "host evidence posture",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:ignored-cache%20boundary",
+      "label": "ignored-cache boundary",
       "type": "guard_family"
     },
     {
@@ -11241,6 +11266,11 @@
     {
       "id": "source_surface:mechanics/runtime-lifecycle/parts/deployment-route/schemas/",
       "label": "mechanics/runtime-lifecycle/parts/deployment-route/schemas/",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/runtime-lifecycle/parts/deployment-route/schemas/recovery-receipt.v1.json",
+      "label": "mechanics/runtime-lifecycle/parts/deployment-route/schemas/recovery-receipt.v1.json",
       "type": "source_surface"
     },
     {

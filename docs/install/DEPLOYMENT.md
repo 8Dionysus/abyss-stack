@@ -175,15 +175,19 @@ It is a different route from Configs sync:
   commit/tree, and a same-filesystem preflight;
 - it stages a self-contained Git release under a versioned identity, then
   atomically replaces one destination symlink while retaining the predecessor;
-- activation and rollback are explicit commands and emit receipts; the route
-  does not install dependencies, relink Configs, start services, or prove live
-  health.
+- activation and rollback are explicit commands and emit receipts; activation
+  writes a durable recovery journal before the switch and exposes deterministic
+  `recover --action finalize|rollback` continuation after an interruption; the
+  route does not install dependencies, relink Configs, start services, or prove
+  live health.
 
 The route rejects dirty source/destination state, stale or mismatched
-admission, incomplete staging, cross-device paths, concurrent deployment, and
-predecessor identity drift. Artifact signature/SBOM/provenance admission stays
-with `abyss-machine`; this repository must not invent an artifact class for a
-source-only owner route.
+admission, incomplete staging, cross-device paths, concurrent deployment,
+predecessor or activated-release ref/tree/clean drift, and untracked mutable
+content. Ignored cache content is outside the Git source identity and is not
+copied into the self-contained release. Artifact signature/SBOM/provenance
+admission stays with `abyss-machine`; this repository must not invent an
+artifact class for a source-only owner route.
 
 The shortest honest verify path for the current promoted runtime is:
 

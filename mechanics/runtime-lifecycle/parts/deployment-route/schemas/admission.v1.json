@@ -3,7 +3,7 @@
   "$id": "https://abyss-stack.invalid/schemas/owner-source-deployment-admission-v1",
   "title": "Abyss Stack owner-source deployment admission v1",
   "type": "object",
-  "additionalProperties": true,
+  "additionalProperties": false,
   "required": [
     "schema_version",
     "admission_kind",
@@ -23,13 +23,20 @@
     "schema_version": {"const": "abyss_stack_owner_source_deployment_admission_v1"},
     "admission_kind": {"const": "owner_source_deployment_route"},
     "status": {"const": "admitted"},
+    "admission_id": {"type": "string", "minLength": 1},
+    "admission_ref": {"type": "string", "minLength": 1},
+    "owner_repo": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"},
+    "source_root": {"type": "string", "pattern": "^/"},
     "source_ref": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
     "source_tree": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "destination": {"type": "string", "pattern": "^/"},
     "authority_ceiling": {
       "enum": [
         "disposable-source-package-canary",
         "installed-source-package-activation"
       ]
-    }
+    },
+    "issued_at": {"type": "string", "format": "date-time"},
+    "expires_at": {"type": "string", "format": "date-time"}
   }
 }
