@@ -816,21 +816,31 @@ ordinary actor-local `config.toml`, `cache`, `log`, `tmp`, and descendant binary
 remain real incarnation-local paths.
 
 The mutable home has two lifecycle coordinates. A newly created home requires
-an opaque holder namespace; its digest is recorded as
-`holder_namespace_coordinate` and places the home below the realization root,
-so sequential or concurrent holders with the same realization cannot share
-Codex-created databases, sidecars, locks, or other local state. Repeating
-`prepare` with the same namespace addresses the same home. For compatibility,
-the realization-scoped `codex-home` path remains loadable and preparable only
-when its existing v2 ownership marker is present; an unmarked new home cannot
-silently fall back to that shared mutable coordinate.
+the exact bytes of a typed holder/task/run responsibility context. That context
+extends the existing goal/actor/incarnation/session runtime binding with
+owner-defined holder, task, and run references. Its digest is recorded with a
+derived holder coordinate below the realization root, and the same binding is
+carried into the holder receipt. A non-replacing `holder-claim.json` is then
+published beside the manifest and remains the durable single-lifecycle
+reservation: a mismatched context, reassignment, simultaneous launch, or
+sequential reuse fails closed. Distinct contexts therefore receive distinct
+mutable homes, manifests, configs, databases, credentials, temporary paths,
+and receipt reservations. For compatibility, a realization-scoped legacy
+`codex-home` remains loadable and preparable only when its existing v2
+ownership marker is present; it cannot satisfy a canonical launch without the
+typed holder binding.
 
 The projection derives `actor_local_state_names` from every current capability
 entry whose typed projection is `denied`. An entry in that derived set may be
 absent or may be a top-level regular file or real directory created by the
 actor. It is not a shared link, and the runtime never deletes it during
-prepare. A symlink, special file, foreign target, or arbitrary undeclared
-top-level entry fails closed. When a previous shared link becomes denied under
+prepare. Validation opens each existing denied entry without following
+symlinks, rechecks its device/inode/mode across the observation, recursively
+checks real directories, rejects every multiply linked regular file, and
+rejects any inode also present below the ambient home. Thus same-filesystem
+hard links, device/inode aliases, symlink replacement, special files, foreign
+targets, and arbitrary undeclared top-level entries fail closed before
+manifest admission or launch. When a previous shared link becomes denied under
 the current typed policy, the exact old ambient link may be removed; a regular
 local shadow is retained and validated. A shared projection still requires its
 exact ambient symlink, so local files cannot widen a denied capability.

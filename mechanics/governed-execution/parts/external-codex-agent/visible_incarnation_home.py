@@ -52,6 +52,20 @@ CAPABILITY_CLASS_POLICIES = {
 CAPABILITY_CLASS_ID_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
 CAPABILITY_ENTRY_NAME_PATTERN = re.compile(r"^(?!\.\.?$)[^/]+$")
 HOLDER_RECEIPT_SCHEMA_VERSION = "abyss_stack_visible_incarnation_holder_terminal_v1"
+HOLDER_BINDING_CONTEXT_SCHEMA_VERSION = (
+    "abyss_stack_visible_incarnation_holder_binding_context_v1"
+)
+HOLDER_BINDING_CONTEXT_FIELDS = ("holder_ref", "task_ref", "run_ref")
+TERMINAL_BINDING_CONTEXT_FIELDS = (
+    "goal_ref",
+    "actor_ref",
+    "incarnation_ref",
+    "session_ref",
+    "runtime_state_root",
+    "closeout_route",
+)
+HOLDER_CLAIM_SCHEMA_VERSION = "abyss_stack_visible_incarnation_holder_claim_v1"
+HOLDER_CLAIM_FILE_NAME = "holder-claim.json"
 HOLDER_LOSS_REENTRY_SCHEMA_VERSION = (
     "task_local_external_actor_holder_loss_reentry_v1"
 )
@@ -644,17 +658,43 @@ def _incarnation_coordinate(realization_id: str, fingerprint: str) -> str:
     )
 
 
-def _holder_namespace_coordinate(holder_namespace: str) -> str:
-    """Bind one durable mutable home to an opaque holder-owned namespace."""
+def _holder_binding_context_coordinate(
+    context: dict[str, str], binding_digest: str
+) -> str:
+    """Derive a home coordinate from one exact typed responsibility context."""
 
-    if not isinstance(holder_namespace, str) or not holder_namespace.strip():
-        raise IncarnationHomeError("holder namespace must be a non-empty string")
-    if any(
-        ord(character) < 0x20 or ord(character) == 0x7F
-        for character in holder_namespace
-    ):
-        raise IncarnationHomeError("holder namespace contains a control character")
-    return sha256_bytes(canonical_bytes({"holder_namespace": holder_namespace}))
+    if SHA256_DIGEST_PATTERN.fullmatch(binding_digest) is None:
+        raise IncarnationHomeError("holder binding context digest is invalid")
+    identity = {
+        "schema_version": context["schema_version"],
+        **{
+            key: context[key]
+            for key in TERMINAL_BINDING_CONTEXT_FIELDS
+            + HOLDER_BINDING_CONTEXT_FIELDS
+        },
+        "binding_digest": binding_digest,
+    }
+    return sha256_bytes(canonical_bytes(identity))
+
+
+def _holder_binding_manifest_record(
+    context: dict[str, str], binding_digest: str, coordinate: str
+) -> dict[str, str]:
+    if SHA256_DIGEST_PATTERN.fullmatch(binding_digest) is None:
+        raise IncarnationHomeError("holder binding context digest is invalid")
+    if SHA256_DIGEST_PATTERN.fullmatch(coordinate) is None:
+        raise IncarnationHomeError("holder binding coordinate is invalid")
+    return {
+        "schema_version": context["schema_version"],
+        "binding_digest": binding_digest,
+        "coordinate": coordinate,
+        **{
+            key: context[key]
+            for key in ("goal_ref", "actor_ref", "incarnation_ref", "session_ref")
+            + ("runtime_state_root", "closeout_route")
+            + HOLDER_BINDING_CONTEXT_FIELDS
+        },
+    }
 
 
 def _holder_incarnation_root(
@@ -666,29 +706,158 @@ def _holder_incarnation_root(
     if holder_coordinate is None:
         return realization_root
     if SHA256_DIGEST_PATTERN.fullmatch(holder_coordinate) is None:
-        raise IncarnationHomeError("holder namespace coordinate is invalid")
+        raise IncarnationHomeError("holder binding coordinate is invalid")
     return realization_root / (
         "holder-sha256-" + holder_coordinate.removeprefix("sha256:")
     )
 
 
-def _validate_actor_local_entry(target: Path, name: str) -> None:
-    """Permit only Codex-owned regular files/directories for denied entries."""
+def _ambient_inode_identities(ambient_home: Path) -> set[tuple[int, int]]:
+    """Collect ambient inode identities without following ambient symlinks."""
 
-    if target.is_symlink():
-        raise IncarnationHomeError(
-            f"actor-local capability entry may not be a symlink: {target}"
-        )
+    identities: set[tuple[int, int]] = set()
+    pending = [ambient_home]
+    visited_directories: set[tuple[int, int]] = set()
+    while pending:
+        current = pending.pop()
+        try:
+            observed = current.lstat()
+        except OSError as exc:
+            raise IncarnationHomeError(
+                f"ambient capability entry cannot be inspected: {current}"
+            ) from exc
+        identity = (observed.st_dev, observed.st_ino)
+        identities.add(identity)
+        if not stat.S_ISDIR(observed.st_mode) or current.is_symlink():
+            continue
+        if identity in visited_directories:
+            continue
+        visited_directories.add(identity)
+        try:
+            pending.extend(current.iterdir())
+        except OSError as exc:
+            raise IncarnationHomeError(
+                f"ambient capability directory cannot be enumerated: {current}"
+            ) from exc
+    return identities
+
+
+def _open_stable_actor_local_entry(target: Path, name: str) -> os.stat_result:
+    """Open one entry without following a replacement symlink and recheck it."""
+
     try:
-        mode = target.lstat().st_mode
+        initial = os.lstat(target)
     except OSError as exc:
         raise IncarnationHomeError(
             f"actor-local capability entry cannot be inspected: {target}"
         ) from exc
-    if not (stat.S_ISREG(mode) or stat.S_ISDIR(mode)):
+    if stat.S_ISLNK(initial.st_mode):
         raise IncarnationHomeError(
-            f"actor-local capability entry is not a regular file or directory: {name}"
+            f"actor-local capability entry may not be a symlink: {target}"
         )
+    flags = getattr(os, "O_PATH", os.O_RDONLY)
+    flags |= getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
+    try:
+        descriptor = os.open(target, flags)
+    except OSError as exc:
+        raise IncarnationHomeError(
+            f"actor-local capability entry cannot be opened safely: {target}"
+        ) from exc
+    try:
+        opened = os.fstat(descriptor)
+        observed = os.lstat(target)
+        if (
+            (
+                opened.st_dev,
+                opened.st_ino,
+                opened.st_mode,
+            )
+            != (
+                initial.st_dev,
+                initial.st_ino,
+                initial.st_mode,
+            )
+            or (
+                opened.st_dev,
+                opened.st_ino,
+                opened.st_mode,
+            )
+            != (
+                observed.st_dev,
+                observed.st_ino,
+                observed.st_mode,
+            )
+        ):
+            raise IncarnationHomeError(
+                f"actor-local capability entry changed during validation: {name}"
+            )
+        return opened
+    except OSError as exc:
+        raise IncarnationHomeError(
+            f"actor-local capability entry cannot be inspected: {target}"
+        ) from exc
+    finally:
+        os.close(descriptor)
+
+
+def _validate_actor_local_entry(
+    target: Path,
+    name: str,
+    *,
+    ambient_identities: set[tuple[int, int]] | None = None,
+) -> None:
+    """Permit only unaliased Codex-owned regular files/directories."""
+
+    ambient_identities = ambient_identities or set()
+    visited_directories: set[tuple[int, int]] = set()
+
+    def visit(path: Path, label: str) -> None:
+        observed = _open_stable_actor_local_entry(path, label)
+        identity = (observed.st_dev, observed.st_ino)
+        mode = observed.st_mode
+        if identity in ambient_identities:
+            raise IncarnationHomeError(
+                f"actor-local capability entry aliases ambient state: {path}"
+            )
+        if stat.S_ISREG(mode):
+            if observed.st_nlink != 1:
+                raise IncarnationHomeError(
+                    f"actor-local capability entry is multiply linked: {path}"
+                )
+            return
+        if not stat.S_ISDIR(mode):
+            raise IncarnationHomeError(
+                f"actor-local capability entry is not a regular file or directory: {name}"
+            )
+        if identity in visited_directories:
+            raise IncarnationHomeError(
+                f"actor-local capability directory is aliased: {path}"
+            )
+        visited_directories.add(identity)
+        try:
+            children = list(path.iterdir())
+        except OSError as exc:
+            raise IncarnationHomeError(
+                f"actor-local capability directory cannot be enumerated: {path}"
+            ) from exc
+        for child in children:
+            visit(child, f"{name}/{child.name}")
+
+    visit(target, name)
+
+
+def _validate_actor_local_entries(
+    codex_home: Path, names: Sequence[str], ambient_home: Path
+) -> None:
+    ambient_identities = _ambient_inode_identities(ambient_home)
+    for name in names:
+        target = codex_home / name
+        if target.exists() or target.is_symlink():
+            _validate_actor_local_entry(
+                target,
+                name,
+                ambient_identities=ambient_identities,
+            )
 
 
 def _reject_custom_model_provider(parsed: dict[str, Any]) -> None:
@@ -1177,15 +1346,11 @@ def _holder_tty(pid: int) -> str:
 
 
 def _validate_binding_context(context: dict[str, Any]) -> dict[str, str]:
-    required = (
-        "goal_ref",
-        "actor_ref",
-        "incarnation_ref",
-        "session_ref",
-        "runtime_state_root",
-        "closeout_route",
-    )
+    required = TERMINAL_BINDING_CONTEXT_FIELDS
     values = {key: _binding_ref(context.get(key), key) for key in required}
+    for key in ("schema_version",) + HOLDER_BINDING_CONTEXT_FIELDS:
+        if key in context:
+            values[key] = _binding_ref(context[key], key)
     runtime_state_root = Path(values["runtime_state_root"])
     if (
         not runtime_state_root.is_absolute()
@@ -1199,6 +1364,34 @@ def _validate_binding_context(context: dict[str, Any]) -> dict[str, str]:
     return values
 
 
+def _validate_holder_binding_context(context: dict[str, Any]) -> dict[str, str]:
+    """Require the typed holder/task/run coordinates used for home identity."""
+
+    values = _validate_binding_context(context)
+    if values.get("schema_version") != HOLDER_BINDING_CONTEXT_SCHEMA_VERSION:
+        raise IncarnationHomeError(
+            "holder binding context schema is missing or unsupported"
+        )
+    for key in HOLDER_BINDING_CONTEXT_FIELDS:
+        if key not in values:
+            raise IncarnationHomeError(f"holder binding context {key} is missing")
+    return values
+
+
+def _holder_binding_context_input(
+    value: Path | dict[str, Any],
+) -> tuple[dict[str, str], bytes, str]:
+    if isinstance(value, Path):
+        context_document, raw = _load_json_snapshot(value, "holder binding context")
+    elif isinstance(value, dict):
+        context_document = value
+        raw = canonical_bytes(value)
+    else:
+        raise IncarnationHomeError("holder binding context input is invalid")
+    context = _validate_holder_binding_context(context_document)
+    return context, raw, sha256_bytes(raw)
+
+
 def _load_binding_context(path: Path) -> dict[str, str]:
     context = _load_json(path, "terminal binding context")
     return _validate_binding_context(context)
@@ -1207,6 +1400,12 @@ def _load_binding_context(path: Path) -> dict[str, str]:
 def _load_binding_context_snapshot(raw: bytes) -> dict[str, str]:
     return _validate_binding_context(
         _decode_json_snapshot(raw, "terminal binding context snapshot")
+    )
+
+
+def _load_holder_binding_context_snapshot(raw: bytes) -> dict[str, str]:
+    return _validate_holder_binding_context(
+        _decode_json_snapshot(raw, "holder binding context snapshot")
     )
 
 
@@ -1324,7 +1523,11 @@ def _load_holder_loss_reentry(
 
 
 def _load_rebind_manifest(
-    path: Path, *, runtime_state_root: Path
+    path: Path,
+    *,
+    runtime_state_root: Path,
+    binding_context: dict[str, str] | None = None,
+    binding_context_digest: str | None = None,
 ) -> tuple[dict[str, Any], bytes, str]:
     """Load and fully revalidate the manifest admitted by a replacement."""
 
@@ -1332,7 +1535,12 @@ def _load_rebind_manifest(
         raise IncarnationHomeError(
             "replacement incarnation manifest is outside the bound runtime state root"
         )
-    return _load_manifest_snapshot(path)
+    return _load_manifest_snapshot(
+        path,
+        binding_context=binding_context,
+        binding_context_digest=binding_context_digest,
+        require_holder_binding=binding_context is not None,
+    )
 
 
 def _validate_replacement_reentry_binding(
@@ -2181,6 +2389,120 @@ def _write_new_json(path: Path, value: dict[str, Any], label: str) -> None:
     _write_atomic_json(path, value, label, replace=False)
 
 
+def _holder_claim_path(manifest_path: Path) -> Path:
+    return manifest_path.with_name(HOLDER_CLAIM_FILE_NAME)
+
+
+def _reserve_holder_claim(
+    *,
+    manifest_path: Path,
+    manifest: dict[str, Any],
+    manifest_digest: str,
+    binding_context_digest: str,
+    holder_receipt_path: Path,
+) -> tuple[Path, str]:
+    if SHA256_DIGEST_PATTERN.fullmatch(manifest_digest) is None:
+        raise IncarnationHomeError("holder claim manifest digest is invalid")
+    if SHA256_DIGEST_PATTERN.fullmatch(binding_context_digest) is None:
+        raise IncarnationHomeError("holder claim binding context digest is invalid")
+    claim_path = _holder_claim_path(manifest_path)
+    expected_manifest_path = manifest_path.resolve()
+    if claim_path.resolve().parent != expected_manifest_path.parent:
+        raise IncarnationHomeError("holder claim path escaped the manifest home")
+    _validate_owner_private_parent(claim_path, "holder claim")
+    if claim_path.is_symlink() or claim_path.exists():
+        raise IncarnationHomeError(
+            "incarnation home already has an active or completed holder claim"
+        )
+    holder_binding = _validate_holder_binding_manifest_record(
+        manifest.get("holder_binding")
+    )
+    if holder_binding["binding_digest"] != binding_context_digest:
+        raise IncarnationHomeError("holder claim binding context digest disagrees")
+    receipt_ref = _safe_source_receipt_path(holder_receipt_path)
+    claim = {
+        "schema_version": HOLDER_CLAIM_SCHEMA_VERSION,
+        "manifest_path": str(expected_manifest_path),
+        "manifest_digest": manifest_digest,
+        "holder_binding": holder_binding,
+        "holder_receipt": receipt_ref,
+        "created_at": _utc_now(),
+    }
+    _write_new_json(claim_path, claim, "holder claim")
+    try:
+        claim_digest = sha256_bytes(claim_path.read_bytes())
+    except OSError as exc:
+        raise IncarnationHomeError("holder claim could not be hashed") from exc
+    return claim_path, claim_digest
+
+
+def _validate_holder_claim(
+    *,
+    claim_path: Path,
+    claim_digest: str,
+    manifest_path: Path,
+    manifest: dict[str, Any],
+    manifest_digest: str,
+    binding_context_digest: str,
+    holder_receipt_path: Path,
+) -> None:
+    claim, raw = _load_json_snapshot(claim_path, "holder claim")
+    if sha256_bytes(raw) != claim_digest:
+        raise IncarnationHomeError("holder claim digest drifted")
+    expected_fields = {
+        "schema_version",
+        "manifest_path",
+        "manifest_digest",
+        "holder_binding",
+        "holder_receipt",
+        "created_at",
+    }
+    if set(claim) != expected_fields:
+        raise IncarnationHomeError("holder claim fields are not exact")
+    if claim.get("schema_version") != HOLDER_CLAIM_SCHEMA_VERSION:
+        raise IncarnationHomeError("unsupported holder claim schema")
+    if not isinstance(claim_digest, str) or SHA256_DIGEST_PATTERN.fullmatch(
+        claim_digest
+    ) is None:
+        raise IncarnationHomeError("holder claim digest is invalid")
+    if not isinstance(claim.get("created_at"), str) or not claim["created_at"].strip():
+        raise IncarnationHomeError("holder claim creation time is invalid")
+    expected_claim = {
+        "manifest_path": str(manifest_path.resolve()),
+        "manifest_digest": manifest_digest,
+        "holder_binding": _validate_holder_binding_manifest_record(
+            manifest.get("holder_binding")
+        ),
+        "holder_receipt": _safe_source_receipt_path(holder_receipt_path),
+    }
+    if SHA256_DIGEST_PATTERN.fullmatch(manifest_digest) is None:
+        raise IncarnationHomeError("holder claim manifest digest is invalid")
+    if SHA256_DIGEST_PATTERN.fullmatch(binding_context_digest) is None:
+        raise IncarnationHomeError("holder claim binding context digest is invalid")
+    for key, expected in expected_claim.items():
+        if claim.get(key) != expected:
+            raise IncarnationHomeError(f"holder claim {key} disagrees with launch")
+    if claim["holder_binding"]["binding_digest"] != binding_context_digest:
+        raise IncarnationHomeError("holder claim binding context digest disagrees")
+
+
+def _release_holder_claim(
+    *, claim_path: Path, claim_digest: str, label: str = "holder claim"
+) -> None:
+    """Remove only the exact unpublished reservation; uncertainty is retained."""
+
+    try:
+        raw = _regular_file(claim_path, label).read_bytes()
+    except IncarnationHomeError:
+        raise
+    if sha256_bytes(raw) != claim_digest:
+        raise IncarnationHomeError(f"{label} changed before rollback")
+    try:
+        claim_path.unlink()
+    except OSError as exc:
+        raise IncarnationHomeError(f"cannot roll back {label}") from exc
+
+
 def _write_reservation_json(
     path: Path, value: dict[str, Any], label: str
 ) -> None:
@@ -2468,6 +2790,7 @@ def _holder_receipt(
     manifest_bytes: bytes | None = None,
     manifest_digest: str | None = None,
     companion_binding: dict[str, str] | None = None,
+    holder_binding: dict[str, str] | None = None,
     binding_context: dict[str, str] | None = None,
     control_socket: str | None = None,
     terminal_title: str | None = None,
@@ -2530,6 +2853,10 @@ def _holder_receipt(
         "ambient_codex_home": str(manifest["ambient_codex_home"]),
         "incarnation_codex_home": str(manifest["codex_home"]),
     }
+    if holder_binding is not None:
+        runtime["holder_binding"] = _validate_holder_binding_manifest_record(
+            holder_binding
+        )
     if companion_binding is not None:
         runtime["codex_companion"] = dict(companion_binding)
     _decode_holder_manifest_snapshot(runtime)
@@ -2613,10 +2940,11 @@ def _rebind_replacement_holder_receipt(
     digest are re-observed before a new canonical holder receipt is published.
     """
 
-    context_document, _context_raw = _load_json_snapshot(
+    context_document, context_raw = _load_json_snapshot(
         binding_context_path, "terminal binding context"
     )
-    context = _validate_binding_context(context_document)
+    context = _validate_holder_binding_context(context_document)
+    context_digest = sha256_bytes(context_raw)
     context_workspace = context_document.get("workspace")
     if not isinstance(context_workspace, str) or not Path(context_workspace).is_absolute():
         raise IncarnationHomeError("terminal binding context workspace is invalid")
@@ -2659,6 +2987,11 @@ def _rebind_replacement_holder_receipt(
     manifest, manifest_bytes, manifest_digest = _load_rebind_manifest(
         manifest_path,
         runtime_state_root=Path(context["runtime_state_root"]),
+        binding_context=context,
+        binding_context_digest=context_digest,
+    )
+    holder_binding = _validate_holder_binding_manifest_record(
+        manifest.get("holder_binding")
     )
     executable = _regular_file(codex_executable_path, "replacement Codex executable")
     holder_environment = _proc_environ(holder_pid)
@@ -2715,6 +3048,7 @@ def _rebind_replacement_holder_receipt(
             "reasoning_effort": str(manifest["reasoning_effort"]),
             "ambient_codex_home": str(manifest["ambient_codex_home"]),
             "incarnation_codex_home": str(manifest["codex_home"]),
+            "holder_binding": holder_binding,
         },
         "terminal": {
             "binding": "kitty_ancestor_at_exec",
@@ -2787,6 +3121,23 @@ def _decode_holder_manifest_snapshot(runtime: dict[str, Any]) -> bytes | None:
             raise IncarnationHomeError(
                 "holder incarnation manifest snapshot binding has drifted"
             )
+    runtime_holder_binding = runtime.get("holder_binding")
+    manifest_holder_binding = manifest.get("holder_binding")
+    if manifest_holder_binding is not None:
+        if runtime_holder_binding is None:
+            raise IncarnationHomeError(
+                "holder incarnation manifest snapshot holder binding is missing"
+            )
+        if _validate_holder_binding_manifest_record(
+            runtime_holder_binding
+        ) != _validate_holder_binding_manifest_record(manifest_holder_binding):
+            raise IncarnationHomeError(
+                "holder incarnation manifest snapshot holder binding has drifted"
+            )
+    elif runtime_holder_binding is not None:
+        raise IncarnationHomeError(
+            "holder incarnation manifest snapshot has an unexpected holder binding"
+        )
     return snapshot
 
 
@@ -4008,6 +4359,7 @@ def _validate_visible_launch_receipt(
     executable: Path,
     executable_digest: str,
     binding_context: dict[str, str],
+    holder_binding: dict[str, str],
     control_socket: str,
     terminal_title: str,
     companion_binding: dict[str, str] | None,
@@ -4026,6 +4378,7 @@ def _validate_visible_launch_receipt(
         "reasoning_effort": str(manifest["reasoning_effort"]),
         "ambient_codex_home": str(manifest["ambient_codex_home"]),
         "incarnation_codex_home": str(manifest["codex_home"]),
+        "holder_binding": _validate_holder_binding_manifest_record(holder_binding),
     }
     if receipt.get("receipt_ref") != str(receipt_path.resolve()):
         raise IncarnationHomeError("visible launch receipt path identity drifted")
@@ -4049,7 +4402,8 @@ def _validate_visible_launch_receipt(
     binding_value = receipt.get("binding")
     binding = _validate_terminal_binding_shape(binding_value)
     _validate_receipt_binding_consistency(receipt, binding)
-    for key, value in binding_context.items():
+    for key in TERMINAL_BINDING_CONTEXT_FIELDS:
+        value = binding_context[key]
         if binding.get(key) != value:
             raise IncarnationHomeError(
                 f"visible launch receipt binding context drifted: {key}"
@@ -4855,14 +5209,19 @@ def command_close(args: argparse.Namespace) -> int:
     return 0
 
 
-def prepare_home(
+def _prepare_home_impl(
     *,
     ambient_home: Path,
     realization_path: Path,
     runtime_root: Path,
     capability_grants: Sequence[Path] = (),
+    binding_context: Path | dict[str, Any] | None = None,
     holder_namespace: str | None = None,
 ) -> dict[str, Any]:
+    if holder_namespace is not None:
+        raise IncarnationHomeError(
+            "holder namespace is not an identity proof; use a typed holder binding context"
+        )
     ambient_home = _absolute_directory(ambient_home, "ambient Codex home")
     runtime_root = _absolute_directory(runtime_root, "runtime root")
     realization_path = _regular_file(realization_path, "model realization")
@@ -4876,11 +5235,20 @@ def prepare_home(
     coordinate = _incarnation_coordinate(
         str(realization.get("model_realization_id")), fingerprint
     )
-    holder_coordinate = (
-        None
-        if holder_namespace is None
-        else _holder_namespace_coordinate(holder_namespace)
-    )
+    holder_context: dict[str, str] | None = None
+    holder_context_digest: str | None = None
+    holder_coordinate: str | None = None
+    if binding_context is not None:
+        holder_context, _holder_context_bytes, holder_context_digest = (
+            _holder_binding_context_input(binding_context)
+        )
+        if Path(holder_context["runtime_state_root"]).resolve() != runtime_root:
+            raise IncarnationHomeError(
+                "holder binding runtime state root does not match runtime root"
+            )
+        holder_coordinate = _holder_binding_context_coordinate(
+            holder_context, holder_context_digest
+        )
     realization_root = _holder_incarnation_root(
         runtime_root=runtime_root,
         incarnation_coordinate=coordinate,
@@ -4893,7 +5261,7 @@ def prepare_home(
         and not (realization_root / "incarnation-home.json").is_symlink()
     ):
         raise IncarnationHomeError(
-            "holder namespace is required for a new incarnation home"
+            "typed holder binding context is required for a new incarnation home"
         )
     if holder_coordinate is not None:
         realization_root.mkdir(mode=0o700, exist_ok=True)
@@ -4930,12 +5298,21 @@ def prepare_home(
             raise IncarnationHomeError("incarnation model realization identity drift")
         if existing.get("codex_home") != str(codex_home):
             raise IncarnationHomeError("incarnation home coordinate drift")
-        existing_holder_coordinate = existing.get("holder_namespace_coordinate")
-        if holder_coordinate is None:
-            if existing_holder_coordinate is not None:
-                raise IncarnationHomeError("incarnation holder namespace drift")
-        elif existing_holder_coordinate != holder_coordinate:
-            raise IncarnationHomeError("incarnation holder namespace drift")
+        existing_holder_binding = existing.get("holder_binding")
+        if holder_context is None:
+            if existing_holder_binding is not None:
+                raise IncarnationHomeError(
+                    "typed holder binding context is required for this incarnation home"
+                )
+        else:
+            if not isinstance(existing_holder_binding, dict):
+                raise IncarnationHomeError(
+                    "incarnation home lacks its typed holder binding"
+                )
+            if existing_holder_binding.get("coordinate") != holder_coordinate:
+                raise IncarnationHomeError("incarnation holder binding drift")
+            if existing_holder_binding.get("binding_digest") != holder_context_digest:
+                raise IncarnationHomeError("incarnation holder binding digest drift")
 
     # Validate ambient inputs before creating a new content-addressed root. A
     # failed first preparation must not leave an unowned directory that blocks
@@ -4962,6 +5339,7 @@ def prepare_home(
         for name, entry in capability_projection["entries"].items()
         if entry["projection"] == "denied"
     )
+    ambient_identities = _ambient_inode_identities(ambient_home)
 
     incarnation_root.mkdir(mode=0o700, exist_ok=True)
     codex_home.mkdir(mode=0o700, exist_ok=True)
@@ -5029,7 +5407,11 @@ def prepare_home(
             target.unlink()
             continue
         if name in actor_local_state_names:
-            _validate_actor_local_entry(target, name)
+            _validate_actor_local_entry(
+                target,
+                name,
+                ambient_identities=ambient_identities,
+            )
             continue
         if not target.is_symlink():
             raise IncarnationHomeError(
@@ -5040,17 +5422,17 @@ def prepare_home(
                 f"obsolete capability projection link drift: {target}"
             )
 
-    for name in actor_local_state_names:
-        target = codex_home / name
-        if target.exists() or target.is_symlink():
-            _validate_actor_local_entry(target, name)
-
     expected_names = set(shared_names) | set(actor_local_state_names) | LOCAL_NAMES
     for entry in codex_home.iterdir():
         if entry.name not in expected_names:
             raise IncarnationHomeError(
                 f"unexpected incarnation-home entry: {entry.name}"
             )
+    _validate_actor_local_entries(
+        codex_home,
+        sorted(set(actor_local_state_names) | set(LOCAL_NAMES)),
+        ambient_home,
+    )
 
     manifest = {
         "$schema": "schemas/external-codex-incarnation-home.schema.json",
@@ -5072,8 +5454,12 @@ def prepare_home(
         "top_level_posture": "incarnation-home",
         "child_posture": "incarnation-home-via-shell-environment-policy",
     }
-    if holder_coordinate is not None:
-        manifest["holder_namespace_coordinate"] = holder_coordinate
+    if holder_context is not None and holder_context_digest is not None:
+        manifest["holder_binding"] = _holder_binding_manifest_record(
+            holder_context,
+            holder_context_digest,
+            holder_coordinate or "",
+        )
     _write_exact(
         incarnation_root / "incarnation-home.json",
         json.dumps(manifest, ensure_ascii=False, sort_keys=True, indent=2).encode("utf-8")
@@ -5083,8 +5469,156 @@ def prepare_home(
     return manifest
 
 
+def _rollback_unpublished_home(
+    *,
+    incarnation_root: Path,
+    realization_root: Path,
+    home_preexisted: bool,
+    realization_preexisted: bool,
+) -> None:
+    """Remove only roots created by a failed first preparation."""
+
+    if home_preexisted or incarnation_root.is_symlink() or not incarnation_root.is_dir():
+        return
+    marker = incarnation_root / "incarnation-home.json"
+    if marker.exists() or marker.is_symlink():
+        return
+    try:
+        shutil.rmtree(incarnation_root)
+        if not realization_preexisted and realization_root.is_dir():
+            realization_root.rmdir()
+    except OSError as exc:
+        raise IncarnationHomeError(
+            "failed home preparation left an unpublished owner root"
+        ) from exc
+
+
+def prepare_home(
+    *,
+    ambient_home: Path,
+    realization_path: Path,
+    runtime_root: Path,
+    capability_grants: Sequence[Path] = (),
+    binding_context: Path | dict[str, Any] | None = None,
+    holder_namespace: str | None = None,
+) -> dict[str, Any]:
+    """Prepare one home and roll back an unpublished first-attempt root."""
+
+    rollback: tuple[Path, Path, bool, bool] | None = None
+    if binding_context is not None and holder_namespace is None:
+        try:
+            _absolute_directory(ambient_home, "ambient Codex home")
+            runtime = _absolute_directory(runtime_root, "runtime root")
+            realization_file = _regular_file(
+                realization_path, "model realization"
+            )
+            realization, _model, _effort, _version, fingerprint = _realization(
+                realization_file
+            )
+            context, _raw, context_digest = _holder_binding_context_input(
+                binding_context
+            )
+            if Path(context["runtime_state_root"]).resolve() == runtime:
+                coordinate = _incarnation_coordinate(
+                    str(realization.get("model_realization_id")), fingerprint
+                )
+                holder_coordinate = _holder_binding_context_coordinate(
+                    context, context_digest
+                )
+                realization_root = _holder_incarnation_root(
+                    runtime_root=runtime,
+                    incarnation_coordinate=coordinate,
+                    holder_coordinate=None,
+                )
+                incarnation_root = _holder_incarnation_root(
+                    runtime_root=runtime,
+                    incarnation_coordinate=coordinate,
+                    holder_coordinate=holder_coordinate,
+                )
+                rollback = (
+                    incarnation_root,
+                    realization_root,
+                    incarnation_root.exists(),
+                    realization_root.exists(),
+                )
+        except IncarnationHomeError:
+            rollback = None
+    try:
+        return _prepare_home_impl(
+            ambient_home=ambient_home,
+            realization_path=realization_path,
+            runtime_root=runtime_root,
+            capability_grants=capability_grants,
+            binding_context=binding_context,
+            holder_namespace=holder_namespace,
+        )
+    except BaseException:
+        if rollback is not None:
+            _rollback_unpublished_home(
+                incarnation_root=rollback[0],
+                realization_root=rollback[1],
+                home_preexisted=rollback[2],
+                realization_preexisted=rollback[3],
+            )
+        raise
+
+
+def _validate_holder_binding_manifest_record(value: object) -> dict[str, str]:
+    if not isinstance(value, dict):
+        raise IncarnationHomeError("incarnation-home holder binding is not an object")
+    expected = {
+        "schema_version",
+        "binding_digest",
+        "coordinate",
+        "goal_ref",
+        "actor_ref",
+        "incarnation_ref",
+        "session_ref",
+        "runtime_state_root",
+        "closeout_route",
+        "holder_ref",
+        "task_ref",
+        "run_ref",
+    }
+    if set(value) != expected:
+        raise IncarnationHomeError(
+            "incarnation-home holder binding fields are not exact"
+        )
+    result = {
+        key: _binding_ref(value.get(key), key)
+        for key in expected - {"binding_digest", "coordinate"}
+    }
+    binding_digest = value.get("binding_digest")
+    coordinate = value.get("coordinate")
+    if not isinstance(binding_digest, str) or SHA256_DIGEST_PATTERN.fullmatch(
+        binding_digest
+    ) is None:
+        raise IncarnationHomeError("incarnation-home holder binding digest is invalid")
+    if not isinstance(coordinate, str) or SHA256_DIGEST_PATTERN.fullmatch(
+        coordinate
+    ) is None:
+        raise IncarnationHomeError("incarnation-home holder binding coordinate is invalid")
+    result["binding_digest"] = binding_digest
+    result["coordinate"] = coordinate
+    if result["schema_version"] != HOLDER_BINDING_CONTEXT_SCHEMA_VERSION:
+        raise IncarnationHomeError("incarnation-home holder binding schema is invalid")
+    expected_coordinate = _holder_binding_context_coordinate(
+        result, result["binding_digest"]
+    )
+    if result["coordinate"] != expected_coordinate:
+        raise IncarnationHomeError(
+            "incarnation-home holder binding coordinate is not derived from context"
+        )
+    return result
+
+
 def _load_manifest_snapshot(
-    path: Path, *, snapshot_bytes: bytes | None = None
+    path: Path,
+    *,
+    snapshot_bytes: bytes | None = None,
+    binding_context: dict[str, str] | None = None,
+    binding_context_digest: str | None = None,
+    require_holder_binding: bool = False,
 ) -> tuple[dict[str, Any], bytes, str]:
     if snapshot_bytes is None:
         manifest, raw = _load_json_snapshot(path, "incarnation-home manifest")
@@ -5097,6 +5631,42 @@ def _load_manifest_snapshot(
         raise IncarnationHomeError("unsupported incarnation-home manifest")
     if manifest.get("$schema") != "schemas/external-codex-incarnation-home.schema.json":
         raise IncarnationHomeError("incarnation-home manifest schema binding is invalid")
+    holder_binding_value = manifest.get("holder_binding")
+    if holder_binding_value is None:
+        if require_holder_binding:
+            raise IncarnationHomeError(
+                "incarnation-home manifest lacks a typed holder binding"
+            )
+        holder_coordinate = manifest.get("holder_namespace_coordinate")
+        if holder_coordinate is not None and (
+            not isinstance(holder_coordinate, str)
+            or SHA256_DIGEST_PATTERN.fullmatch(holder_coordinate) is None
+        ):
+            raise IncarnationHomeError("legacy holder coordinate is invalid")
+        holder_binding: dict[str, str] | None = None
+    else:
+        holder_binding = _validate_holder_binding_manifest_record(holder_binding_value)
+        holder_coordinate = holder_binding["coordinate"]
+    if binding_context is not None:
+        binding_context = _validate_holder_binding_context(binding_context)
+        if binding_context_digest is None:
+            binding_context_digest = sha256_bytes(canonical_bytes(binding_context))
+        expected_coordinate = _holder_binding_context_coordinate(
+            binding_context, binding_context_digest
+        )
+        if holder_binding is None:
+            raise IncarnationHomeError(
+                "manifest holder binding is missing for the supplied context"
+            )
+        expected_binding = _holder_binding_manifest_record(
+            binding_context,
+            binding_context_digest,
+            expected_coordinate,
+        )
+        if holder_binding != expected_binding:
+            raise IncarnationHomeError(
+                "incarnation-home manifest holder binding does not match context"
+            )
     codex_home = _absolute_directory(Path(str(manifest.get("codex_home"))), "incarnation Codex home")
     ambient_home = _absolute_directory(
         Path(str(manifest.get("ambient_codex_home"))), "ambient Codex home"
@@ -5129,12 +5699,12 @@ def _load_manifest_snapshot(
     incarnation_coordinate = _incarnation_coordinate(
         str(realization.get("model_realization_id")), fingerprint
     )
-    holder_coordinate = manifest.get("holder_namespace_coordinate")
-    if holder_coordinate is not None and (
-        not isinstance(holder_coordinate, str)
-        or SHA256_DIGEST_PATTERN.fullmatch(holder_coordinate) is None
-    ):
-        raise IncarnationHomeError("holder namespace coordinate is invalid")
+    if binding_context is not None and Path(
+        binding_context["runtime_state_root"]
+    ).resolve() != runtime_root:
+        raise IncarnationHomeError(
+            "holder binding runtime state root does not match manifest runtime root"
+        )
     realization_root = _holder_incarnation_root(
         runtime_root=runtime_root,
         incarnation_coordinate=incarnation_coordinate,
@@ -5147,6 +5717,11 @@ def _load_manifest_snapshot(
     )
     if realization_root.is_symlink() or expected_root.is_symlink():
         raise IncarnationHomeError("incarnation root may not be a symlink")
+    expected_manifest = expected_root / "incarnation-home.json"
+    if path.resolve() != expected_manifest.resolve():
+        raise IncarnationHomeError(
+            "incarnation-home manifest path is not its derived binding path"
+        )
     expected_home = (expected_root / "codex-home").resolve()
     if codex_home != expected_home:
         raise IncarnationHomeError("incarnation Codex home is not derived from realization")
@@ -5266,10 +5841,11 @@ def _load_manifest_snapshot(
         local = codex_home / name
         if local.is_symlink() or not local.is_dir():
             raise IncarnationHomeError(f"actor-local {name} is not a real directory")
-    for name in actor_local_names:
-        local = codex_home / name
-        if local.exists() or local.is_symlink():
-            _validate_actor_local_entry(local, name)
+    _validate_actor_local_entries(
+        codex_home,
+        sorted(set(actor_local_names) | set(LOCAL_NAMES)),
+        ambient_home,
+    )
     return manifest, raw, sha256_bytes(raw)
 
 
@@ -6463,7 +7039,7 @@ def command_prepare(args: argparse.Namespace) -> int:
         realization_path=Path(args.model_realization),
         runtime_root=Path(args.runtime_root),
         capability_grants=[Path(path) for path in (args.capability_grant or [])],
-        holder_namespace=args.holder_namespace,
+        binding_context=Path(args.binding_context),
     )
     print(json.dumps(manifest, ensure_ascii=False, sort_keys=True))
     return 0
@@ -6473,39 +7049,14 @@ def command_payload_launch(args: argparse.Namespace) -> int:
     """Bind the receipt to the exact process that owns the private payload."""
 
     manifest_path = Path(args.manifest)
-    manifest_snapshot_b64 = getattr(args, "manifest_snapshot_b64", None)
-    if manifest_snapshot_b64 is None:
-        manifest_path = _regular_file(manifest_path, "incarnation-home manifest")
-        manifest, manifest_bytes, manifest_digest = _load_manifest_snapshot(
-            manifest_path
+    if not args.holder_receipt:
+        raise IncarnationHomeError(
+            "canonical payload launch requires a holder receipt"
         )
-    else:
-        if not isinstance(manifest_snapshot_b64, str) or not manifest_snapshot_b64:
-            raise IncarnationHomeError(
-                "payload launch manifest snapshot is invalid"
-            )
-        try:
-            manifest_bytes = base64.b64decode(
-                manifest_snapshot_b64.encode("ascii"), validate=True
-            )
-        except (UnicodeEncodeError, ValueError, base64.binascii.Error) as exc:
-            raise IncarnationHomeError(
-                "payload launch manifest snapshot is not valid base64"
-            ) from exc
-        if not manifest_bytes:
-            raise IncarnationHomeError("payload launch manifest snapshot is empty")
-        manifest, manifest_bytes, manifest_digest = _load_manifest_snapshot(
-            manifest_path, snapshot_bytes=manifest_bytes
-        )
-    if manifest_digest != args.manifest_digest:
-        raise IncarnationHomeError("payload launch manifest digest drifted")
-
-    binding_context: dict[str, str] | None = None
+    binding_context: dict[str, str]
     binding_context_path = getattr(args, "binding_context", None)
     binding_context_snapshot_b64 = getattr(args, "binding_context_snapshot_b64", None)
     binding_context_digest = getattr(args, "binding_context_digest", None)
-    control_socket = getattr(args, "control_socket", None)
-    terminal_title = getattr(args, "terminal_title", None)
     if (binding_context_snapshot_b64 is None) != (binding_context_digest is None):
         raise IncarnationHomeError("payload binding context snapshot is incomplete")
     if binding_context_snapshot_b64 is not None:
@@ -6526,28 +7077,87 @@ def command_payload_launch(args: argparse.Namespace) -> int:
             or sha256_bytes(binding_context_bytes) != binding_context_digest
         ):
             raise IncarnationHomeError("payload binding context snapshot digest drifted")
-        binding_context = _load_binding_context_snapshot(binding_context_bytes)
+        binding_context = _load_holder_binding_context_snapshot(binding_context_bytes)
     elif binding_context_path is not None:
-        binding_context = _load_binding_context(Path(binding_context_path))
-    if binding_context is not None and (
+        _context_document, binding_context_bytes = _load_json_snapshot(
+            Path(binding_context_path), "holder binding context"
+        )
+        binding_context = _validate_holder_binding_context(_context_document)
+        binding_context_digest = sha256_bytes(binding_context_bytes)
+    else:
+        raise IncarnationHomeError(
+            "canonical payload launch requires a typed holder binding context"
+        )
+    manifest_snapshot_b64 = getattr(args, "manifest_snapshot_b64", None)
+    if manifest_snapshot_b64 is None:
+        manifest_path = _regular_file(manifest_path, "incarnation-home manifest")
+        manifest, manifest_bytes, manifest_digest = _load_manifest_snapshot(
+            manifest_path,
+            binding_context=binding_context,
+            binding_context_digest=binding_context_digest,
+            require_holder_binding=True,
+        )
+    else:
+        if not isinstance(manifest_snapshot_b64, str) or not manifest_snapshot_b64:
+            raise IncarnationHomeError(
+                "payload launch manifest snapshot is invalid"
+            )
+        try:
+            manifest_bytes = base64.b64decode(
+                manifest_snapshot_b64.encode("ascii"), validate=True
+            )
+        except (UnicodeEncodeError, ValueError, base64.binascii.Error) as exc:
+            raise IncarnationHomeError(
+                "payload launch manifest snapshot is not valid base64"
+            ) from exc
+        if not manifest_bytes:
+            raise IncarnationHomeError("payload launch manifest snapshot is empty")
+        manifest, manifest_bytes, manifest_digest = _load_manifest_snapshot(
+            manifest_path,
+            snapshot_bytes=manifest_bytes,
+            binding_context=binding_context,
+            binding_context_digest=binding_context_digest,
+            require_holder_binding=True,
+        )
+    if manifest_digest != args.manifest_digest:
+        raise IncarnationHomeError("payload launch manifest digest drifted")
+
+    control_socket = getattr(args, "control_socket", None)
+    terminal_title = getattr(args, "terminal_title", None)
+    terminal_binding_requested = terminal_title is not None or control_socket is not None
+    if terminal_binding_requested and (
         not isinstance(control_socket, str) or not isinstance(terminal_title, str)
     ):
-        raise IncarnationHomeError(
-            "payload terminal binding lacks control socket or title"
-        )
-    if binding_context is not None:
+        raise IncarnationHomeError("payload terminal binding lacks control socket or title")
+    if terminal_title is not None:
         terminal_title = _safe_terminal_title(terminal_title)
     launch_gate_argument = getattr(args, "launch_gate", None)
     launch_gate_token = getattr(args, "launch_gate_token", None)
-    if binding_context is not None and (
-        not args.holder_receipt
-        or not isinstance(launch_gate_argument, str)
+    if terminal_title is not None and (
+        not isinstance(launch_gate_argument, str)
         or not isinstance(launch_gate_token, str)
         or not launch_gate_token
     ):
         raise IncarnationHomeError(
             "canonical payload launch requires a holder receipt and admission gate"
         )
+    claim_argument = getattr(args, "holder_claim", None)
+    claim_digest = getattr(args, "holder_claim_digest", None)
+    if not isinstance(claim_argument, str) or not isinstance(claim_digest, str):
+        raise IncarnationHomeError("canonical payload launch requires a holder claim")
+    holder_claim_path = Path(claim_argument)
+    _validate_holder_claim(
+        claim_path=holder_claim_path,
+        claim_digest=claim_digest,
+        manifest_path=manifest_path,
+        manifest=manifest,
+        manifest_digest=manifest_digest,
+        binding_context_digest=binding_context_digest,
+        holder_receipt_path=Path(args.holder_receipt),
+    )
+    holder_binding = _validate_holder_binding_manifest_record(
+        manifest.get("holder_binding")
+    )
 
     payload_path = _regular_file(
         Path(args.payload_executable), "private payload executable"
@@ -6637,11 +7247,12 @@ def command_payload_launch(args: argparse.Namespace) -> int:
             manifest_bytes=manifest_bytes,
             manifest_digest=manifest_digest,
             companion_binding=companion_binding,
-            binding_context=binding_context,
+            holder_binding=holder_binding,
+            binding_context=(binding_context if terminal_title is not None else None),
             control_socket=control_socket,
             terminal_title=terminal_title,
         )
-        if binding_context is not None:
+        if terminal_title is not None:
             _await_visible_launch_admission(
                 gate_path=Path(launch_gate_argument),
                 holder_receipt_path=Path(args.holder_receipt),
@@ -6658,30 +7269,36 @@ def command_launch(args: argparse.Namespace) -> int:
     control_socket_argument = getattr(args, "control_socket", None)
     if terminal_title is not None:
         terminal_title = _safe_terminal_title(terminal_title)
-    if terminal_title is None and (
-        binding_context_argument is not None or control_socket_argument is not None
-    ):
+    if terminal_title is None and control_socket_argument is not None:
         raise IncarnationHomeError(
             "visible launch binding options require --terminal-title"
         )
-    if terminal_title is not None and (
-        not holder_receipt_argument or not binding_context_argument
-    ):
+    if not holder_receipt_argument or not binding_context_argument:
         raise IncarnationHomeError(
-            "canonical visible launch requires --holder-receipt and --binding-context"
+            "canonical visible launch requires --holder-receipt and a typed --binding-context"
         )
+    _binding_context_value, binding_context_bytes = _load_json_snapshot(
+        Path(binding_context_argument), "holder binding context"
+    )
+    binding_context = _validate_holder_binding_context(_binding_context_value)
+    binding_context_digest = sha256_bytes(binding_context_bytes)
     manifest_path = _regular_file(Path(args.manifest), "incarnation-home manifest")
-    manifest, manifest_bytes, manifest_digest = _load_manifest_snapshot(manifest_path)
+    manifest, manifest_bytes, manifest_digest = _load_manifest_snapshot(
+        manifest_path,
+        binding_context=binding_context,
+        binding_context_digest=binding_context_digest,
+        require_holder_binding=True,
+    )
+    holder_binding = _validate_holder_binding_manifest_record(
+        manifest.get("holder_binding")
+    )
     command = Path(args.codex_executable)
     executable = _resolved_executable(command)
     environment = dict(os.environ)
     environment["CODEX_HOME"] = str(manifest["codex_home"])
+    holder_receipt_path = Path(holder_receipt_argument)
+    _require_unoccupied_receipt_path(holder_receipt_path)
     if terminal_title is not None:
-        _binding_context_value, binding_context_bytes = _load_json_snapshot(
-            Path(binding_context_argument), "terminal binding context"
-        )
-        binding_context = _load_binding_context_snapshot(binding_context_bytes)
-        binding_context_digest = sha256_bytes(binding_context_bytes)
         control_socket = getattr(args, "control_socket", None) or _allocate_control_socket()
         _socket_path(control_socket)
         _validate_socket_parent(_socket_path(control_socket))
@@ -6689,25 +7306,37 @@ def command_launch(args: argparse.Namespace) -> int:
             raise IncarnationHomeError(
                 f"control socket path is already occupied: {control_socket}"
             )
-        holder_receipt_path = Path(holder_receipt_argument)
-        _require_unoccupied_receipt_path(holder_receipt_path)
         launch_gate_path = holder_receipt_path.with_name(
             holder_receipt_path.name + ".launch-gate.json"
         )
         _require_unoccupied_launch_gate_path(launch_gate_path)
         launch_gate_token = secrets.token_hex(32)
-        (
-            executable_fd,
-            _executable_fd_path,
-            executable_bytes,
-            executable_digest,
-            executable_snapshot_dir,
-            executable_snapshot_path,
-            executable_snapshot_mount,
-        ) = _open_verified_executable(
-            executable,
-            snapshot_root=Path(str(manifest["codex_home"])) / "tmp",
+        holder_claim_path, holder_claim_digest = _reserve_holder_claim(
+            manifest_path=manifest_path,
+            manifest=manifest,
+            manifest_digest=manifest_digest,
+            binding_context_digest=binding_context_digest,
+            holder_receipt_path=holder_receipt_path,
         )
+        try:
+            (
+                executable_fd,
+                _executable_fd_path,
+                executable_bytes,
+                executable_digest,
+                executable_snapshot_dir,
+                executable_snapshot_path,
+                executable_snapshot_mount,
+            ) = _open_verified_executable(
+                executable,
+                snapshot_root=Path(str(manifest["codex_home"])) / "tmp",
+            )
+        except BaseException:
+            _release_holder_claim(
+                claim_path=holder_claim_path,
+                claim_digest=holder_claim_digest,
+            )
+            raise
         launcher_fd: int | None = None
         cleanup_started = False
         launch_candidate: dict[str, Any] | None = None
@@ -6773,6 +7402,10 @@ def command_launch(args: argparse.Namespace) -> int:
                 base64.b64encode(manifest_bytes).decode("ascii"),
                 "--holder-receipt",
                 str(Path(holder_receipt_argument)),
+                "--holder-claim",
+                str(holder_claim_path),
+                "--holder-claim-digest",
+                str(holder_claim_digest),
                 "--binding-context-snapshot-b64",
                 base64.b64encode(binding_context_bytes).decode("ascii"),
                 "--binding-context-digest",
@@ -6848,6 +7481,7 @@ def command_launch(args: argparse.Namespace) -> int:
                                 executable=executable,
                                 executable_digest=executable_digest,
                                 binding_context=binding_context,
+                                holder_binding=holder_binding,
                                 control_socket=control_socket,
                                 terminal_title=terminal_title,
                                 companion_binding=companion_binding,
@@ -6933,6 +7567,16 @@ def command_launch(args: argparse.Namespace) -> int:
                         "rejected visible launch holder did not terminate"
                     )
             if (
+                holder_claim_path is not None
+                and holder_claim_digest is not None
+                and not launch_accepted
+                and launch_candidate is None
+            ):
+                _release_holder_claim(
+                    claim_path=holder_claim_path,
+                    claim_digest=holder_claim_digest,
+                )
+            if (
                 executable_snapshot_dir is not None
                 and executable_snapshot_path is not None
                 and not cleanup_started
@@ -6954,18 +7598,33 @@ def command_launch(args: argparse.Namespace) -> int:
                 pass
             if rejected_cleanup_error is not None:
                 raise rejected_cleanup_error
-    (
-        executable_fd,
-        executable_fd_path,
-        executable_bytes,
-        executable_digest,
-        executable_snapshot_dir,
-        executable_snapshot_path,
-        executable_snapshot_mount,
-    ) = _open_verified_executable(
-        executable,
-        snapshot_root=Path(str(manifest["codex_home"])) / "tmp",
+    holder_claim_path, holder_claim_digest = _reserve_holder_claim(
+        manifest_path=manifest_path,
+        manifest=manifest,
+        manifest_digest=manifest_digest,
+        binding_context_digest=binding_context_digest,
+        holder_receipt_path=holder_receipt_path,
     )
+    holder_receipt_published = False
+    try:
+        (
+            executable_fd,
+            executable_fd_path,
+            executable_bytes,
+            executable_digest,
+            executable_snapshot_dir,
+            executable_snapshot_path,
+            executable_snapshot_mount,
+        ) = _open_verified_executable(
+            executable,
+            snapshot_root=Path(str(manifest["codex_home"])) / "tmp",
+        )
+    except BaseException:
+        _release_holder_claim(
+            claim_path=holder_claim_path,
+            claim_digest=holder_claim_digest,
+        )
+        raise
     snapshot_component_fds: list[int] = []
     cleanup_started = False
     try:
@@ -7022,7 +7681,9 @@ def command_launch(args: argparse.Namespace) -> int:
                 executable_digest=executable_digest,
                 manifest_bytes=manifest_bytes,
                 manifest_digest=manifest_digest,
+                holder_binding=holder_binding,
             )
+            holder_receipt_published = True
         final_argv = launch_argv
         if executable_snapshot_mount is not None and args.holder_receipt:
             # The bwrap monitor is not the responsibility holder.  Its payload
@@ -7038,6 +7699,14 @@ def command_launch(args: argparse.Namespace) -> int:
                 base64.b64encode(manifest_bytes).decode("ascii"),
                 "--holder-receipt",
                 str(args.holder_receipt),
+                "--holder-claim",
+                str(holder_claim_path),
+                "--holder-claim-digest",
+                str(holder_claim_digest),
+                "--binding-context-snapshot-b64",
+                base64.b64encode(binding_context_bytes).decode("ascii"),
+                "--binding-context-digest",
+                binding_context_digest,
                 "--codex-executable",
                 str(executable),
                 "--payload-executable",
@@ -7099,6 +7768,11 @@ def command_launch(args: argparse.Namespace) -> int:
             os.close(executable_fd)
         except OSError:
             pass
+        if not holder_receipt_published:
+            _release_holder_claim(
+                claim_path=holder_claim_path,
+                claim_digest=holder_claim_digest,
+            )
 
 
 def parser() -> argparse.ArgumentParser:
@@ -7109,11 +7783,9 @@ def parser() -> argparse.ArgumentParser:
     prepare.add_argument("--model-realization", required=True)
     prepare.add_argument("--runtime-root", required=True)
     prepare.add_argument(
-        "--holder-namespace",
-        help=(
-            "opaque durable namespace for one holder-local mutable home; "
-            "required when creating a new home"
-        ),
+        "--binding-context",
+        required=True,
+        help="typed holder/task/run responsibility context for this home",
     )
     prepare.add_argument(
         "--capability-grant",
@@ -7129,6 +7801,7 @@ def parser() -> argparse.ArgumentParser:
     launch.add_argument("--kitty-executable", default="/usr/bin/kitty")
     launch.add_argument(
         "--holder-receipt",
+        required=True,
         help=(
             "non-replacing receipt for this direct responsibility-holder process; "
             "the shebang payload writes it immediately before exec"
@@ -7136,6 +7809,7 @@ def parser() -> argparse.ArgumentParser:
     )
     launch.add_argument(
         "--binding-context",
+        required=True,
         help="owner context required for a canonical detached visible holder",
     )
     launch.add_argument(
@@ -7146,7 +7820,9 @@ def parser() -> argparse.ArgumentParser:
     launch.set_defaults(handler=command_launch)
     payload = subcommands.add_parser("payload-launch")
     payload.add_argument("--manifest", required=True)
-    payload.add_argument("--holder-receipt")
+    payload.add_argument("--holder-receipt", required=True)
+    payload.add_argument("--holder-claim", required=True)
+    payload.add_argument("--holder-claim-digest", required=True)
     payload.add_argument("--codex-executable", required=True)
     payload.add_argument("--payload-executable", required=True)
     payload.add_argument("--manifest-digest", required=True)

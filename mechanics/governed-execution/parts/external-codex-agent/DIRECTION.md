@@ -42,14 +42,18 @@ separate evidence. A future live canary must prove both the exact holder and
 Kitty disappearance while preserving an unrelated live holder.
 
 The projected home now separates realization identity from holder-local
-mutability. New preparation requires a digest-bound opaque holder namespace;
-same-namespace retries are idempotent and different holders receive different
-Codex state coordinates. Denied ambient entries may retain actor-created
-regular files or directories only when the current typed projection names them;
-shared links remain exact and symlinks or undeclared top-level state fail
-closed. The realization-scoped v2 path remains a compatibility route only for
-an already marked home, so legacy continuity does not reintroduce concurrent
-mutable-state sharing.
+mutability. New preparation requires the exact bytes of a typed
+holder/task/run responsibility context, extending the existing
+goal/actor/incarnation/session binding with owner-defined holder, task, and run
+references. Its digest selects the home coordinate and is carried into the
+manifest and holder receipt; a non-replacing holder claim rejects mismatched,
+reassigned, overlapping, and sequential reuse. Denied ambient entries may
+retain actor-created regular files or directories only when the current typed
+projection names them; recursive no-follow validation rejects hard links,
+ambient inode aliases, special files, and replacement races. Shared links
+remain exact and undeclared top-level state fails closed. The realization-
+scoped v2 path remains a compatibility route only for an already marked home
+and cannot satisfy canonical launch without the typed holder binding.
 
 The canonical external return leaf now owns the transport bridge around that
 typed lifecycle. It accepts an explicit owner binding, uses the current local

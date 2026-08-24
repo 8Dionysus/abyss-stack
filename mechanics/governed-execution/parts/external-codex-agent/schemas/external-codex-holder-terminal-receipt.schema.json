@@ -75,6 +75,7 @@
         "incarnation_manifest": {"type": "string", "pattern": "^/"},
         "incarnation_manifest_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
         "incarnation_manifest_snapshot_b64": {"type": "string", "minLength": 1, "pattern": "^[A-Za-z0-9+/]+={0,2}$"},
+        "holder_binding": {"$ref": "#/$defs/holderBinding"},
         "model": {"type": "string", "minLength": 1},
         "reasoning_effort": {"type": "string", "minLength": 1},
         "ambient_codex_home": {"type": "string", "pattern": "^/"},
@@ -188,6 +189,38 @@
         "start_ticks": {"type": "integer", "minimum": 1},
         "argv_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
         "exe_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      }
+    },
+    "holderBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "binding_digest",
+        "coordinate",
+        "goal_ref",
+        "actor_ref",
+        "incarnation_ref",
+        "session_ref",
+        "holder_ref",
+        "task_ref",
+        "run_ref"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "abyss_stack_visible_incarnation_holder_binding_context_v1"
+        },
+        "binding_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "coordinate": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "goal_ref": {"type": "string", "minLength": 1},
+        "actor_ref": {"type": "string", "minLength": 1},
+        "incarnation_ref": {"type": "string", "minLength": 1},
+        "session_ref": {"type": "string", "minLength": 1},
+        "runtime_state_root": {"type": "string", "pattern": "^/", "minLength": 2},
+        "closeout_route": {"type": "string", "pattern": "^/", "minLength": 2},
+        "holder_ref": {"type": "string", "minLength": 1},
+        "task_ref": {"type": "string", "minLength": 1},
+        "run_ref": {"type": "string", "minLength": 1}
       }
     },
     "terminalBinding": {

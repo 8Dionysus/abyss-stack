@@ -135,11 +135,15 @@ and replay only through their matching legacy wake reservation. A retry after a 
   manifest records the derived `actor_local_state_names` set for new homes and
   recomputes it for older v2 manifests, so this is a registry-derived
   invariant rather than a filename exception;
-- gives each newly created home an opaque, digest-bound holder namespace below
-  the realization root. Repeated preparation with the same namespace is
-  idempotent, distinct holders receive distinct mutable homes, and the
-  realization-scoped legacy path is accepted without a namespace only when an
-  existing ownership marker proves that it is an older v2 home;
+- binds each newly created home below the realization root to the exact bytes
+  of a typed holder/task/run responsibility context. The context carries the
+  existing goal/actor/incarnation/session runtime coordinates plus owner-bound
+  holder, task, and run references; its digest and a derived holder coordinate
+  are recorded in the manifest and holder receipt. A non-replacing holder
+  claim reserves that home for one responsibility lifecycle, so mismatched,
+  reassigned, overlapping, and sequential reuse fail closed. The
+  realization-scoped legacy path remains a compatibility read/preparation
+  route only for a marked older v2 home and cannot satisfy canonical launch;
 - exposes the installed `aoa-external-codex-return` leaf for the final external
   return contour. The leaf receives an explicit return-owner binding and exact
   handoff/holder paths, uses a connectable local Codex app-server as a

@@ -17,6 +17,7 @@
     "ambient_home_identity",
     "runtime_root",
     "codex_home",
+    "holder_binding",
     "config_digest",
     "shared_state_names",
     "capability_projection",
@@ -36,7 +37,7 @@
     "ambient_home_identity": {"$ref": "#/$defs/digest"},
     "runtime_root": {"$ref": "#/$defs/absolutePath"},
     "codex_home": {"$ref": "#/$defs/absolutePath"},
-    "holder_namespace_coordinate": {"$ref": "#/$defs/digest"},
+    "holder_binding": {"$ref": "#/$defs/holderBinding"},
     "config_digest": {"$ref": "#/$defs/digest"},
     "shared_state_names": {
       "type": "array",
@@ -59,6 +60,40 @@
       "type": "string",
       "pattern": "^(?!\\.\\.?$)[^/]+$",
       "minLength": 1
+    },
+    "holderBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "binding_digest",
+        "coordinate",
+        "goal_ref",
+        "actor_ref",
+        "incarnation_ref",
+        "session_ref",
+        "runtime_state_root",
+        "closeout_route",
+        "holder_ref",
+        "task_ref",
+        "run_ref"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "abyss_stack_visible_incarnation_holder_binding_context_v1"
+        },
+        "binding_digest": {"$ref": "#/$defs/digest"},
+        "coordinate": {"$ref": "#/$defs/digest"},
+        "goal_ref": {"type": "string", "minLength": 1},
+        "actor_ref": {"type": "string", "minLength": 1},
+        "incarnation_ref": {"type": "string", "minLength": 1},
+        "session_ref": {"type": "string", "minLength": 1},
+        "runtime_state_root": {"$ref": "#/$defs/absolutePath"},
+        "closeout_route": {"$ref": "#/$defs/absolutePath"},
+        "holder_ref": {"type": "string", "minLength": 1},
+        "task_ref": {"type": "string", "minLength": 1},
+        "run_ref": {"type": "string", "minLength": 1}
+      }
     },
     "capabilityProjection": {
       "type": "object",

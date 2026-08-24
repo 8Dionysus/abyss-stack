@@ -50,11 +50,67 @@ def _realization(path: Path) -> Path:
 _ORIGINAL_PREPARE_HOME = MODULE.prepare_home
 
 
+def _holder_binding_context(
+    runtime_root: Path, label: str = "fixture-holder"
+) -> dict[str, str]:
+    closeout_route = runtime_root / "closeout.route"
+    if not closeout_route.exists():
+        closeout_route.write_text("closeout\n", encoding="utf-8")
+    return {
+        "schema_version": MODULE.HOLDER_BINDING_CONTEXT_SCHEMA_VERSION,
+        "goal_ref": f"goal:test/{label}",
+        "actor_ref": f"actor:test/{label}",
+        "incarnation_ref": f"incarnation:test/{label}",
+        "session_ref": f"session:test/{label}",
+        "holder_ref": f"holder:test/{label}",
+        "task_ref": f"task:test/{label}",
+        "run_ref": f"run:test/{label}",
+        "runtime_state_root": str(runtime_root),
+        "closeout_route": str(closeout_route),
+    }
+
+
+def _holder_binding_context_path(
+    tmp_path: Path, runtime_root: Path, label: str = "fixture-holder"
+) -> Path:
+    path = tmp_path / f"binding-context-{label}.json"
+    path.write_bytes(
+        MODULE.canonical_bytes(_holder_binding_context(runtime_root, label))
+    )
+    return path
+
+
+def _payload_binding_arguments(
+    runtime_root: Path,
+    manifest: dict[str, object],
+    manifest_path: Path,
+    holder_receipt: Path,
+    *,
+    label: str = "fixture-holder",
+) -> dict[str, str]:
+    context = _holder_binding_context(runtime_root, label)
+    context_bytes = MODULE.canonical_bytes(context)
+    claim_path, claim_digest = MODULE._reserve_holder_claim(
+        manifest_path=manifest_path,
+        manifest=manifest,
+        manifest_digest=MODULE.sha256_bytes(manifest_path.read_bytes()),
+        binding_context_digest=MODULE.sha256_bytes(context_bytes),
+        holder_receipt_path=holder_receipt,
+    )
+    return {
+        "binding_context_snapshot_b64": base64.b64encode(context_bytes).decode(
+            "ascii"
+        ),
+        "binding_context_digest": MODULE.sha256_bytes(context_bytes),
+        "holder_claim": str(claim_path),
+        "holder_claim_digest": claim_digest,
+    }
+
+
 def _prepare_home_for_test(**kwargs: object) -> dict[str, object]:
-    # Every ordinary fixture is one durable holder. Concurrency tests opt into
-    # distinct namespaces explicitly; production callers must do the same for
-    # a new home.
-    kwargs.setdefault("holder_namespace", "fixture-holder")
+    runtime_root = Path(kwargs["runtime_root"])
+    kwargs.pop("holder_namespace", None)
+    kwargs.setdefault("binding_context", _holder_binding_context(runtime_root))
     return _ORIGINAL_PREPARE_HOME(**kwargs)
 
 
@@ -192,10 +248,14 @@ def _holder_loss_reentry_fixture(
     path = tmp_path / "holder-loss-reentry.json"
     path.write_bytes(MODULE.canonical_bytes(receipt) + b"\n")
     context = {
+        "schema_version": MODULE.HOLDER_BINDING_CONTEXT_SCHEMA_VERSION,
         "goal_ref": receipt["goal_id"],
         "actor_ref": receipt["actor_id"],
         "incarnation_ref": "incarnation:holder-loss",
         "session_ref": receipt["session_id"],
+        "holder_ref": "holder:holder-loss",
+        "task_ref": "task:holder-loss",
+        "run_ref": "run:holder-loss",
         "runtime_state_root": str(runtime_state_root),
         "closeout_route": str(closeout_route),
         "workspace": receipt["workspace"],
@@ -281,7 +341,7 @@ def test_denied_ambient_entry_can_be_actor_local_regular_state_and_reprepared(
         ambient_home=ambient,
         realization_path=realization,
         runtime_root=runtime_root,
-        holder_namespace="sequential-holder",
+        binding_context=_holder_binding_context(runtime_root, "sequential-holder"),
     )
     actor_home = Path(manifest["codex_home"])
     local_state = actor_home / denied_name
@@ -294,7 +354,7 @@ def test_denied_ambient_entry_can_be_actor_local_regular_state_and_reprepared(
         ambient_home=ambient,
         realization_path=realization,
         runtime_root=runtime_root,
-        holder_namespace="sequential-holder",
+        binding_context=_holder_binding_context(runtime_root, "sequential-holder"),
     )
 
     assert refreshed["codex_home"] == str(actor_home)
@@ -304,14 +364,14 @@ def test_denied_ambient_entry_can_be_actor_local_regular_state_and_reprepared(
     assert shared_name in refreshed["shared_state_names"]
 
 
-def test_new_home_requires_holder_local_namespace(tmp_path: Path) -> None:
+def test_new_home_requires_typed_holder_binding(tmp_path: Path) -> None:
     ambient = tmp_path / "ambient"
     runtime_root = tmp_path / "runtime"
     ambient.mkdir()
     runtime_root.mkdir()
     (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
 
-    with pytest.raises(MODULE.IncarnationHomeError, match="holder namespace"):
+    with pytest.raises(MODULE.IncarnationHomeError, match="typed holder binding"):
         _ORIGINAL_PREPARE_HOME(
             ambient_home=ambient,
             realization_path=_realization(tmp_path / "realization.json"),
@@ -355,7 +415,7 @@ def test_legacy_v2_manifest_derives_denied_local_state_set(tmp_path: Path) -> No
         realization_path=realization,
         runtime_root=runtime_root,
     )
-    assert "holder_namespace_coordinate" not in manifest
+    assert "holder_binding" not in manifest
     actor_home = Path(manifest["codex_home"])
     (actor_home / denied_name).write_bytes(b"legacy-local-state")
     manifest_path = incarnation_root / "incarnation-home.json"
@@ -382,7 +442,7 @@ def test_holder_local_namespaces_keep_sequential_duties_isolated(tmp_path: Path)
         ambient_home=ambient,
         realization_path=realization,
         runtime_root=runtime_root,
-        holder_namespace="holder-alpha",
+        binding_context=_holder_binding_context(runtime_root, "holder-alpha"),
     )
     first_home = Path(first["codex_home"])
     (first_home / denied_name).write_bytes(b"first-duty")
@@ -390,7 +450,7 @@ def test_holder_local_namespaces_keep_sequential_duties_isolated(tmp_path: Path)
         ambient_home=ambient,
         realization_path=realization,
         runtime_root=runtime_root,
-        holder_namespace="holder-beta",
+        binding_context=_holder_binding_context(runtime_root, "holder-beta"),
     )
     second_home = Path(second["codex_home"])
     (second_home / denied_name).write_bytes(b"second-duty")
@@ -401,7 +461,7 @@ def test_holder_local_namespaces_keep_sequential_duties_isolated(tmp_path: Path)
             ambient_home=ambient,
             realization_path=realization,
             runtime_root=runtime_root,
-            holder_namespace="holder-alpha",
+            binding_context=_holder_binding_context(runtime_root, "holder-alpha"),
         )["codex_home"]
         == str(first_home)
     )
@@ -410,7 +470,7 @@ def test_holder_local_namespaces_keep_sequential_duties_isolated(tmp_path: Path)
             ambient_home=ambient,
             realization_path=realization,
             runtime_root=runtime_root,
-            holder_namespace="holder-beta",
+            binding_context=_holder_binding_context(runtime_root, "holder-beta"),
         )["codex_home"]
         == str(second_home)
     )
@@ -433,7 +493,6 @@ def test_denied_actor_local_symlink_and_undeclared_state_fail_closed(
         ambient_home=ambient,
         realization_path=realization,
         runtime_root=runtime_root,
-        holder_namespace="fail-closed-holder",
     )
     actor_home = Path(manifest["codex_home"])
     foreign = tmp_path / "foreign-state"
@@ -444,7 +503,6 @@ def test_denied_actor_local_symlink_and_undeclared_state_fail_closed(
             ambient_home=ambient,
             realization_path=realization,
             runtime_root=runtime_root,
-            holder_namespace="fail-closed-holder",
         )
 
     (actor_home / denied_name).unlink()
@@ -456,8 +514,261 @@ def test_denied_actor_local_symlink_and_undeclared_state_fail_closed(
             ambient_home=ambient,
             realization_path=realization,
             runtime_root=runtime_root,
-            holder_namespace="fail-closed-holder",
         )
+
+
+def test_denied_actor_local_hard_link_cannot_reach_ambient_bytes(
+    tmp_path: Path,
+) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    denied_name = _unknown_fixture_name(tmp_path)
+    ambient_entry = ambient / denied_name
+    ambient_entry.write_bytes(b"ambient-secret-state")
+    realization = _realization(tmp_path / "realization.json")
+    manifest = MODULE.prepare_home(
+        ambient_home=ambient,
+        realization_path=realization,
+        runtime_root=runtime_root,
+    )
+    actor_home = Path(manifest["codex_home"])
+    manifest_path = actor_home.parent / "incarnation-home.json"
+    holder_entry = actor_home / denied_name
+    os.link(ambient_entry, holder_entry)
+
+    with pytest.raises(MODULE.IncarnationHomeError, match="aliases ambient|multiply linked"):
+        MODULE._load_manifest(manifest_path)
+    assert ambient_entry.read_bytes() == b"ambient-secret-state"
+
+    context_path = _holder_binding_context_path(tmp_path, runtime_root)
+    executable = tmp_path / "codex"
+    executable.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    executable.chmod(0o700)
+    with pytest.raises(MODULE.IncarnationHomeError, match="aliases ambient|multiply linked"):
+        MODULE.command_launch(
+            MODULE.argparse.Namespace(
+                manifest=str(manifest_path),
+                codex_executable=str(executable),
+                holder_receipt=str(tmp_path / "holder.json"),
+                binding_context=str(context_path),
+                terminal_title=None,
+                control_socket=None,
+                codex_arguments=["exec", "--help"],
+            )
+        )
+    assert ambient_entry.read_bytes() == b"ambient-secret-state"
+
+
+def test_denied_actor_local_replacement_race_fails_closed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = tmp_path / "actor-local.json"
+    target.write_bytes(b"original")
+    replacement = tmp_path / "replacement.json"
+    replacement.write_bytes(b"replacement")
+    real_lstat = MODULE.os.lstat
+    target_checks = 0
+
+    def racing_lstat(path: str | os.PathLike[str]) -> os.stat_result:
+        nonlocal target_checks
+        if Path(path) == target:
+            target_checks += 1
+            if target_checks == 2:
+                os.replace(replacement, target)
+        return real_lstat(path)
+
+    monkeypatch.setattr(MODULE.os, "lstat", racing_lstat)
+    with pytest.raises(MODULE.IncarnationHomeError, match="changed during validation"):
+        MODULE._validate_actor_local_entry(target, "actor-local.json")
+
+
+def test_denied_actor_local_replacement_before_open_fails_closed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = tmp_path / "actor-local.json"
+    target.write_bytes(b"original")
+    replacement = tmp_path / "replacement.json"
+    replacement.write_bytes(b"replacement")
+    real_open = MODULE.os.open
+    replaced = False
+
+    def racing_open(path: object, flags: int, *args: object, **kwargs: object) -> int:
+        nonlocal replaced
+        if Path(path) == target and not replaced:
+            replaced = True
+            os.replace(replacement, target)
+        return real_open(path, flags, *args, **kwargs)
+
+    monkeypatch.setattr(MODULE.os, "open", racing_open)
+    with pytest.raises(MODULE.IncarnationHomeError, match="changed during validation"):
+        MODULE._validate_actor_local_entry(target, "actor-local.json")
+
+
+def test_typed_holder_binding_separates_sequential_homes_and_rejects_reassignment(
+    tmp_path: Path,
+) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    denied_name = _unknown_fixture_name(tmp_path)
+    (ambient / denied_name).write_bytes(b"ambient-sidecar")
+    realization = _realization(tmp_path / "realization.json")
+    first_context = _holder_binding_context(runtime_root, "sequential-a")
+    second_context = _holder_binding_context(runtime_root, "sequential-b")
+
+    first = _ORIGINAL_PREPARE_HOME(
+        ambient_home=ambient,
+        realization_path=realization,
+        runtime_root=runtime_root,
+        binding_context=first_context,
+    )
+    second = _ORIGINAL_PREPARE_HOME(
+        ambient_home=ambient,
+        realization_path=realization,
+        runtime_root=runtime_root,
+        binding_context=second_context,
+    )
+    first_home = Path(first["codex_home"])
+    second_home = Path(second["codex_home"])
+    assert first_home != second_home
+    (first_home / denied_name).write_bytes(b"first-duty")
+    (second_home / denied_name).write_bytes(b"second-duty")
+    assert (first_home / denied_name).read_bytes() == b"first-duty"
+    assert (second_home / denied_name).read_bytes() == b"second-duty"
+    assert first_home.parent != second_home.parent
+    first_manifest_path = first_home.parent / "incarnation-home.json"
+    second_manifest_path = second_home.parent / "incarnation-home.json"
+    assert not first_manifest_path.samefile(second_manifest_path)
+    assert not (first_home / "config.toml").samefile(second_home / "config.toml")
+    for name in ("cache", "log", "tmp", MODULE.DESCENDANT_BIN_NAME):
+        assert not (first_home / name).samefile(second_home / name)
+
+    second_bytes = MODULE.canonical_bytes(second_context)
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="does not match context|not derived from context",
+    ):
+        MODULE._load_manifest_snapshot(
+            first_manifest_path,
+            binding_context=MODULE._validate_holder_binding_context(first_context),
+            binding_context_digest=MODULE.sha256_bytes(second_bytes),
+            require_holder_binding=True,
+        )
+
+    with pytest.raises(MODULE.IncarnationHomeError, match="not an identity proof"):
+        _ORIGINAL_PREPARE_HOME(
+            ambient_home=ambient,
+            realization_path=realization,
+            runtime_root=runtime_root,
+            binding_context=first_context,
+            holder_namespace="reusable-string",
+        )
+
+
+def test_holder_claim_rejects_overlapping_and_sequential_reuse(
+    tmp_path: Path,
+) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    manifest = MODULE.prepare_home(
+        ambient_home=ambient,
+        realization_path=_realization(tmp_path / "realization.json"),
+        runtime_root=runtime_root,
+    )
+    manifest_path = Path(manifest["codex_home"]).parent / "incarnation-home.json"
+    context = _holder_binding_context(runtime_root)
+    context_bytes = MODULE.canonical_bytes(context)
+    context_digest = MODULE.sha256_bytes(context_bytes)
+    first_receipt = tmp_path / "holder-a.json"
+    second_receipt = tmp_path / "holder-b.json"
+    claim_path, claim_digest = MODULE._reserve_holder_claim(
+        manifest_path=manifest_path,
+        manifest=manifest,
+        manifest_digest=MODULE.sha256_bytes(manifest_path.read_bytes()),
+        binding_context_digest=context_digest,
+        holder_receipt_path=first_receipt,
+    )
+    assert claim_path.is_file()
+    with pytest.raises(MODULE.IncarnationHomeError, match="active or completed"):
+        MODULE._reserve_holder_claim(
+            manifest_path=manifest_path,
+            manifest=manifest,
+            manifest_digest=MODULE.sha256_bytes(manifest_path.read_bytes()),
+            binding_context_digest=context_digest,
+            holder_receipt_path=second_receipt,
+        )
+    MODULE._validate_holder_claim(
+        claim_path=claim_path,
+        claim_digest=claim_digest,
+        manifest_path=manifest_path,
+        manifest=manifest,
+        manifest_digest=MODULE.sha256_bytes(manifest_path.read_bytes()),
+        binding_context_digest=context_digest,
+        holder_receipt_path=first_receipt,
+    )
+
+
+def test_stale_holder_manifest_and_failed_first_prepare_roll_back(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    realization = _realization(tmp_path / "realization.json")
+    context = _holder_binding_context(runtime_root, "stale-manifest")
+    manifest = _ORIGINAL_PREPARE_HOME(
+        ambient_home=ambient,
+        realization_path=realization,
+        runtime_root=runtime_root,
+        binding_context=context,
+    )
+    manifest_path = Path(manifest["codex_home"]).parent / "incarnation-home.json"
+    stale = json.loads(manifest_path.read_text(encoding="utf-8"))
+    stale["holder_binding"]["holder_ref"] = "holder:test/reassigned"
+    manifest_path.write_bytes(MODULE.canonical_bytes(stale))
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="does not match context|not derived from context",
+    ):
+        MODULE._load_manifest_snapshot(
+            manifest_path,
+            binding_context=MODULE._validate_holder_binding_context(context),
+            binding_context_digest=MODULE.sha256_bytes(
+                MODULE.canonical_bytes(context)
+            ),
+            require_holder_binding=True,
+        )
+
+    failing_runtime = tmp_path / "failing-runtime"
+    failing_runtime.mkdir()
+    failing_context = _holder_binding_context(failing_runtime, "rollback")
+    original_validate = MODULE._validate_actor_local_entries
+
+    def fail_after_materialization(*_args: object, **_kwargs: object) -> None:
+        raise MODULE.IncarnationHomeError("synthetic validation failure")
+
+    monkeypatch.setattr(
+        MODULE, "_validate_actor_local_entries", fail_after_materialization
+    )
+    with pytest.raises(MODULE.IncarnationHomeError, match="synthetic validation"):
+        _ORIGINAL_PREPARE_HOME(
+            ambient_home=ambient,
+            realization_path=realization,
+            runtime_root=failing_runtime,
+            binding_context=failing_context,
+        )
+    monkeypatch.setattr(MODULE, "_validate_actor_local_entries", original_validate)
+    assert {entry.name for entry in failing_runtime.iterdir()} == {"closeout.route"}
 
 
 def test_capability_projection_denies_ambient_operator_control_by_default(
@@ -1159,7 +1470,7 @@ def test_former_shared_link_demotes_only_under_typed_denied_policy(
         ambient_home=ambient,
         realization_path=realization,
         runtime_root=runtime_root,
-        holder_namespace="typed-demotion-holder",
+        binding_context=_holder_binding_context(runtime_root, "typed-demotion-holder"),
     )
     actor_home = Path(first["codex_home"])
     assert (actor_home / shared_name).is_symlink()
@@ -1183,7 +1494,7 @@ def test_former_shared_link_demotes_only_under_typed_denied_policy(
         ambient_home=ambient,
         realization_path=realization,
         runtime_root=runtime_root,
-        holder_namespace="typed-demotion-holder",
+        binding_context=_holder_binding_context(runtime_root, "typed-demotion-holder"),
     )
     assert not (actor_home / shared_name).exists()
     assert not (actor_home / shared_name).is_symlink()
@@ -1194,7 +1505,7 @@ def test_former_shared_link_demotes_only_under_typed_denied_policy(
         ambient_home=ambient,
         realization_path=realization,
         runtime_root=runtime_root,
-        holder_namespace="typed-demotion-holder",
+        binding_context=_holder_binding_context(runtime_root, "typed-demotion-holder"),
     )
     assert resumed["codex_home"] == str(actor_home)
     assert (actor_home / shared_name).read_bytes() == b"local-after-demotion"
@@ -1370,7 +1681,7 @@ def test_rebind_receipt_binds_holder_environment_and_manifest_snapshot(
     reentry_path.write_bytes(MODULE.canonical_bytes(reentry) + b"\n")
 
     context_path = tmp_path / "binding-context.json"
-    context_path.write_bytes(MODULE.canonical_bytes(context) + b"\n")
+    context_path.write_bytes(MODULE.canonical_bytes(context))
     ambient = tmp_path / "ambient"
     runtime_root = Path(context["runtime_state_root"])
     ambient.mkdir()
@@ -1379,6 +1690,7 @@ def test_rebind_receipt_binds_holder_environment_and_manifest_snapshot(
         ambient_home=ambient,
         realization_path=_realization(tmp_path / "realization.json"),
         runtime_root=runtime_root,
+        binding_context=context,
     )
     manifest_path = Path(manifest["codex_home"]).parent / "incarnation-home.json"
     executable = Path("/proc/self/exe").resolve()
@@ -1633,6 +1945,7 @@ def test_direct_launch_records_the_actual_responsibility_holder_before_exec(
             executable_digest=MODULE.sha256_bytes(original_content),
             manifest_bytes=manifest_snapshot,
             manifest_digest=MODULE.sha256_bytes(manifest_snapshot),
+            holder_binding=manifest["holder_binding"],
         )
 
     original_holder_receipt = MODULE._holder_receipt
@@ -1679,6 +1992,9 @@ def test_direct_launch_records_the_actual_responsibility_holder_before_exec(
     monkeypatch.setattr(MODULE.os, "execve", fake_exec)
     args = MODULE.argparse.Namespace(
         holder_receipt=str(receipt_path),
+        binding_context=str(
+            _holder_binding_context_path(tmp_path, runtime_root)
+        ),
         terminal_title=None,
         kitty_executable="/usr/bin/kitty",
         manifest=str(manifest_path),
@@ -1758,7 +2074,7 @@ def test_direct_launch_records_the_actual_responsibility_holder_before_exec(
 
     executable.write_bytes(original_content)
     executable.chmod(0o700)
-    with pytest.raises(MODULE.IncarnationHomeError, match="already exists"):
+    with pytest.raises(MODULE.IncarnationHomeError, match="already occupied"):
         MODULE.command_launch(args)
 
 
@@ -1801,6 +2117,9 @@ def test_payload_launch_binds_receipt_to_payload_process(
         payload_executable=str(payload),
         manifest_digest=MODULE.sha256_bytes(manifest_bytes),
         executable_digest=MODULE.sha256_bytes(payload_bytes),
+        **_payload_binding_arguments(
+            runtime_root, manifest, manifest_path, receipt_path
+        ),
         codex_arguments=[str(payload), "exec", "--help"],
     )
 
@@ -1842,22 +2161,9 @@ def test_payload_launch_requires_parent_admission_gate(
     holder_path = tmp_path / "holder.json"
     gate_path = tmp_path / "holder.json.launch-gate.json"
     context_path = tmp_path / "context.json"
-    state_root = tmp_path / "state"
-    state_root.mkdir()
-    context_path.write_text(
-        json.dumps(
-            {
-                "goal_ref": "goal:test",
-                "actor_ref": "actor:test",
-                "incarnation_ref": "incarnation:test",
-                "session_ref": "session:test",
-                "runtime_state_root": str(state_root),
-                "closeout_route": str(tmp_path / "closeout.sh"),
-            }
-        ),
-        encoding="utf-8",
+    context_path.write_bytes(
+        MODULE.canonical_bytes(_holder_binding_context(runtime_root))
     )
-    context_bytes = context_path.read_bytes()
     token = "launch-gate-test-token"
     MODULE._write_visible_launch_gate(
         gate_path=gate_path,
@@ -1883,8 +2189,9 @@ def test_payload_launch_requires_parent_admission_gate(
         payload_executable=str(payload),
         manifest_digest=MODULE.sha256_bytes(manifest_bytes),
         executable_digest=MODULE.sha256_bytes(payload_bytes),
-        binding_context_snapshot_b64=base64.b64encode(context_bytes).decode("ascii"),
-        binding_context_digest=MODULE.sha256_bytes(context_bytes),
+        **_payload_binding_arguments(
+            runtime_root, manifest, manifest_path, holder_path
+        ),
         control_socket="unix:/tmp/aoa-launch-gate-test.sock",
         terminal_title="visible-holder",
         launch_gate=str(gate_path),
@@ -1957,17 +2264,22 @@ def test_payload_launch_uses_private_companion_after_host_copy_disappears(
 
     monkeypatch.setattr(MODULE, "_holder_receipt", fake_holder_receipt)
     monkeypatch.setattr(MODULE.os, "execve", fake_exec)
+    holder_path = tmp_path / "holder.json"
+    payload_binding_args = _payload_binding_arguments(
+        runtime_root, manifest, manifest_path, holder_path
+    )
     host_companion.unlink()
     (host_package / "package.json").unlink()
     manifest_path.unlink()
     args = MODULE.argparse.Namespace(
         manifest=str(manifest_path),
-        holder_receipt=str(tmp_path / "holder.json"),
+        holder_receipt=str(holder_path),
         codex_executable=str(host_executable),
         payload_executable=str(payload),
         manifest_digest=MODULE.sha256_bytes(manifest_bytes),
         manifest_snapshot_b64=base64.b64encode(manifest_bytes).decode("ascii"),
         executable_digest=MODULE.sha256_bytes(payload.read_bytes()),
+        **payload_binding_args,
         companion_path=str(host_companion),
         companion_digest=MODULE.sha256_bytes(companion_bytes),
         companion_relative=(
@@ -2035,13 +2347,18 @@ def test_payload_launch_accepts_shebang_package_relative_companion(
 
     monkeypatch.setattr(MODULE, "_holder_receipt", fake_holder_receipt)
     monkeypatch.setattr(MODULE.os, "execve", fake_exec)
+    holder_path = tmp_path / "holder.json"
+    payload_binding_args = _payload_binding_arguments(
+        runtime_root, manifest, manifest_path, holder_path
+    )
     args = MODULE.argparse.Namespace(
         manifest=str(manifest_path),
-        holder_receipt=str(tmp_path / "holder.json"),
+        holder_receipt=str(holder_path),
         codex_executable=str(host_executable),
         payload_executable=str(payload),
         manifest_digest=MODULE.sha256_bytes(manifest_bytes),
         executable_digest=MODULE.sha256_bytes(payload.read_bytes()),
+        **payload_binding_args,
         companion_path=str(host_companion),
         companion_digest=MODULE.sha256_bytes(companion_bytes),
         companion_relative=(
@@ -2279,22 +2596,7 @@ def test_detached_launch_publishes_socket_only_binding(
     executable.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
     executable.chmod(0o700)
     holder_path = tmp_path / "holder.json"
-    context_path = tmp_path / "context.json"
-    state_root = tmp_path / "state"
-    state_root.mkdir()
-    context_path.write_text(
-        json.dumps(
-            {
-                "goal_ref": "goal:test",
-                "actor_ref": "actor:test",
-                "incarnation_ref": "incarnation:test",
-                "session_ref": "session:test",
-                "runtime_state_root": str(state_root),
-                "closeout_route": str(tmp_path / "closeout.sh"),
-            }
-        ),
-        encoding="utf-8",
-    )
+    context_path = _holder_binding_context_path(tmp_path, runtime_root)
     socket_path = tmp_path / "kitty.sock"
     address = f"unix:{socket_path}"
     binding = {
@@ -2304,8 +2606,8 @@ def test_detached_launch_publishes_socket_only_binding(
         "actor_ref": "actor:test",
         "incarnation_ref": "incarnation:test",
         "session_ref": "session:test",
-        "runtime_state_root": str(state_root),
-        "closeout_route": str(tmp_path / "closeout.sh"),
+            "runtime_state_root": str(runtime_root),
+            "closeout_route": str(runtime_root / "closeout.route"),
         "holder": {"pid": 101, "start_ticks": 1001},
         "terminal": {
             "pid": 202,
@@ -5771,7 +6073,7 @@ def test_launch_rejects_explicit_empty_terminal_title() -> None:
         MODULE.command_launch(MODULE.argparse.Namespace(terminal_title=""))
 
 
-@pytest.mark.parametrize("field", ["binding_context", "control_socket"])
+@pytest.mark.parametrize("field", ["control_socket"])
 def test_launch_rejects_binding_options_without_terminal_title(field: str) -> None:
     arguments = MODULE.argparse.Namespace(
         terminal_title=None,

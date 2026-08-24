@@ -22,30 +22,39 @@ if it were a managed shared link. A Codex-created regular file or SQLite sidecar
 under a denied ambient name was therefore either reported as projection-link
 drift during repeated `prepare` or as an unexpected top-level home entry during
 manifest loading. The realization-scoped home also gave sequential holders the
-same mutable top-level namespace, so one duty could poison the next one.
+same mutable top-level namespace, so one duty could poison the next one. A
+regular-file hard link could additionally expose an ambient inode through the
+actor-local name, and a caller could reuse a namespace string without proving
+the typed responsibility context that owned it.
 
 ## Options considered
 
 - Add filename-specific exceptions for the observed database and sidecar names.
 - Permit arbitrary actor-local top-level state in the projected home.
-- Derive actor-local state from the current typed denied projection and give
-  every newly created holder a digest-bound mutable namespace, while retaining
-  marked legacy v2 homes for compatibility.
+- Derive actor-local state from the current typed denied projection, reject
+  inode aliases and replacement races, and bind every newly created holder to a
+  digest of the typed holder/task/run responsibility context with a persistent
+  non-replacing claim, while retaining marked legacy v2 homes for compatibility.
 
 ## Decision
 
 Use the third route. The runtime records the derived denied-entry set as
 `actor_local_state_names`; those entries may be absent or materialize as
-regular files/directories owned by the actor, but never as symlinks or special
-files. Shared entries continue to require an exact symlink to the ambient
-source. A prior shared symlink may be removed only when the current typed
-projection demotes that entry to denied; a regular local shadow is preserved.
+regular files/directories owned by the actor, but never as symlinks, special
+files, multiply linked files, or inodes also present in the ambient home.
+Validation opens entries without following symlinks and rechecks their
+device/inode/mode, so replacement during validation fails closed. Shared
+entries continue to require an exact symlink to the ambient source. A prior
+shared symlink may be removed only when the current typed projection demotes
+that entry to denied; a regular local shadow is preserved.
 
-New homes require an opaque holder namespace whose digest selects a holder-local
-directory below the realization coordinate. Repeated preparation with that
-namespace is idempotent, while distinct namespaces cannot share mutable Codex
-state. A missing namespace remains valid only when an existing legacy v2
-ownership marker selects the old realization-scoped path.
+New homes require the exact bytes of a typed holder/task/run responsibility
+context. The digest of that context selects a holder-local directory below the
+realization coordinate and is carried into the manifest and holder receipt. A
+persistent non-replacing claim reserves the home for one responsibility
+lifecycle, so a mismatched, reassigned, overlapping, or sequential launch is
+rejected. A missing typed binding remains valid only for an existing legacy v2
+ownership marker and cannot satisfy canonical launch.
 
 ## Rationale
 
@@ -62,8 +71,9 @@ putting actor, task, Goal, version, or path identity into policy.
   converting it into shared authority.
 - Positive: distinct holders retain separate mutable databases, sidecars, and
   lock directories while preserving realization-bound grants.
-- Tradeoff: callers creating a new home must supply a stable unique namespace;
-  old marked v2 homes remain a compatibility case until retired by their owner.
+- Tradeoff: callers creating a new home must supply the owner-defined typed
+  responsibility context and retain its claim until lifecycle closeout; old
+  marked v2 homes remain a compatibility case until retired by their owner.
 - Residual: source behavior and installed-artifact parity remain separate from
   host trust admission, live canary evidence, transport delivery, and owner
   acceptance.

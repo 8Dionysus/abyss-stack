@@ -63,12 +63,20 @@ an actor-created regular-file shadow across repeated preparation, that an
 exact shared link remains exact, and that a prior shared link is removed only
 when the current typed projection demotes it to denied. Unknown or foreign
 symlinks and undeclared top-level state fail closed. New realization homes
-require an opaque holder namespace, while two holder namespaces receive
-distinct mutable homes and sequential duties do not poison one another. Older
-v2 manifests without `actor_local_state_names` remain readable only after the
-loader derives that set from the recomputed typed projection. These are source
-and fixture claims; they do not establish host artifact admission, activation,
-live canary success, transport delivery, or owner acceptance.
+require the exact typed holder/task/run context, with mismatched binding, stale
+manifest, persistent sequential reuse, and overlapping claim attempts rejected.
+Same-filesystem hard links to ambient denied state, multiply linked regular
+files, device/inode aliases, and replacement during no-follow validation fail
+closed before manifest admission or launch; the adversarial fixture also
+verifies that ambient bytes remain unchanged. Distinct contexts receive
+separate manifest, config, cache, log, tmp, and descendant-binary coordinates,
+while a first-preparation validation failure removes only unpublished owner
+roots and preserves the pre-existing closeout route. Older v2 manifests
+without `actor_local_state_names` remain readable only after the loader derives
+that set from the recomputed typed projection; they cannot satisfy canonical
+launch without a typed holder binding. These are source and fixture claims; they
+do not establish host artifact admission, activation, live canary success,
+transport delivery, or owner acceptance.
 
 The F4 residual regressions also prove that duplicate future class IDs cannot
 be represented in the registry schema because class IDs are object keys, and
