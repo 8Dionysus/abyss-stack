@@ -2282,6 +2282,221 @@ def _write_exact(
         os.close(parent_fd)
 
 
+def _copy_legacy_actor_local_state(
+    *,
+    source_home: Path,
+    target_home: Path,
+    source_expected_names: set[str],
+    source_actor_local_names: Sequence[str],
+    target_actor_local_names: set[str],
+    ambient_home: Path,
+    ambient_identities: set[tuple[int, int]],
+) -> None:
+    """Copy validated legacy local state into an unpublished typed home."""
+
+    _validate_actor_local_top_level_names(source_home, source_expected_names)
+    source_names = sorted(set(source_actor_local_names) | LOCAL_NAMES)
+    _validate_actor_local_entries(
+        source_home,
+        source_names,
+        ambient_home,
+        initially_ambient_identities=ambient_identities,
+    )
+    allowed_target_names = set(target_actor_local_names) | LOCAL_NAMES
+    visited_directories: set[tuple[int, int]] = set()
+
+    def ensure_target_directory(target: Path, mode: int, label: str) -> None:
+        try:
+            observed = os.lstat(target)
+        except FileNotFoundError:
+            parent_fd = _open_pinned_parent_directory(target, label)
+            try:
+                try:
+                    os.mkdir(target.name, mode, dir_fd=parent_fd)
+                except FileExistsError:
+                    pass
+                created = os.lstat(target.name, dir_fd=parent_fd)
+                if stat.S_ISLNK(created.st_mode) or not stat.S_ISDIR(created.st_mode):
+                    raise IncarnationHomeError(
+                        f"migration target is not a real directory: {label}"
+                    )
+                os.fsync(parent_fd)
+            except OSError as exc:
+                raise IncarnationHomeError(
+                    f"migration target directory cannot be created safely: {label}"
+                ) from exc
+            finally:
+                os.close(parent_fd)
+            return
+        except OSError as exc:
+            raise IncarnationHomeError(
+                f"migration target directory cannot be inspected: {label}"
+            ) from exc
+        if stat.S_ISLNK(observed.st_mode) or not stat.S_ISDIR(observed.st_mode):
+            raise IncarnationHomeError(
+                f"migration target is not a real directory: {label}"
+            )
+
+    def revalidate_source(
+        source: Path,
+        descriptor: int,
+        initial: os.stat_result,
+        parent_fd: int | None,
+        child_name: str | None,
+        label: str,
+    ) -> None:
+        if parent_fd is None:
+            _revalidate_actor_local_path(source, descriptor, initial, label)
+        else:
+            assert child_name is not None
+            _revalidate_actor_local_child(
+                parent_fd, child_name, descriptor, initial, label
+            )
+
+    def copy_opened(
+        source: Path,
+        target: Path,
+        descriptor: int,
+        initial: os.stat_result,
+        opened: os.stat_result,
+        *,
+        parent_fd: int | None,
+        child_name: str | None,
+        label: str,
+    ) -> None:
+        current = os.fstat(descriptor)
+        if _actor_local_identity_mode(current) != _actor_local_identity_mode(opened):
+            raise IncarnationHomeError(
+                f"legacy actor-local state changed during migration: {label}"
+            )
+        identity = (current.st_dev, current.st_ino)
+        if identity in ambient_identities:
+            raise IncarnationHomeError(
+                f"legacy actor-local state aliases ambient state: {label}"
+            )
+        if stat.S_ISREG(current.st_mode):
+            if current.st_nlink != 1:
+                raise IncarnationHomeError(
+                    f"legacy actor-local state is multiply linked: {label}"
+                )
+            read_parent_fd: int | None = None
+            read_descriptor: int | None = None
+            try:
+                if parent_fd is None:
+                    read_parent_fd = _open_pinned_parent_directory(source, label)
+                    read_descriptor, read_opened = _open_stable_regular_file_at(
+                        read_parent_fd,
+                        source.name,
+                        label=label,
+                        ambient_identities=ambient_identities,
+                    )
+                else:
+                    assert child_name is not None
+                    read_descriptor, read_opened = _open_stable_regular_file_at(
+                        parent_fd,
+                        child_name,
+                        label=label,
+                        ambient_identities=ambient_identities,
+                    )
+                if _actor_local_identity_mode(read_opened) != _actor_local_identity_mode(
+                    current
+                ):
+                    raise IncarnationHomeError(
+                        f"legacy actor-local state changed during migration: {label}"
+                    )
+                content = _read_descriptor_bytes(read_descriptor, label)
+            finally:
+                if read_descriptor is not None:
+                    os.close(read_descriptor)
+                if read_parent_fd is not None:
+                    os.close(read_parent_fd)
+            revalidate_source(
+                source, descriptor, initial, parent_fd, child_name, label
+            )
+            _write_exact(
+                target,
+                content,
+                stat.S_IMODE(current.st_mode),
+                ambient_identities=ambient_identities,
+            )
+            return
+        if not stat.S_ISDIR(current.st_mode):
+            raise IncarnationHomeError(
+                f"legacy actor-local state is not a regular file or directory: {label}"
+            )
+        if identity in visited_directories:
+            raise IncarnationHomeError(
+                f"legacy actor-local state directory is aliased: {label}"
+            )
+        visited_directories.add(identity)
+        ensure_target_directory(target, stat.S_IMODE(current.st_mode), label)
+        try:
+            children = sorted(os.listdir(descriptor))
+            after_listing = os.fstat(descriptor)
+        except OSError as exc:
+            raise IncarnationHomeError(
+                f"legacy actor-local state directory cannot be enumerated: {label}"
+            ) from exc
+        if _actor_local_identity_mode(after_listing) != _actor_local_identity_mode(current):
+            raise IncarnationHomeError(
+                f"legacy actor-local state directory changed during migration: {label}"
+            )
+        for child in children:
+            child_label = f"{label}/{child}"
+            child_descriptor, child_initial, child_opened = (
+                _open_stable_actor_local_child_descriptor(
+                    descriptor, child, child_label
+                )
+            )
+            try:
+                copy_opened(
+                    source / child,
+                    target / child,
+                    child_descriptor,
+                    child_initial,
+                    child_opened,
+                    parent_fd=descriptor,
+                    child_name=child,
+                    label=child_label,
+                )
+            finally:
+                os.close(child_descriptor)
+        revalidate_source(source, descriptor, initial, parent_fd, child_name, label)
+
+    for name in source_names:
+        source = source_home / name
+        try:
+            os.lstat(source)
+        except FileNotFoundError:
+            continue
+        except OSError as exc:
+            raise IncarnationHomeError(
+                f"legacy actor-local state cannot be inspected: {source}"
+            ) from exc
+        if name == "config.toml":
+            continue
+        if name not in allowed_target_names:
+            raise IncarnationHomeError(
+                f"legacy actor-local state is no longer denied: {name}"
+            )
+        descriptor, initial, opened = _open_stable_actor_local_path_descriptor(
+            source, name
+        )
+        try:
+            copy_opened(
+                source,
+                target_home / name,
+                descriptor,
+                initial,
+                opened,
+                parent_fd=None,
+                child_name=None,
+                label=f"legacy actor-local state {name}",
+            )
+        finally:
+            os.close(descriptor)
+
+
 def _utc_now() -> str:
     return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
@@ -7806,6 +8021,9 @@ def _prepare_home_impl(
     binding_context: Path | dict[str, Any] | None = None,
     holder_namespace: str | None = None,
     _owner_token: dict[str, Any] | None = None,
+    _migration_source_home: Path | None = None,
+    _migration_source_expected_names: set[str] | None = None,
+    _migration_source_actor_local_names: Sequence[str] = (),
 ) -> dict[str, Any]:
     if holder_namespace is not None:
         raise IncarnationHomeError(
@@ -8103,6 +8321,19 @@ def _prepare_home_impl(
             raise IncarnationHomeError(
                 f"obsolete capability projection link drift: {target}"
             )
+
+    if _migration_source_home is not None:
+        if _migration_source_expected_names is None:
+            raise IncarnationHomeError("legacy migration source declaration is missing")
+        _copy_legacy_actor_local_state(
+            source_home=_migration_source_home,
+            target_home=codex_home,
+            source_expected_names=_migration_source_expected_names,
+            source_actor_local_names=_migration_source_actor_local_names,
+            target_actor_local_names=set(actor_local_state_names),
+            ambient_home=ambient_home,
+            ambient_identities=ambient_identities,
+        )
 
     for entry in codex_home.iterdir():
         if entry.name not in expected_names:
@@ -8562,6 +8793,121 @@ def _load_manifest_snapshot(
         ambient_home,
     )
     return manifest, raw, sha256_bytes(raw)
+
+
+def _legacy_migration_actor_local_names(manifest: dict[str, Any]) -> list[str]:
+    projection = manifest.get("capability_projection")
+    entries = projection.get("entries") if isinstance(projection, dict) else None
+    if not isinstance(entries, dict):
+        raise IncarnationHomeError(
+            "legacy incarnation-home capability projection is unavailable for migration"
+        )
+    names = [
+        name
+        for name, entry in entries.items()
+        if isinstance(name, str)
+        and isinstance(entry, dict)
+        and entry.get("projection") == "denied"
+    ]
+    return sorted(names)
+
+
+def migrate_legacy_home(
+    *,
+    legacy_manifest_path: Path,
+    binding_context: Path | dict[str, Any],
+    capability_grants: Sequence[Path] = (),
+) -> dict[str, Any]:
+    """Explicitly carry legacy v2 local state into a new typed v3 home."""
+
+    legacy_path = _regular_file(
+        legacy_manifest_path, "legacy incarnation-home manifest"
+    )
+    legacy, _legacy_bytes, legacy_digest = _load_manifest_snapshot(legacy_path)
+    if legacy.get("schema_version") != LEGACY_SCHEMA_VERSION:
+        raise IncarnationHomeError(
+            "legacy migration requires an incarnation-home v2 manifest"
+        )
+    context, _context_bytes, _context_digest = _holder_binding_context_input(
+        binding_context
+    )
+    runtime_root = _absolute_directory(
+        Path(str(legacy["runtime_root"])), "runtime root"
+    )
+    ambient_home = _absolute_directory(
+        Path(str(legacy["ambient_codex_home"])), "ambient Codex home"
+    )
+    if Path(context["runtime_state_root"]).resolve() != runtime_root:
+        raise IncarnationHomeError(
+            "holder binding runtime state root does not match legacy runtime root"
+        )
+    realization_path = _regular_file(
+        Path(str(legacy["model_realization_ref"])), "model realization"
+    )
+    source_home = Path(str(legacy["codex_home"])).resolve()
+    source_actor_local_names = _legacy_migration_actor_local_names(legacy)
+    source_expected_names = (
+        set(str(name) for name in legacy["shared_state_names"])
+        | set(source_actor_local_names)
+        | LOCAL_NAMES
+    )
+    ambient_identities = _ambient_inode_identities(ambient_home)
+    _validate_actor_local_top_level_names(source_home, source_expected_names)
+    _validate_actor_local_entries(
+        source_home,
+        sorted(set(source_actor_local_names) | LOCAL_NAMES),
+        ambient_home,
+        initially_ambient_identities=ambient_identities,
+    )
+    owner_token = _prepare_home_attempt_owner(
+        ambient_home=ambient_home,
+        realization_path=realization_path,
+        runtime_root=runtime_root,
+        binding_context=context,
+    )
+    if owner_token is None:
+        raise IncarnationHomeError(
+            "legacy migration requires a typed holder binding for the target home"
+        )
+    target_home = (Path(str(owner_token["incarnation_root"])) / "codex-home").resolve()
+    if target_home == source_home:
+        raise IncarnationHomeError(
+            "legacy migration requires a distinct typed target home"
+        )
+    try:
+        with _incarnation_preparation_lock(runtime_root, ambient_identities):
+            locked_legacy, _locked_bytes, locked_digest = _load_manifest_snapshot(
+                legacy_path
+            )
+            if locked_digest != legacy_digest:
+                raise IncarnationHomeError(
+                    "legacy incarnation-home manifest changed before migration"
+                )
+            if locked_legacy.get("schema_version") != LEGACY_SCHEMA_VERSION:
+                raise IncarnationHomeError(
+                    "legacy migration requires an incarnation-home v2 manifest"
+                )
+            _validate_actor_local_top_level_names(source_home, source_expected_names)
+            _validate_actor_local_entries(
+                source_home,
+                sorted(set(source_actor_local_names) | LOCAL_NAMES),
+                ambient_home,
+                initially_ambient_identities=ambient_identities,
+            )
+            return _prepare_home_impl(
+                ambient_home=ambient_home,
+                realization_path=realization_path,
+                runtime_root=runtime_root,
+                capability_grants=capability_grants,
+                binding_context=context,
+                _owner_token=owner_token,
+                _migration_source_home=source_home,
+                _migration_source_expected_names=source_expected_names,
+                _migration_source_actor_local_names=source_actor_local_names,
+            )
+    except BaseException:
+        _rollback_unpublished_home(owner_token=owner_token)
+        raise
 
 
 def _load_manifest(path: Path) -> dict[str, Any]:
@@ -9760,6 +10106,16 @@ def command_prepare(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_migrate(args: argparse.Namespace) -> int:
+    manifest = migrate_legacy_home(
+        legacy_manifest_path=Path(args.legacy_manifest),
+        binding_context=Path(args.binding_context),
+        capability_grants=[Path(path) for path in (args.capability_grant or [])],
+    )
+    print(json.dumps(manifest, ensure_ascii=False, sort_keys=True))
+    return 0
+
+
 def command_payload_launch(args: argparse.Namespace) -> int:
     """Run a payload and release an unpublished claim if admission fails."""
 
@@ -10546,6 +10902,23 @@ def parser() -> argparse.ArgumentParser:
         help="owner-authored exact grant for one operator capability entry",
     )
     prepare.set_defaults(handler=command_prepare)
+    migrate = subcommands.add_parser(
+        "migrate",
+        help="carry a legacy v2 home into a new typed v3 home",
+    )
+    migrate.add_argument("--legacy-manifest", required=True)
+    migrate.add_argument(
+        "--binding-context",
+        required=True,
+        help="typed holder/task/run responsibility context for the v3 target",
+    )
+    migrate.add_argument(
+        "--capability-grant",
+        action="append",
+        default=[],
+        help="owner-authored exact grant for one operator capability entry",
+    )
+    migrate.set_defaults(handler=command_migrate)
     launch = subcommands.add_parser("launch")
     launch.add_argument("--manifest", required=True)
     launch.add_argument("--codex-executable", required=True)

@@ -93,9 +93,12 @@ freezes the home against re-preparation before any config, projection,
 provenance, permission, or manifest effect. Legacy v2 manifests are
 schema-valid on their explicit compatibility route; every v2 manifest,
 including typed and provenance-bearing variants, is rejected by canonical
-loading until preparation migrates it to v3, and provenance-bearing v2 is
-rejected even on the non-canonical loader route because the public v2 branch
-forbids that field. A multiply linked preparation lock is rejected before any
+loading. The explicit `migrate` route validates the v2 home under the
+preparation lock, carries isolated actor-local trees into a distinct typed v3
+home, regenerates the bound config, and leaves the v2 source untouched.
+Provenance-bearing v2 is rejected even on the non-canonical loader route because
+the public v2 branch forbids that field. A multiply linked preparation lock is
+rejected before any
 mode effect, with the external inode's bytes and mode preserved; a deterministic
 lock-name replacement after acquisition is also rejected. The lock serializes
 through the pinned runtime directory, so concurrent first preparation remains

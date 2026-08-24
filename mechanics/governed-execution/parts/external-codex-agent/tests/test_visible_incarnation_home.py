@@ -1589,6 +1589,96 @@ def test_canonical_launch_rejects_every_typed_legacy_v2_manifest(
             MODULE._load_manifest_snapshot(manifest_path)
 
 
+def test_explicit_legacy_migration_carries_local_state_into_typed_v3(
+    tmp_path: Path,
+) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    denied_name = _unknown_fixture_name(tmp_path)
+    (ambient / denied_name).write_bytes(b"ambient-denied-state")
+    realization = _realization(tmp_path / "realization.json")
+    realization_payload = json.loads(realization.read_text(encoding="utf-8"))
+    coordinate = MODULE._incarnation_coordinate(
+        realization_payload["model_realization_id"],
+        realization_payload["configuration_fingerprint"],
+    )
+    legacy_root = runtime_root / ("sha256-" + coordinate.removeprefix("sha256:"))
+    legacy_root.mkdir()
+    legacy_home = legacy_root / "codex-home"
+    (legacy_root / "incarnation-home.json").write_text(
+        json.dumps(
+            {
+                "ambient_codex_home": str(ambient),
+                "ambient_home_identity": MODULE._ambient_home_identity(ambient),
+                "model_realization_id": realization_payload["model_realization_id"],
+                "codex_home": str(legacy_home),
+            }
+        ),
+        encoding="utf-8",
+    )
+    legacy_manifest = _ORIGINAL_PREPARE_HOME(
+        ambient_home=ambient,
+        realization_path=realization,
+        runtime_root=runtime_root,
+    )
+    legacy_home = Path(legacy_manifest["codex_home"])
+    (legacy_home / denied_name).write_bytes(b"legacy-denied-state")
+    (legacy_home / "cache" / "legacy-cache").write_bytes(b"legacy-cache")
+    legacy_manifest_path = legacy_home.parent / "incarnation-home.json"
+    context = _holder_binding_context(runtime_root, "explicit-legacy-migration")
+
+    parsed = MODULE.parser().parse_args(
+        [
+            "migrate",
+            "--legacy-manifest",
+            str(legacy_manifest_path),
+            "--binding-context",
+            str(_holder_binding_context_path(
+                tmp_path, runtime_root, "explicit-legacy-migration"
+            )),
+        ]
+    )
+    assert parsed.handler is MODULE.command_migrate
+
+    migrated = MODULE.migrate_legacy_home(
+        legacy_manifest_path=legacy_manifest_path,
+        binding_context=context,
+    )
+    migrated_home = Path(migrated["codex_home"])
+    migrated_manifest_path = migrated_home.parent / "incarnation-home.json"
+
+    assert migrated["schema_version"] == MODULE.SCHEMA_VERSION
+    assert migrated_home != legacy_home
+    assert (migrated_home / denied_name).read_bytes() == b"legacy-denied-state"
+    assert (migrated_home / "cache" / "legacy-cache").read_bytes() == (
+        b"legacy-cache"
+    )
+    schema = json.loads(
+        (PART / "schemas" / "external-codex-incarnation-home.schema.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    Draft202012Validator(schema).validate(migrated)
+    loaded, _raw, _digest = MODULE._load_manifest_snapshot(
+        migrated_manifest_path,
+        binding_context=context,
+    )
+    assert loaded["schema_version"] == MODULE.SCHEMA_VERSION
+    retried = MODULE.migrate_legacy_home(
+        legacy_manifest_path=legacy_manifest_path,
+        binding_context=context,
+    )
+    assert retried["codex_home"] == migrated["codex_home"]
+    assert (migrated_home / denied_name).read_bytes() == b"legacy-denied-state"
+    assert json.loads(legacy_manifest_path.read_text(encoding="utf-8"))["schema_version"] == (
+        MODULE.LEGACY_SCHEMA_VERSION
+    )
+    assert (legacy_home / denied_name).read_bytes() == b"legacy-denied-state"
+
+
 def test_claimed_home_rejects_repreparation_before_any_projection_effect(
     tmp_path: Path,
 ) -> None:

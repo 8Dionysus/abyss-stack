@@ -868,9 +868,12 @@ marker is present. A v2 marker without typed binding remains a
 readable/preparation compatibility shape and cannot satisfy canonical launch.
 A v2 marker with an older typed binding is also readable for migration, but
 canonical launch rejects every v2 manifest, whether or not it carries typed
-holder data or denied-state provenance, until `prepare` rewrites the home as
-v3. A provenance-bearing v2 marker is not a schema-valid compatibility shape
-and is rejected by the loader on the non-canonical route as well. Current
+holder data or denied-state provenance. The explicit `migrate` route validates
+the v2 home under the preparation lock, carries its isolated actor-local trees
+into a distinct typed v3 home, regenerates the bound config, and leaves the v2
+source untouched. A provenance-bearing v2 marker is not a schema-valid
+compatibility shape and is rejected by the loader on the non-canonical route as
+well. Current
 typed holder requirements are therefore not weakened by the compatibility
 route.
 
