@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/8Dionysus/abyss-stack/main/mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-review-state-seal.schema.json",
+  "title": "Content-addressed terminal external Codex review-state seal",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schema_version",
+    "seal_kind",
+    "seal_root",
+    "session_id",
+    "incarnation_id",
+    "writer_status",
+    "projection_path",
+    "manifest_path",
+    "manifest_digest",
+    "manifest_file_digest",
+    "delta_path",
+    "delta_digest",
+    "delta_file_digest",
+    "tree_digest",
+    "tree_entries",
+    "object_count",
+    "projection_bytes",
+    "storage_bytes"
+  ],
+  "properties": {
+    "$schema": {"const": "schemas/external-codex-review-state-seal.schema.json"},
+    "schema_version": {"const": "abyss_stack_external_codex_review_state_seal_v1"},
+    "seal_kind": {"const": "runtime_owned_external_codex_review_state"},
+    "seal_root": {"type": "string", "pattern": "^/"},
+    "session_id": {"type": "string", "minLength": 1},
+    "incarnation_id": {"type": "string", "minLength": 1},
+    "writer_status": {"enum": ["completed", "review_required"]},
+    "projection_path": {"type": "string", "pattern": "^/"},
+    "manifest_path": {"$ref": "#/$defs/relativePath"},
+    "manifest_digest": {"$ref": "#/$defs/digest"},
+    "manifest_file_digest": {"$ref": "#/$defs/digest"},
+    "delta_path": {"$ref": "#/$defs/relativePath"},
+    "delta_digest": {"$ref": "#/$defs/digest"},
+    "delta_file_digest": {"$ref": "#/$defs/digest"},
+    "tree_digest": {"$ref": "#/$defs/digest"},
+    "tree_entries": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/treeEntry"}
+    },
+    "object_count": {"type": "integer", "minimum": 0},
+    "projection_bytes": {"type": "integer", "minimum": 0},
+    "storage_bytes": {"type": "integer", "minimum": 0}
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "relativePath": {
+      "type": "string",
+      "minLength": 1,
+      "not": {"pattern": "(^/|(^|/)\\.\\.(/|$)|\\\\)"}
+    },
+    "treeEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "kind", "mode", "size_bytes", "sha256"],
+      "properties": {
+        "path": {"$ref": "#/$defs/relativePath"},
+        "kind": {"enum": ["file", "symlink", "directory"]},
+        "mode": {"type": "integer", "minimum": 0},
+        "size_bytes": {"type": "integer", "minimum": 0},
+        "sha256": {"oneOf": [{"$ref": "#/$defs/digest"}, {"type": "null"}]},
+        "object_digest": {"$ref": "#/$defs/digest"},
+        "target": {"type": "string", "minLength": 1}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"kind": {"const": "file"}}, "required": ["kind"]},
+          "then": {"required": ["object_digest"]}
+        },
+        {
+          "if": {"properties": {"kind": {"const": "symlink"}}, "required": ["kind"]},
+          "then": {"required": ["target"]}
+        }
+      ]
+    }
+  }
+}
