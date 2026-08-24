@@ -306,11 +306,14 @@ remains `unknown`. Status is read-only and has no desktop effect.
 `send-text` is a separate explicitly invoked operator transport targeting
 the exact bound socket and window; it is not A2A responsibility transfer.
 Before invoking the external Kitty client, the transport connects to and
-revalidates the recorded socket device/inode, then relays the client bytes
-through that retained peer using a fresh process-owned abstract endpoint.
-Replacing the recorded pathname before that boundary fails closed; replacing
-it after the boundary cannot redirect bytes to the replacement socket. A
-successful receipt is emitted only after the external client connected and the
+authenticates the actual connected peer against the recorded Kitty PID and
+start ticks with kernel peer credentials, then revalidates the recorded socket
+device/inode. It relays the client bytes through that retained peer using a
+fresh process-owned abstract endpoint whose client is likewise authenticated
+against the spawned Kitty client's PID and start ticks; the abstract address
+alone is never trusted. Replacing the recorded pathname before that boundary
+fails closed, and replacing it after the boundary cannot redirect bytes to the
+replacement socket. A successful receipt is emitted only after the external client connected and the
 relay completed payload delivery, and it continues to report the admitted
 pathname/device/inode rather than the relay endpoint.
 These terminal surfaces do not replace the governed JSONL runtime or owner

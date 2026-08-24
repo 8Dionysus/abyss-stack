@@ -27,6 +27,7 @@ import shutil
 import signal
 import socket
 import stat
+import struct
 import subprocess
 import sys
 import tempfile
@@ -3264,23 +3265,77 @@ def _secure_control_socket(
     }
 
 
+def _socket_peer_credentials(
+    peer: socket.socket, label: str
+) -> tuple[int, int, int]:
+    """Read Linux's kernel-authenticated peer identity or fail closed."""
+
+    option = getattr(socket, "SO_PEERCRED", None)
+    if not isinstance(option, int):
+        raise IncarnationHomeError(f"{label} credentials are unavailable")
+    size = struct.calcsize("3i")
+    try:
+        raw = peer.getsockopt(socket.SOL_SOCKET, option, size)
+    except OSError as exc:
+        raise IncarnationHomeError(f"{label} credentials cannot be read") from exc
+    if not isinstance(raw, bytes) or len(raw) != size:
+        raise IncarnationHomeError(f"{label} credentials are malformed")
+    try:
+        peer_pid, peer_uid, peer_gid = struct.unpack("3i", raw)
+    except struct.error as exc:
+        raise IncarnationHomeError(f"{label} credentials are malformed") from exc
+    if peer_pid <= 0 or peer_uid < 0 or peer_gid < 0:
+        raise IncarnationHomeError(f"{label} credentials are invalid")
+    return peer_pid, peer_uid, peer_gid
+
+
+def _require_socket_peer_identity(
+    peer: socket.socket,
+    *,
+    expected_pid: int,
+    expected_start_ticks: int,
+    label: str,
+) -> None:
+    peer_pid, peer_uid, _peer_gid = _socket_peer_credentials(peer, label)
+    if peer_pid != expected_pid or peer_uid != os.getuid():
+        raise IncarnationHomeError(f"{label} identity does not match the admitted process")
+    try:
+        observed_start_ticks = _proc_start_ticks(peer_pid)
+    except IncarnationHomeError as exc:
+        raise IncarnationHomeError(f"{label} process identity cannot be confirmed") from exc
+    if observed_start_ticks != expected_start_ticks:
+        raise IncarnationHomeError(f"{label} process start identity has drifted")
+
+
 def _send_text_through_bound_socket(
     *,
     kitty_executable: str,
     socket_record: dict[str, object],
     window_id: object,
     text: str,
+    terminal_pid: int,
+    terminal_start_ticks: int,
 ) -> None:
-    """Deliver directed input through the inode admitted before the effect.
+    """Deliver directed input through the inode and process admitted before the effect.
 
     Kitty accepts a Unix socket address, but opening the recorded pathname in
     a child process would leave a pathname-replacement race between validation
     and delivery. The runtime therefore connects to the admitted pathname
-    itself, revalidates that the pathname still names the same socket, and
-    gives Kitty a fresh abstract endpoint whose lifetime is held by this
-    process. The relay never re-opens the recorded pathname.
+    itself, authenticates the actual connected Kitty peer with kernel peer
+    credentials, and gives Kitty a fresh abstract endpoint whose client is
+    authenticated against the spawned process. The relay never re-opens the
+    recorded pathname.
     """
 
+    if (
+        not isinstance(terminal_pid, int)
+        or isinstance(terminal_pid, bool)
+        or terminal_pid <= 0
+        or not isinstance(terminal_start_ticks, int)
+        or isinstance(terminal_start_ticks, bool)
+        or terminal_start_ticks <= 0
+    ):
+        raise IncarnationHomeError("bound terminal process identity is incomplete")
     address = str(socket_record["address"])
     expected_device = socket_record.get("device")
     expected_inode = socket_record.get("inode")
@@ -3299,6 +3354,8 @@ def _send_text_through_bound_socket(
     cancel_reader: socket.socket | None = None
     cancel_writer: socket.socket | None = None
     bridge_thread: threading.Thread | None = None
+    kitty_process: subprocess.Popen[str] | None = None
+    kitty_start_ticks: int | None = None
     bridge_done = threading.Event()
     bridge_accepted = threading.Event()
     bridge_payload = threading.Event()
@@ -3314,6 +3371,12 @@ def _send_text_through_bound_socket(
             raise IncarnationHomeError(
                 "bound control socket could not be opened before directed input"
             ) from exc
+        _require_socket_peer_identity(
+            retained_peer,
+            expected_pid=terminal_pid,
+            expected_start_ticks=terminal_start_ticks,
+            label="bound control socket peer",
+        )
         _secure_control_socket(
             address,
             harden=False,
@@ -3330,8 +3393,34 @@ def _send_text_through_bound_socket(
             client: socket.socket | None = None
             try:
                 assert relay_listener is not None
-                client, _ = relay_listener.accept()
-                bridge_accepted.set()
+                assert cancel_reader is not None
+                while not cancelled.is_set():
+                    readable, _writable, _exceptional = select.select(
+                        [relay_listener, cancel_reader], [], []
+                    )
+                    if cancel_reader in readable:
+                        return
+                    if relay_listener not in readable:
+                        continue
+                    candidate, _ = relay_listener.accept()
+                    try:
+                        if kitty_process is None or kitty_start_ticks is None:
+                            candidate.close()
+                            continue
+                        _require_socket_peer_identity(
+                            candidate,
+                            expected_pid=kitty_process.pid,
+                            expected_start_ticks=kitty_start_ticks,
+                            label="directed input relay client",
+                        )
+                    except IncarnationHomeError:
+                        candidate.close()
+                        continue
+                    client = candidate
+                    bridge_accepted.set()
+                    break
+                if client is None or cancelled.is_set():
+                    return
                 while not cancelled.is_set():
                     readable, _writable, _exceptional = select.select(
                         [client, cancel_reader], [], []
@@ -3355,14 +3444,8 @@ def _send_text_through_bound_socket(
                     client.close()
                 bridge_done.set()
 
-        bridge_thread = threading.Thread(
-            target=bridge,
-            name="aoa-bound-control-socket-relay",
-            daemon=True,
-        )
-        bridge_thread.start()
         try:
-            completed = subprocess.run(
+            kitty_process = subprocess.Popen(
                 [
                     kitty_executable,
                     "@",
@@ -3373,19 +3456,59 @@ def _send_text_through_bound_socket(
                     f"id:{window_id}",
                     "--stdin",
                 ],
-                input=text,
-                check=False,
-                capture_output=True,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 text=True,
-                timeout=5,
             )
-        except (OSError, subprocess.TimeoutExpired) as exc:
+            kitty_start_ticks = _proc_start_ticks(kitty_process.pid)
+        except (OSError, IncarnationHomeError) as exc:
+            if kitty_process is not None and kitty_process.poll() is None:
+                try:
+                    kitty_process.kill()
+                except OSError:
+                    pass
+                try:
+                    kitty_process.communicate(timeout=1)
+                except (OSError, subprocess.TimeoutExpired):
+                    pass
+            raise IncarnationHomeError(
+                "directed terminal input client identity could not be established"
+            ) from exc
+        bridge_thread = threading.Thread(
+            target=bridge,
+            name="aoa-bound-control-socket-relay",
+            daemon=True,
+        )
+        bridge_thread.start()
+        try:
+            kitty_process.communicate(input=text, timeout=5)
+        except subprocess.TimeoutExpired as exc:
+            try:
+                kitty_process.kill()
+            except OSError:
+                pass
+            try:
+                kitty_process.communicate(timeout=1)
+            except (OSError, subprocess.TimeoutExpired):
+                pass
             raise IncarnationHomeError("directed terminal input failed") from exc
-        if completed.returncode != 0:
+        except OSError as exc:
+            raise IncarnationHomeError("directed terminal input failed") from exc
+        if kitty_process.returncode != 0:
             raise IncarnationHomeError("directed terminal input returned an error")
         if not bridge_done.wait(timeout=1):
             raise IncarnationHomeError("directed terminal input relay did not complete")
     finally:
+        if kitty_process is not None and kitty_process.poll() is None:
+            try:
+                kitty_process.kill()
+            except OSError:
+                pass
+            try:
+                kitty_process.communicate(timeout=1)
+            except (OSError, subprocess.TimeoutExpired):
+                pass
         cancelled.set()
         if cancel_writer is not None:
             try:
@@ -7076,6 +7199,8 @@ def command_send_text(args: argparse.Namespace) -> int:
         )
     socket_record = terminal["control_socket"]
     assert isinstance(socket_record, dict)
+    terminal_start_ticks = terminal["start_ticks"]
+    assert isinstance(terminal_start_ticks, int)
     _secure_control_socket(
         str(socket_record["address"]),
         harden=False,
@@ -7088,6 +7213,8 @@ def command_send_text(args: argparse.Namespace) -> int:
         socket_record=socket_record,
         window_id=terminal["window_id"],
         text=args.text,
+        terminal_pid=terminal_pid,
+        terminal_start_ticks=terminal_start_ticks,
     )
     result = {
         "schema_version": TERMINAL_BINDING_SCHEMA_VERSION,

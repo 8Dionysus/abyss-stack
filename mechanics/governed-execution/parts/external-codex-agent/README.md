@@ -57,8 +57,11 @@ The controller:
   unknown. `send-text` is a separately invoked terminal transport, not A2A
   responsibility transfer. It retains an inode-bound connection to the
   admitted control socket and exposes Kitty only a fresh abstract relay
-  endpoint, so pathname replacement before admission fails closed and
-  replacement during delivery cannot receive the payload. The holder receipt
+  endpoint. Both the retained upstream socket and the abstract client are
+  authenticated with kernel peer credentials against their admitted PID and
+  start ticks, so the abstract address alone is not trusted; pathname
+  replacement before admission fails closed and replacement during delivery
+  cannot receive the payload. The holder receipt
   also binds the kernel boot ID
   alongside each process start tick. The closer publishes a
   recoverable sidecar reservation before signaling. The sidecar records the

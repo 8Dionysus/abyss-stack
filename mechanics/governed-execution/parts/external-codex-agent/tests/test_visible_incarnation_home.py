@@ -29,6 +29,27 @@ MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
 
 
+def _connect_abstract_and_send(
+    address: str,
+    payload: bytes,
+    connected: object,
+    release: object,
+) -> None:
+    client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    try:
+        client.connect("\0" + address.removeprefix("unix:@"))
+        connected.set()  # type: ignore[attr-defined]
+        release.wait(timeout=2)  # type: ignore[attr-defined]
+        try:
+            client.sendall(payload)
+            client.shutdown(socket.SHUT_WR)
+        except OSError:
+            # The relay should reject this peer and close it before forwarding.
+            pass
+    finally:
+        client.close()
+
+
 def _realization(path: Path) -> Path:
     configuration = {
         "runtime": {
@@ -8589,6 +8610,8 @@ def test_directed_input_rejects_socket_replacement_before_external_invocation(
         "device": original_stat.st_dev,
         "inode": original_stat.st_ino,
         "mode": 0o600,
+        "terminal_pid": os.getpid(),
+        "terminal_start_ticks": MODULE._proc_start_ticks(os.getpid()),
     }
     replacement = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     calls: list[object] = []
@@ -8600,9 +8623,10 @@ def test_directed_input_rejects_socket_replacement_before_external_invocation(
 
         monkeypatch.setattr(
             MODULE.subprocess,
-            "run",
-            lambda *args, **kwargs: calls.append((args, kwargs))
-            or subprocess.CompletedProcess([], 0, stdout="", stderr=""),
+            "Popen",
+            lambda *_args, **_kwargs: pytest.fail(
+                "external client was invoked after socket replacement"
+            ),
         )
         with pytest.raises(MODULE.IncarnationHomeError, match="inode identity"):
             MODULE._send_text_through_bound_socket(
@@ -8610,6 +8634,8 @@ def test_directed_input_rejects_socket_replacement_before_external_invocation(
                 socket_record=record,
                 window_id="7",
                 text="secret\n",
+                terminal_pid=record["terminal_pid"],
+                terminal_start_ticks=record["terminal_start_ticks"],
             )
         assert calls == []
         replacement.setblocking(False)
@@ -8618,6 +8644,137 @@ def test_directed_input_rejects_socket_replacement_before_external_invocation(
     finally:
         original.close()
         replacement.close()
+
+
+def test_directed_input_rejects_connected_peer_identity_before_external_invocation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    socket_path = tmp_path / "kitty.sock"
+    listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    listener.bind(str(socket_path))
+    listener.listen(1)
+    os.chmod(socket_path, 0o600)
+    observed = socket_path.stat()
+    record = {
+        "address": f"unix:{socket_path}",
+        "device": observed.st_dev,
+        "inode": observed.st_ino,
+        "mode": 0o600,
+    }
+    calls: list[object] = []
+    monkeypatch.setattr(
+        MODULE,
+        "_socket_peer_credentials",
+        lambda *_args, **_kwargs: (os.getpid() + 1, os.getuid(), os.getgid()),
+    )
+    monkeypatch.setattr(
+        MODULE.subprocess,
+        "Popen",
+        lambda *args, **kwargs: calls.append((args, kwargs))
+        or pytest.fail("external client was invoked for an unbound peer"),
+    )
+    try:
+        with pytest.raises(MODULE.IncarnationHomeError, match="peer.*identity"):
+            MODULE._send_text_through_bound_socket(
+                kitty_executable="/usr/bin/kitty",
+                socket_record=record,
+                window_id="7",
+                text="secret\n",
+                terminal_pid=os.getpid(),
+                terminal_start_ticks=MODULE._proc_start_ticks(os.getpid()),
+            )
+        assert calls == []
+    finally:
+        listener.close()
+
+
+def test_directed_input_rejects_untrusted_abstract_client_before_forwarding(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    socket_path = tmp_path / "kitty.sock"
+    original = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    original.bind(str(socket_path))
+    original.listen(4)
+    os.chmod(socket_path, 0o600)
+    observed = socket_path.stat()
+    record = {
+        "address": f"unix:{socket_path}",
+        "device": observed.st_dev,
+        "inode": observed.st_ino,
+        "mode": 0o600,
+    }
+    received = bytearray()
+    received_done = threading.Event()
+
+    def receive_original() -> None:
+        connection, _ = original.accept()
+        with connection:
+            while True:
+                payload = connection.recv(4096)
+                if not payload:
+                    break
+                received.extend(payload)
+        received_done.set()
+
+    receiver = threading.Thread(target=receive_original, daemon=True)
+    receiver.start()
+
+    class FakeProcess:
+        pid = os.getpid()
+        returncode: int | None = None
+
+        def __init__(self, argv: list[str], **_kwargs: object) -> None:
+            self.argv = argv
+
+        def communicate(
+            self, input: str | None = None, **_kwargs: object
+        ) -> tuple[str, str]:
+            assert input == "secret\n"
+            endpoint = self.argv[self.argv.index("--to") + 1]
+            assert isinstance(endpoint, str) and endpoint.startswith("unix:@")
+            context = mp.get_context("spawn")
+            connected = context.Event()
+            release = context.Event()
+            attacker = context.Process(
+                target=_connect_abstract_and_send,
+                args=(endpoint, b"attacker-bytes", connected, release),
+            )
+            attacker.start()
+            assert connected.wait(timeout=2)
+            release.set()
+            client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            try:
+                client.connect("\0" + endpoint.removeprefix("unix:@"))
+                client.sendall(b"trusted-kitty-frame")
+                client.shutdown(socket.SHUT_WR)
+            finally:
+                client.close()
+            attacker.join(timeout=2)
+            assert attacker.exitcode == 0
+            self.returncode = 0
+            return "", ""
+
+        def poll(self) -> int | None:
+            return self.returncode
+
+        def kill(self) -> None:
+            self.returncode = -9
+
+    monkeypatch.setattr(MODULE.subprocess, "Popen", FakeProcess)
+    try:
+        MODULE._send_text_through_bound_socket(
+            kitty_executable="/usr/bin/kitty",
+            socket_record=record,
+            window_id="7",
+            text="secret\n",
+            terminal_pid=os.getpid(),
+            terminal_start_ticks=MODULE._proc_start_ticks(os.getpid()),
+        )
+        assert received_done.wait(timeout=1)
+        assert bytes(received) == b"trusted-kitty-frame"
+    finally:
+        original.close()
+        receiver.join(timeout=1)
 
 
 def test_directed_input_keeps_original_inode_when_path_replaced_during_invocation(
@@ -8634,6 +8791,8 @@ def test_directed_input_keeps_original_inode_when_path_replaced_during_invocatio
         "device": original_stat.st_dev,
         "inode": original_stat.st_ino,
         "mode": 0o600,
+        "terminal_pid": os.getpid(),
+        "terminal_start_ticks": MODULE._proc_start_ticks(os.getpid()),
     }
     replacement: socket.socket | None = None
     received = bytearray()
@@ -8653,31 +8812,49 @@ def test_directed_input_keeps_original_inode_when_path_replaced_during_invocatio
     receiver.start()
     calls: dict[str, object] = {}
 
-    def fake_run(argv: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
-        calls["argv"] = argv
-        calls["kwargs"] = kwargs
-        nonlocal replacement
-        socket_path.unlink()
-        replacement = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        replacement.bind(str(socket_path))
-        replacement.listen(1)
-        os.chmod(socket_path, 0o600)
-        endpoint = argv[argv.index("--to") + 1]
-        assert isinstance(endpoint, str) and endpoint.startswith("unix:@")
-        client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        client.connect("\0" + endpoint.removeprefix("unix:@"))
-        client.sendall(b"kitty-send-text-frame")
-        client.shutdown(socket.SHUT_WR)
-        client.close()
-        return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
+    class FakeProcess:
+        pid = os.getpid()
+        returncode: int | None = None
 
-    monkeypatch.setattr(MODULE.subprocess, "run", fake_run)
+        def __init__(self, argv: list[str], **_kwargs: object) -> None:
+            self.argv = argv
+
+        def communicate(
+            self, input: str | None = None, **_kwargs: object
+        ) -> tuple[str, str]:
+            calls["argv"] = self.argv
+            calls["input"] = input
+            nonlocal replacement
+            socket_path.unlink()
+            replacement = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            replacement.bind(str(socket_path))
+            replacement.listen(1)
+            os.chmod(socket_path, 0o600)
+            endpoint = self.argv[self.argv.index("--to") + 1]
+            assert isinstance(endpoint, str) and endpoint.startswith("unix:@")
+            client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            client.connect("\0" + endpoint.removeprefix("unix:@"))
+            client.sendall(b"kitty-send-text-frame")
+            client.shutdown(socket.SHUT_WR)
+            client.close()
+            self.returncode = 0
+            return "", ""
+
+        def poll(self) -> int | None:
+            return self.returncode
+
+        def kill(self) -> None:
+            self.returncode = -9
+
+    monkeypatch.setattr(MODULE.subprocess, "Popen", FakeProcess)
     try:
         MODULE._send_text_through_bound_socket(
             kitty_executable="/usr/bin/kitty",
             socket_record=record,
             window_id="7",
             text="secret\n",
+            terminal_pid=record["terminal_pid"],
+            terminal_start_ticks=record["terminal_start_ticks"],
         )
         assert received_done.wait(timeout=1)
         assert bytes(received) == b"kitty-send-text-frame"
@@ -8692,7 +8869,7 @@ def test_directed_input_keeps_original_inode_when_path_replaced_during_invocatio
         assert argv[argv.index("--match") + 1] == "id:7"
         assert "send-text" in argv
         assert "--stdin" in argv
-        assert calls["kwargs"]["input"] == "secret\n"
+        assert calls["input"] == "secret\n"
     finally:
         original.close()
         if replacement is not None:
@@ -8733,7 +8910,7 @@ def test_directed_input_rechecks_bound_holder_identity_before_send(
     )
     monkeypatch.setattr(
         MODULE.subprocess,
-        "run",
+        "Popen",
         lambda *_args, **_kwargs: pytest.fail(
             "directed input bypassed holder identity recheck"
         ),
@@ -8780,7 +8957,7 @@ def test_directed_input_rechecks_kitty_dedication_before_send(
     monkeypatch.setattr(MODULE, "_proc_argv", lambda _pid: ["/usr/bin/kitty", "--detach"])
     monkeypatch.setattr(
         MODULE.subprocess,
-        "run",
+        "Popen",
         lambda *_args, **_kwargs: pytest.fail("directed input bypassed dedication recheck"),
     )
     try:
