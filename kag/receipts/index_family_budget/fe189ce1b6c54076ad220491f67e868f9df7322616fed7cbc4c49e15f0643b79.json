@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 24196206,
+  "allowed_tracked_bytes": 38588490,
+  "approved_by": "repository-owner",
+  "base_ref": "639d4743e24d24cf788d13a38b22e9b1cb2299bc",
+  "changed_generated_bytes": 24196206,
+  "changed_generated_files": 221,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "fe189ce1b6c54076ad220491f67e868f9df7322616fed7cbc4c49e15f0643b79",
+  "reason": "Refresh derived owner family for d83927659 staging-victim restoration and exact holder-receipt claim rollback; standing budgets unchanged.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 38588490,
+  "tracked_bytes_max": 24117248
+}
