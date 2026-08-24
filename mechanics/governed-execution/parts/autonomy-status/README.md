@@ -19,15 +19,23 @@ route-api or the status command an owner or archival authority.
 
 Parity-aware source selection is fail-closed and owner-qualified:
 
-1. An explicit `AOA_SOURCE_ROOT` is the operator binding and has precedence.
-   If it is invalid, the resolver does not silently fall through to another
-   checkout.
-2. When the helper is executed from source, its own root is accepted only when
-   the source shape is present, the first non-empty `README.md` line is exactly
+1. An explicit `AOA_SOURCE_ROOT` is only a lookup coordinate; it must be paired
+   with an absolute shared `AOA_SOURCE_IDENTITY` receipt binding exact Git
+   `HEAD`/tree coordinates and selected source-surface digests for the three
+   consumers. If it is invalid, the resolver does not silently fall through to
+   another checkout.
+2. When the helper is executed from source, its own root derives a current
+   content identity. This preserves legitimate isolated worktrees without
+   relying on a canonical path.
+3. The source shape remains exact: the first non-empty `README.md` line is
    `# abyss-stack`, and the owner line in the first eight `AGENTS.md` lines is
-   exactly 'Root route card for `abyss-stack`.'.
-3. The deployed `Configs` projection, `~/src/abyss-stack`, and sibling or
-   workspace discovery are not implicit source candidates.
+   exactly 'Root route card for `abyss-stack`.'. The deployed `Configs`
+   projection, `~/src/abyss-stack`, and sibling or workspace discovery are not
+   implicit source candidates.
+4. Relative paths, `/proc/self/cwd`, and symlink aliases are accepted only when
+   covered by the identity contract. The identity and source-root device/inode
+   are revalidated immediately before parity use; replacement or drift remains
+   `source_root_unresolved`.
 
 If no valid binding exists, the parity check reports
 `source_root_unresolved`. That is a source-input truth gap, not runtime health,

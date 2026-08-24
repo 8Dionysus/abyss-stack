@@ -9,6 +9,10 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Close same-shape source-root identity gaps across diagnostic, autonomy-status,
+  and governed-runner consumers with one content-addressed Git/surface contract,
+  alias-safe binding, and resolve/use replacement revalidation while preserving
+  legitimate isolated worktrees.
 - Bound the Codex agent-routing adapter's wait for an event-keyed relay
   context when matching `PreToolUse` groups run concurrently, while retaining
   fail-closed behavior when the context remains unavailable.

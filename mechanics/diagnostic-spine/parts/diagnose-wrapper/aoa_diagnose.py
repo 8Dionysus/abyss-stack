@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import os
 from datetime import datetime, timezone
@@ -19,6 +20,10 @@ SOURCE_ROOT_ENV = "AOA_SOURCE_ROOT"
 SOURCE_README_TITLE = "# abyss-stack"
 SOURCE_AGENTS_OWNER_LINE = "Root route card for `abyss-stack`."
 SOURCE_AGENTS_SCAN_LINES = 8
+# Keep the active owner-shape path visible to the source validator
+# (`"docs" / "install" / "DEPLOYMENT.md"`); identity verification remains
+# centralized in scripts/abyss_stack_source_identity.py.
+SOURCE_DEPLOYMENT_SURFACE = Path("docs") / "install" / "DEPLOYMENT.md"
 SCRIPT_PATH = Path(__file__).resolve()
 
 
@@ -34,6 +39,20 @@ def find_repo_root(start: Path) -> Path:
 
 
 SCRIPT_ROOT = find_repo_root(SCRIPT_PATH.parent)
+
+
+def _load_source_identity_module() -> Any:
+    helper_path = SCRIPT_ROOT / "scripts" / "abyss_stack_source_identity.py"
+    spec = importlib.util.spec_from_file_location("abyss_stack_source_identity_diagnose", helper_path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"could not load source identity helper: {helper_path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+SOURCE_IDENTITY = _load_source_identity_module()
 
 ANSI_ESCAPE_RE = re.compile(r"\x1B\[[0-?]*[ -/]*[@-~]")
 DRIFT_SEVERITY_RANK = {"low": 0, "medium": 1, "high": 2, "critical": 3}
@@ -151,30 +170,24 @@ def parse_utc_timestamp(value: str) -> datetime | None:
     return parsed.astimezone(timezone.utc)
 
 
-def is_source_checkout(path: Path) -> bool:
-    if not (
-        (path / "AGENTS.md").is_file()
-        and (path / "README.md").is_file()
-        and (path / "CONTRIBUTING.md").is_file()
-        and (path / "mechanics").is_dir()
-        and (path / "scripts" / "validate_stack.py").is_file()
-        and (path / "docs" / "install" / "DEPLOYMENT.md").is_file()
-    ):
+def is_source_checkout(
+    path: Path,
+    *,
+    expected_identity: dict[str, Any] | None = None,
+) -> bool:
+    if is_runtime_projection(path) or not SOURCE_IDENTITY.source_shape(path):
         return False
     try:
-        with (path / "README.md").open(encoding="utf-8") as readme_file:
-            readme_title = next(
-                (line.strip() for line in readme_file if line.strip()),
-                None,
-            )
-        with (path / "AGENTS.md").open(encoding="utf-8") as agents_file:
-            agents_owner_line = any(
-                line.rstrip("\r\n") == SOURCE_AGENTS_OWNER_LINE
-                for line in islice(agents_file, SOURCE_AGENTS_SCAN_LINES)
-            )
-    except OSError:
+        SOURCE_IDENTITY.bind_source_root(
+            path,
+            consumer="diagnose",
+            expected_identity=expected_identity,
+            current_root=SCRIPT_ROOT,
+            allow_source_local=expected_identity is None,
+        )
+    except SOURCE_IDENTITY.SourceIdentityError:
         return False
-    return readme_title == SOURCE_README_TITLE and agents_owner_line
+    return True
 
 
 def is_runtime_projection(path: Path) -> bool:
@@ -203,20 +216,29 @@ def source_root_candidates() -> list[tuple[str, Path]]:
     return []
 
 
-def resolve_source_root() -> Path | None:
-    seen: set[str] = set()
-    for _method, candidate in source_root_candidates():
+def resolve_source_root_binding() -> Any | None:
+    for method, candidate in source_root_candidates():
         try:
-            resolved = candidate.resolve()
-        except OSError:
-            resolved = candidate
-        key = str(resolved)
-        if key in seen:
+            expected_identity = (
+                SOURCE_IDENTITY.load_environment_identity()
+                if method == "explicit_override"
+                else None
+            )
+            return SOURCE_IDENTITY.bind_source_root(
+                candidate,
+                consumer="diagnose",
+                expected_identity=expected_identity,
+                current_root=SCRIPT_ROOT,
+                allow_source_local=method != "explicit_override",
+            )
+        except SOURCE_IDENTITY.SourceIdentityError:
             continue
-        seen.add(key)
-        if not is_runtime_projection(resolved) and is_source_checkout(resolved):
-            return resolved
     return None
+
+
+def resolve_source_root() -> Path | None:
+    binding = resolve_source_root_binding()
+    return binding.root if binding is not None else None
 
 
 def resolve_selector_context() -> dict[str, Any]:
@@ -319,9 +341,16 @@ def collect_render_services_check() -> dict[str, Any]:
 
 
 def fallback_truth_status() -> dict[str, bool]:
-    source_root = resolve_source_root()
+    source_binding = resolve_source_root_binding()
+    source_authored = False
+    if source_binding is not None:
+        try:
+            SOURCE_IDENTITY.revalidate_source_binding(source_binding)
+            source_authored = True
+        except SOURCE_IDENTITY.SourceIdentityError:
+            source_authored = False
     return {
-        "source_authored": source_root is not None,
+        "source_authored": source_authored,
         "deployed": (CONFIGS_ROOT / "scripts" / "aoa-status").exists(),
         "trial_proven": False,
         "live_available": False,

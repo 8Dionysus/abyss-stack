@@ -1,5 +1,8 @@
 import importlib.util
+import json
 import os
+import shutil
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -57,7 +60,20 @@ def make_source_checkout(
     (root / "CONTRIBUTING.md").write_text("contributing\n", encoding="utf-8")
     (root / "scripts" / "validate_stack.py").write_text("# validator\n", encoding="utf-8")
     (root / "docs" / "install" / "DEPLOYMENT.md").write_text("deploy\n", encoding="utf-8")
+    subprocess.run(["git", "init", "-q"], cwd=root, check=True, capture_output=True, text=True)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=root, check=True, capture_output=True, text=True)
+    subprocess.run(["git", "config", "user.name", "Test User"], cwd=root, check=True, capture_output=True, text=True)
+    subprocess.run(["git", "add", "."], cwd=root, check=True, capture_output=True, text=True)
+    subprocess.run(["git", "commit", "-qm", "fixture"], cwd=root, check=True, capture_output=True, text=True)
     return root
+
+
+def write_source_identity(module, root: Path, receipt_path: Path, *, consumer: str = "autonomy-status") -> Path:
+    receipt_path.write_text(
+        json.dumps(module.SOURCE_IDENTITY.make_source_identity(root, consumer=consumer), indent=2) + "\n",
+        encoding="utf-8",
+    )
+    return receipt_path
 
 
 def make_check(*, status: str, summary: str, detail: dict | None = None) -> dict:
@@ -177,16 +193,18 @@ class AutonomyCollectorTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             source_root = Path(tmpdir) / "source"
             make_source_checkout(source_root)
+            receipt_path = write_source_identity(self.module, source_root, Path(tmpdir) / "source-identity.json", consumer="shared")
 
-            with patch.dict(os.environ, {"AOA_SOURCE_ROOT": str(source_root)}):
+            with patch.dict(os.environ, {"AOA_SOURCE_ROOT": str(source_root), "AOA_SOURCE_IDENTITY": str(receipt_path)}):
                 self.assertEqual(self.module.resolve_source_root(), source_root.resolve())
 
     def test_explicit_override_wins_over_conflicting_script_root(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             explicit_root = make_source_checkout(Path(tmpdir) / "explicit")
             script_root = make_source_checkout(Path(tmpdir) / "script")
+            receipt_path = write_source_identity(self.module, explicit_root, Path(tmpdir) / "source-identity.json", consumer="shared")
 
-            with patch.dict(os.environ, {"AOA_SOURCE_ROOT": str(explicit_root)}):
+            with patch.dict(os.environ, {"AOA_SOURCE_ROOT": str(explicit_root), "AOA_SOURCE_IDENTITY": str(receipt_path)}):
                 with patch.object(self.module, "SCRIPT_ROOT", script_root):
                     self.assertEqual(self.module.resolve_source_root(), explicit_root.resolve())
 
@@ -232,6 +250,42 @@ class AutonomyCollectorTests(unittest.TestCase):
                         with patch.object(self.module, "SCRIPT_ROOT", configs_root):
                             with patch.object(self.module, "HOME_SOURCE_ROOT", home_source_root, create=True):
                                 self.assertIsNone(self.module.resolve_source_root())
+
+    def test_same_shape_foreign_checkout_requires_exact_identity_and_alias_is_allowed(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            foreign_root = make_source_checkout(Path(tmpdir) / "foreign")
+            alias_root = Path(tmpdir) / "foreign-alias"
+            alias_root.symlink_to(foreign_root, target_is_directory=True)
+            receipt_path = write_source_identity(self.module, foreign_root, Path(tmpdir) / "foreign-identity.json", consumer="shared")
+
+            with patch.dict(os.environ, {"AOA_SOURCE_ROOT": str(foreign_root)}, clear=True):
+                self.assertIsNone(self.module.resolve_source_root())
+
+            with patch.dict(
+                os.environ,
+                {"AOA_SOURCE_ROOT": str(alias_root), "AOA_SOURCE_IDENTITY": str(receipt_path)},
+                clear=True,
+            ):
+                self.assertEqual(self.module.resolve_source_root(), foreign_root.resolve())
+
+    def test_source_replacement_fails_binding_revalidation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source_root = make_source_checkout(Path(tmpdir) / "source")
+            receipt_path = write_source_identity(self.module, source_root, Path(tmpdir) / "source-identity.json", consumer="shared")
+            with patch.dict(
+                os.environ,
+                {"AOA_SOURCE_ROOT": str(source_root), "AOA_SOURCE_IDENTITY": str(receipt_path)},
+                clear=True,
+            ):
+                binding = self.module.resolve_source_root_binding()
+                self.assertIsNotNone(binding)
+                replacement_root = make_source_checkout(Path(tmpdir) / "replacement")
+                shutil.rmtree(source_root)
+                replacement_root.rename(source_root)
+                with self.assertRaises(self.module.SOURCE_IDENTITY.SourceIdentityError):
+                    self.module.SOURCE_IDENTITY.revalidate_source_binding(binding)
+                parity = self.module.run_parity_check(source_root, binding=binding)
+                self.assertEqual(parity["detail"]["reason"], "source_root_unresolved")
 
     def test_foreign_owner_marker_is_not_a_source_binding(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

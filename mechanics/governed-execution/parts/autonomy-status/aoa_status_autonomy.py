@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import os
 from itertools import islice
@@ -19,6 +20,10 @@ SOURCE_ROOT_ENV = "AOA_SOURCE_ROOT"
 SOURCE_README_TITLE = "# abyss-stack"
 SOURCE_AGENTS_OWNER_LINE = "Root route card for `abyss-stack`."
 SOURCE_AGENTS_SCAN_LINES = 8
+# Keep the active owner-shape path visible to the source validator
+# (`"docs" / "install" / "DEPLOYMENT.md"`); identity verification remains
+# centralized in scripts/abyss_stack_source_identity.py.
+SOURCE_DEPLOYMENT_SURFACE = Path("docs") / "install" / "DEPLOYMENT.md"
 ROUTE_API_BASE_URL = os.environ.get("AOA_ROUTE_API_BASE_URL", "http://127.0.0.1:5402")
 SCRIPT_PATH = Path(__file__).resolve()
 
@@ -35,6 +40,20 @@ def find_repo_root(start: Path) -> Path:
 
 
 SCRIPT_ROOT = find_repo_root(SCRIPT_PATH.parent)
+
+
+def _load_source_identity_module() -> Any:
+    helper_path = SCRIPT_ROOT / "scripts" / "abyss_stack_source_identity.py"
+    spec = importlib.util.spec_from_file_location("abyss_stack_source_identity_autonomy", helper_path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"could not load source identity helper: {helper_path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+SOURCE_IDENTITY = _load_source_identity_module()
 
 PRESERVED_LONG_HORIZON_PROGRAM_ID = "w5-langgraph-llamacpp-v1"
 PRESERVED_LONG_HORIZON_INDEX_NAME = "W5-long-horizon-index.json"
@@ -79,30 +98,24 @@ PODMAN_INSPECT_MISSING_MARKERS = (
 )
 
 
-def is_source_checkout(path: Path) -> bool:
-    if not (
-        (path / "AGENTS.md").is_file()
-        and (path / "README.md").is_file()
-        and (path / "CONTRIBUTING.md").is_file()
-        and (path / "mechanics").is_dir()
-        and (path / "scripts" / "validate_stack.py").is_file()
-        and (path / "docs" / "install" / "DEPLOYMENT.md").is_file()
-    ):
+def is_source_checkout(
+    path: Path,
+    *,
+    expected_identity: dict[str, Any] | None = None,
+) -> bool:
+    if is_runtime_projection(path) or not SOURCE_IDENTITY.source_shape(path):
         return False
     try:
-        with (path / "README.md").open(encoding="utf-8") as readme_file:
-            readme_title = next(
-                (line.strip() for line in readme_file if line.strip()),
-                None,
-            )
-        with (path / "AGENTS.md").open(encoding="utf-8") as agents_file:
-            agents_owner_line = any(
-                line.rstrip("\r\n") == SOURCE_AGENTS_OWNER_LINE
-                for line in islice(agents_file, SOURCE_AGENTS_SCAN_LINES)
-            )
-    except OSError:
+        SOURCE_IDENTITY.bind_source_root(
+            path,
+            consumer="autonomy-status",
+            expected_identity=expected_identity,
+            current_root=SCRIPT_ROOT,
+            allow_source_local=expected_identity is None,
+        )
+    except SOURCE_IDENTITY.SourceIdentityError:
         return False
-    return readme_title == SOURCE_README_TITLE and agents_owner_line
+    return True
 
 
 def is_runtime_projection(path: Path) -> bool:
@@ -131,20 +144,29 @@ def source_root_candidates() -> list[tuple[str, Path]]:
     return []
 
 
-def resolve_source_root() -> Path | None:
-    seen: set[str] = set()
-    for _method, candidate in source_root_candidates():
+def resolve_source_root_binding() -> Any | None:
+    for method, candidate in source_root_candidates():
         try:
-            resolved = candidate.resolve()
-        except OSError:
-            resolved = candidate
-        key = str(resolved)
-        if key in seen:
+            expected_identity = (
+                SOURCE_IDENTITY.load_environment_identity()
+                if method == "explicit_override"
+                else None
+            )
+            return SOURCE_IDENTITY.bind_source_root(
+                candidate,
+                consumer="autonomy-status",
+                expected_identity=expected_identity,
+                current_root=SCRIPT_ROOT,
+                allow_source_local=method != "explicit_override",
+            )
+        except SOURCE_IDENTITY.SourceIdentityError:
             continue
-        seen.add(key)
-        if not is_runtime_projection(resolved) and is_source_checkout(resolved):
-            return resolved
     return None
+
+
+def resolve_source_root() -> Path | None:
+    binding = resolve_source_root_binding()
+    return binding.root if binding is not None else None
 
 
 def run_command(
@@ -294,7 +316,11 @@ def make_check(
     return payload
 
 
-def run_parity_check(source_root: Path | None) -> dict[str, Any]:
+def run_parity_check(
+    source_root: Path | None,
+    *,
+    binding: Any | None = None,
+) -> dict[str, Any]:
     if source_root is None:
         return make_check(
             status="fail",
@@ -302,13 +328,39 @@ def run_parity_check(source_root: Path | None) -> dict[str, Any]:
             detail={"reason": "source_root_unresolved"},
         )
 
+    try:
+        if binding is None:
+            expected_identity = (
+                SOURCE_IDENTITY.load_environment_identity()
+                if os.environ.get(SOURCE_ROOT_ENV)
+                else None
+            )
+            binding = SOURCE_IDENTITY.bind_source_root(
+                source_root,
+                consumer="autonomy-status",
+                expected_identity=expected_identity,
+                current_root=SCRIPT_ROOT,
+                allow_source_local=expected_identity is None,
+            )
+        resolved_source_root = SOURCE_IDENTITY.revalidate_source_binding(binding)
+    except SOURCE_IDENTITY.SourceIdentityError as exc:
+        return make_check(
+            status="fail",
+            summary="source root unresolved for parity check",
+            detail={"reason": "source_root_unresolved", "identity_error": str(exc)},
+        )
+
     result = run_command(
-        [sys.executable, str(source_root / "scripts" / "validate_stack.py"), "--parity-check"],
-        cwd=source_root,
+        [
+            sys.executable,
+            str(resolved_source_root / "scripts" / "validate_stack.py"),
+            "--parity-check",
+        ],
+        cwd=resolved_source_root,
         timeout_s=120.0,
     )
     detail = {
-        "source_root": str(source_root),
+        "source_root": str(resolved_source_root),
         "deployed_configs_root": str(CONFIGS_ROOT),
         "exit_code": result["exit_code"],
         "stdout": result["stdout"].strip(),
@@ -816,8 +868,26 @@ def collect_autonomy_status(
     *,
     source_root: Path | None = None,
 ) -> dict[str, Any]:
-    resolved_source_root = source_root or resolve_source_root()
-    parity = run_parity_check(resolved_source_root)
+    try:
+        source_binding = (
+            resolve_source_root_binding()
+            if source_root is None
+            else SOURCE_IDENTITY.bind_source_root(
+                source_root,
+                consumer="autonomy-status",
+                expected_identity=(
+                    SOURCE_IDENTITY.load_environment_identity()
+                    if os.environ.get(SOURCE_ROOT_ENV)
+                    else None
+                ),
+                current_root=SCRIPT_ROOT,
+                allow_source_local=not bool(os.environ.get(SOURCE_ROOT_ENV)),
+            )
+        )
+    except SOURCE_IDENTITY.SourceIdentityError:
+        source_binding = None
+    resolved_source_root = source_binding.root if source_binding is not None else None
+    parity = run_parity_check(resolved_source_root, binding=source_binding)
     verify = run_llamacpp_verify()
     route_requirement = route_api_requirement()
     route_health = fetch_route_api_health(route_requirement)

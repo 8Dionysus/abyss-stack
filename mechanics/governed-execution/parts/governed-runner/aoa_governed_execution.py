@@ -33,6 +33,22 @@ def find_repo_root(start: Path) -> Path:
 
 
 SCRIPT_ROOT = find_repo_root(SCRIPT_PATH.parent)
+
+
+def _load_source_identity_module() -> Any:
+    helper_path = SCRIPT_ROOT / "scripts" / "abyss_stack_source_identity.py"
+    spec = importlib.util.spec_from_file_location("abyss_stack_source_identity_runner", helper_path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"could not load source identity helper: {helper_path}")
+    module = importlib.util.module_from_spec(spec)
+    import sys
+
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+SOURCE_IDENTITY = _load_source_identity_module()
 STACK_ROOT = Path(os.environ.get("AOA_STACK_ROOT", "/srv/AbyssOS/abyss-stack"))
 CONFIGS_ROOT = Path(os.environ.get("AOA_CONFIGS_ROOT", str(STACK_ROOT / "Configs")))
 SOURCE_ROOT_ENV = "AOA_SOURCE_ROOT"
@@ -393,30 +409,52 @@ def is_runtime_projection(path: Path) -> bool:
     return False
 
 
-def is_abyss_stack_checkout(path: Path) -> bool:
-    if is_runtime_projection(path) or not (
-        (path / "AGENTS.md").is_file()
-        and (path / "README.md").is_file()
-        and (path / "CONTRIBUTING.md").is_file()
-        and (path / "mechanics").is_dir()
-        and (path / "scripts" / "validate_stack.py").is_file()
-        and (path / "docs" / "install" / "DEPLOYMENT.md").is_file()
-    ):
+def is_abyss_stack_checkout(
+    path: Path,
+    *,
+    expected_identity: dict[str, Any] | None = None,
+) -> bool:
+    if is_runtime_projection(path) or not SOURCE_IDENTITY.source_shape(path):
+        return False
+    identity = expected_identity
+    if identity is None:
+        try:
+            normalized_path, _path_stat = SOURCE_IDENTITY.normalize_root(path)
+            normalized_script_root, _script_stat = SOURCE_IDENTITY.normalize_root(SCRIPT_ROOT)
+            if (
+                normalized_path == normalized_script_root
+                and not os.environ.get(SOURCE_ROOT_ENV)
+            ):
+                identity = SOURCE_IDENTITY.make_source_identity(
+                    normalized_path,
+                    consumer="governed-runner",
+                )
+            elif os.environ.get(SOURCE_ROOT_ENV):
+                identity = SOURCE_IDENTITY.load_environment_identity()
+        except SOURCE_IDENTITY.SourceIdentityError:
+            return False
+    else:
+        try:
+            normalized_path, _path_stat = SOURCE_IDENTITY.normalize_root(path)
+            if os.environ.get(SOURCE_ROOT_ENV):
+                normalized_explicit_root, _explicit_stat = SOURCE_IDENTITY.normalize_root(
+                    os.environ[SOURCE_ROOT_ENV]
+                )
+                if normalized_path != normalized_explicit_root:
+                    return False
+        except SOURCE_IDENTITY.SourceIdentityError:
+            return False
+    if identity is None:
         return False
     try:
-        with (path / "README.md").open(encoding="utf-8") as readme_file:
-            readme_title = next(
-                (line.strip() for line in readme_file if line.strip()),
-                None,
-            )
-        with (path / "AGENTS.md").open(encoding="utf-8") as agents_file:
-            agents_owner_line = any(
-                line.rstrip("\r\n") == SOURCE_AGENTS_OWNER_LINE
-                for line in islice(agents_file, SOURCE_AGENTS_SCAN_LINES)
-            )
-    except OSError:
+        SOURCE_IDENTITY.verify_source_identity(
+            path,
+            identity,
+            consumer="governed-runner",
+        )
+    except SOURCE_IDENTITY.SourceIdentityError:
         return False
-    return readme_title == SOURCE_README_TITLE and agents_owner_line
+    return True
 
 
 def target_checkout_detector(target_id: str) -> Callable[[Path], bool]:
@@ -469,20 +507,91 @@ def candidate_repo_roots_for_target(
     return []
 
 
+def _explicit_source_identity() -> dict[str, Any] | None:
+    if not os.environ.get(SOURCE_ROOT_ENV):
+        return None
+    return SOURCE_IDENTITY.load_environment_identity()
+
+
+def _bind_repo_root(
+    path: str | Path,
+    *,
+    expected_identity: dict[str, Any] | None = None,
+) -> Any:
+    identity = expected_identity
+    normalized_path, _path_stat = SOURCE_IDENTITY.normalize_root(path)
+    explicit_source_root = bool(os.environ.get(SOURCE_ROOT_ENV))
+    if explicit_source_root:
+        normalized_explicit_root, _explicit_stat = SOURCE_IDENTITY.normalize_root(
+            os.environ[SOURCE_ROOT_ENV]
+        )
+        if normalized_path != normalized_explicit_root:
+            raise SOURCE_IDENTITY.SourceIdentityError(
+                "repo root conflicts with the explicit AOA_SOURCE_ROOT binding"
+            )
+        configured_identity = _explicit_source_identity()
+        SOURCE_IDENTITY.verify_source_identity(
+            normalized_explicit_root,
+            configured_identity,
+            consumer="governed-runner",
+        )
+        if identity is None:
+            identity = configured_identity
+    current_root = SOURCE_IDENTITY.normalize_root(SCRIPT_ROOT)[0]
+    allow_source_local = not explicit_source_root and normalized_path == current_root
+    return SOURCE_IDENTITY.bind_source_root(
+        normalized_path,
+        consumer="governed-runner",
+        expected_identity=identity,
+        current_root=current_root,
+        allow_source_local=allow_source_local,
+    )
+
+
+def _revalidate_repo_root(
+    path: str | Path,
+    *,
+    expected_identity: dict[str, Any],
+    expected_device: int | None = None,
+    expected_inode: int | None = None,
+) -> Any:
+    binding = _bind_repo_root(path, expected_identity=expected_identity)
+    if expected_device is not None and binding.device != expected_device:
+        raise SOURCE_IDENTITY.SourceIdentityError("source root device changed during governed execution")
+    if expected_inode is not None and binding.inode != expected_inode:
+        raise SOURCE_IDENTITY.SourceIdentityError("source root inode changed during governed execution")
+    SOURCE_IDENTITY.revalidate_source_binding(binding)
+    return binding
+
+
 def resolve_default_repo_root(target_id: str = "abyss-stack", *, policy: dict[str, Any] | None = None) -> Path:
     detector = target_checkout_detector(target_id)
     candidates = candidate_repo_roots_for_target(target_id, policy=policy)
     explicit_root = bool(os.environ.get(SOURCE_ROOT_ENV))
+    try:
+        expected_identity = _explicit_source_identity() if explicit_root else None
+    except SOURCE_IDENTITY.SourceIdentityError as exc:
+        raise RuntimeError(
+            "source_root_unresolved: explicit AOA_SOURCE_ROOT requires a valid "
+            f"AOA_SOURCE_IDENTITY contract ({exc})"
+        ) from exc
     if candidates and not explicit_root:
-        return candidates[0].resolve()
+        try:
+            return _bind_repo_root(candidates[0]).root
+        except SOURCE_IDENTITY.SourceIdentityError:
+            pass
     seen: set[str] = set()
     for candidate in candidates:
-        key = str(candidate)
+        try:
+            normalized_candidate = SOURCE_IDENTITY.normalize_root(candidate)[0]
+        except SOURCE_IDENTITY.SourceIdentityError:
+            continue
+        key = str(normalized_candidate)
         if key in seen:
             continue
         seen.add(key)
-        if detector(candidate):
-            return candidate.resolve()
+        if detector(normalized_candidate, expected_identity=expected_identity):
+            return normalized_candidate
     raise RuntimeError(
         "source_root_unresolved: governed execution requires a valid explicit "
         "AOA_SOURCE_ROOT or an executing abyss-stack source checkout"
@@ -492,12 +601,17 @@ def resolve_default_repo_root(target_id: str = "abyss-stack", *, policy: dict[st
 def default_request_template() -> dict[str, Any]:
     policy = load_policy_or_none()
     target_id = str(((policy or {}).get("global_rules") or {}).get("default_target_id") or "abyss-stack")
+    repo_root = resolve_default_repo_root(target_id, policy=policy)
     return {
         "goal": "Describe the bounded abyss-stack change you want to propose.",
         "target_id": target_id,
         "playbook_id": "AOA-P-0011",
         "profile_class": DEFAULT_PROFILE_CLASS,
-        "repo_root": str(resolve_default_repo_root(target_id, policy=policy)),
+        "repo_root": str(repo_root),
+        "source_identity": SOURCE_IDENTITY.make_source_identity(
+            repo_root,
+            consumer="governed-runner",
+        ),
         "memo": None,
         "break_glass_reason": None,
         "canary_id": None,
@@ -516,6 +630,9 @@ def validate_request_shape(request: dict[str, Any]) -> None:
         raise RuntimeError("request profile_class must be a non-empty string")
     if not isinstance(request.get("repo_root"), str) or not request["repo_root"].strip():
         raise RuntimeError("request repo_root must be a non-empty string")
+    source_identity = request.get("source_identity")
+    if source_identity is not None and not isinstance(source_identity, dict):
+        raise RuntimeError("request source_identity must be an object when present")
     memo = request.get("memo")
     if memo is not None and not isinstance(memo, dict):
         raise RuntimeError("request memo must be an object when present")
@@ -548,22 +665,29 @@ def request_from_canary(
     *,
     catalog_path: str | Path | None = None,
     repo_root: str | Path | None = None,
+    source_identity: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     catalog, _catalog_path = load_canary_catalog(catalog_path)
     canary = lookup_canary(catalog, canary_id)
     policy = load_policy_or_none()
     target_id = str(canary["target_id"])
-    resolved_repo_root = (
-        normalize_repo_root(repo_root, target_id=target_id)
-        if repo_root is not None
-        else resolve_default_repo_root(target_id, policy=policy)
-    )
+    target_checkout_detector(target_id)
+    if repo_root is not None:
+        source_binding = _bind_repo_root(
+            repo_root,
+            expected_identity=source_identity,
+        )
+    else:
+        resolved_default = resolve_default_repo_root(target_id, policy=policy)
+        source_binding = _bind_repo_root(resolved_default)
+    resolved_repo_root = source_binding.root
     payload: dict[str, Any] = {
         "goal": canary["goal"],
         "target_id": target_id,
         "playbook_id": canary["playbook_id"],
         "profile_class": canary.get("profile_class") or DEFAULT_PROFILE_CLASS,
         "repo_root": str(resolved_repo_root),
+        "source_identity": source_binding.identity,
         "memo": copy.deepcopy(canary.get("memo")),
         "break_glass_reason": None,
         "canary_id": canary["canary_id"],
@@ -578,6 +702,7 @@ def materialize_canary_requests(
     *,
     catalog_path: str | Path | None = None,
     repo_root: str | Path | None = None,
+    source_identity: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     target_root = Path(write_dir).expanduser()
     target_root.mkdir(parents=True, exist_ok=True)
@@ -590,6 +715,7 @@ def materialize_canary_requests(
             str(entry["canary_id"]),
             catalog_path=resolved_catalog,
             repo_root=repo_root,
+            source_identity=source_identity,
         )
         target = target_root / f"{entry['canary_id']}.request.json"
         target.write_text(json.dumps(request, indent=2, ensure_ascii=True) + "\n", encoding="utf-8")
@@ -915,11 +1041,24 @@ def evaluate_autonomy_gate(
     }
 
 
-def normalize_repo_root(path: str | Path, *, target_id: str) -> Path:
-    repo_root = Path(path).expanduser().resolve()
-    if not target_checkout_detector(target_id)(repo_root):
-        raise RuntimeError(f"repo_root does not match governed target {target_id}: {repo_root}")
-    return repo_root
+def normalize_repo_root(
+    path: str | Path,
+    *,
+    target_id: str,
+    expected_identity: dict[str, Any] | None = None,
+) -> Path:
+    target_checkout_detector(target_id)
+    try:
+        binding = _bind_repo_root(
+            path,
+            expected_identity=expected_identity,
+        )
+    except SOURCE_IDENTITY.SourceIdentityError as exc:
+        normalized = Path(path).expanduser()
+        raise RuntimeError(
+            f"repo_root does not match governed target {target_id}: {normalized} ({exc})"
+        ) from exc
+    return binding.root
 
 
 def matches_allowed_pattern(relative_path: str, pattern: str) -> bool:
@@ -2132,10 +2271,16 @@ def advance_milestone(approval: dict[str, Any], *, milestone: str, status: str, 
     return approval
 
 
-def ensure_policy_repo_scope(playbook_policy: dict[str, Any], repo_root: Path, *, target_id: str) -> None:
+def ensure_policy_repo_scope(
+    playbook_policy: dict[str, Any],
+    repo_root: Path,
+    *,
+    target_id: str,
+    source_identity: dict[str, Any] | None = None,
+) -> None:
     if str(playbook_policy.get("repo_scope") or "").strip() != target_id:
         raise RuntimeError(f"playbook policy repo_scope must stay aligned with target_id={target_id}")
-    if not target_checkout_detector(target_id)(repo_root):
+    if not target_checkout_detector(target_id)(repo_root, expected_identity=source_identity):
         raise RuntimeError(f"repo_root is outside the governed target scope {target_id}: {repo_root}")
 
 
@@ -3554,7 +3699,13 @@ def preview_proposal(
     playbook_policy: dict[str, Any],
     attempt_label: str,
 ) -> tuple[dict[str, Any], list[str], list[str]]:
-    repo_root = Path(state["repo_root"])
+    source_binding = _revalidate_repo_root(
+        state["repo_root"],
+        expected_identity=state["source_identity"],
+        expected_device=state.get("source_root_device"),
+        expected_inode=state.get("source_root_inode"),
+    )
+    repo_root = source_binding.root
     proposal_summary = json.loads(proposal_summary_artifact(run_dir).read_text(encoding="utf-8"))
     proposal_edit_spec = json.loads(proposal_edit_spec_artifact(run_dir).read_text(encoding="utf-8"))
     selected_target_file = proposal_summary["selected_target_file"]
@@ -3634,7 +3785,23 @@ def run_main_acceptance(run_dir: Path, *, repo_root: Path, playbook_policy: dict
 
 
 def apply_landing_diff(run_dir: Path, *, state: dict[str, Any], playbook_policy: dict[str, Any]) -> dict[str, Any]:
-    repo_root = Path(state["repo_root"])
+    try:
+        source_binding = _revalidate_repo_root(
+            state["repo_root"],
+            expected_identity=state["source_identity"],
+            expected_device=state.get("source_root_device"),
+            expected_inode=state.get("source_root_inode"),
+        )
+    except SOURCE_IDENTITY.SourceIdentityError as exc:
+        return failure_result(
+            run_dir,
+            state=state,
+            phase="apply_main",
+            failure_class="policy_denied",
+            reasons=[f"source identity changed before landing: {exc}"],
+            next_action="Start a new governed run from the currently bound source checkout.",
+        )
+    repo_root = source_binding.root
     landing_diff_path = run_dir / "landing.diff"
     if not landing_diff_path.exists():
         return failure_result(
@@ -3794,8 +3961,18 @@ def prepare_run(
             ).expanduser()
         advisory = resolve_playbook_id(request, policy, advisory_provider=advisory_provider)
         playbook_policy = advisory["policy"]
-        repo_root = normalize_repo_root(request["repo_root"], target_id=target_id)
-        ensure_policy_repo_scope(playbook_policy, repo_root, target_id=target_id)
+        source_binding = _bind_repo_root(
+            request["repo_root"],
+            expected_identity=request.get("source_identity"),
+        )
+        repo_root = source_binding.root
+        source_identity = source_binding.identity
+        ensure_policy_repo_scope(
+            playbook_policy,
+            repo_root,
+            target_id=target_id,
+            source_identity=source_identity,
+        )
         task_class = str(request.get("task_class") or playbook_policy.get("task_class") or "unknown")
         trust_state_snapshot = str(playbook_policy.get("trust_state") or "experimental")
     except Exception as exc:
@@ -3821,6 +3998,12 @@ def prepare_run(
             next_action="Repair the request target, repo_root, or governed policy before preparing a new run.",
         )
     try:
+        source_binding = _bind_repo_root(
+            repo_root,
+            expected_identity=source_identity,
+        )
+        repo_root = source_binding.root
+        request["source_identity"] = source_binding.identity
         TRIALS.ensure_repo_tracked_clean(repo_root)
     except RuntimeError as exc:
         state = {
@@ -3916,6 +4099,11 @@ def prepare_run(
             next_action="Restore aoa-status --autonomy --json to pass or use an allowed break-glass reason.",
         )
 
+    source_binding = _bind_repo_root(
+        repo_root,
+        expected_identity=source_identity,
+    )
+    repo_root = source_binding.root
     base_head = TRIALS.git_head(repo_root)
     state = {
         "artifact_kind": "aoa.governed-run.state",
@@ -3930,6 +4118,9 @@ def prepare_run(
         "canary_id": request.get("canary_id"),
         "policy_path": str(resolved_policy_path),
         "base_head": base_head,
+        "source_identity": source_binding.identity,
+        "source_root_device": source_binding.device,
+        "source_root_inode": source_binding.inode,
         "phase": "prepare_proposal",
         "status": "running",
         "break_glass_used": bool(gate_result["break_glass_used"]),
@@ -4031,7 +4222,23 @@ def run_preview_after_plan_approval(
     proposal_provider: Callable[[dict[str, Any]], dict[str, Any]] | None,
     advisory_context: dict[str, Any],
 ) -> dict[str, Any]:
-    repo_root = Path(state["repo_root"])
+    try:
+        source_binding = _revalidate_repo_root(
+            state["repo_root"],
+            expected_identity=state["source_identity"],
+            expected_device=state.get("source_root_device"),
+            expected_inode=state.get("source_root_inode"),
+        )
+    except SOURCE_IDENTITY.SourceIdentityError as exc:
+        return failure_result(
+            run_dir,
+            state=state,
+            phase="worktree_preview",
+            failure_class="policy_denied",
+            reasons=[f"source identity changed before worktree preview: {exc}"],
+            next_action="Start a new governed run from the currently bound source checkout.",
+        )
+    repo_root = source_binding.root
     try:
         TRIALS.ensure_repo_tracked_clean(repo_root)
     except RuntimeError as exc:

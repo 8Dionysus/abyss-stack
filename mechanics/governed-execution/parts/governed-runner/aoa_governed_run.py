@@ -36,10 +36,18 @@ def build_parser() -> argparse.ArgumentParser:
     prepare_canary.add_argument("canary_id", help="Canary identifier from the governed canary catalog")
     prepare_canary.add_argument("--write", required=True, help="Path to write the canary request JSON")
     prepare_canary.add_argument("--repo-root", help="Override the repo_root placed into the request")
+    prepare_canary.add_argument(
+        "--source-identity",
+        help="Absolute source identity receipt for an explicit or isolated repo root",
+    )
 
     materialize = subparsers.add_parser("materialize-canaries", help="Write all governed canary request templates")
     materialize.add_argument("--write-dir", required=True, help="Directory that should receive one request per canary")
     materialize.add_argument("--repo-root", help="Override the repo_root placed into each request")
+    materialize.add_argument(
+        "--source-identity",
+        help="Absolute source identity receipt for an explicit or isolated repo root",
+    )
 
     run = subparsers.add_parser("run", help="Prepare a new governed run from a request file")
     run.add_argument("--request-file", required=True, help="Path to the governed request JSON")
@@ -87,7 +95,16 @@ def main() -> int:
     if args.command == "prepare-canary":
         target = Path(args.write).expanduser()
         target.parent.mkdir(parents=True, exist_ok=True)
-        payload = governed.request_from_canary(args.canary_id, repo_root=args.repo_root)
+        source_identity = (
+            governed.SOURCE_IDENTITY.load_source_identity(args.source_identity)
+            if args.source_identity
+            else None
+        )
+        payload = governed.request_from_canary(
+            args.canary_id,
+            repo_root=args.repo_root,
+            source_identity=source_identity,
+        )
         target.write_text(json.dumps(payload, indent=2, ensure_ascii=True) + "\n", encoding="utf-8")
         print(
             json.dumps(
@@ -99,7 +116,16 @@ def main() -> int:
         return 0
 
     if args.command == "materialize-canaries":
-        payload = governed.materialize_canary_requests(args.write_dir, repo_root=args.repo_root)
+        source_identity = (
+            governed.SOURCE_IDENTITY.load_source_identity(args.source_identity)
+            if args.source_identity
+            else None
+        )
+        payload = governed.materialize_canary_requests(
+            args.write_dir,
+            repo_root=args.repo_root,
+            source_identity=source_identity,
+        )
         print(json.dumps(payload, indent=2, ensure_ascii=True))
         return 0
 

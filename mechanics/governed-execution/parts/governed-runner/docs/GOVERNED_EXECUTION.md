@@ -46,6 +46,7 @@ The request contract is runtime-owned and JSON-shaped:
 - optional `memo`
 - `profile_class`
 - `repo_root`
+- optional `source_identity` (content-addressed source identity receipt)
 - optional `break_glass_reason`
 - optional `canary_id`
 - optional `task_class`
@@ -55,9 +56,13 @@ the first non-empty `README.md` line is exactly `# abyss-stack`, and the exact
 owner line 'Root route card for `abyss-stack`.' appears within the first eight
 lines of `AGENTS.md`, including `docs/install/DEPLOYMENT.md`; the retired
 `docs/DEPLOYMENT.md` path is not a valid checkout marker. `AOA_SOURCE_ROOT` is
-the only authoritative override. When it is absent, only the executing
-owner-qualified source checkout is eligible; policy `default_repo_root`, home,
-`STACK_ROOT`, and deployed projections are not implicit candidates.
+only a lookup coordinate: an explicit or foreign root requires a caller-supplied
+`source_identity` contract binding exact Git `HEAD`/tree and selected source
+surfaces; an environment receipt should use the shared contract, while a
+request may use its governed-runner-specific contract. When no contract is supplied, only the executing owner checkout is
+eligible. Relative aliases and `/proc/self/cwd` do not bypass the contract;
+policy `default_repo_root`, home, `STACK_ROOT`, and deployed projections are not
+implicit candidates.
 
 The green repo-scope expansion gate serves as evidence for later review only; it does not widen governed repo scope implicitly during the current governed run. The default governed target remains mutation-only and `abyss-stack`-owned, while any external target still requires explicit policy coverage and evidence-backed scope promotion.
 
@@ -67,6 +72,11 @@ For canary preparation, use:
 scripts/aoa-governed-run prepare-canary docs-truth-wording-alignment --write /tmp/governed-request.json
 scripts/aoa-governed-run materialize-canaries --write-dir /tmp/governed-canaries/
 ```
+
+When `--repo-root` selects an isolated or foreign checkout, also pass
+`--source-identity /absolute/path/to/identity.json`; the receipt is copied into
+the generated request and is checked again during preflight and each later
+source-use boundary.
 
 ## Execution flow
 

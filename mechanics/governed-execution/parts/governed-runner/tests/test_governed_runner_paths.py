@@ -1,3 +1,6 @@
+import shutil
+import subprocess
+
 from unittest.mock import patch
 
 from governed_runner_test_support import (
@@ -58,8 +61,23 @@ class GovernedRunnerPathTests(GovernedRunnerTestCase):
         script_root = self.root / "script"
         init_minimal_repo(explicit_root)
         init_minimal_repo(script_root)
+        identity_path = self.root / "explicit-source-identity.json"
+        write_json(
+            identity_path,
+            self.module.SOURCE_IDENTITY.make_source_identity(
+                explicit_root,
+                consumer="shared",
+            ),
+        )
 
-        with patch.dict("os.environ", {"AOA_SOURCE_ROOT": str(explicit_root)}, clear=False):
+        with patch.dict(
+            "os.environ",
+            {
+                "AOA_SOURCE_ROOT": str(explicit_root),
+                "AOA_SOURCE_IDENTITY": str(identity_path),
+            },
+            clear=False,
+        ):
             with patch.object(self.module, "SCRIPT_ROOT", script_root):
                 self.assertEqual(
                     self.module.resolve_default_repo_root("abyss-stack", policy=make_policy()),
@@ -87,6 +105,52 @@ class GovernedRunnerPathTests(GovernedRunnerTestCase):
                     self.module.resolve_default_repo_root("abyss-stack", policy=make_policy()),
                     script_root.resolve(),
                 )
+
+    def test_same_shape_foreign_checkout_requires_exact_identity_and_alias_is_allowed(self) -> None:
+        foreign_root = self.root / "foreign"
+        init_minimal_repo(foreign_root)
+        (foreign_root / "docs" / "target.md").write_text("foreign\n", encoding="utf-8")
+        subprocess.run(["git", "add", "docs/target.md"], cwd=foreign_root, check=True, capture_output=True, text=True)
+        subprocess.run(["git", "commit", "-qm", "foreign"], cwd=foreign_root, check=True, capture_output=True, text=True)
+        identity = self.module.SOURCE_IDENTITY.make_source_identity(
+            foreign_root,
+            consumer="governed-runner",
+        )
+        alias_root = self.root / "foreign-alias"
+        alias_root.symlink_to(foreign_root, target_is_directory=True)
+
+        with patch.dict("os.environ", {}, clear=True):
+            self.assertFalse(self.module.is_abyss_stack_checkout(foreign_root))
+            with self.assertRaisesRegex(RuntimeError, "source root requires an explicit source identity contract"):
+                self.module.normalize_repo_root(
+                    foreign_root,
+                    target_id="abyss-stack",
+                )
+            self.assertEqual(
+                self.module.normalize_repo_root(
+                    alias_root,
+                    target_id="abyss-stack",
+                    expected_identity=identity,
+                ),
+                foreign_root.resolve(),
+            )
+
+    def test_source_replacement_fails_revalidation_before_use(self) -> None:
+        identity = self.module.SOURCE_IDENTITY.make_source_identity(
+            self.repo_root,
+            consumer="governed-runner",
+        )
+        binding = self.module.SOURCE_IDENTITY.bind_source_root(
+            self.repo_root,
+            consumer="governed-runner",
+            expected_identity=identity,
+        )
+        replacement_root = self.root / "replacement"
+        init_minimal_repo(replacement_root)
+        shutil.rmtree(self.repo_root)
+        replacement_root.rename(self.repo_root)
+        with self.assertRaises(self.module.SOURCE_IDENTITY.SourceIdentityError):
+            self.module.SOURCE_IDENTITY.revalidate_source_binding(binding)
 
     def test_home_default_stack_root_and_projection_are_not_source_candidates(self) -> None:
         portable_home = self.root / "portable-home"

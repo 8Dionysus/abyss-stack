@@ -11,12 +11,16 @@ diagnostic surface contracts.
 ## Source binding
 
 The diagnostic fallback truth check follows the same bounded route as autonomy
-status: explicit `AOA_SOURCE_ROOT` first, then the executing owner-marked
-source checkout. The source contract requires the source shape, the exact first
-non-empty `README.md` line `# abyss-stack`, and the exact owner line
-'Root route card for `abyss-stack`.' in the first eight `AGENTS.md` lines.
-There is no home-directory, sibling, workspace, or deployed `Configs` fallback.
-An invalid explicit binding is not replaced silently.
+status: explicit `AOA_SOURCE_ROOT` plus its absolute shared `AOA_SOURCE_IDENTITY`
+receipt first, then a content-addressed identity derived from the executing owner
+checkout. The receipt binds exact Git `HEAD`/tree coordinates and selected
+source-surface digests; the source shape still requires the exact first
+non-empty `README.md` line `# abyss-stack` and owner line 'Root route card for
+`abyss-stack`.' in the first eight `AGENTS.md` lines. There is no home-directory,
+sibling, workspace, or deployed `Configs` fallback. Relative or symlink aliases
+are valid only under that identity contract, and the binding is revalidated
+before the fallback truth is used. An invalid explicit binding is not replaced
+silently.
 When no valid source input exists, the diagnostic result preserves an explicit
 `source_root_unresolved` truth gap; it does not convert source absence into
 runtime health, deployment, or repair completion.

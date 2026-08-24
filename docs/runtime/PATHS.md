@@ -13,7 +13,8 @@ That separation is what allows `abyss-stack` to be Fedora-first while still usab
 - `AOA_STACK_ROOT` — deployed Linux runtime root
 - `AOA_CONFIGS_ROOT` — config root, usually `${AOA_STACK_ROOT}/Configs`
 - `AOA_VAULT_ROOT` — optional heavy-data vault root
-- `AOA_SOURCE_ROOT` — optional explicit canonical source checkout root used for parity-aware helpers such as `aoa-status --autonomy`; it is required when those helpers run from the deployed `Configs` projection
+- `AOA_SOURCE_ROOT` — optional explicit source checkout lookup coordinate used for parity-aware helpers such as `aoa-status --autonomy`; when set, it must be paired with `AOA_SOURCE_IDENTITY`
+- `AOA_SOURCE_IDENTITY` — absolute JSON receipt for the explicit source root, using `abyss_stack_source_identity_v1` with exact Git `HEAD`/tree coordinates, selected source-surface SHA-256 digests, and a content seal; a shared receipt covers all three parity-aware consumers
 - `AOA_WORKSPACE_ROOT` — optional shared AbyssOS workspace root for sibling repository checkouts, usually `/srv/AbyssOS`
 - `AOA_AGENTS_ROOT` — optional source root used to mirror public-safe `aoa-agents` surfaces into the runtime tree
 - `AOA_SKILLS_ROOT` — optional source root used by repo-local skill projection surfaces
@@ -62,15 +63,25 @@ That separation is what allows `abyss-stack` to be Fedora-first while still usab
 | optional `aoa-sdk` source root | `/srv/AbyssOS/aoa-sdk` |
 
 The source checkout path is a Fedora-first default, not a universal host constant.
-If the repository is intentionally relocated on another machine, set `AOA_SOURCE_ROOT` to the actual source checkout path. A source candidate is owner-qualified only when its source shape is present, the first non-empty `README.md` line is exactly `# abyss-stack`, and the exact line 'Root route card for `abyss-stack`.' appears within the first eight `AGENTS.md` lines.
+`AOA_SOURCE_ROOT` is only a lookup coordinate: an explicit binding is admitted
+only with an `AOA_SOURCE_IDENTITY` receipt whose content seal covers the target,
+exact Git `HEAD`/tree, and selected source surfaces. A source candidate must
+also have the source shape, the first non-empty `README.md` line exactly
+`# abyss-stack`, and the exact line 'Root route card for `abyss-stack`.' within
+the first eight `AGENTS.md` lines.
+
 Parity-aware helpers do not search `~/src/abyss-stack`, sibling checkouts, or
-the workspace root as an implicit fallback. An explicit binding wins; when a
-helper runs from an owner-qualified source checkout it may use that checkout;
-when neither route is valid it reports `source_root_unresolved` instead of
-selecting a dirty or stale tree. The governed runner follows the same rule and
-does not promote policy `default_repo_root` or `STACK_ROOT` into source
-authority. This source binding identifies an owner-qualified input path only;
-it does not prove remote currentness, deployment, runtime health, or semantic
+the workspace root as an implicit fallback. When a helper runs from an
+owner-qualified source checkout, it derives the same content-addressed identity
+from that executing root, which preserves legitimate isolated worktrees without
+making a canonical-path claim. Relative paths, `/proc/self/cwd`, and symlink
+aliases are accepted only when they resolve to a root covered by the explicit
+identity contract; invalid explicit input never falls back. Each consumer
+revalidates the content identity and source-root device/inode before source use,
+so replacement between resolution and use remains a source truth gap. The
+governed runner follows the same rule and does not promote policy
+`default_repo_root` or `STACK_ROOT` into source authority. This source binding
+does not prove remote currentness, deployment, runtime health, or semantic
 acceptance.
 
 The runtime-root decision is recorded in [2026-05-07 Runtime Root Under AbyssOS](../decisions/ABYSS-STACK-D-0001-runtime-root-under-abyssos.md).
@@ -121,9 +132,10 @@ The repository includes helper scripts that bridge from a source checkout into t
 - `scripts/aoa-bootstrap-configs`
 
 Parity-aware helpers such as `scripts/aoa-status --autonomy` use the explicit
-`AOA_SOURCE_ROOT` binding when the canonical source checkout is not the running
-source checkout. The deployed `Configs` projection is never treated as source
-authority, and an absent or invalid binding remains an explicit truth gap.
+`AOA_SOURCE_ROOT` plus `AOA_SOURCE_IDENTITY` binding when the source checkout is
+not the running source checkout. The deployed `Configs` projection is never
+treated as source authority, and an absent or invalid binding remains an
+explicit truth gap.
 
 Those scripts exist to keep the separation explicit instead of relying on path confusion.
 

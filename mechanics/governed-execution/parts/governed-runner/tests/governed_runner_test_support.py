@@ -61,8 +61,13 @@ def init_minimal_repo(root: Path) -> None:
     subprocess.run(["git", "commit", "-m", "init"], cwd=root, check=True, capture_output=True, text=True)
 
 
-def governed_request(repo_root: Path, *, target_id: str = "abyss-stack") -> dict:
-    return {
+def governed_request(
+    repo_root: Path,
+    *,
+    target_id: str = "abyss-stack",
+    source_identity: dict | None = None,
+) -> dict:
+    request = {
         "goal": "Change beta to gamma in the target doc.",
         "target_id": target_id,
         "playbook_id": "AOA-P-0011",
@@ -71,6 +76,9 @@ def governed_request(repo_root: Path, *, target_id: str = "abyss-stack") -> dict
         "memo": None,
         "break_glass_reason": None,
     }
+    if source_identity is not None:
+        request["source_identity"] = source_identity
+    return request
 
 
 def make_policy(enabled_break_glass: bool = False) -> dict:
@@ -202,7 +210,16 @@ class GovernedRunnerTestCase(unittest.TestCase):
         self.canary_catalog_path = self.root / "canaries.json"
         write_json(self.canary_catalog_path, make_canary_catalog())
         self.request_path = self.root / "request.json"
-        write_json(self.request_path, governed_request(self.repo_root))
+        write_json(
+            self.request_path,
+            governed_request(
+                self.repo_root,
+                source_identity=self.module.SOURCE_IDENTITY.make_source_identity(
+                    self.repo_root,
+                    consumer="governed-runner",
+                ),
+            ),
+        )
 
     def gate_payload(self, *, overall_status: str = "pass") -> dict:
         return {
