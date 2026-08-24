@@ -55,8 +55,10 @@ RELEASE_SYMLINK_POLICY = "record_target_no_follow"
 RELEASE_SPECIAL_FILE_POLICY = "reject"
 POST_SWITCH_VERIFICATION = "required_before_activation_receipt"
 POST_SWITCH_ROLLBACK = "durable-predecessor-restore"
-FINALIZATION_METHOD = "locked-manifest-destination-cas-v1"
+FINALIZATION_METHOD = "atomic-destination-effect-v1"
 DESTINATION_CAS_METHOD = "rename-noreplace-displaced-v1"
+ACTIVATION_CLAIM_CEILING = "source_activation_event_only_no_current_destination_claim"
+RECOVERY_CLAIM_CEILING = "source_activation_event_recovery_only_no_current_destination_claim"
 SOURCE_ROUTE_ADMISSION_KIND = "owner_source_deployment_route"
 ALLOWED_AUTHORITY_CEILINGS = {
     "disposable-source-package-canary",
@@ -885,6 +887,16 @@ def _receipt_binding(payload: dict[str, Any]) -> dict[str, Any]:
         "predecessor": predecessor,
         "admission": admission,
     }
+    destination_owner = payload.get("destination_owner")
+    if destination_owner is not None:
+        _validate_destination_owner(destination_owner, "receipt destination owner")
+        binding["destination_owner"] = destination_owner
+    elif payload.get("status") in {
+        "activated",
+        "switch_complete",
+        "finalized",
+    } or (payload.get("status") == "rolled_back" and payload.get("destination_owner") is not None):
+        raise DeploymentError("recovery_record_invalid", "receipt binding lacks destination owner")
     finalization = payload.get("finalization")
     if finalization is not None:
         _validate_finalization(finalization, "receipt finalization")
@@ -909,6 +921,7 @@ def _recovery_binding_payload(payload: dict[str, Any]) -> dict[str, Any]:
         "rollback_receipt_path": payload["rollback_receipt_path"],
         "atomicity": payload["atomicity"],
         "claim_ceiling": payload["claim_ceiling"],
+        "destination_owner": payload.get("destination_owner"),
         "finalization": payload.get("finalization"),
     }
 
@@ -994,7 +1007,7 @@ def _validate_historical_activation_reference(
 ) -> None:
     """Validate an activation receipt's pre-rollback journal reference.
 
-    Rollback intentionally removes the finalization token from the live
+    Rollback intentionally removes the finalization event from the live
     recovery journal before emitting a rollback receipt.  The activation
     receipt still points at the prior switch-complete state, so validate that
     historical state against a reconstructed binding instead of comparing it
@@ -1019,7 +1032,7 @@ def _validate_historical_activation_reference(
         raise DeploymentError("recovery_record_invalid", "activation recovery journal historical binding is invalid")
     finalization = activation.get("finalization")
     if not isinstance(finalization, dict):
-        raise DeploymentError("recovery_record_invalid", "activation receipt lacks finalization admission")
+        raise DeploymentError("recovery_record_invalid", "activation receipt lacks finalization event")
     historical = dict(journal)
     historical["finalization"] = finalization
     historical["binding_sha256"] = _recovery_binding_digest(historical)
@@ -1088,23 +1101,34 @@ def _validate_receipt_path_reference(reference: Any, label: str) -> dict[str, An
     return reference
 
 
+def _validate_destination_owner(owner: Any, label: str) -> dict[str, Any]:
+    if not isinstance(owner, dict):
+        raise DeploymentError("recovery_record_invalid", f"{label} is not an object")
+    for key in ("target", "link_text"):
+        if not isinstance(owner.get(key), str) or not owner[key]:
+            raise DeploymentError("recovery_record_invalid", f"{label} lacks {key}")
+    _absolute_path(owner["target"], f"{label}.target")
+    for key in ("device", "inode", "mode"):
+        if not isinstance(owner.get(key), int) or owner[key] < 0:
+            raise DeploymentError("recovery_record_invalid", f"{label} {key} is invalid")
+    if owner["inode"] == 0:
+        raise DeploymentError("recovery_record_invalid", f"{label} inode is invalid")
+    return owner
+
+
 def _validate_finalization(finalization: Any, label: str) -> None:
     if not isinstance(finalization, dict):
         raise DeploymentError("recovery_record_invalid", f"{label} is not an object")
-    if finalization.get("method") != FINALIZATION_METHOD or finalization.get("status") != "admitted":
+    if (
+        finalization.get("method") != FINALIZATION_METHOD
+        or finalization.get("status") != "committed"
+        or finalization.get("effect") != "relative-symlink-os-replace"
+        or finalization.get("current_destination_claim") is not False
+    ):
         raise DeploymentError("recovery_record_invalid", f"{label} method or status is invalid")
-    _timestamp(str(finalization.get("admitted_at", "")), f"{label}.admitted_at")
+    _timestamp(str(finalization.get("committed_at", "")), f"{label}.committed_at")
     destination = finalization.get("destination")
-    if not isinstance(destination, dict):
-        raise DeploymentError("recovery_record_invalid", f"{label} lacks destination identity")
-    for key in ("target", "link_text"):
-        if not isinstance(destination.get(key), str) or not destination[key]:
-            raise DeploymentError("recovery_record_invalid", f"{label} destination lacks {key}")
-    for key in ("device", "inode", "mode"):
-        if not isinstance(destination.get(key), int) or destination[key] < 0:
-            raise DeploymentError("recovery_record_invalid", f"{label} destination {key} is invalid")
-    if destination["inode"] == 0:
-        raise DeploymentError("recovery_record_invalid", f"{label} destination inode is invalid")
+    _validate_destination_owner(destination, f"{label} destination identity")
     release = finalization.get("release")
     if not isinstance(release, dict):
         raise DeploymentError("recovery_record_invalid", f"{label} lacks release identity")
@@ -1129,9 +1153,14 @@ def _validate_finalization_binding(
     activated_release: Path,
     release_seal: dict[str, Any],
     label: str,
+    destination_owner: dict[str, Any] | None = None,
 ) -> None:
     _validate_finalization(finalization, label)
     recorded_destination = finalization["destination"]
+    if destination_owner is not None:
+        _validate_destination_owner(destination_owner, f"{label} destination owner")
+        if recorded_destination != destination_owner:
+            raise DeploymentError("recovery_record_invalid", f"{label} destination owner is not event-bound")
     expected_target = os.fspath(activated_release.resolve(strict=False))
     expected_link_text = os.path.relpath(activated_release, destination.parent)
     if (
@@ -1179,6 +1208,9 @@ def _validate_activation_receipt_payload(payload: dict[str, Any], path: Path) ->
     if not isinstance(release_seal, dict):
         raise DeploymentError("activation_receipt_invalid", "activation receipt lacks release seal")
     _verify_recorded_release(activated_release, source_ref, source_tree, label="activated_release", seal=release_seal)
+    destination_owner = _validate_destination_owner(
+        payload.get("destination_owner"), "activation destination owner"
+    )
     predecessor = payload.get("predecessor")
     if not isinstance(predecessor, dict):
         raise DeploymentError("activation_receipt_invalid", "activation receipt lacks predecessor snapshot")
@@ -1190,6 +1222,7 @@ def _validate_activation_receipt_payload(payload: dict[str, Any], path: Path) ->
         activated_release=activated_release,
         release_seal=release_seal,
         label="activation finalization",
+        destination_owner=destination_owner,
     )
     prepare_reference = _validate_receipt_path_reference(payload.get("prepare_receipt"), "activation prepare receipt")
     expected_prepare_path = path.parent / f"prepare-{prepare_operation_id}.json"
@@ -1230,7 +1263,7 @@ def _validate_activation_receipt_payload(payload: dict[str, Any], path: Path) ->
         or atomicity.get("finalization") != FINALIZATION_METHOD
     ):
         raise DeploymentError("activation_receipt_invalid", "activation atomicity is not bound")
-    if payload.get("claim_ceiling") != "source_activation_only_no_runtime_claim":
+    if payload.get("claim_ceiling") != ACTIVATION_CLAIM_CEILING:
         raise DeploymentError("activation_receipt_invalid", "activation claim ceiling is invalid")
     if not isinstance(payload.get("effects"), list):
         raise DeploymentError("activation_receipt_invalid", "activation effects must be a list")
@@ -1265,6 +1298,9 @@ def _validate_rollback_receipt_payload(payload: dict[str, Any], path: Path) -> N
     if not isinstance(release_seal, dict):
         raise DeploymentError("rollback_receipt_invalid", "rollback receipt lacks release seal")
     _verify_recorded_release(removed_activation, source_ref, source_tree, label="removed_activation", seal=release_seal)
+    destination_owner = payload.get("destination_owner")
+    if destination_owner is not None:
+        _validate_destination_owner(destination_owner, "rollback destination owner")
     predecessor = payload.get("restored_predecessor")
     if not isinstance(predecessor, dict):
         raise DeploymentError("rollback_receipt_invalid", "rollback receipt lacks predecessor snapshot")
@@ -1360,22 +1396,20 @@ def _validate_activation_against_journal(
     if activation_path != expected_path:
         raise DeploymentError("recovery_record_invalid", "activation receipt path does not match journal")
     if require_current:
-        destination = _absolute_path(journal["destination"], "recovery destination")
-        release_root = _absolute_path(journal["release_root"], "recovery release root")
-        activated_release = _absolute_path(journal["activated_release"], "recovery activated release")
-        current = _snapshot_destination(destination, release_root)
-        expected = _recovery_target_snapshot(journal)
-        if not _same_snapshot(current, expected) or current.get("release_seal") != journal.get("release_seal"):
-            raise DeploymentError("recovery_state_unrecognized", "destination is not the journal's activated release")
-        source = journal["source"]
-        _finalization_admission(
-            destination=destination,
-            release_root=release_root,
-            release_path=activated_release,
-            source_ref=source["ref"],
-            source_tree=source["tree"],
+        # The receipt is bound to the historical atomic switch event, not to a
+        # later current-path observation.  A superseding writer therefore
+        # cannot invalidate the event receipt, and rollback must use the
+        # durable destination owner below rather than this finite read.
+        _validate_finalization_binding(
+            activation["finalization"],
+            destination=_absolute_path(journal["destination"], "recovery destination"),
+            release_root=_absolute_path(journal["release_root"], "recovery release root"),
+            activated_release=_absolute_path(journal["activated_release"], "recovery activated release"),
             release_seal=journal["release_seal"],
-            existing=activation["finalization"],
+            label="activation finalization",
+            destination_owner=_validate_destination_owner(
+                journal.get("destination_owner"), "recovery destination owner"
+            ),
         )
     source = journal["source"]
     _verify_recorded_release(
@@ -1476,8 +1510,17 @@ def _validate_recovery_payload(payload: dict[str, Any], path: Path) -> None:
     if not isinstance(release_seal, dict):
         raise DeploymentError("recovery_record_invalid", "recovery journal lacks release seal")
     _verify_recorded_release(activated_release, source_ref, source_tree, label="activated_release", seal=release_seal)
+    destination_owner = None
+    if status in {"switch_complete", "finalized"}:
+        destination_owner = _validate_destination_owner(
+            payload.get("destination_owner"), "recovery destination owner"
+        )
+    elif payload.get("destination_owner") is not None:
+        destination_owner = _validate_destination_owner(
+            payload.get("destination_owner"), "recovery destination owner"
+        )
     if status in {"rollback_intent", "rollback_switch_complete", "rolled_back"} and "finalization" in payload:
-        raise DeploymentError("recovery_record_invalid", "rollback journal retains finalization admission")
+        raise DeploymentError("recovery_record_invalid", "rollback journal retains finalization event")
     if payload.get("finalization") is not None:
         _validate_finalization_binding(
             payload["finalization"],
@@ -1486,9 +1529,10 @@ def _validate_recovery_payload(payload: dict[str, Any], path: Path) -> None:
             activated_release=activated_release,
             release_seal=release_seal,
             label="recovery finalization",
+            destination_owner=destination_owner,
         )
-    elif status == "finalized":
-        raise DeploymentError("recovery_record_invalid", "finalized journal lacks finalization admission")
+    elif status in {"switch_complete", "finalized"}:
+        raise DeploymentError("recovery_record_invalid", "finalized journal lacks finalization event")
     predecessor = payload.get("predecessor")
     if not isinstance(predecessor, dict):
         raise DeploymentError("recovery_record_invalid", "recovery journal lacks predecessor snapshot")
@@ -1528,7 +1572,7 @@ def _validate_recovery_payload(payload: dict[str, Any], path: Path) -> None:
         or atomicity.get("finalization") != FINALIZATION_METHOD
     ):
         raise DeploymentError("recovery_record_invalid", "recovery atomicity is not bound")
-    if payload.get("claim_ceiling") != "source_activation_recovery_only_no_runtime_claim":
+    if payload.get("claim_ceiling") != RECOVERY_CLAIM_CEILING:
         raise DeploymentError("recovery_record_invalid", "recovery claim ceiling is invalid")
     for key, prefix in (("activation_receipt_path", "activate"), ("rollback_receipt_path", "rollback")):
         if not isinstance(payload.get(key), str) or not Path(payload[key]).is_absolute():
@@ -1910,7 +1954,39 @@ def _verify_post_switch_state(
         )
 
 
-def _finalization_admission(
+def _finalization_event(
+    *,
+    destination_owner: dict[str, Any],
+    release_path: Path,
+    release_seal: dict[str, Any],
+) -> dict[str, Any]:
+    """Bind receipt eligibility to the successful destination switch event.
+
+    ``destination_owner`` is captured from the temporary symlink before the
+    atomic ``os.replace``.  Rename preserves that inode and link text, so the
+    record describes the effect performed by this route rather than a later
+    read of a mutable destination path.
+    """
+
+    owner = _validate_destination_owner(destination_owner, "finalization destination owner")
+    return {
+        "method": FINALIZATION_METHOD,
+        "status": "committed",
+        "committed_at": _iso(_utc_now()),
+        "effect": "relative-symlink-os-replace",
+        "current_destination_claim": False,
+        "destination": owner,
+        "release": {
+            "path": os.fspath(release_path),
+            "root_device": release_seal["root_device"],
+            "root_inode": release_seal["root_inode"],
+            "manifest_sha256": release_seal["manifest_sha256"],
+            "seal_sha256": release_seal["sha256"],
+        },
+    }
+
+
+def _verify_finalization_integrity(
     *,
     destination: Path,
     release_root: Path,
@@ -1918,9 +1994,16 @@ def _finalization_admission(
     source_ref: str,
     source_tree: str,
     release_seal: dict[str, Any],
-    existing: dict[str, Any] | None = None,
-) -> dict[str, Any]:
-    """Admit one shared receipt boundary after a final state and identity fence."""
+    destination_owner: dict[str, Any],
+) -> None:
+    """Reject known drift before publishing the event-bound receipt.
+
+    This is a defensive integrity fence for release/seal drift.  It is not
+    the ownership proof: the receipt is already bound to the exact atomic
+    switch inode captured before ``os.replace``.  A writer after this fence is
+    therefore represented as a later writer, not misclassified as this route's
+    destination owner.
+    """
 
     _verify_post_switch_state(
         destination=destination,
@@ -1930,9 +2013,6 @@ def _finalization_admission(
         source_tree=source_tree,
         release_seal=release_seal,
     )
-    # The second read is part of this shared admission protocol, not a caller-
-    # specific late check.  It catches a writer that runs after the ordinary
-    # post-switch verifier returns but before the eligibility token is bound.
     current = _snapshot_destination(destination, release_root)
     expected = {
         "kind": "symlink",
@@ -1941,52 +2021,11 @@ def _finalization_admission(
         "source_tree": source_tree,
         "release_seal": release_seal,
     }
-    if not _same_snapshot(current, expected):
+    if not _same_snapshot(current, expected) or not _destination_identity_matches(destination, destination_owner):
         raise DeploymentError(
             "finalization_state_invalid",
-            "destination or sealed release drifted before receipt eligibility",
+            "destination or sealed release drifted before event-bound receipt publication",
         )
-    identity = _destination_identity(destination)
-    if existing is not None:
-        _validate_finalization(existing, "finalization token")
-        recorded_destination = existing["destination"]
-        recorded_release = existing["release"]
-        if (
-            recorded_destination.get("target") != current.get("target")
-            or recorded_destination.get("link_text") != current.get("link_text")
-            or recorded_destination.get("device") != identity.get("device")
-            or recorded_destination.get("inode") != identity.get("inode")
-            or recorded_destination.get("mode") != identity.get("mode")
-            or recorded_release.get("path") != os.fspath(release_path)
-            or recorded_release.get("root_device") != release_seal.get("root_device")
-            or recorded_release.get("root_inode") != release_seal.get("root_inode")
-            or recorded_release.get("manifest_sha256") != release_seal.get("manifest_sha256")
-            or recorded_release.get("seal_sha256") != release_seal.get("sha256")
-        ):
-            raise DeploymentError(
-                "finalization_token_stale",
-                "durable finalization token no longer owns the current destination and release",
-            )
-        return existing
-    return {
-        "method": FINALIZATION_METHOD,
-        "status": "admitted",
-        "admitted_at": _iso(_utc_now()),
-        "destination": {
-            "target": current["target"],
-            "link_text": current["link_text"],
-            "device": identity["device"],
-            "inode": identity["inode"],
-            "mode": identity["mode"],
-        },
-        "release": {
-            "path": os.fspath(release_path),
-            "root_device": release_seal["root_device"],
-            "root_inode": release_seal["root_inode"],
-            "manifest_sha256": release_seal["manifest_sha256"],
-            "seal_sha256": release_seal["sha256"],
-        },
-    }
 
 
 def _rollback_after_post_switch_failure(
@@ -2002,12 +2041,14 @@ def _rollback_after_post_switch_failure(
     """Durably remove an unreceipted target after post-switch validation fails."""
 
     try:
-        expected_owner = _destination_identity(destination)
+        expected_owner = _validate_destination_owner(
+            journal.get("destination_owner"), "rollback destination owner"
+        )
         journal = _write_json(recovery_path, _rollback_intent_payload(journal))
-        if _destination_link_target(destination) != Path(expected_owner["target"]):
+        if not _destination_identity_matches(destination, expected_owner):
             raise DeploymentError(
                 "concurrent_deployment",
-                "destination changed before post-switch rollback",
+                "destination owner is not the durable activation owner before post-switch rollback",
             )
         _validate_recorded_snapshot(predecessor, release_root, label="predecessor")
         _restore_predecessor(
@@ -2091,7 +2132,7 @@ def _new_recovery_payload(
             "release_binding": RELEASE_BINDING_METHOD,
             "finalization": FINALIZATION_METHOD,
         },
-        "claim_ceiling": "source_activation_recovery_only_no_runtime_claim",
+        "claim_ceiling": RECOVERY_CLAIM_CEILING,
     }
     payload["binding_sha256"] = _recovery_binding_digest(payload)
     return payload
@@ -2100,9 +2141,17 @@ def _new_recovery_payload(
 def _switch_complete_payload(journal: dict[str, Any]) -> dict[str, Any]:
     payload = dict(journal)
     payload.pop("_recovery_path", None)
+    destination_owner = _validate_destination_owner(
+        payload.get("destination_owner"), "switch-complete destination owner"
+    )
+    finalization = payload.get("finalization")
+    _validate_finalization(finalization, "switch-complete finalization")
+    if finalization["destination"] != destination_owner:
+        raise DeploymentError("recovery_record_invalid", "switch-complete finalization owner is not bound")
     payload["status"] = "switch_complete"
     payload["updated_at"] = _iso(_utc_now())
     payload["switched_at"] = payload.get("switched_at") or _iso(_utc_now())
+    payload["binding_sha256"] = _recovery_binding_digest(payload)
     payload["switch_complete_sha256"] = _recovery_state_digest(payload, "switch_complete")
     return payload
 
@@ -2113,11 +2162,10 @@ def _finalization_journal_payload(
 ) -> dict[str, Any]:
     payload = dict(journal)
     payload.pop("_recovery_path", None)
+    _validate_destination_owner(payload.get("destination_owner"), "finalization journal destination owner")
+    _validate_finalization(finalization, "finalization journal event")
     payload["finalization"] = finalization
-    payload["updated_at"] = _iso(_utc_now())
-    payload["binding_sha256"] = _recovery_binding_digest(payload)
-    payload["switch_complete_sha256"] = _recovery_state_digest(payload, "switch_complete")
-    return payload
+    return _switch_complete_payload(payload)
 
 
 def _rollback_intent_payload(journal: dict[str, Any]) -> dict[str, Any]:
@@ -2189,6 +2237,7 @@ def _activation_payload(
         "release_root": os.fspath(release_root),
         "activated_release": os.fspath(release_path),
         "release_seal": prepare_payload["release_seal"],
+        "destination_owner": recovery_payload["destination_owner"],
         "predecessor": predecessor,
         "admission": admission,
         "finalization": finalization,
@@ -2209,7 +2258,7 @@ def _activation_payload(
         },
         "dependency_posture": "source_only_no_install",
         "effects": ["destination_symlink_replaced"],
-        "claim_ceiling": "source_activation_only_no_runtime_claim",
+        "claim_ceiling": ACTIVATION_CLAIM_CEILING,
     }
 
 
@@ -2230,30 +2279,38 @@ def _finalize_activation(
     predecessor: dict[str, Any],
     admission: dict[str, Any],
 ) -> dict[str, Any]:
-    """Run the one activation/recovery finalization and receipt admission."""
+    """Materialize one shared receipt from an event-bound switch journal."""
 
-    # Every path enters the same durable post-switch state before attempting
-    # finalization.  This makes an interrupted activation and an interrupted
-    # recovery converge on one journal state and one rollback boundary.
-    if journal.get("status") == "intent_written":
-        try:
-            journal = _write_json(recovery_path, _switch_complete_payload(journal))
-        except DeploymentError as exc:
-            raise _recovery_required(recovery_path, exc) from exc
-        journal["_recovery_path"] = os.fspath(recovery_path)
-
-    existing = journal.get("finalization")
-    if existing is not None and not isinstance(existing, dict):
-        raise DeploymentError("recovery_record_invalid", "finalization admission is malformed")
+    if journal.get("status") not in {"switch_complete", "finalized"}:
+        raise _recovery_required(
+            recovery_path,
+            DeploymentError(
+                "switch_owner_missing",
+                "finalization cannot infer an atomic switch owner from intent_written state",
+            ),
+        )
+    destination_owner = _validate_destination_owner(
+        journal.get("destination_owner"), "finalization destination owner"
+    )
+    finalization = journal.get("finalization")
+    _validate_finalization_binding(
+        finalization,
+        destination=destination,
+        release_root=release_root,
+        activated_release=release_path,
+        release_seal=prepare_payload["release_seal"],
+        label="finalization event",
+        destination_owner=destination_owner,
+    )
     try:
-        finalization = _finalization_admission(
+        _verify_finalization_integrity(
             destination=destination,
             release_root=release_root,
             release_path=release_path,
             source_ref=source_ref,
             source_tree=source_tree,
             release_seal=prepare_payload["release_seal"],
-            existing=existing,
+            destination_owner=destination_owner,
         )
     except DeploymentError as failure:
         if not os.path.lexists(destination):
@@ -2268,11 +2325,6 @@ def _finalize_activation(
             failure=failure,
         ) from failure
 
-    if existing is None:
-        try:
-            journal = _write_json(recovery_path, _finalization_journal_payload(journal, finalization))
-        except DeploymentError as exc:
-            raise _recovery_required(recovery_path, exc) from exc
     journal["_recovery_path"] = os.fspath(recovery_path)
     if os.path.lexists(activation_path):
         try:
@@ -2387,6 +2439,7 @@ def activate(args: argparse.Namespace) -> dict[str, Any]:
             if os.path.lexists(recovery_path):
                 raise _recovery_required(recovery_path, exc) from exc
             raise
+        temporary: Path | None = None
         try:
             pre_switch_current = _snapshot_destination(destination, release_root, strict_seal=False)
             if not _same_snapshot(pre_switch_current, expected):
@@ -2401,14 +2454,26 @@ def activate(args: argparse.Namespace) -> dict[str, Any]:
             target_link = os.path.relpath(release_path, destination.parent)
             temporary = destination.parent / f".{destination.name}.{uuid.uuid4().hex}.switch"
             os.symlink(target_link, temporary)
+            destination_owner = _destination_identity(temporary)
             os.replace(temporary, destination)
             _fsync_directory(destination.parent)
+            journal["destination_owner"] = destination_owner
+            journal["finalization"] = _finalization_event(
+                destination_owner=destination_owner,
+                release_path=release_path,
+                release_seal=payload["release_seal"],
+            )
+            journal = _write_json(
+                recovery_path,
+                _finalization_journal_payload(journal, journal["finalization"]),
+            )
         except DeploymentError as exc:
             raise _recovery_required(recovery_path, exc) from exc
         except OSError as exc:
             try:
-                temporary.unlink(missing_ok=True)  # type: ignore[union-attr]
-            except (OSError, UnboundLocalError):
+                if temporary is not None:
+                    temporary.unlink(missing_ok=True)
+            except OSError:
                 pass
             raise _recovery_required(
                 recovery_path,
@@ -2585,6 +2650,7 @@ def _rollback_payload(
         "release_root": journal["release_root"],
         "removed_activation": journal["activated_release"],
         "release_seal": journal["release_seal"],
+        "destination_owner": journal.get("destination_owner"),
         "restored_predecessor": predecessor,
         "restored_target": restored_target,
         "admission": journal["admission"],
@@ -2637,10 +2703,18 @@ def rollback(args: argparse.Namespace) -> dict[str, Any]:
             raise _recovery_required(recovery_path, exc) from exc
         journal["_recovery_path"] = os.fspath(recovery_path)
         try:
-            expected_owner = _destination_identity(destination)
+            expected_owner = _validate_destination_owner(
+                journal.get("destination_owner"), "rollback destination owner"
+            )
             current = _snapshot_destination(destination, release_root)
-            if not _same_snapshot(current, _recovery_target_snapshot(journal)):
-                raise DeploymentError("concurrent_deployment", "destination changed before rollback switch")
+            if (
+                not _same_snapshot(current, _recovery_target_snapshot(journal))
+                or not _destination_identity_matches(destination, expected_owner)
+            ):
+                raise DeploymentError(
+                    "concurrent_deployment",
+                    "destination is not the durable activation owner before rollback switch",
+                )
             source = journal["source"]
             _verify_recorded_release(
                 _absolute_path(journal["activated_release"], "activated release"),
@@ -2767,11 +2841,13 @@ def _recover_finalize(recovery_path: Path) -> dict[str, Any]:
             _validate_activation_against_journal(activation, activation_path, fresh, require_current=True)
             return {"receipt_path": os.fspath(activation_path), **activation}
         if fresh.get("status") == "intent_written":
-            try:
-                fresh = _write_json(recovery_path, _switch_complete_payload(fresh))
-            except DeploymentError as exc:
-                raise _recovery_required(recovery_path, exc) from exc
-            fresh["_recovery_path"] = os.fspath(recovery_path)
+            raise _recovery_required(
+                recovery_path,
+                DeploymentError(
+                    "switch_owner_missing",
+                    "recovery finalize cannot infer which destination inode was installed from intent_written state",
+                ),
+            )
         source = fresh["source"]
         return _finalize_activation(
             journal=fresh,
@@ -2829,12 +2905,24 @@ def _recover_rollback(recovery_path: Path) -> dict[str, Any]:
         current = _snapshot_destination(destination, release_root)
         expected_target = _recovery_target_snapshot(fresh)
         predecessor = fresh["predecessor"]
-        target_current = _same_snapshot(current, expected_target) and current.get("release_seal") == fresh.get("release_seal")
+        destination_owner = fresh.get("destination_owner")
+        owner_matches = (
+            isinstance(destination_owner, dict)
+            and _destination_identity_matches(destination, destination_owner)
+        )
+        target_current = (
+            _same_snapshot(current, expected_target)
+            and current.get("release_seal") == fresh.get("release_seal")
+            and owner_matches
+        )
         predecessor_current = _same_snapshot(current, predecessor)
         if not target_current and not predecessor_current:
-            raise DeploymentError(
-                "recovery_state_unrecognized",
-                "destination is neither the recorded activated release nor its predecessor",
+            raise _recovery_required(
+                recovery_path,
+                DeploymentError(
+                    "recovery_state_unrecognized",
+                    "destination is neither the durable activated owner nor its predecessor",
+                ),
             )
         if fresh.get("status") == "rollback_switch_complete" and target_current:
             raise DeploymentError(
@@ -2851,7 +2939,9 @@ def _recover_rollback(recovery_path: Path) -> dict[str, Any]:
         if target_current:
             source = fresh["source"]
             try:
-                expected_owner = _destination_identity(destination)
+                expected_owner = _validate_destination_owner(
+                    fresh.get("destination_owner"), "rollback destination owner"
+                )
                 _verify_recorded_release(
                     activated_release,
                     source["ref"],

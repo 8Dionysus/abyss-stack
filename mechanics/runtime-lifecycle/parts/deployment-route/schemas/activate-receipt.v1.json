@@ -41,26 +41,29 @@
         "dirty": {"const": false}
       }
     },
+    "destinationOwner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["target", "link_text", "device", "inode", "mode"],
+      "properties": {
+        "target": {"$ref": "#/$defs/absolutePath"},
+        "link_text": {"type": "string", "minLength": 1},
+        "device": {"type": "integer", "minimum": 0},
+        "inode": {"type": "integer", "minimum": 1},
+        "mode": {"type": "integer", "minimum": 0}
+      }
+    },
     "finalization": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["method", "status", "admitted_at", "destination", "release"],
+      "required": ["method", "status", "committed_at", "effect", "current_destination_claim", "destination", "release"],
       "properties": {
-        "method": {"const": "locked-manifest-destination-cas-v1"},
-        "status": {"const": "admitted"},
-        "admitted_at": {"type": "string", "format": "date-time"},
-        "destination": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["target", "link_text", "device", "inode", "mode"],
-          "properties": {
-            "target": {"$ref": "#/$defs/absolutePath"},
-            "link_text": {"type": "string", "minLength": 1},
-            "device": {"type": "integer", "minimum": 0},
-            "inode": {"type": "integer", "minimum": 1},
-            "mode": {"type": "integer", "minimum": 0}
-          }
-        },
+        "method": {"const": "atomic-destination-effect-v1"},
+        "status": {"const": "committed"},
+        "committed_at": {"type": "string", "format": "date-time"},
+        "effect": {"const": "relative-symlink-os-replace"},
+        "current_destination_claim": {"const": false},
+        "destination": {"$ref": "#/$defs/destinationOwner"},
         "release": {
           "type": "object",
           "additionalProperties": false,
@@ -110,7 +113,7 @@
     "binding": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["operation_id", "prepare_operation_id", "owner_repo", "source", "destination", "release_root", "activated_release", "release_seal", "predecessor", "admission", "finalization"],
+      "required": ["operation_id", "prepare_operation_id", "owner_repo", "source", "destination", "release_root", "activated_release", "release_seal", "destination_owner", "predecessor", "admission", "finalization"],
       "properties": {
         "operation_id": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
         "prepare_operation_id": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
@@ -120,6 +123,7 @@
         "release_root": {"$ref": "#/$defs/absolutePath"},
         "activated_release": {"$ref": "#/$defs/absolutePath"},
         "release_seal": {"$ref": "#/$defs/releaseSeal"},
+        "destination_owner": {"$ref": "#/$defs/destinationOwner"},
         "predecessor": {"$ref": "#/$defs/snapshot"},
         "admission": {"$ref": "#/$defs/admission"},
         "finalization": {"$ref": "#/$defs/finalization"}
@@ -174,7 +178,7 @@
         "release_binding": {"const": "content-manifest-root-inode-v1"},
         "post_switch_verification": {"const": "required_before_activation_receipt"},
         "post_switch_rollback": {"const": "durable-predecessor-restore"},
-        "finalization": {"const": "locked-manifest-destination-cas-v1"}
+        "finalization": {"const": "atomic-destination-effect-v1"}
       }
     }
   },
@@ -191,6 +195,7 @@
     "release_root",
     "activated_release",
     "release_seal",
+    "destination_owner",
     "predecessor",
     "admission",
     "finalization",
@@ -214,6 +219,7 @@
     "release_root": {"$ref": "#/$defs/absolutePath"},
     "activated_release": {"$ref": "#/$defs/absolutePath"},
     "release_seal": {"$ref": "#/$defs/releaseSeal"},
+    "destination_owner": {"$ref": "#/$defs/destinationOwner"},
     "predecessor": {"$ref": "#/$defs/snapshot"},
     "admission": {"$ref": "#/$defs/admission"},
     "finalization": {"$ref": "#/$defs/finalization"},
@@ -221,7 +227,7 @@
     "atomicity": {"$ref": "#/$defs/atomicity"},
     "dependency_posture": {"const": "source_only_no_install"},
     "effects": {"type": "array", "items": {"type": "string"}},
-    "claim_ceiling": {"const": "source_activation_only_no_runtime_claim"},
+    "claim_ceiling": {"const": "source_activation_event_only_no_current_destination_claim"},
     "receipt_digest": {"$ref": "#/$defs/hex64"}
   }
 }

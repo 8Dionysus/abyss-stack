@@ -241,9 +241,17 @@
 
 - [ABYSS-STACK-D-0076 Owner-source Atomic Deployment Route](../ABYSS-STACK-D-0076-owner-source-atomic-deployment-route.md) (`docs/decisions/ABYSS-STACK-D-0076-owner-source-atomic-deployment-route.md`)
 
+## effect-bound destination ownership
+
+- [ABYSS-STACK-D-0076 Owner-source Atomic Deployment Route](../ABYSS-STACK-D-0076-owner-source-atomic-deployment-route.md) (`docs/decisions/ABYSS-STACK-D-0076-owner-source-atomic-deployment-route.md`)
+
 ## entry contract
 
 - [ABYSS-STACK-D-0055 Root Routes Validator Module](../ABYSS-STACK-D-0055-root-routes-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0055-root-routes-validator-module.md`)
+
+## explicit claim ceiling
+
+- [ABYSS-STACK-D-0076 Owner-source Atomic Deployment Route](../ABYSS-STACK-D-0076-owner-source-atomic-deployment-route.md) (`docs/decisions/ABYSS-STACK-D-0076-owner-source-atomic-deployment-route.md`)
 
 ## export candidate
 

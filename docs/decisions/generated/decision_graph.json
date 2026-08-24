@@ -1,11 +1,11 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
   "decision_count": 76,
-  "edge_count": 1661,
+  "edge_count": 1663,
   "edge_type_counts": {
     "CITES_SOURCE_SURFACE": 662,
     "DATED": 76,
-    "GUARDED_BY": 202,
+    "GUARDED_BY": 204,
     "HAS_STATUS": 76,
     "HAS_SURFACE_CLASS": 185,
     "IN_STACK_LANE": 151,
@@ -7878,6 +7878,16 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0076",
+      "target": "guard_family:effect-bound%20destination%20ownership",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
+      "target": "guard_family:explicit%20claim%20ceiling",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
       "target": "guard_family:ignored-cache%20boundary",
       "type": "GUARDED_BY"
     },
@@ -8323,11 +8333,11 @@
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 706,
+  "node_count": 708,
   "node_type_counts": {
     "date": 19,
     "decision": 76,
-    "guard_family": 82,
+    "guard_family": 84,
     "mechanic_parent": 10,
     "owner_surface": 38,
     "repo": 1,
@@ -9293,8 +9303,18 @@
       "type": "guard_family"
     },
     {
+      "id": "guard_family:effect-bound%20destination%20ownership",
+      "label": "effect-bound destination ownership",
+      "type": "guard_family"
+    },
+    {
       "id": "guard_family:entry%20contract",
       "label": "entry contract",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:explicit%20claim%20ceiling",
+      "label": "explicit claim ceiling",
       "type": "guard_family"
     },
     {

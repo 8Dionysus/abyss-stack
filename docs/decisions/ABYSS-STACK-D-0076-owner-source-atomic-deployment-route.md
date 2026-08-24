@@ -11,7 +11,7 @@
 - Surface classes: runtime topology, source/runtime boundary, deployment route
 - Stack lanes: runtime lifecycle, source checkout, operator deployment
 - Mechanic parents: runtime-lifecycle
-- Guard families: clean source identity, ignored-cache boundary, content manifest, release-root inode binding, post-switch rollback, atomic switch, durable activation recovery, predecessor rollback, deployment lock
+- Guard families: clean source identity, ignored-cache boundary, content manifest, release-root inode binding, effect-bound destination ownership, explicit claim ceiling, post-switch rollback, atomic switch, durable activation recovery, predecessor rollback, deployment lock
 - Posture: accepted owner-source deployment rationale
 
 ## Context
@@ -23,7 +23,10 @@ non-destructive mirror boundary, while the existing managed checkout route can
 reset and clean a destination in place. Neither provides the required
 transactional identity and rollback boundary for this duty. The route must also
 remain recoverable when the process stops after durable intent, after the
-symlink switch, or while writing a receipt.
+symlink switch, or while writing a receipt. Review of the first implementation
+also showed that a second destination snapshot after `_finalization_admission`
+was data, not proof that the route owned a later same-UID `os.replace`; rollback
+target/seal comparison alone had the same defect.
 
 The source owner, the host artifact-trust owner, and the runtime/deployment
 owner are different responsibilities. A source commit/tree check, artifact
@@ -37,10 +40,12 @@ green result.
 3. Use a hybrid runtime-owned route: external typed admission, clean exact
    source validation, self-contained versioned Git release, atomic destination
    symlink switch, and explicit predecessor rollback.
+4. Treat a post-switch snapshot or final recheck as the ownership proof and
+   infer rollback authority from destination target/seal.
 
 ## Decision
 
-Choose option 3.
+Choose option 3, with an effect-bound ownership refinement that rejects option 4.
 
 `abyss-stack` owns the route implementation under
 `mechanics/runtime-lifecycle/parts/deployment-route/`. It stages a full
@@ -54,17 +59,24 @@ directories, ignored entries, modes, metadata, and symlink targets. Special
 files are rejected and symlinks are recorded without traversal. The route
 revalidates that seal immediately before switching and again after the
 destination switch. The lock coordinates cooperating route writers, but
-staged rename alone cannot exclude a same-UID path replacement. If that
-interleave changes the release or destination, the route durably restores the
-predecessor and emits no activation receipt. A privileged actor that changes
-modes or bypasses the filesystem controls remains outside this source-only
-guarantee. Ignored cache content is outside Git's source identity and is not
-introduced by staging, but any ignored content present in a release is covered
-by the release manifest; tracked and non-ignored untracked content remains a
-hard failure. Activation writes a durable recovery journal before the
-same-filesystem relative symlink plus `os.replace` switch. A journaled
-interruption can be deterministically finalized or rolled back, and rollback
-restores the recorded predecessor without deleting releases.
+staged rename alone cannot exclude a same-UID path replacement. The route
+captures the temporary symlink's device/inode, mode, target, and link text
+before the successful `os.replace`, then durably records that owner with a
+committed switch event before an activation receipt is written. Ordinary
+activation and `recover --action finalize` share this contract. Their
+finalization is historical (`current_destination_claim: false`), so a later
+writer is not misclaimed as the route's current destination; a defensive
+post-switch read remains an integrity fence, not the atomicity proof. A
+privileged actor that changes modes or bypasses the filesystem controls
+remains outside this source-only guarantee. Ignored cache content is outside
+Git's source identity and is not introduced by staging, but any ignored content
+present in a release is covered by the release manifest; tracked and
+non-ignored untracked content remains a hard failure. Activation writes a
+durable recovery journal before the same-filesystem relative symlink plus
+`os.replace` switch. A journaled interruption can be deterministically
+finalized or rolled back, and rollback restores the recorded predecessor
+without deleting releases. If the switch owner was not durably recorded,
+recovery refuses to infer it from target or seal.
 
 The route admission is an input contract, not an `abyss-machine` artifact
 signature. Artifact classes, signatures, SBOM/provenance, registry selection,
@@ -89,18 +101,23 @@ prepared receipt single-use against the observed destination state, but are
 not a complete exclusion mechanism for a same-UID non-cooperating writer.
 Alternatives such as a cooperative lock, a staged `os.replace`, or an inode
 check only before the switch each leave a final-check-to-effect gap. A
-pre-switch manifest/root-inode check catches staged tampering; the chosen
-post-switch manifest/root-inode/destination verification closes the observable
-interleave and the durable predecessor restore provides a fail-closed outcome.
-The durable intent/switch/receipt sequence makes an active destination explicit
-instead of allowing a plain rejection with an unjournaled new target. Rollback
-has its own `rollback_intent` and `rollback_switch_complete` states, with the
-rollback receipt written only after the predecessor effect is journaled. Typed
-receipts bind every finalized activation/rollback reference to the journal
-state digest and immutable operation/source/destination/release/predecessor/
-admission identity. Directory-open/fsync and receipt-write failures therefore
-return a recovery-required result instead of claiming a completed durable
-receipt. Nested source snapshots and recovery states make the authority ceiling
+pre-switch manifest/root-inode check catches staged tampering; the
+post-switch manifest/root-inode/destination verification remains a defensive
+integrity fence, while the pre-effect owner capture and durable event bind the
+effect itself. A finite recheck, cooperative lock, or descriptor/rename
+exchange without a cross-file receipt transaction cannot establish that
+ownership. The durable intent/switch/receipt sequence makes an active
+destination explicit instead of allowing a plain rejection with an unjournaled
+new target. Rollback has its own `rollback_intent` and
+`rollback_switch_complete` states and carries the exact destination owner
+through retries; changed inode/link identity, even with the same target and
+seal, is preserved and remains recovery-required. The rollback receipt is
+written only after the predecessor effect is journaled. Typed receipts bind
+every finalized activation/rollback reference to the journal state digest and
+immutable operation/source/destination/release/predecessor/admission identity.
+Directory-open/fsync and receipt-write failures therefore return a
+recovery-required result instead of claiming a completed durable receipt.
+Nested source snapshots and recovery states make the authority ceiling
 explicit so source preparation cannot be mistaken for runtime proof.
 
 ## Consequences
@@ -114,8 +131,11 @@ explicit so source preparation cannot be mistaken for runtime proof.
 - The route adds a root wrapper, mechanic-local tests, nested receipt schemas,
   a recovery-journal schema, and validation topology entries.
 - Release seals add a closed content manifest and root-inode binding; activation
-  performs a post-switch verification and durable predecessor rollback before
-  any activation receipt is emitted.
+  performs a post-switch integrity fence and durable predecessor rollback
+  before any activation receipt is emitted.
+- Activation receipts describe the historical atomic switch event and
+  explicitly do not claim that the mutable destination is still current;
+  rollback requires the durable destination owner token.
 - Configs sync remains the source/runtime mirror route for ordinary stack
   changes; this route is not a replacement for it.
 

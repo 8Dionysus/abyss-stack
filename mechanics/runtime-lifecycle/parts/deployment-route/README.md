@@ -64,23 +64,42 @@ release identity are rechecked immediately before the switch while a
 non-blocking deployment lock is held. The lock coordinates cooperating route
 writers; it cannot prevent a same-UID writer from replacing a prepared path.
 Activation therefore verifies the release and destination again after the
-switch. Live activation and `recover --action finalize` enter the same locked
-finalization admission: the post-switch verifier is followed by a second
-destination/seal snapshot and a destination inode/link identity token. That
-token is durably bound to the recovery journal before an activation receipt
-can be written. Any content, root-inode, or destination drift at either read
-causes the same durable rollback to the predecessor and no activation receipt.
-A privileged actor that changes permissions or bypasses the filesystem
-boundary remains outside this source-only guarantee.
+switch. Live activation and `recover --action finalize` use the same
+effect-bound contract: the route captures the temporary symlink's device/inode,
+mode, target, and link text before the successful `os.replace`, and persists
+that owner together with a committed switch event before an activation receipt
+can be written. The event is historical and explicitly carries
+`current_destination_claim: false`; the receipt does not claim that a later
+read of the destination is still current. A second release/seal/owner read is
+kept as a defensive integrity fence before publication, but it is not the
+atomicity proof. A writer after that fence is a later writer: the event receipt
+remains truthful, while rollback and recovery require the durable owner token
+and fail closed if its inode/link identity no longer matches. A privileged
+actor that changes permissions or bypasses the filesystem boundary remains
+outside this source-only guarantee.
+
+The compared methods are deliberately separated. A cooperative `flock` or a
+finite final recheck only coordinates or observes a pathname and cannot own an
+arbitrary same-UID `os.replace`. A descriptor/rename-exchange or directory
+transaction would still need a cross-file durable receipt transaction and would
+not make a later pathname writer belong to this route. The selected method is
+the atomic destination effect plus the pre-effect owner token, durable
+`switch_complete` event, and explicit claim narrowing. The owner token is also
+carried through rollback intent and retry; claim narrowing without that
+recovery identity is not sufficient.
 
 The durable journal records intent before the switch and permits deterministic
 `recover --action finalize|rollback` after switch or receipt-write interruption.
+If an interruption happens before the atomic switch owner can be durably
+recorded (for example, before the destination directory fsync), recovery does
+not infer ownership from target or seal and remains recovery-required.
 Activation and rollback receipt references carry the journal binding, state
 digest, operation, source, destination, release, predecessor, and admission;
 cross-state references are rejected. Rollback records `rollback_intent` before
 the predecessor switch and `rollback_switch_complete` before writing the
 rollback receipt. Its compare-and-swap moves the observed destination to a
-displaced path with `renameat2(RENAME_NOREPLACE)`, checks the moved inode/link
+recorded destination owner to a displaced path with
+`renameat2(RENAME_NOREPLACE)`, checks the moved inode/link
 identity, and installs a predecessor only with another no-replace rename. A
 same-UID writer that replaces the destination between observation and commit
 is preserved and the route fails closed with recovery required; it is never
@@ -118,9 +137,12 @@ ref/tree/clean tamper, ignored-cache packaging, manifest/symlink policy,
 nested emitted schema instances, cross-state journal references,
 directory-fsync failure, rollback receipt persistence failure, and
 interruption/retry recovery at each activation boundary. Dedicated
-interleavings cover mutation after the shared post-switch verifier, mutation
-during recovery finalization, and a same-target writer during rollback CAS;
-they assert seal/inode policy, no receipt claim, and the durable journal state.
+interleavings cover a same-target writer after ordinary and recovery
+finalization event capture, owner replacement immediately after rollback
+observation, replacement after rollback displacement before predecessor
+commit, mutation after the shared post-switch verifier, and mutation during
+recovery finalization; they assert seal/inode policy, no current-destination
+claim, no receipt on ambiguous rollback, and the durable journal state.
 No live `/srv/AbyssOS` root is used by the tests.
 
 ```bash

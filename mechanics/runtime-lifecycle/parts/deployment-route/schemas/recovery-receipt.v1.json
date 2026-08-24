@@ -41,26 +41,29 @@
         "dirty": {"const": false}
       }
     },
+    "destinationOwner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["target", "link_text", "device", "inode", "mode"],
+      "properties": {
+        "target": {"$ref": "#/$defs/absolutePath"},
+        "link_text": {"type": "string", "minLength": 1},
+        "device": {"type": "integer", "minimum": 0},
+        "inode": {"type": "integer", "minimum": 1},
+        "mode": {"type": "integer", "minimum": 0}
+      }
+    },
     "finalization": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["method", "status", "admitted_at", "destination", "release"],
+      "required": ["method", "status", "committed_at", "effect", "current_destination_claim", "destination", "release"],
       "properties": {
-        "method": {"const": "locked-manifest-destination-cas-v1"},
-        "status": {"const": "admitted"},
-        "admitted_at": {"type": "string", "format": "date-time"},
-        "destination": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["target", "link_text", "device", "inode", "mode"],
-          "properties": {
-            "target": {"$ref": "#/$defs/absolutePath"},
-            "link_text": {"type": "string", "minLength": 1},
-            "device": {"type": "integer", "minimum": 0},
-            "inode": {"type": "integer", "minimum": 1},
-            "mode": {"type": "integer", "minimum": 0}
-          }
-        },
+        "method": {"const": "atomic-destination-effect-v1"},
+        "status": {"const": "committed"},
+        "committed_at": {"type": "string", "format": "date-time"},
+        "effect": {"const": "relative-symlink-os-replace"},
+        "current_destination_claim": {"const": false},
+        "destination": {"$ref": "#/$defs/destinationOwner"},
         "release": {
           "type": "object",
           "additionalProperties": false,
@@ -111,6 +114,7 @@
         "release_root": {"$ref": "#/$defs/absolutePath"},
         "activated_release": {"$ref": "#/$defs/absolutePath"},
         "release_seal": {"$ref": "#/$defs/releaseSeal"},
+        "destination_owner": {"$ref": "#/$defs/destinationOwner"},
         "predecessor": {"$ref": "#/$defs/snapshot"},
         "admission": {"$ref": "#/$defs/admission"},
         "finalization": {"$ref": "#/$defs/finalization"}
@@ -152,7 +156,7 @@
         "switch": {"const": "relative-symlink-os-replace"},
         "journal": {"const": "durable-before-switch"},
         "release_binding": {"const": "content-manifest-root-inode-v1"},
-        "finalization": {"const": "locked-manifest-destination-cas-v1"}
+        "finalization": {"const": "atomic-destination-effect-v1"}
       }
     }
   },
@@ -204,6 +208,7 @@
     "release_root": {"$ref": "#/$defs/absolutePath"},
     "activated_release": {"$ref": "#/$defs/absolutePath"},
     "release_seal": {"$ref": "#/$defs/releaseSeal"},
+    "destination_owner": {"$ref": "#/$defs/destinationOwner"},
     "predecessor": {"$ref": "#/$defs/snapshot"},
     "admission": {"$ref": "#/$defs/admission"},
     "activation_receipt_path": {"$ref": "#/$defs/absolutePath"},
@@ -212,7 +217,7 @@
     "activation_receipt": {"$ref": "#/$defs/completedReference"},
     "rollback_receipt": {"$ref": "#/$defs/completedReference"},
     "atomicity": {"$ref": "#/$defs/atomicity"},
-    "claim_ceiling": {"const": "source_activation_recovery_only_no_runtime_claim"},
+    "claim_ceiling": {"const": "source_activation_event_recovery_only_no_current_destination_claim"},
     "binding_sha256": {"$ref": "#/$defs/hex64"},
     "switch_complete_sha256": {"$ref": "#/$defs/hex64"},
     "rollback_switch_complete_sha256": {"$ref": "#/$defs/hex64"},
@@ -224,7 +229,14 @@
         "required": ["status"],
         "properties": {"status": {"enum": ["switch_complete", "finalized"]}}
       },
-      "then": {"required": ["switched_at", "switch_complete_sha256"]}
+      "then": {"required": ["destination_owner"]}
+    },
+    {
+      "if": {
+        "required": ["status"],
+        "properties": {"status": {"enum": ["switch_complete", "finalized"]}}
+      },
+      "then": {"required": ["switched_at", "switch_complete_sha256", "finalization"]}
     },
     {
       "if": {

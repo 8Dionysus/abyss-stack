@@ -41,26 +41,29 @@
         "dirty": {"const": false}
       }
     },
+    "destinationOwner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["target", "link_text", "device", "inode", "mode"],
+      "properties": {
+        "target": {"$ref": "#/$defs/absolutePath"},
+        "link_text": {"type": "string", "minLength": 1},
+        "device": {"type": "integer", "minimum": 0},
+        "inode": {"type": "integer", "minimum": 1},
+        "mode": {"type": "integer", "minimum": 0}
+      }
+    },
     "finalization": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["method", "status", "admitted_at", "destination", "release"],
+      "required": ["method", "status", "committed_at", "effect", "current_destination_claim", "destination", "release"],
       "properties": {
-        "method": {"const": "locked-manifest-destination-cas-v1"},
-        "status": {"const": "admitted"},
-        "admitted_at": {"type": "string", "format": "date-time"},
-        "destination": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["target", "link_text", "device", "inode", "mode"],
-          "properties": {
-            "target": {"$ref": "#/$defs/absolutePath"},
-            "link_text": {"type": "string", "minLength": 1},
-            "device": {"type": "integer", "minimum": 0},
-            "inode": {"type": "integer", "minimum": 1},
-            "mode": {"type": "integer", "minimum": 0}
-          }
-        },
+        "method": {"const": "atomic-destination-effect-v1"},
+        "status": {"const": "committed"},
+        "committed_at": {"type": "string", "format": "date-time"},
+        "effect": {"const": "relative-symlink-os-replace"},
+        "current_destination_claim": {"const": false},
+        "destination": {"$ref": "#/$defs/destinationOwner"},
         "release": {
           "type": "object",
           "additionalProperties": false,
@@ -138,6 +141,12 @@
         "release_root": {"$ref": "#/$defs/absolutePath"},
         "activated_release": {"$ref": "#/$defs/absolutePath"},
         "release_seal": {"$ref": "#/$defs/releaseSeal"},
+        "destination_owner": {
+          "oneOf": [
+            {"$ref": "#/$defs/destinationOwner"},
+            {"type": "null"}
+          ]
+        },
         "predecessor": {"$ref": "#/$defs/snapshot"},
         "admission": {"$ref": "#/$defs/admission"},
         "finalization": {"$ref": "#/$defs/finalization"}
@@ -214,6 +223,7 @@
     "release_root",
     "removed_activation",
     "release_seal",
+    "destination_owner",
     "admission",
     "restored_predecessor",
     "restored_target",
@@ -238,6 +248,12 @@
     "release_root": {"$ref": "#/$defs/absolutePath"},
     "removed_activation": {"$ref": "#/$defs/absolutePath"},
     "release_seal": {"$ref": "#/$defs/releaseSeal"},
+    "destination_owner": {
+      "oneOf": [
+        {"$ref": "#/$defs/destinationOwner"},
+        {"type": "null"}
+      ]
+    },
     "admission": {"$ref": "#/$defs/admission"},
     "restored_predecessor": {"$ref": "#/$defs/snapshot"},
     "restored_target": {
