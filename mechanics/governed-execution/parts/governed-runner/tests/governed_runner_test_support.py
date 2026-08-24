@@ -54,6 +54,16 @@ def init_minimal_repo(root: Path) -> None:
     )
     (root / "docs" / "target.md").write_text("alpha\nbeta\n", encoding="utf-8")
     (root / "scripts" / "validate_stack.py").write_text("print('ok')\n", encoding="utf-8")
+    runtime_surfaces = {
+        "scripts/abyss_stack_source_identity.py": "# source identity helper\n",
+        "mechanics/diagnostic-spine/parts/diagnose-wrapper/aoa_diagnose.py": "# diagnose consumer\n",
+        "mechanics/governed-execution/parts/autonomy-status/aoa_status_autonomy.py": "# autonomy consumer\n",
+        "mechanics/governed-execution/parts/governed-runner/aoa_governed_execution.py": "# governed consumer\n",
+    }
+    for relative, content in runtime_surfaces.items():
+        surface = root / relative
+        surface.parent.mkdir(parents=True, exist_ok=True)
+        surface.write_text(content, encoding="utf-8")
     subprocess.run(["git", "init"], cwd=root, check=True, capture_output=True, text=True)
     subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=root, check=True, capture_output=True, text=True)
     subprocess.run(["git", "config", "user.name", "Test User"], cwd=root, check=True, capture_output=True, text=True)

@@ -62,7 +62,14 @@ surfaces; an environment receipt should use the shared contract, while a
 request may use its governed-runner-specific contract. When no contract is supplied, only the executing owner checkout is
 eligible. Relative aliases and `/proc/self/cwd` do not bypass the contract;
 policy `default_repo_root`, home, `STACK_ROOT`, and deployed projections are not
-implicit candidates.
+implicit candidates. Admission also requires the shared identity helper and the
+invoked runner surface, with symlink-free required topology. Before each
+non-mutating source operation, the runner pins the root directory descriptor and
+sanitizes inherited `GIT_*` selectors; source validator use is descriptor-bound
+where a file is executed. Revalidation is a fail-closed drift detector, not an
+atomic pathname TOCTOU claim. A source-mutating landing keeps its pre-apply
+boundary pinned and uses governed acceptance/rollback evidence rather than
+pretending that the pre-mutation identity receipt remains current.
 
 The green repo-scope expansion gate serves as evidence for later review only; it does not widen governed repo scope implicitly during the current governed run. The default governed target remains mutation-only and `abyss-stack`-owned, while any external target still requires explicit policy coverage and evidence-backed scope promotion.
 

@@ -45,6 +45,7 @@ def make_source_checkout(
     owner_marker: str = "abyss-stack",
     readme_title: str | None = None,
     agents_owner_line: str | None = None,
+    include_runtime_surfaces: bool = True,
 ) -> Path:
     (root / "scripts").mkdir(parents=True)
     (root / "docs" / "install").mkdir(parents=True)
@@ -60,6 +61,17 @@ def make_source_checkout(
     (root / "CONTRIBUTING.md").write_text("contributing\n", encoding="utf-8")
     (root / "scripts" / "validate_stack.py").write_text("# validator\n", encoding="utf-8")
     (root / "docs" / "install" / "DEPLOYMENT.md").write_text("deploy\n", encoding="utf-8")
+    if include_runtime_surfaces:
+        runtime_surfaces = {
+            "scripts/abyss_stack_source_identity.py": "# source identity helper\n",
+            "mechanics/diagnostic-spine/parts/diagnose-wrapper/aoa_diagnose.py": "# diagnose consumer\n",
+            "mechanics/governed-execution/parts/autonomy-status/aoa_status_autonomy.py": "# autonomy consumer\n",
+            "mechanics/governed-execution/parts/governed-runner/aoa_governed_execution.py": "# governed consumer\n",
+        }
+        for relative, content in runtime_surfaces.items():
+            surface = root / relative
+            surface.parent.mkdir(parents=True, exist_ok=True)
+            surface.write_text(content, encoding="utf-8")
     subprocess.run(["git", "init", "-q"], cwd=root, check=True, capture_output=True, text=True)
     subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=root, check=True, capture_output=True, text=True)
     subprocess.run(["git", "config", "user.name", "Test User"], cwd=root, check=True, capture_output=True, text=True)
@@ -286,6 +298,117 @@ class AutonomyCollectorTests(unittest.TestCase):
                     self.module.SOURCE_IDENTITY.revalidate_source_binding(binding)
                 parity = self.module.run_parity_check(source_root, binding=binding)
                 self.assertEqual(parity["detail"]["reason"], "source_root_unresolved")
+
+    def test_git_discovery_is_bound_to_selected_root(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source_root = make_source_checkout(Path(tmpdir) / "source")
+            external_root = make_source_checkout(Path(tmpdir) / "external")
+            local_identity = self.module.SOURCE_IDENTITY.make_source_identity(
+                source_root,
+                consumer="autonomy-status",
+            )
+            with patch.dict(
+                os.environ,
+                {
+                    "GIT_DIR": str(external_root / ".git"),
+                    "GIT_WORK_TREE": str(external_root),
+                },
+                clear=False,
+            ):
+                inherited_identity = self.module.SOURCE_IDENTITY.make_source_identity(
+                    source_root,
+                    consumer="autonomy-status",
+                )
+            self.assertEqual(inherited_identity["head"], local_identity["head"])
+            self.assertEqual(inherited_identity["tree"], local_identity["tree"])
+
+            shutil.rmtree(source_root / ".git")
+            with patch.dict(
+                os.environ,
+                {"GIT_DIR": str(external_root / ".git")},
+                clear=False,
+            ):
+                with self.assertRaises(self.module.SOURCE_IDENTITY.SourceIdentityError):
+                    self.module.SOURCE_IDENTITY.make_source_identity(
+                        source_root,
+                        consumer="autonomy-status",
+                    )
+
+    def test_fixture_only_root_is_rejected_at_consumer_boundary(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            fixture_root = make_source_checkout(
+                Path(tmpdir) / "fixture-only",
+                include_runtime_surfaces=False,
+            )
+            self.assertTrue(self.module.SOURCE_IDENTITY.source_shape(fixture_root))
+            with self.assertRaisesRegex(
+                self.module.SOURCE_IDENTITY.SourceIdentityError,
+                "invoked surface",
+            ):
+                self.module.SOURCE_IDENTITY.make_source_identity(
+                    fixture_root,
+                    consumer="autonomy-status",
+                )
+
+    def test_symlinked_required_directory_and_parent_are_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            outside = Path(tmpdir) / "outside"
+            outside.mkdir()
+            source_root = make_source_checkout(Path(tmpdir) / "mechanics-link")
+            shutil.rmtree(source_root / "mechanics")
+            (source_root / "mechanics").symlink_to(outside, target_is_directory=True)
+            self.assertFalse(self.module.SOURCE_IDENTITY.source_shape(source_root))
+
+            parent_link_root = make_source_checkout(Path(tmpdir) / "parent-link")
+            shutil.rmtree(parent_link_root / "docs" / "install")
+            (parent_link_root / "docs" / "install").symlink_to(outside, target_is_directory=True)
+            self.assertFalse(self.module.SOURCE_IDENTITY.source_shape(parent_link_root))
+
+    def test_parity_uses_bound_validator_when_path_is_replaced_after_revalidation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source_root = make_source_checkout(Path(tmpdir) / "source")
+            marker = Path(tmpdir) / "marker.txt"
+            validator = source_root / "scripts" / "validate_stack.py"
+            validator.write_text(
+                "import os\n"
+                "from pathlib import Path\n"
+                "Path(os.environ['BOUND_MARKER']).write_text('original', encoding='utf-8')\n",
+                encoding="utf-8",
+            )
+            subprocess.run(["git", "add", "scripts/validate_stack.py"], cwd=source_root, check=True)
+            subprocess.run(["git", "commit", "-qm", "validator fixture"], cwd=source_root, check=True)
+            binding = self.module.SOURCE_IDENTITY.bind_source_root(
+                source_root,
+                consumer="autonomy-status",
+                expected_identity=self.module.SOURCE_IDENTITY.make_source_identity(
+                    source_root,
+                    consumer="autonomy-status",
+                ),
+            )
+            original_run_command = self.module.run_command
+
+            def replace_path_then_run(parts, *, cwd=None, timeout_s=60.0, pass_fds=()):
+                replacement = validator.with_name("validate_stack.replacement.py")
+                replacement.write_text(
+                    "import os\n"
+                    "from pathlib import Path\n"
+                    "Path(os.environ['BOUND_MARKER']).write_text('replacement', encoding='utf-8')\n",
+                    encoding="utf-8",
+                )
+                replacement.replace(validator)
+                return original_run_command(
+                    parts,
+                    cwd=cwd,
+                    timeout_s=timeout_s,
+                    pass_fds=pass_fds,
+                )
+
+            with patch.dict(os.environ, {"BOUND_MARKER": str(marker)}, clear=False):
+                with patch.object(self.module, "run_command", side_effect=replace_path_then_run):
+                    parity = self.module.run_parity_check(source_root, binding=binding)
+            self.assertEqual(marker.read_text(encoding="utf-8"), "original")
+            self.assertEqual(parity["status"], "fail")
+            self.assertIn("source identity", parity["detail"]["identity_error"])
 
     def test_foreign_owner_marker_is_not_a_source_binding(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

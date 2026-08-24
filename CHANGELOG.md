@@ -13,6 +13,10 @@ Tracking starts with the community-docs baseline for this repository.
   and governed-runner consumers with one content-addressed Git/surface contract,
   alias-safe binding, and resolve/use replacement revalidation while preserving
   legitimate isolated worktrees.
+- Close the source-identity review follow-up: sanitize inherited Git selectors,
+  require invoked helper/consumer surfaces, reject symlinked sealed topology,
+  and use descriptor-bound parity plus pinned governed Git/worktree operations
+  while keeping revalidation claims fail-closed and non-atomic.
 - Bound the Codex agent-routing adapter's wait for an event-keyed relay
   context when matching `PreToolUse` groups run concurrently, while retaining
   fail-closed behavior when the context remains unavailable.

@@ -76,6 +76,7 @@
 - [ABYSS-STACK-D-0133 Owner-Bound External Goal Pause](../ABYSS-STACK-D-0133-owner-bound-external-goal-pause.md) (`docs/decisions/ABYSS-STACK-D-0133-owner-bound-external-goal-pause.md`)
 - [ABYSS-STACK-D-0134 Generic Responsibility-Movement Observation](../ABYSS-STACK-D-0134-generic-responsibility-movement-observation.md) (`docs/decisions/ABYSS-STACK-D-0134-generic-responsibility-movement-observation.md`)
 - [ABYSS-STACK-D-0135 Typed Incarnation Capability Projection](../ABYSS-STACK-D-0135-typed-incarnation-capability-projection.md) (`docs/decisions/ABYSS-STACK-D-0135-typed-incarnation-capability-projection.md`)
+- [ABYSS-STACK-D-0136 Fail-Closed Source-Root Binding for Parity-Aware Helpers](../ABYSS-STACK-D-0136-fail-closed-source-root-binding.md) (`docs/decisions/ABYSS-STACK-D-0136-fail-closed-source-root-binding.md`)
 
 ## mechanic package
 
@@ -729,6 +730,7 @@
 - [ABYSS-STACK-D-0085 SDK Routing Canary Intake](../ABYSS-STACK-D-0085-sdk-routing-canary-intake.md) (`docs/decisions/ABYSS-STACK-D-0085-sdk-routing-canary-intake.md`)
 - [ABYSS-STACK-D-0086 Receipt-Bound SDK Routing Cutover](../ABYSS-STACK-D-0086-receipt-bound-sdk-routing-cutover.md) (`docs/decisions/ABYSS-STACK-D-0086-receipt-bound-sdk-routing-cutover.md`)
 - [ABYSS-STACK-D-0101 Retire Routing Predecessor Checkout Consumers](../ABYSS-STACK-D-0101-retire-routing-predecessor-checkout-consumers.md) (`docs/decisions/ABYSS-STACK-D-0101-retire-routing-predecessor-checkout-consumers.md`)
+- [ABYSS-STACK-D-0136 Fail-Closed Source-Root Binding for Parity-Aware Helpers](../ABYSS-STACK-D-0136-fail-closed-source-root-binding.md) (`docs/decisions/ABYSS-STACK-D-0136-fail-closed-source-root-binding.md`)
 
 ## runtime routes
 

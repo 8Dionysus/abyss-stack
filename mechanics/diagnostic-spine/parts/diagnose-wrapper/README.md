@@ -18,9 +18,11 @@ source-surface digests; the source shape still requires the exact first
 non-empty `README.md` line `# abyss-stack` and owner line 'Root route card for
 `abyss-stack`.' in the first eight `AGENTS.md` lines. There is no home-directory,
 sibling, workspace, or deployed `Configs` fallback. Relative or symlink aliases
-are valid only under that identity contract, and the binding is revalidated
-before the fallback truth is used. An invalid explicit binding is not replaced
-silently.
+are valid only under that identity contract. Consumer admission also requires
+the shared identity helper and this invoked diagnostic surface; sealed surface
+parents and required directories cannot be symlinks. The binding is revalidated
+before the fallback truth is used as a fail-closed drift detector, not as an
+atomic TOCTOU claim. An invalid explicit binding is not replaced silently.
 When no valid source input exists, the diagnostic result preserves an explicit
 `source_root_unresolved` truth gap; it does not convert source absence into
 runtime health, deployment, or repair completion.

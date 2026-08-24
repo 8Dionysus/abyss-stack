@@ -8,12 +8,14 @@ can load it without a bootstrap or ``sys.path`` dependency.
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 import hashlib
 import json
 import os
 from pathlib import Path, PurePosixPath
+import stat
 import subprocess
-from typing import Any, Mapping
+from typing import Any, Iterator, Mapping
 
 
 SCHEMA_VERSION = "abyss_stack_source_identity_v1"
@@ -37,6 +39,21 @@ CONSUMER_SURFACES = {
     "autonomy-status": "mechanics/governed-execution/parts/autonomy-status/aoa_status_autonomy.py",
     "governed-runner": "mechanics/governed-execution/parts/governed-runner/aoa_governed_execution.py",
 }
+GIT_SAFE_ENVIRONMENT = {
+    "GIT_ATTR_NOSYSTEM": "1",
+    "GIT_CONFIG_COUNT": "0",
+    "GIT_CONFIG_GLOBAL": "/dev/null",
+    "GIT_CONFIG_NOSYSTEM": "1",
+    "GIT_CONFIG_SYSTEM": "/dev/null",
+    "GIT_OPTIONAL_LOCKS": "0",
+    "GIT_TERMINAL_PROMPT": "0",
+}
+DIRECTORY_OPEN_FLAGS = (
+    os.O_RDONLY
+    | getattr(os, "O_DIRECTORY", 0)
+    | getattr(os, "O_NOFOLLOW", 0)
+)
+FILE_OPEN_FLAGS = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
 
 
 class SourceIdentityError(ValueError):
@@ -62,6 +79,17 @@ class SourceIdentityBinding:
         self.device = device
         self.inode = inode
         self.consumer = consumer
+
+
+class SourceSurfaceUse:
+    """Descriptor-bound source surface and the directory it belongs to."""
+
+    __slots__ = ("path", "root_path", "pass_fds")
+
+    def __init__(self, *, path: Path, root_path: Path, pass_fds: tuple[int, ...]) -> None:
+        self.path = path
+        self.root_path = root_path
+        self.pass_fds = pass_fds
 
 
 def _canonical_bytes(payload: Mapping[str, Any]) -> bytes:
@@ -105,6 +133,17 @@ def _safe_relative_path(value: Any) -> str:
     return path.as_posix()
 
 
+def sanitized_git_environment(environment: Mapping[str, str] | None = None) -> dict[str, str]:
+    """Return Git configuration bound to the selected checkout, not the caller."""
+
+    cleaned = dict(os.environ if environment is None else environment)
+    for key in tuple(cleaned):
+        if key.startswith("GIT_"):
+            del cleaned[key]
+    cleaned.update(GIT_SAFE_ENVIRONMENT)
+    return cleaned
+
+
 def normalize_root(path: str | Path) -> tuple[Path, os.stat_result]:
     candidate = Path(path).expanduser()
     if not candidate.is_absolute():
@@ -125,11 +164,19 @@ def source_shape(path: str | Path) -> bool:
     except SourceIdentityError:
         return False
     for relative in SHAPE_SURFACES:
-        surface = root / relative
-        if surface.is_symlink() or not surface.is_file():
+        try:
+            surface = _surface_path(root, relative)
+        except SourceIdentityError:
             return False
-    if any(not (root / relative).is_dir() for relative in SOURCE_REQUIRED_DIRS):
-        return False
+        if not surface.is_file():
+            return False
+    for relative in SOURCE_REQUIRED_DIRS:
+        try:
+            required_dir = _surface_path(root, relative)
+        except SourceIdentityError:
+            return False
+        if not required_dir.is_dir():
+            return False
     try:
         with (root / "README.md").open(encoding="utf-8") as readme_file:
             readme_title = next(
@@ -147,19 +194,19 @@ def source_shape(path: str | Path) -> bool:
 
 
 def _git_coordinates(root: Path) -> tuple[str, str]:
-    environment = os.environ.copy()
-    environment.update(
-        {
-            "GIT_ATTR_NOSYSTEM": "1",
-            "GIT_CONFIG_COUNT": "0",
-            "GIT_CONFIG_GLOBAL": "/dev/null",
-            "GIT_CONFIG_NOSYSTEM": "1",
-            "GIT_CONFIG_SYSTEM": "/dev/null",
-            "GIT_OPTIONAL_LOCKS": "0",
-            "GIT_TERMINAL_PROMPT": "0",
-        }
-    )
+    git_marker = root / ".git"
+    if git_marker.is_symlink() or not (git_marker.is_dir() or git_marker.is_file()):
+        raise SourceIdentityError("selected source root must contain local Git metadata")
+    environment = sanitized_git_environment()
     try:
+        top_level = subprocess.run(
+            ["git", "-C", str(root), "rev-parse", "--show-toplevel"],
+            capture_output=True,
+            check=False,
+            env=environment,
+            text=True,
+            timeout=5.0,
+        )
         completed = subprocess.run(
             ["git", "-C", str(root), "rev-parse", "HEAD^{commit}", "HEAD^{tree}"],
             capture_output=True,
@@ -170,20 +217,51 @@ def _git_coordinates(root: Path) -> tuple[str, str]:
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
         raise SourceIdentityError("Git source identity could not be observed") from exc
-    if completed.returncode != 0:
+    if top_level.returncode != 0 or completed.returncode != 0:
         raise SourceIdentityError("Git source identity could not be observed")
+    observed_top_level = top_level.stdout.strip()
+    try:
+        if not observed_top_level or Path(observed_top_level).resolve(strict=True) != root:
+            raise SourceIdentityError("Git discovery escaped the selected source root")
+    except (OSError, RuntimeError) as exc:
+        raise SourceIdentityError("Git source root could not be resolved") from exc
     coordinates = [line.strip() for line in completed.stdout.splitlines() if line.strip()]
     if len(coordinates) != 2 or not all(_is_git_object_id(item) for item in coordinates):
         raise SourceIdentityError("Git source identity returned malformed HEAD/tree coordinates")
     return coordinates[0], coordinates[1]
 
 
+def _surface_path(root: Path, raw_path: str) -> Path:
+    relative = _safe_relative_path(raw_path)
+    current = root
+    for component in PurePosixPath(relative).parts:
+        current = current / component
+        if current.is_symlink():
+            raise SourceIdentityError(f"source identity surface has a symlinked path component: {relative}")
+    return current
+
+
+def _required_surfaces(consumer: str | None) -> tuple[str, ...]:
+    if consumer is not None and consumer != "shared" and consumer not in CONSUMER_SURFACES:
+        raise SourceIdentityError(f"unknown source identity consumer: {consumer}")
+    if consumer in {None, "shared"}:
+        return (IDENTITY_HELPER_SURFACE, *CONSUMER_SURFACES.values())
+    return (IDENTITY_HELPER_SURFACE, CONSUMER_SURFACES[consumer])
+
+
+def _require_surfaces(root: Path, consumer: str | None) -> None:
+    for relative in _required_surfaces(consumer):
+        surface = _surface_path(root, relative)
+        if not surface.is_file():
+            raise SourceIdentityError(f"source identity requires invoked surface: {relative}")
+
+
 def _surface_digests(root: Path, paths: tuple[str, ...]) -> dict[str, str]:
     digests: dict[str, str] = {}
     for raw_path in paths:
         relative = _safe_relative_path(raw_path)
-        surface = root / relative
-        if surface.is_symlink() or not surface.is_file():
+        surface = _surface_path(root, relative)
+        if not surface.is_file():
             raise SourceIdentityError(f"source identity surface is missing or symlinked: {relative}")
         try:
             digests[relative] = _sha256_bytes(surface.read_bytes())
@@ -201,17 +279,10 @@ def _identity_body(
     if consumer is not None and consumer != "shared" and consumer not in CONSUMER_SURFACES:
         raise SourceIdentityError(f"unknown source identity consumer: {consumer}")
     selected = list(surface_paths or SHAPE_SURFACES)
-    if (root / IDENTITY_HELPER_SURFACE).is_file() and IDENTITY_HELPER_SURFACE not in selected:
-        selected.append(IDENTITY_HELPER_SURFACE)
-    if surface_paths is None and consumer in {None, "shared"}:
-        consumer_surfaces = CONSUMER_SURFACES.values()
-    elif surface_paths is None and consumer is not None:
-        consumer_surfaces = (CONSUMER_SURFACES[consumer],)
-    else:
-        consumer_surfaces = ()
-    for consumer_surface in consumer_surfaces:
-        if (root / consumer_surface).is_file() and consumer_surface not in selected:
-            selected.append(consumer_surface)
+    if surface_paths is None:
+        for required in _required_surfaces(consumer):
+            if required not in selected:
+                selected.append(required)
     normalized_paths = tuple(dict.fromkeys(_safe_relative_path(path) for path in selected))
     head, tree = _git_coordinates(root)
     body: dict[str, Any] = {
@@ -235,10 +306,16 @@ def make_source_identity(
     normalized_root, _stat_result = normalize_root(root)
     if not source_shape(normalized_root):
         raise SourceIdentityError(f"source root does not match the owner shape: {normalized_root}")
+    _require_surfaces(normalized_root, consumer)
+    identity_surface_paths = surface_paths
+    if surface_paths is not None:
+        identity_surface_paths = tuple(
+            dict.fromkeys((*surface_paths, *_required_surfaces(consumer)))
+        )
     body = _identity_body(
         normalized_root,
         consumer=consumer,
-        surface_paths=surface_paths,
+        surface_paths=identity_surface_paths,
     )
     return {**body, "identity_digest": _sha256_bytes(_canonical_bytes(body))}
 
@@ -253,6 +330,7 @@ def _validate_contract_shape(identity: Mapping[str, Any], *, consumer: str) -> d
     contract_consumer = identity.get("consumer")
     if contract_consumer not in {None, "shared", consumer}:
         raise SourceIdentityError("source identity consumer does not match the invoked mechanic")
+    contract_scope = contract_consumer if contract_consumer in {None, "shared"} else consumer
     if not _is_git_object_id(identity.get("head")) or not _is_git_object_id(identity.get("tree")):
         raise SourceIdentityError("source identity requires exact lowercase Git HEAD and tree IDs")
     surface_digests = identity.get("surface_digests")
@@ -267,6 +345,9 @@ def _validate_contract_shape(identity: Mapping[str, Any], *, consumer: str) -> d
     for required in SHAPE_SURFACES:
         if required not in normalized_surfaces:
             raise SourceIdentityError(f"source identity omits required surface: {required}")
+    for required in _required_surfaces(contract_scope):
+        if required not in normalized_surfaces:
+            raise SourceIdentityError(f"source identity omits required invoked surface: {required}")
     body = {
         "schema_version": SCHEMA_VERSION,
         "target_id": TARGET_ID,
@@ -291,21 +372,8 @@ def verify_source_identity(
     if not source_shape(normalized_root):
         raise SourceIdentityError(f"source root does not match the owner shape: {normalized_root}")
     expected = _validate_contract_shape(identity, consumer=consumer)
-    if (
-        expected.get("consumer") in {None, "shared", consumer}
-        and (normalized_root / CONSUMER_SURFACES[consumer]).is_file()
-        and CONSUMER_SURFACES[consumer] not in expected["surface_digests"]
-    ):
-        raise SourceIdentityError(
-            f"source identity omits invoked consumer surface: {CONSUMER_SURFACES[consumer]}"
-        )
-    if (
-        (normalized_root / IDENTITY_HELPER_SURFACE).is_file()
-        and IDENTITY_HELPER_SURFACE not in expected["surface_digests"]
-    ):
-        raise SourceIdentityError(
-            f"source identity omits the shared identity helper: {IDENTITY_HELPER_SURFACE}"
-        )
+    contract_scope = expected.get("consumer") if expected.get("consumer") in {None, "shared"} else consumer
+    _require_surfaces(normalized_root, contract_scope)
     observed = _identity_body(
         normalized_root,
         consumer=None,
@@ -370,6 +438,110 @@ def revalidate_source_binding(binding: SourceIdentityBinding) -> Path:
     ):
         raise SourceIdentityError("source root path identity changed during use")
     return normalized_root
+
+
+def _open_pinned_root(binding: SourceIdentityBinding) -> int:
+    root_fd: int | None = None
+    try:
+        root_fd = os.open(binding.root, DIRECTORY_OPEN_FLAGS)
+        stat_result = os.fstat(root_fd)
+    except OSError as exc:
+        if root_fd is not None:
+            os.close(root_fd)
+        raise SourceIdentityError("source root could not be opened without following symlinks") from exc
+    if (
+        stat_result.st_dev != binding.device
+        or stat_result.st_ino != binding.inode
+        or not stat.S_ISDIR(stat_result.st_mode)
+    ):
+        os.close(root_fd)
+        raise SourceIdentityError("source root descriptor identity changed during use")
+    return root_fd
+
+
+def _fd_path(fd: int) -> Path:
+    for prefix in (Path("/proc/self/fd"), Path("/dev/fd")):
+        candidate = prefix / str(fd)
+        if candidate.exists():
+            return candidate
+    raise SourceIdentityError("descriptor-bound source use requires an fd path")
+
+
+def _open_relative_fd(root_fd: int, relative: str) -> int:
+    parts = PurePosixPath(_safe_relative_path(relative)).parts
+    current_fd = os.dup(root_fd)
+    try:
+        for component in parts[:-1]:
+            next_fd = os.open(component, DIRECTORY_OPEN_FLAGS, dir_fd=current_fd)
+            os.close(current_fd)
+            current_fd = next_fd
+        return os.open(parts[-1], FILE_OPEN_FLAGS, dir_fd=current_fd)
+    except OSError as exc:
+        raise SourceIdentityError(f"source identity surface could not be opened: {relative}") from exc
+    finally:
+        os.close(current_fd)
+
+
+@contextmanager
+def pinned_source_root(
+    binding: SourceIdentityBinding,
+    *,
+    verify_before: bool = True,
+    verify_after: bool = True,
+) -> Iterator[Path]:
+    """Pin the selected root as the process cwd for path-based Git helpers."""
+
+    root_fd = _open_pinned_root(binding)
+    try:
+        previous_fd = os.open(".", DIRECTORY_OPEN_FLAGS)
+    except OSError as exc:
+        os.close(root_fd)
+        raise SourceIdentityError("current directory could not be pinned") from exc
+    try:
+        if verify_before:
+            revalidate_source_binding(binding)
+        os.fchdir(root_fd)
+        yield binding.root
+        if verify_after:
+            revalidate_source_binding(binding)
+    finally:
+        try:
+            os.fchdir(previous_fd)
+        finally:
+            os.close(previous_fd)
+            os.close(root_fd)
+
+
+@contextmanager
+def open_bound_surface(binding: SourceIdentityBinding, relative: str) -> Iterator[SourceSurfaceUse]:
+    """Open a sealed source file before use and expose only its inherited fd path."""
+
+    normalized = _safe_relative_path(relative)
+    expected_digest = (binding.identity.get("surface_digests") or {}).get(normalized)
+    if not _is_sha256(expected_digest):
+        raise SourceIdentityError(f"source identity does not seal the requested surface: {normalized}")
+    root_fd = _open_pinned_root(binding)
+    surface_fd: int | None = None
+    try:
+        revalidate_source_binding(binding)
+        surface_fd = _open_relative_fd(root_fd, normalized)
+        surface_stat = os.fstat(surface_fd)
+        if not stat.S_ISREG(surface_stat.st_mode):
+            raise SourceIdentityError(f"source identity surface is not a regular file: {normalized}")
+        with os.fdopen(os.dup(surface_fd), "rb") as surface_file:
+            observed_digest = _sha256_bytes(surface_file.read())
+        if observed_digest != expected_digest:
+            raise SourceIdentityError(f"source identity surface changed before use: {normalized}")
+        yield SourceSurfaceUse(
+            path=_fd_path(surface_fd),
+            root_path=_fd_path(root_fd),
+            pass_fds=(root_fd, surface_fd),
+        )
+        revalidate_source_binding(binding)
+    finally:
+        if surface_fd is not None:
+            os.close(surface_fd)
+        os.close(root_fd)
 
 
 def load_source_identity(reference: str | Path) -> dict[str, Any]:

@@ -1,5 +1,7 @@
+import os
 import shutil
 import subprocess
+from pathlib import Path
 
 from unittest.mock import patch
 
@@ -151,6 +153,44 @@ class GovernedRunnerPathTests(GovernedRunnerTestCase):
         replacement_root.rename(self.repo_root)
         with self.assertRaises(self.module.SOURCE_IDENTITY.SourceIdentityError):
             self.module.SOURCE_IDENTITY.revalidate_source_binding(binding)
+
+    def test_source_bound_trial_operation_pins_cwd_and_sanitizes_git_selectors(self) -> None:
+        identity = self.module.SOURCE_IDENTITY.make_source_identity(
+            self.repo_root,
+            consumer="governed-runner",
+        )
+        binding = self.module.SOURCE_IDENTITY.bind_source_root(
+            self.repo_root,
+            consumer="governed-runner",
+            expected_identity=identity,
+        )
+        external_root = self.root / "external"
+        init_minimal_repo(external_root)
+        observed: dict[str, object] = {}
+
+        def operation() -> dict:
+            observed["cwd"] = Path.cwd().resolve()
+            observed["git_dir"] = os.environ.get("GIT_DIR")
+            return self.module.TRIALS.run_command(
+                ["git", "rev-parse", "--show-toplevel"],
+                cwd=self.repo_root,
+                timeout_s=30,
+            )
+
+        with patch.dict(
+            "os.environ",
+            {
+                "GIT_DIR": str(external_root / ".git"),
+                "GIT_WORK_TREE": str(external_root),
+            },
+            clear=False,
+        ):
+            result = self.module._source_bound_call(binding, operation)
+            self.assertEqual(os.environ.get("GIT_DIR"), str(external_root / ".git"))
+        self.assertEqual(observed["cwd"], self.repo_root.resolve())
+        self.assertIsNone(observed["git_dir"])
+        self.assertEqual(result["exit_code"], 0)
+        self.assertEqual(Path(result["stdout"].strip()).resolve(), self.repo_root.resolve())
 
     def test_home_default_stack_root_and_projection_are_not_source_candidates(self) -> None:
         portable_home = self.root / "portable-home"

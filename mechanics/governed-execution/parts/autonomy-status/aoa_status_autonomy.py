@@ -174,15 +174,21 @@ def run_command(
     *,
     cwd: Path | None = None,
     timeout_s: float = 60.0,
+    pass_fds: tuple[int, ...] = (),
 ) -> dict[str, Any]:
     try:
+        subprocess_options: dict[str, Any] = {
+            "cwd": str(cwd) if cwd else None,
+            "text": True,
+            "capture_output": True,
+            "timeout": timeout_s,
+            "check": False,
+        }
+        if pass_fds:
+            subprocess_options["pass_fds"] = pass_fds
         proc = subprocess.run(
             parts,
-            cwd=str(cwd) if cwd else None,
-            text=True,
-            capture_output=True,
-            timeout=timeout_s,
-            check=False,
+            **subprocess_options,
         )
         return {
             "command": parts,
@@ -343,6 +349,20 @@ def run_parity_check(
                 allow_source_local=expected_identity is None,
             )
         resolved_source_root = SOURCE_IDENTITY.revalidate_source_binding(binding)
+        with SOURCE_IDENTITY.open_bound_surface(
+            binding,
+            "scripts/validate_stack.py",
+        ) as source_surface:
+            result = run_command(
+                [
+                    sys.executable,
+                    str(source_surface.path),
+                    "--parity-check",
+                ],
+                cwd=source_surface.root_path,
+                timeout_s=120.0,
+                pass_fds=source_surface.pass_fds,
+            )
     except SOURCE_IDENTITY.SourceIdentityError as exc:
         return make_check(
             status="fail",
@@ -350,15 +370,6 @@ def run_parity_check(
             detail={"reason": "source_root_unresolved", "identity_error": str(exc)},
         )
 
-    result = run_command(
-        [
-            sys.executable,
-            str(resolved_source_root / "scripts" / "validate_stack.py"),
-            "--parity-check",
-        ],
-        cwd=resolved_source_root,
-        timeout_s=120.0,
-    )
     detail = {
         "source_root": str(resolved_source_root),
         "deployed_configs_root": str(CONFIGS_ROOT),

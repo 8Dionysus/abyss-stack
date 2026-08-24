@@ -19,7 +19,11 @@ be accompanied by an absolute `AOA_SOURCE_IDENTITY` receipt with exact Git
 use the shared contract for all three consumers. An explicit foreign or isolated
 worktree is therefore admitted only by its caller-supplied identity contract;
 without an explicit contract, only the executing owner checkout is eligible.
-The binding is revalidated before governed use, including source-root
-device/inode, so aliases do not become a canonical-path rail and replacement
-fails closed. Policy `default_repo_root`, `$HOME/src`, `STACK_ROOT`, and
-deployed projections are not implicit source bindings.
+Admission requires the shared identity helper and the invoked runner surface;
+fixture-only roots, symlinked required directories, and symlinked parent
+components of sealed surfaces fail closed. Non-mutating Git and worktree
+operations run with a pinned root directory descriptor and sanitized `GIT_*`
+environment, so Git discovery follows the selected root. Revalidation remains
+a fail-closed drift detector; it is not described as an atomic pathname TOCTOU
+closure. Policy `default_repo_root`, `$HOME/src`, `STACK_ROOT`, and deployed
+projections are not implicit source bindings.

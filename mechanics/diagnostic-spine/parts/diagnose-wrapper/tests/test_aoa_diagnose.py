@@ -39,6 +39,7 @@ def make_source_checkout(
     owner_marker: str = "abyss-stack",
     readme_title: str | None = None,
     agents_owner_line: str | None = None,
+    include_runtime_surfaces: bool = True,
 ) -> Path:
     (root / "scripts").mkdir(parents=True)
     (root / "docs" / "install").mkdir(parents=True)
@@ -54,6 +55,17 @@ def make_source_checkout(
     (root / "CONTRIBUTING.md").write_text("contributing\n", encoding="utf-8")
     (root / "scripts" / "validate_stack.py").write_text("# validator\n", encoding="utf-8")
     (root / "docs" / "install" / "DEPLOYMENT.md").write_text("deploy\n", encoding="utf-8")
+    if include_runtime_surfaces:
+        runtime_surfaces = {
+            "scripts/abyss_stack_source_identity.py": "# source identity helper\n",
+            "mechanics/diagnostic-spine/parts/diagnose-wrapper/aoa_diagnose.py": "# diagnose consumer\n",
+            "mechanics/governed-execution/parts/autonomy-status/aoa_status_autonomy.py": "# autonomy consumer\n",
+            "mechanics/governed-execution/parts/governed-runner/aoa_governed_execution.py": "# governed consumer\n",
+        }
+        for relative, content in runtime_surfaces.items():
+            surface = root / relative
+            surface.parent.mkdir(parents=True, exist_ok=True)
+            surface.write_text(content, encoding="utf-8")
     subprocess.run(["git", "init", "-q"], cwd=root, check=True, capture_output=True, text=True)
     subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=root, check=True, capture_output=True, text=True)
     subprocess.run(["git", "config", "user.name", "Test User"], cwd=root, check=True, capture_output=True, text=True)

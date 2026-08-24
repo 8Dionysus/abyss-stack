@@ -564,6 +564,49 @@ def _revalidate_repo_root(
     return binding
 
 
+def _source_bound_call(
+    binding: Any,
+    operation: Callable[[], Any],
+    *,
+    verify_before: bool = True,
+    verify_after: bool = True,
+) -> Any:
+    """Run a local-trials source operation from a pinned, sanitized root cwd."""
+
+    owners = [TRIALS]
+    backend = getattr(TRIALS, "_BACKEND", None)
+    if backend is not None and backend is not TRIALS:
+        owners.append(backend)
+    original_run_commands = [(owner, owner.run_command) for owner in owners]
+
+    def bound_run_command(
+        parts: list[str],
+        *,
+        cwd: Path | None = None,
+        timeout_s: float | None = None,
+    ) -> dict[str, Any]:
+        bound_cwd = None if cwd is not None and Path(cwd) == binding.root else cwd
+        return original_run_commands[0][1](parts, cwd=bound_cwd, timeout_s=timeout_s)
+
+    saved_environment = dict(os.environ)
+    try:
+        for owner, _original in original_run_commands:
+            owner.run_command = bound_run_command
+        os.environ.clear()
+        os.environ.update(SOURCE_IDENTITY.sanitized_git_environment(saved_environment))
+        with SOURCE_IDENTITY.pinned_source_root(
+            binding,
+            verify_before=verify_before,
+            verify_after=verify_after,
+        ):
+            return operation()
+    finally:
+        for owner, original in original_run_commands:
+            owner.run_command = original
+        os.environ.clear()
+        os.environ.update(saved_environment)
+
+
 def resolve_default_repo_root(target_id: str = "abyss-stack", *, policy: dict[str, Any] | None = None) -> Path:
     detector = target_checkout_detector(target_id)
     candidates = candidate_repo_roots_for_target(target_id, policy=policy)
@@ -3710,7 +3753,10 @@ def preview_proposal(
     proposal_edit_spec = json.loads(proposal_edit_spec_artifact(run_dir).read_text(encoding="utf-8"))
     selected_target_file = proposal_summary["selected_target_file"]
     allowed_files = proposal_summary["allowed_files"]
-    worktree_path, add_raw = TRIALS.with_temp_worktree(repo_root, case_id=state["run_id"], log_root=run_dir.parent)
+    worktree_path, add_raw = _source_bound_call(
+        source_binding,
+        lambda: TRIALS.with_temp_worktree(repo_root, case_id=state["run_id"], log_root=run_dir.parent),
+    )
     add_ref = TRIALS.persist_command_result(run_dir, f"{attempt_label}-worktree-add", add_raw)
     artifact_refs = [add_ref["stdout_path"], add_ref["stderr_path"], add_ref["command_meta"]]
     if add_raw["exit_code"] != 0 or add_raw["timed_out"]:
@@ -3763,23 +3809,47 @@ def preview_proposal(
         )
         if not acceptance_ok:
             raise ValueError("one or more acceptance checks failed in the isolated worktree")
-        remove_raw = TRIALS.remove_temp_worktree(repo_root, worktree_path)
+        remove_raw = _source_bound_call(
+            source_binding,
+            lambda: TRIALS.remove_temp_worktree(repo_root, worktree_path),
+        )
         remove_ref = TRIALS.persist_command_result(run_dir, f"{attempt_label}-worktree-remove", remove_raw)
         artifact_refs.extend([remove_ref["stdout_path"], remove_ref["stderr_path"], remove_ref["command_meta"]])
         return worktree_manifest, changed_files, artifact_refs
     except Exception:
-        remove_raw = TRIALS.remove_temp_worktree(repo_root, worktree_path)
+        remove_raw = _source_bound_call(
+            source_binding,
+            lambda: TRIALS.remove_temp_worktree(repo_root, worktree_path),
+        )
         TRIALS.persist_command_result(run_dir, f"{attempt_label}-worktree-remove", remove_raw)
         raise
 
 
-def run_main_acceptance(run_dir: Path, *, repo_root: Path, playbook_policy: dict[str, Any], label_prefix: str) -> bool:
-    acceptance_refs, acceptance_ok = TRIALS.run_acceptance_checks(
+def run_main_acceptance(
+    run_dir: Path,
+    *,
+    repo_root: Path,
+    playbook_policy: dict[str, Any],
+    label_prefix: str,
+    source_binding: Any | None = None,
+    verify_before: bool = True,
+    verify_after: bool = True,
+) -> bool:
+    operation = lambda: TRIALS.run_acceptance_checks(
         run_dir,
         repo_root=repo_root,
         checks=list(playbook_policy.get("acceptance_commands") or []),
         label_prefix=label_prefix,
     )
+    if source_binding is not None:
+        acceptance_refs, acceptance_ok = _source_bound_call(
+            source_binding,
+            operation,
+            verify_before=verify_before,
+            verify_after=verify_after,
+        )
+    else:
+        acceptance_refs, acceptance_ok = operation()
     _ = acceptance_refs
     return acceptance_ok
 
@@ -3813,8 +3883,15 @@ def apply_landing_diff(run_dir: Path, *, state: dict[str, Any], playbook_policy:
             next_action="Repeat worktree preview before attempting landing.",
         )
     try:
-        TRIALS.ensure_repo_tracked_clean(repo_root)
-    except RuntimeError as exc:
+        _source_bound_call(
+            source_binding,
+            lambda: TRIALS.ensure_repo_tracked_clean(repo_root),
+        )
+        current_head = _source_bound_call(
+            source_binding,
+            lambda: TRIALS.git_head(repo_root),
+        )
+    except (RuntimeError, SOURCE_IDENTITY.SourceIdentityError) as exc:
         return failure_result(
             run_dir,
             state=state,
@@ -3823,7 +3900,7 @@ def apply_landing_diff(run_dir: Path, *, state: dict[str, Any], playbook_policy:
             reasons=[str(exc)],
             next_action="Restore a clean tracked repo state before retrying landing.",
         )
-    if TRIALS.git_head(repo_root) != state["base_head"]:
+    if current_head != state["base_head"]:
         return failure_result(
             run_dir,
             state=state,
@@ -3835,7 +3912,20 @@ def apply_landing_diff(run_dir: Path, *, state: dict[str, Any], playbook_policy:
     landing_diff_text = landing_diff_path.read_text(encoding="utf-8")
     landing_diff_digest = sha256_digest_text(landing_diff_text)
 
-    main_check_raw = TRIALS.git_command(repo_root, ["apply", "--check", str(landing_diff_path)], timeout_s=60)
+    try:
+        main_check_raw = _source_bound_call(
+            source_binding,
+            lambda: TRIALS.git_command(repo_root, ["apply", "--check", str(landing_diff_path)], timeout_s=60),
+        )
+    except SOURCE_IDENTITY.SourceIdentityError as exc:
+        return failure_result(
+            run_dir,
+            state=state,
+            phase="apply_main",
+            failure_class="policy_denied",
+            reasons=[f"source identity changed before landing apply check: {exc}"],
+            next_action="Start a new governed run from the currently bound source checkout.",
+        )
     check_ref = TRIALS.persist_command_result(run_dir, "landing-apply-check", main_check_raw)
     _ = check_ref
     if main_check_raw["exit_code"] != 0 or main_check_raw["timed_out"]:
@@ -3848,7 +3938,21 @@ def apply_landing_diff(run_dir: Path, *, state: dict[str, Any], playbook_policy:
             next_action="Start a new governed run from the current HEAD.",
         )
 
-    main_apply_raw = TRIALS.git_command(repo_root, ["apply", str(landing_diff_path)], timeout_s=60)
+    try:
+        main_apply_raw = _source_bound_call(
+            source_binding,
+            lambda: TRIALS.git_command(repo_root, ["apply", str(landing_diff_path)], timeout_s=60),
+            verify_after=False,
+        )
+    except SOURCE_IDENTITY.SourceIdentityError as exc:
+        return failure_result(
+            run_dir,
+            state=state,
+            phase="apply_main",
+            failure_class="policy_denied",
+            reasons=[f"source identity could not be pinned for landing apply: {exc}"],
+            next_action="Inspect the source checkout before retrying landing.",
+        )
     apply_ref = TRIALS.persist_command_result(run_dir, "landing-apply", main_apply_raw)
     _ = apply_ref
     if main_apply_raw["exit_code"] != 0 or main_apply_raw["timed_out"]:
@@ -3861,7 +3965,15 @@ def apply_landing_diff(run_dir: Path, *, state: dict[str, Any], playbook_policy:
             next_action="Inspect landing-apply artifacts before retrying.",
         )
 
-    if run_main_acceptance(run_dir, repo_root=repo_root, playbook_policy=playbook_policy, label_prefix="landing-acceptance"):
+    if run_main_acceptance(
+        run_dir,
+        repo_root=repo_root,
+        playbook_policy=playbook_policy,
+        label_prefix="landing-acceptance",
+        source_binding=source_binding,
+        verify_before=False,
+        verify_after=False,
+    ):
         approval = load_approval(run_dir)
         approval = advance_milestone(
             approval,
@@ -3872,7 +3984,22 @@ def apply_landing_diff(run_dir: Path, *, state: dict[str, Any], playbook_policy:
         write_json(approval_artifact(run_dir), approval)
         return pass_result(run_dir, state=state, changed_files=list(state.get("changed_files") or []))
 
-    reverse_raw = TRIALS.git_command(repo_root, ["apply", "-R", str(landing_diff_path)], timeout_s=60)
+    try:
+        reverse_raw = _source_bound_call(
+            source_binding,
+            lambda: TRIALS.git_command(repo_root, ["apply", "-R", str(landing_diff_path)], timeout_s=60),
+            verify_before=False,
+            verify_after=False,
+        )
+    except SOURCE_IDENTITY.SourceIdentityError as exc:
+        return failure_result(
+            run_dir,
+            state=state,
+            phase="apply_main",
+            failure_class="rollback_failed",
+            reasons=[f"source identity could not be pinned for rollback: {exc}"],
+            next_action="Repair the checkout manually before any further governed execution.",
+        )
     reverse_ref = TRIALS.persist_command_result(run_dir, "landing-rollback", reverse_raw)
     rollback_payload = {
         "artifact_kind": "aoa.governed-run.rollback-status",
@@ -4004,8 +4131,11 @@ def prepare_run(
         )
         repo_root = source_binding.root
         request["source_identity"] = source_binding.identity
-        TRIALS.ensure_repo_tracked_clean(repo_root)
-    except RuntimeError as exc:
+        _source_bound_call(
+            source_binding,
+            lambda: TRIALS.ensure_repo_tracked_clean(repo_root),
+        )
+    except (RuntimeError, SOURCE_IDENTITY.SourceIdentityError) as exc:
         state = {
             "run_id": run_id,
             "target_id": target_id,
@@ -4104,7 +4234,10 @@ def prepare_run(
         expected_identity=source_identity,
     )
     repo_root = source_binding.root
-    base_head = TRIALS.git_head(repo_root)
+    base_head = _source_bound_call(
+        source_binding,
+        lambda: TRIALS.git_head(repo_root),
+    )
     state = {
         "artifact_kind": "aoa.governed-run.state",
         "schema_version": "v1",
@@ -4240,8 +4373,11 @@ def run_preview_after_plan_approval(
         )
     repo_root = source_binding.root
     try:
-        TRIALS.ensure_repo_tracked_clean(repo_root)
-    except RuntimeError as exc:
+        _source_bound_call(
+            source_binding,
+            lambda: TRIALS.ensure_repo_tracked_clean(repo_root),
+        )
+    except (RuntimeError, SOURCE_IDENTITY.SourceIdentityError) as exc:
         return failure_result(
             run_dir,
             state=state,
@@ -4250,7 +4386,21 @@ def run_preview_after_plan_approval(
             reasons=[str(exc)],
             next_action="Restore a clean tracked repo state before resuming governed execution.",
         )
-    if TRIALS.git_head(repo_root) != state["base_head"]:
+    try:
+        current_head = _source_bound_call(
+            source_binding,
+            lambda: TRIALS.git_head(repo_root),
+        )
+    except SOURCE_IDENTITY.SourceIdentityError as exc:
+        return failure_result(
+            run_dir,
+            state=state,
+            phase="worktree_preview",
+            failure_class="policy_denied",
+            reasons=[f"source identity changed before HEAD check: {exc}"],
+            next_action="Start a new governed run from the currently bound source checkout.",
+        )
+    if current_head != state["base_head"]:
         return failure_result(
             run_dir,
             state=state,

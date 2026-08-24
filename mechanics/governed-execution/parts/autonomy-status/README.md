@@ -32,10 +32,18 @@ Parity-aware source selection is fail-closed and owner-qualified:
    exactly 'Root route card for `abyss-stack`.'. The deployed `Configs`
    projection, `~/src/abyss-stack`, and sibling or workspace discovery are not
    implicit source candidates.
-4. Relative paths, `/proc/self/cwd`, and symlink aliases are accepted only when
-   covered by the identity contract. The identity and source-root device/inode
-   are revalidated immediately before parity use; replacement or drift remains
-   `source_root_unresolved`.
+4. A real binding must contain the shared identity helper and the invoked
+   consumer surface; a shared receipt seals all three consumer surfaces. Required
+   directories and every parent component of a sealed surface must be real
+   directories, not symlinks. Fixture-only roots therefore fail at consumer
+   admission.
+5. Relative paths, `/proc/self/cwd`, and symlink aliases are accepted only when
+   covered by the identity contract. Before parity, device/inode and content
+   revalidation are fail-closed race detectors; `scripts/validate_stack.py` is
+   then opened from the pinned root and executed through inherited descriptors.
+   A replacement after that open cannot change the executed file, and the final
+   revalidation reports the drift as `source_root_unresolved`. Revalidation by
+   itself is not presented as an atomic TOCTOU primitive.
 
 If no valid binding exists, the parity check reports
 `source_root_unresolved`. That is a source-input truth gap, not runtime health,

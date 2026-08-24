@@ -78,8 +78,12 @@ making a canonical-path claim. Relative paths, `/proc/self/cwd`, and symlink
 aliases are accepted only when they resolve to a root covered by the explicit
 identity contract; invalid explicit input never falls back. Each consumer
 revalidates the content identity and source-root device/inode before source use,
-so replacement between resolution and use remains a source truth gap. The
-governed runner follows the same rule and does not promote policy
+and source admission rejects fixture-only roots plus symlinked required
+topology. Autonomy parity opens its validator from the pinned root through an
+inherited descriptor, then revalidates to detect post-open replacement; the
+revalidation is not an atomic TOCTOU claim. Governed Git/worktree operations
+pin the root cwd and sanitize inherited `GIT_*` configuration. The governed
+runner follows the same rule and does not promote policy
 `default_repo_root` or `STACK_ROOT` into source authority. This source binding
 does not prove remote currentness, deployment, runtime health, or semantic
 acceptance.

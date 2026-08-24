@@ -35,9 +35,12 @@ identity stopped at marker shape.
 - Introduce a shared, stdlib-only pure helper loaded from each executing source
   root without a `sys.path` or bootstrap dependency.
 - Use a caller-supplied content-addressed source contract containing exact Git
-  `HEAD`/tree coordinates and selected source-surface digests.
-- Use normalized path plus device/inode capture and final revalidation to close
-  resolve/use replacement races.
+  `HEAD`/tree coordinates and required helper/consumer source-surface digests.
+- Bind Git discovery to the selected root with sanitized inherited `GIT_*`
+  configuration and reject symlinked required topology.
+- Use root and surface descriptors for source execution where feasible; retain
+  normalized path plus device/inode and digest revalidation as fail-closed drift
+  detection rather than an atomic resolve/use claim.
 - Use a new runtime-written canonical source manifest containing path, ref, and
   tree identity.
 - Discover source candidates under the shared workspace and reject only when
@@ -50,15 +53,18 @@ identity stopped at marker shape.
 
 Use a content-addressed identity contract across all three consumers. The
 `abyss_stack_source_identity_v1` contract carries the target, exact Git `HEAD`
-and tree object IDs, selected source-surface SHA-256 digests (including the
-shared helper and invoking consumer when present), and a canonical content
-seal. `AOA_SOURCE_ROOT` remains only a lookup coordinate; an explicit root must
-be paired with an absolute shared `AOA_SOURCE_IDENTITY` receipt covering the
-three consumers, and a governed request may carry the same exact contract in
-`source_identity` (or its runner-specific selected surfaces). Without an explicit
-contract, a consumer may derive the current identity only from its executing
-source root. This preserves legitimate isolated worktrees while rejecting a
-foreign same-shape checkout that has no caller-provided identity.
+and tree object IDs, required source-surface SHA-256 digests (the shared helper
+and invoked consumer; a shared receipt seals all three consumers), and a
+canonical content seal. Git observation strips inherited `GIT_*` selectors and
+requires the selected root's own Git top-level. Required directories and all
+parent components of sealed surfaces must be non-symlinked. `AOA_SOURCE_ROOT`
+remains only a lookup coordinate; an explicit root must be paired with an
+absolute shared `AOA_SOURCE_IDENTITY` receipt covering the three consumers, and
+a governed request may carry the same exact contract in `source_identity` (or
+its runner-specific selected surfaces). Without an explicit contract, a
+consumer may derive the current identity only from its executing source root.
+This preserves legitimate isolated worktrees while rejecting a foreign
+same-shape checkout that has no caller-provided identity or invoked surfaces.
 
 Every binding still requires the exact source shape, exact first non-empty
 `README.md` line `# abyss-stack`, and exact line 'Root route card for
@@ -67,18 +73,24 @@ home-directory, policy-default, `STACK_ROOT`, sibling, and workspace discovery
 are not implicit candidates. Relative paths, `/proc/self/cwd`, and symlink
 aliases are accepted only when the resolved root matches the explicit identity
 contract. Bindings capture device/inode and revalidate the identity immediately
-before source use, so source replacement or resolve/use TOCTOU fails closed.
-Invalid or absent binding yields `source_root_unresolved` (or the
-governed-runner equivalent fail-closed error) rather than a fallback path.
+before source use. Parity opens the sealed validator with `O_NOFOLLOW` beneath
+the pinned root and passes its descriptors to the child; governed Git/worktree
+helpers inherit a pinned root cwd with sanitized Git configuration. Revalidation
+after use detects drift, but no consumer presents pathname revalidation alone as
+an atomic TOCTOU closure. Invalid or absent binding yields
+`source_root_unresolved` (or the governed-runner equivalent fail-closed error)
+rather than a fallback path.
 
 ## Rationale
 
 The selected route compares identity rather than location. Exact Git
-`HEAD`/tree coordinates distinguish commits, selected source digests cover the
+`HEAD`/tree coordinates distinguish commits, required source digests cover the
 working-tree surfaces that each consumer can execute, and the canonical JSON
 content seal prevents a receipt from being edited into a different contract.
-The normalized device/inode pair closes root replacement after resolution, while
-the final digest/coordinate observation closes content replacement before use.
+Git discovery is local to the selected root even when the caller exports
+inherited Git selectors. The normalized device/inode pair and final digest
+observation detect root/content replacement; descriptor-bound parity execution
+prevents an atomic rename after validation from changing the file being run.
 
 One shared stdlib-only helper is loaded by absolute path relative to the
 executing source root and deliberately has no repository imports. This avoids a
@@ -88,8 +100,12 @@ Source-local derivation is restricted to that executing root, not any path that
 happens to have the same markers. Explicit receipts retain relocation and
 legitimate isolated worktrees without introducing a brittle canonical-path
 rail. The path/dev/inode check is a race detector, not the source authority;
-content identity remains the authority. Sub-second p50/p95 measurements are a
-performance guard only, not a security proof.
+content identity remains the authority. A source-mutating governed landing
+intentionally narrows its post-use claim: the pre-apply source boundary is
+pinned, while the expected landing mutation is validated by the governed
+acceptance lane rather than by a stale pre-mutation identity receipt.
+Sub-second p50/p95 measurements are a performance guard only, not a security
+proof.
 
 ## Consequences
 
@@ -97,6 +113,13 @@ performance guard only, not a security proof.
   parity-aware status or diagnostic fallback paths.
 - Positive: explicit overrides remain supported only with a valid exact identity
   receipt, and invalid overrides cannot be masked by another candidate.
+- Positive: inherited `GIT_DIR`, `GIT_WORK_TREE`, and related selectors cannot
+  redirect identity discovery away from the selected root.
+- Positive: absent helper/consumer surfaces, symlinked required topology, and
+  fixture-only roots fail at consumer admission.
+- Positive: an atomic source-file replacement after parity revalidation cannot
+  change the descriptor-bound validator that is executed; final drift is still
+  reported and no success claim is made.
 - Positive: forged suffix, prefix, substring, foreign same-shape, alias,
   replacement, policy-default, `HOME`, `STACK_ROOT`, and projection candidates
   fail closed across all three consumers unless an exact caller-supplied
