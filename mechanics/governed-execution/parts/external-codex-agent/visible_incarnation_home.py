@@ -678,6 +678,57 @@ def _build_capability_projection(
     }
 
 
+def _preserve_disappeared_denied_projection_entries(
+    expected_projection: dict[str, Any],
+    previous_projection: object,
+) -> dict[str, Any]:
+    """Retain only validated prior denied rows whose ambient names disappeared."""
+
+    if not isinstance(previous_projection, dict):
+        return expected_projection
+    expected_entries = expected_projection.get("entries")
+    previous_entries = previous_projection.get("entries")
+    if not isinstance(expected_entries, dict) or not isinstance(previous_entries, dict):
+        return expected_projection
+
+    _registry, definitions, unknown = _load_capability_class_registry()
+    required_entry_fields = {
+        "capability_class",
+        "projection",
+        "grantable",
+        "explicit_grant",
+    }
+    for name, previous_entry in previous_entries.items():
+        if name in expected_entries:
+            continue
+        if not isinstance(previous_entry, dict) or previous_entry.get("projection") != "denied":
+            continue
+        if (
+            not isinstance(name, str)
+            or CAPABILITY_ENTRY_NAME_PATTERN.fullmatch(name) is None
+            or name in {".", ".."}
+            or name in LOCAL_NAMES
+            or Path(name).name != name
+            or set(previous_entry) != required_entry_fields
+            or previous_entry.get("explicit_grant") is not None
+            or not isinstance(previous_entry.get("capability_class"), str)
+            or not isinstance(previous_entry.get("grantable"), bool)
+        ):
+            raise IncarnationHomeError("capability projection drift")
+        classification = _classify_ambient_entry(
+            name,
+            definitions=definitions,
+            unknown=unknown,
+        )
+        if (
+            previous_entry["capability_class"] != classification["capability_class"]
+            or previous_entry["grantable"] is not classification["grantable"]
+        ):
+            raise IncarnationHomeError("capability projection drift")
+        expected_entries[name] = dict(previous_entry)
+    return expected_projection
+
+
 def _incarnation_coordinate(realization_id: str, fingerprint: str) -> str:
     """Give equal configurations with different realization identities distinct homes."""
 
@@ -2613,36 +2664,79 @@ def _copy_legacy_actor_local_state_impl(
         return first
 
     def ensure_target_directory(target: Path, mode: int, label: str) -> None:
+        target_parent_fd: int | None = None
+        target_descriptor: int | None = None
         try:
-            observed = os.lstat(target)
-        except FileNotFoundError:
-            parent_fd = _open_pinned_parent_directory(target, label)
             try:
-                try:
-                    os.mkdir(target.name, mode, dir_fd=parent_fd)
-                except FileExistsError:
-                    pass
-                created = os.lstat(target.name, dir_fd=parent_fd)
-                if stat.S_ISLNK(created.st_mode) or not stat.S_ISDIR(created.st_mode):
-                    raise IncarnationHomeError(
-                        f"migration target is not a real directory: {label}"
-                    )
-                os.fsync(parent_fd)
-            except OSError as exc:
+                observed = os.lstat(target)
+            except FileNotFoundError:
+                observed = None
+            if observed is not None and (
+                stat.S_ISLNK(observed.st_mode) or not stat.S_ISDIR(observed.st_mode)
+            ):
                 raise IncarnationHomeError(
-                    f"migration target directory cannot be created safely: {label}"
-                ) from exc
-            finally:
-                os.close(parent_fd)
-            return
+                    f"migration target is not a real directory: {label}"
+                )
+            target_parent_fd = _open_pinned_parent_directory(target, label)
+            if observed is None:
+                try:
+                    os.mkdir(
+                        target.name,
+                        stat.S_IMODE(mode),
+                        dir_fd=target_parent_fd,
+                    )
+                except FileExistsError as exc:
+                    raise IncarnationHomeError(
+                        f"migration target directory changed before safe open: {label}"
+                    ) from exc
+                observed = os.lstat(target.name, dir_fd=target_parent_fd)
+            expected_identity = (observed.st_dev, observed.st_ino)
+            flags = (
+                os.O_RDONLY
+                | getattr(os, "O_DIRECTORY", 0)
+                | getattr(os, "O_NOFOLLOW", 0)
+                | getattr(os, "O_CLOEXEC", 0)
+            )
+            target_descriptor = os.open(
+                target.name,
+                flags,
+                dir_fd=target_parent_fd,
+            )
+            opened = os.fstat(target_descriptor)
+            if (
+                not stat.S_ISDIR(opened.st_mode)
+                or (opened.st_dev, opened.st_ino) != expected_identity
+            ):
+                raise IncarnationHomeError(
+                    f"migration target directory changed during safe open: {label}"
+                )
+            os.fchmod(target_descriptor, stat.S_IMODE(mode))
+            after = os.fstat(target_descriptor)
+            if (
+                not stat.S_ISDIR(after.st_mode)
+                or (after.st_dev, after.st_ino) != expected_identity
+                or stat.S_IMODE(after.st_mode) != stat.S_IMODE(mode)
+            ):
+                raise IncarnationHomeError(
+                    f"migration target directory mode could not be verified: {label}"
+                )
+            os.fsync(target_descriptor)
+            os.fsync(target_parent_fd)
+        except IncarnationHomeError:
+            raise
+        except FileNotFoundError as exc:
+            raise IncarnationHomeError(
+                f"migration target directory changed before safe open: {label}"
+            ) from exc
         except OSError as exc:
             raise IncarnationHomeError(
-                f"migration target directory cannot be inspected: {label}"
+                f"migration target directory cannot be safely mode-bound: {label}"
             ) from exc
-        if stat.S_ISLNK(observed.st_mode) or not stat.S_ISDIR(observed.st_mode):
-            raise IncarnationHomeError(
-                f"migration target is not a real directory: {label}"
-            )
+        finally:
+            if target_descriptor is not None:
+                os.close(target_descriptor)
+            if target_parent_fd is not None:
+                os.close(target_parent_fd)
 
     def revalidate_source(
         source: Path,
@@ -8788,6 +8882,10 @@ def _prepare_home_impl(
         incarnation_coordinate=coordinate,
         capability_grants=capability_grants,
     )
+    capability_projection = _preserve_disappeared_denied_projection_entries(
+        capability_projection,
+        existing.get("capability_projection"),
+    )
     projected_entries = {
         name: entry
         for name, entry in capability_projection["entries"].items()
@@ -9357,6 +9455,10 @@ def _load_manifest_snapshot(
             if isinstance(grant, dict) and isinstance(grant.get("path"), str)
         ],
     )
+    expected_capability_projection = _preserve_disappeared_denied_projection_entries(
+        expected_capability_projection,
+        capability_projection,
+    )
     if capability_projection != expected_capability_projection:
         raise IncarnationHomeError("capability projection drift")
 
@@ -9480,6 +9582,10 @@ def _validate_idempotent_legacy_migration_target(
 ) -> None:
     """Accept only a target that is the exact result of this migration."""
 
+    expected_capability_projection = _preserve_disappeared_denied_projection_entries(
+        expected_capability_projection,
+        target_manifest.get("capability_projection"),
+    )
     if target_manifest.get("migration_source_manifest_digest") != legacy_manifest_digest:
         raise IncarnationHomeError(
             "legacy migration refuses to overwrite a pre-existing typed home"

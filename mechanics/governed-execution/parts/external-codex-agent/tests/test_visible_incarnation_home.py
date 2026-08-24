@@ -415,6 +415,44 @@ def test_denied_ambient_entry_can_be_actor_local_regular_state_and_reprepared(
     assert denied_name in refreshed["actor_local_state_names"]
     assert shared_name in refreshed["shared_state_names"]
 
+    (ambient / denied_name).unlink()
+    reloaded = MODULE._load_manifest(manifest_path)
+    assert denied_name in reloaded["actor_local_state_names"]
+    assert local_state.read_bytes() == b"actor-local-state"
+
+
+def test_denied_projection_row_survives_ambient_unlink_without_local_shadow(
+    tmp_path: Path,
+) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    denied_name = _unknown_fixture_name(tmp_path)
+    (ambient / denied_name).write_bytes(b"ambient-sidecar")
+    realization = _realization(tmp_path / "realization.json")
+    context = _holder_binding_context(runtime_root, "unlink-without-shadow")
+
+    manifest = MODULE.prepare_home(
+        ambient_home=ambient,
+        realization_path=realization,
+        runtime_root=runtime_root,
+        binding_context=context,
+    )
+    manifest_path = Path(manifest["codex_home"]).parent / "incarnation-home.json"
+    (ambient / denied_name).unlink()
+
+    refreshed = MODULE.prepare_home(
+        ambient_home=ambient,
+        realization_path=realization,
+        runtime_root=runtime_root,
+        binding_context=context,
+    )
+    assert denied_name in refreshed["actor_local_state_names"]
+    assert not (Path(manifest["codex_home"]) / denied_name).exists()
+    assert denied_name in MODULE._load_manifest(manifest_path)["actor_local_state_names"]
+
 
 def test_severed_ambient_alias_is_rejected_by_persisted_denied_provenance(
     tmp_path: Path,
@@ -1649,6 +1687,14 @@ def test_explicit_legacy_migration_carries_local_state_into_typed_v3(
     legacy_home = Path(legacy_manifest["codex_home"])
     (legacy_home / denied_name).write_bytes(b"legacy-denied-state")
     (legacy_home / "cache" / "legacy-cache").write_bytes(b"legacy-cache")
+    source_modes = {
+        "cache": 0o750,
+        "log": 0o711,
+        "tmp": 0o755,
+        MODULE.DESCENDANT_BIN_NAME: 0o751,
+    }
+    for name, mode in source_modes.items():
+        (legacy_home / name).chmod(mode)
     legacy_manifest_path = legacy_home.parent / "incarnation-home.json"
     context = _holder_binding_context(runtime_root, "explicit-legacy-migration")
 
@@ -1681,6 +1727,8 @@ def test_explicit_legacy_migration_carries_local_state_into_typed_v3(
     assert (migrated_home / "cache" / "legacy-cache").read_bytes() == (
         b"legacy-cache"
     )
+    for name, mode in source_modes.items():
+        assert stat.S_IMODE((migrated_home / name).stat().st_mode) == mode
     schema = json.loads(
         (PART / "schemas" / "external-codex-incarnation-home.schema.json").read_text(
             encoding="utf-8"
@@ -1698,6 +1746,8 @@ def test_explicit_legacy_migration_carries_local_state_into_typed_v3(
     )
     assert retried["codex_home"] == migrated["codex_home"]
     assert (migrated_home / denied_name).read_bytes() == b"legacy-denied-state"
+    for name, mode in source_modes.items():
+        assert stat.S_IMODE((migrated_home / name).stat().st_mode) == mode
     assert json.loads(legacy_manifest_path.read_text(encoding="utf-8"))["schema_version"] == (
         MODULE.LEGACY_SCHEMA_VERSION
     )

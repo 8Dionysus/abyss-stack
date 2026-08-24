@@ -890,6 +890,10 @@ compatibility shape and is rejected by the loader on the non-canonical route as
 well. Current
 typed holder requirements are therefore not weakened by the compatibility
 route.
+Migration copies every legacy actor-local directory mode, including the
+top-level cache/log/tmp/descendant-bin roots, through a retained no-follow
+target descriptor and verifies the mode before publishing the typed manifest;
+the exact mode is part of idempotent retry validation.
 
 The projection derives `actor_local_state_names` from every current capability
 entry whose typed projection is `denied`. An entry in that derived set may be
@@ -913,6 +917,10 @@ records only the current denied projection: each name has the ambient entry's
 current device/inode identity, when present, and a digest of the admitted local
 tree. After an ambient unlink/replace, the loader permits the existing local
 tree only when its digest is unchanged; a new or altered local tree is denied.
+When an ambient name disappears after preparation, a previously recorded
+denied row is retained only after its exact typed row is revalidated; shared
+rows are never retained this way. The bounded provenance check then admits
+only the unchanged or absent holder-local shadow.
 During one materialization, the initial ambient inode snapshot is also retained
 through the final local-tree walk, so a denied inode moved into the holder home
 cannot become acceptable merely because its ambient pathname was replaced. The
