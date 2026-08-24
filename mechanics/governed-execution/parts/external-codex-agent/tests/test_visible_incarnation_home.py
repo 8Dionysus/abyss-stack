@@ -1800,6 +1800,81 @@ def test_legacy_migration_rejects_aba_source_write(
     assert not (target_home / "cache" / "aba-child").exists()
 
 
+def test_legacy_migration_rejects_transient_absent_top_level_entry(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ambient = tmp_path / "ambient"
+    source_home = tmp_path / "legacy-home"
+    target_home = tmp_path / "typed-home"
+    ambient.mkdir()
+    source_home.mkdir(mode=0o700)
+    target_home.mkdir(mode=0o700)
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    (source_home / "config.toml").write_text(
+        'model = "sol"\n', encoding="utf-8"
+    )
+    for name in MODULE.LOCAL_NAMES - {"config.toml", "cache"}:
+        (source_home / name).mkdir(mode=0o700)
+    cache = source_home / "cache"
+    real_digest = MODULE._local_tree_content_digest
+    real_lstat = MODULE.os.lstat
+    armed = False
+    raced = False
+
+    def arm_after_initial_snapshot(
+        target: Path,
+        name: str,
+        *,
+        ambient_identities: set[tuple[int, int]] | None = None,
+        include_source_version: bool = False,
+    ) -> str | None:
+        nonlocal armed
+        result = real_digest(
+            target,
+            name,
+            ambient_identities=ambient_identities,
+            include_source_version=include_source_version,
+        )
+        if include_source_version and target == source_home / "tmp":
+            armed = True
+        return result
+
+    def create_then_remove(
+        value: str | bytes | os.PathLike[str], *args: object, **kwargs: object
+    ) -> os.stat_result:
+        nonlocal raced
+        if armed and not raced and Path(value) == cache:
+            cache.mkdir(mode=0o700)
+            transient = cache / "transient"
+            transient.write_bytes(b"transient")
+            transient.unlink()
+            cache.rmdir()
+            raced = True
+            raise FileNotFoundError(cache)
+        return real_lstat(value, *args, **kwargs)
+
+    monkeypatch.setattr(MODULE, "_local_tree_content_digest", arm_after_initial_snapshot)
+    monkeypatch.setattr(MODULE.os, "lstat", create_then_remove)
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="legacy actor-local source home changed during migration",
+    ):
+        MODULE._copy_legacy_actor_local_state(
+            source_home=source_home,
+            target_home=target_home,
+            source_expected_names=set(MODULE.LOCAL_NAMES),
+            source_actor_local_names=(),
+            target_actor_local_names=set(),
+            ambient_home=ambient,
+            ambient_identities=MODULE._ambient_inode_identities(ambient),
+        )
+
+    assert armed
+    assert raced
+    assert not cache.exists()
+    assert not (target_home / "cache").exists()
+
+
 def test_legacy_migration_rejects_preexisting_typed_home_before_copy(
     tmp_path: Path,
 ) -> None:

@@ -2522,7 +2522,7 @@ def _write_exact(
         os.close(parent_fd)
 
 
-def _copy_legacy_actor_local_state(
+def _copy_legacy_actor_local_state_impl(
     *,
     source_home: Path,
     target_home: Path,
@@ -2531,9 +2531,31 @@ def _copy_legacy_actor_local_state(
     target_actor_local_names: set[str],
     ambient_home: Path,
     ambient_identities: set[tuple[int, int]],
+    source_root_descriptor: int,
+    source_root_opened: os.stat_result,
 ) -> None:
     """Copy validated legacy local state into an unpublished typed home."""
 
+    source_root_version = _actor_local_source_version(source_root_opened)
+
+    def revalidate_source_root(stage: str) -> None:
+        try:
+            retained = os.fstat(source_root_descriptor)
+            observed = os.lstat(source_home)
+        except OSError as exc:
+            raise IncarnationHomeError(
+                f"legacy actor-local source home changed during migration: {stage}"
+            ) from exc
+        if (
+            _actor_local_source_version(retained) != source_root_version
+            or _actor_local_source_version(observed)
+            != _actor_local_source_version(retained)
+        ):
+            raise IncarnationHomeError(
+                f"legacy actor-local source home changed during migration: {stage}"
+            )
+
+    revalidate_source_root("before validation")
     _validate_actor_local_top_level_names(source_home, source_expected_names)
     source_names = sorted(set(source_actor_local_names) | LOCAL_NAMES)
     _validate_actor_local_entries(
@@ -2553,6 +2575,7 @@ def _copy_legacy_actor_local_state(
         for name in source_names
         if name != "config.toml"
     }
+    revalidate_source_root("after initial snapshot")
     visited_directories: set[tuple[int, int]] = set()
 
     def stable_directory_children(
@@ -2764,6 +2787,7 @@ def _copy_legacy_actor_local_state(
 
     for name in source_names:
         source = source_home / name
+        revalidate_source_root(f"before source entry {name}")
         try:
             os.lstat(source)
         except FileNotFoundError:
@@ -2794,6 +2818,8 @@ def _copy_legacy_actor_local_state(
             )
         finally:
             os.close(descriptor)
+        revalidate_source_root(f"after source entry {name}")
+    revalidate_source_root("before final snapshot")
     final_source_content_digests = {
         name: _local_tree_content_digest(
             source_home / name,
@@ -2804,10 +2830,44 @@ def _copy_legacy_actor_local_state(
         for name in source_names
         if name != "config.toml"
     }
+    revalidate_source_root("after final snapshot")
     if final_source_content_digests != source_content_digests:
         raise IncarnationHomeError(
             "legacy actor-local state changed during migration"
         )
+
+
+def _copy_legacy_actor_local_state(
+    *,
+    source_home: Path,
+    target_home: Path,
+    source_expected_names: set[str],
+    source_actor_local_names: Sequence[str],
+    target_actor_local_names: set[str],
+    ambient_home: Path,
+    ambient_identities: set[tuple[int, int]],
+) -> None:
+    """Copy legacy local state while retaining the source-home fence."""
+
+    source_root_descriptor, _source_root_initial, source_root_opened = (
+        _open_stable_actor_local_path_descriptor(
+            source_home, "legacy migration source home"
+        )
+    )
+    try:
+        _copy_legacy_actor_local_state_impl(
+            source_home=source_home,
+            target_home=target_home,
+            source_expected_names=source_expected_names,
+            source_actor_local_names=source_actor_local_names,
+            target_actor_local_names=target_actor_local_names,
+            ambient_home=ambient_home,
+            ambient_identities=ambient_identities,
+            source_root_descriptor=source_root_descriptor,
+            source_root_opened=source_root_opened,
+        )
+    finally:
+        os.close(source_root_descriptor)
 
 
 def _utc_now() -> str:
