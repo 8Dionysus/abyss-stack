@@ -46,13 +46,30 @@ The request contract is runtime-owned and JSON-shaped:
 - optional `memo`
 - `profile_class`
 - `repo_root`
+- optional `source_identity` (content-addressed source identity receipt)
 - optional `break_glass_reason`
 - optional `canary_id`
 - optional `task_class`
 
-An `abyss-stack` checkout is admitted only when its canonical owner markers are
-present, including `docs/install/DEPLOYMENT.md`; the retired
-`docs/DEPLOYMENT.md` path is not a valid checkout marker.
+An `abyss-stack` checkout is admitted only when its source shape is present,
+the first non-empty `README.md` line is exactly `# abyss-stack`, and the exact
+owner line 'Root route card for `abyss-stack`.' appears within the first eight
+lines of `AGENTS.md`, including `docs/install/DEPLOYMENT.md`; the retired
+`docs/DEPLOYMENT.md` path is not a valid checkout marker. `AOA_SOURCE_ROOT` is
+only a lookup coordinate: an explicit or foreign root requires a caller-supplied
+`source_identity` contract binding exact Git `HEAD`/tree and selected source
+surfaces; an environment receipt should use the shared contract, while a
+request may use its governed-runner-specific contract. When no contract is supplied, only the executing owner checkout is
+eligible. Relative aliases and `/proc/self/cwd` do not bypass the contract;
+policy `default_repo_root`, home, `STACK_ROOT`, and deployed projections are not
+implicit candidates. Admission also requires the shared identity helper and the
+invoked runner surface, with symlink-free required topology. Before each
+non-mutating source operation, the runner pins the root directory descriptor and
+sanitizes inherited `GIT_*` selectors; source validator use is descriptor-bound
+where a file is executed. Revalidation is a fail-closed drift detector, not an
+atomic pathname TOCTOU claim. A source-mutating landing keeps its pre-apply
+boundary pinned and uses governed acceptance/rollback evidence rather than
+pretending that the pre-mutation identity receipt remains current.
 
 The green repo-scope expansion gate serves as evidence for later review only; it does not widen governed repo scope implicitly during the current governed run. The default governed target remains mutation-only and `abyss-stack`-owned, while any external target still requires explicit policy coverage and evidence-backed scope promotion.
 
@@ -62,6 +79,11 @@ For canary preparation, use:
 scripts/aoa-governed-run prepare-canary docs-truth-wording-alignment --write /tmp/governed-request.json
 scripts/aoa-governed-run materialize-canaries --write-dir /tmp/governed-canaries/
 ```
+
+When `--repo-root` selects an isolated or foreign checkout, also pass
+`--source-identity /absolute/path/to/identity.json`; the receipt is copied into
+the generated request and is checked again during preflight and each later
+source-use boundary.
 
 ## Execution flow
 

@@ -178,6 +178,20 @@ for item in "${items[@]}"; do
   rsync "${rsync_flags[@]}" "${SOURCE_ROOT}/${item}" "${AOA_CONFIGS_ROOT}/"
 done
 
+for item in "${items[@]}"; do
+  if [[ "$item" == "mechanics" ]]; then
+    helper_rsync_flags=()
+    for flag in "${rsync_flags[@]}"; do
+      [[ "$flag" == "--delete" ]] || helper_rsync_flags+=("$flag")
+    done
+    helper_rsync_flags+=(--checksum)
+    rsync "${helper_rsync_flags[@]}" \
+      "${SOURCE_ROOT}/scripts/abyss_stack_source_identity.py" \
+      "${AOA_CONFIGS_ROOT}/scripts/"
+    break
+  fi
+done
+
 if ((dry_run)); then
   aoa_note "config sync preview complete; no files changed"
 else

@@ -1,3 +1,8 @@
+import os
+import shutil
+import subprocess
+from pathlib import Path
+
 from unittest.mock import patch
 
 from governed_runner_test_support import (
@@ -32,15 +37,194 @@ class GovernedRunnerPathTests(GovernedRunnerTestCase):
 
         self.assertFalse(self.module.is_abyss_stack_checkout(stale_root))
 
-    def test_resolve_default_repo_root_expands_portable_home_default(self) -> None:
+    def test_forged_prefix_suffix_and_substring_markers_are_rejected(self) -> None:
+        cases = (
+            ("# abyss-stack-fork", "Root route card for `abyss-stack`."),
+            ("# fork-abyss-stack", "Root route card for `abyss-stack`."),
+            ("# abyss-stack", "Root route card for `abyss-stack-fork`."),
+            ("# abyss-stack", "owner: abyss-stack"),
+        )
+        for index, (readme_title, agents_owner_line) in enumerate(cases):
+            with self.subTest(case=index):
+                foreign_root = self.root / f"foreign-{index}"
+                (foreign_root / "docs" / "install").mkdir(parents=True)
+                (foreign_root / "scripts").mkdir()
+                (foreign_root / "mechanics").mkdir()
+                (foreign_root / "README.md").write_text(readme_title + "\n", encoding="utf-8")
+                (foreign_root / "AGENTS.md").write_text(agents_owner_line + "\n", encoding="utf-8")
+                (foreign_root / "CONTRIBUTING.md").write_text("contrib\n", encoding="utf-8")
+                (foreign_root / "scripts" / "validate_stack.py").write_text("# validator\n", encoding="utf-8")
+                (foreign_root / "docs" / "install" / "DEPLOYMENT.md").write_text("deploy\n", encoding="utf-8")
+
+                self.assertFalse(self.module.is_abyss_stack_checkout(foreign_root))
+
+    def test_explicit_override_wins_and_invalid_override_does_not_fall_through(self) -> None:
+        explicit_root = self.root / "explicit"
+        script_root = self.root / "script"
+        init_minimal_repo(explicit_root)
+        init_minimal_repo(script_root)
+        identity_path = self.root / "explicit-source-identity.json"
+        write_json(
+            identity_path,
+            self.module.SOURCE_IDENTITY.make_source_identity(
+                explicit_root,
+                consumer="shared",
+            ),
+        )
+
+        with patch.dict(
+            "os.environ",
+            {
+                "AOA_SOURCE_ROOT": str(explicit_root),
+                "AOA_SOURCE_IDENTITY": str(identity_path),
+            },
+            clear=False,
+        ):
+            with patch.object(self.module, "SCRIPT_ROOT", script_root):
+                self.assertEqual(
+                    self.module.resolve_default_repo_root("abyss-stack", policy=make_policy()),
+                    explicit_root.resolve(),
+                )
+
+        invalid_root = self.root / "invalid"
+        invalid_root.mkdir()
+        with patch.dict("os.environ", {"AOA_SOURCE_ROOT": str(invalid_root)}, clear=False):
+            with patch.object(self.module, "SCRIPT_ROOT", script_root):
+                self.assertEqual(
+                    self.module.candidate_repo_roots_for_target("abyss-stack", policy=make_policy()),
+                    [invalid_root],
+                )
+                with self.assertRaisesRegex(RuntimeError, "source_root_unresolved"):
+                    self.module.resolve_default_repo_root("abyss-stack", policy=make_policy())
+
+    def test_valid_explicit_root_without_identity_fails_closed_before_verification(self) -> None:
+        explicit_root = self.root / "explicit-without-identity"
+        init_minimal_repo(explicit_root)
+
+        with patch.dict(
+            "os.environ",
+            {"AOA_SOURCE_ROOT": str(explicit_root)},
+            clear=True,
+        ):
+            with self.assertRaisesRegex(
+                self.module.SOURCE_IDENTITY.SourceIdentityError,
+                "AOA_SOURCE_ROOT requires AOA_SOURCE_IDENTITY",
+            ):
+                self.module._bind_repo_root(explicit_root)
+            with self.assertRaisesRegex(RuntimeError, "source_root_unresolved"):
+                self.module.resolve_default_repo_root("abyss-stack", policy=make_policy())
+
+    def test_source_local_root_is_the_only_implicit_candidate(self) -> None:
+        script_root = self.root / "script"
+        init_minimal_repo(script_root)
+
+        with patch.dict("os.environ", {}, clear=True):
+            with patch.object(self.module, "SCRIPT_ROOT", script_root):
+                self.assertEqual(
+                    self.module.resolve_default_repo_root("abyss-stack", policy=make_policy()),
+                    script_root.resolve(),
+                )
+
+    def test_same_shape_foreign_checkout_requires_exact_identity_and_alias_is_allowed(self) -> None:
+        foreign_root = self.root / "foreign"
+        init_minimal_repo(foreign_root)
+        (foreign_root / "docs" / "target.md").write_text("foreign\n", encoding="utf-8")
+        subprocess.run(["git", "add", "docs/target.md"], cwd=foreign_root, check=True, capture_output=True, text=True)
+        subprocess.run(["git", "commit", "-qm", "foreign"], cwd=foreign_root, check=True, capture_output=True, text=True)
+        identity = self.module.SOURCE_IDENTITY.make_source_identity(
+            foreign_root,
+            consumer="governed-runner",
+        )
+        alias_root = self.root / "foreign-alias"
+        alias_root.symlink_to(foreign_root, target_is_directory=True)
+
+        with patch.dict("os.environ", {}, clear=True):
+            self.assertFalse(self.module.is_abyss_stack_checkout(foreign_root))
+            with self.assertRaisesRegex(RuntimeError, "source root requires an explicit source identity contract"):
+                self.module.normalize_repo_root(
+                    foreign_root,
+                    target_id="abyss-stack",
+                )
+            self.assertEqual(
+                self.module.normalize_repo_root(
+                    alias_root,
+                    target_id="abyss-stack",
+                    expected_identity=identity,
+                ),
+                foreign_root.resolve(),
+            )
+
+    def test_source_replacement_fails_revalidation_before_use(self) -> None:
+        identity = self.module.SOURCE_IDENTITY.make_source_identity(
+            self.repo_root,
+            consumer="governed-runner",
+        )
+        binding = self.module.SOURCE_IDENTITY.bind_source_root(
+            self.repo_root,
+            consumer="governed-runner",
+            expected_identity=identity,
+        )
+        replacement_root = self.root / "replacement"
+        init_minimal_repo(replacement_root)
+        shutil.rmtree(self.repo_root)
+        replacement_root.rename(self.repo_root)
+        with self.assertRaises(self.module.SOURCE_IDENTITY.SourceIdentityError):
+            self.module.SOURCE_IDENTITY.revalidate_source_binding(binding)
+
+    def test_source_bound_trial_operation_pins_cwd_and_sanitizes_git_selectors(self) -> None:
+        identity = self.module.SOURCE_IDENTITY.make_source_identity(
+            self.repo_root,
+            consumer="governed-runner",
+        )
+        binding = self.module.SOURCE_IDENTITY.bind_source_root(
+            self.repo_root,
+            consumer="governed-runner",
+            expected_identity=identity,
+        )
+        external_root = self.root / "external"
+        init_minimal_repo(external_root)
+        observed: dict[str, object] = {}
+
+        def operation() -> dict:
+            observed["cwd"] = Path.cwd().resolve()
+            observed["git_dir"] = os.environ.get("GIT_DIR")
+            return self.module.TRIALS.run_command(
+                ["git", "rev-parse", "--show-toplevel"],
+                cwd=self.repo_root,
+                timeout_s=30,
+            )
+
+        with patch.dict(
+            "os.environ",
+            {
+                "GIT_DIR": str(external_root / ".git"),
+                "GIT_WORK_TREE": str(external_root),
+            },
+            clear=False,
+        ):
+            result = self.module._source_bound_call(binding, operation)
+            self.assertEqual(os.environ.get("GIT_DIR"), str(external_root / ".git"))
+        self.assertEqual(observed["cwd"], self.repo_root.resolve())
+        self.assertIsNone(observed["git_dir"])
+        self.assertEqual(result["exit_code"], 0)
+        self.assertEqual(Path(result["stdout"].strip()).resolve(), self.repo_root.resolve())
+
+    def test_home_default_stack_root_and_projection_are_not_source_candidates(self) -> None:
         portable_home = self.root / "portable-home"
-        portable_repo_root = portable_home / "src" / "abyss-stack"
-        init_minimal_repo(portable_repo_root)
+        home_repo_root = portable_home / "src" / "abyss-stack"
+        init_minimal_repo(home_repo_root)
+        stack_root = self.root / "stack"
+        configs_root = stack_root / "Configs"
+        init_minimal_repo(configs_root)
 
-        policy = make_policy()
-        policy["targets"]["abyss-stack"]["default_repo_root"] = "~/src/abyss-stack"
-
-        with patch.dict("os.environ", {"HOME": str(portable_home)}, clear=False):
-            resolved = self.module.resolve_default_repo_root("abyss-stack", policy=policy)
-
-        self.assertEqual(resolved, portable_repo_root.resolve())
+        with patch.dict("os.environ", {"HOME": str(portable_home)}, clear=True):
+            with patch.object(self.module, "SCRIPT_ROOT", self.root / "missing"):
+                with patch.object(self.module, "STACK_ROOT", stack_root):
+                    with patch.object(self.module, "CONFIGS_ROOT", configs_root):
+                        self.assertEqual(
+                            self.module.candidate_repo_roots_for_target("abyss-stack", policy=make_policy()),
+                            [],
+                        )
+                        with self.assertRaisesRegex(RuntimeError, "source_root_unresolved"):
+                            self.module.resolve_default_repo_root("abyss-stack", policy=make_policy())
+                        self.assertFalse(self.module.is_abyss_stack_checkout(configs_root))

@@ -184,6 +184,7 @@
     {
       "family": "root-validation-and-generated-entrypoints",
       "paths": [
+        "scripts/abyss_stack_source_identity.py",
         "scripts/build_diagnostic_surface_catalog.py",
         "scripts/build_workspace_decision_graph.py",
         "scripts/ci_gate.py",

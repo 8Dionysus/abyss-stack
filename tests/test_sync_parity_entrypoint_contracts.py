@@ -39,6 +39,48 @@ def write_text(path: Path, content: str) -> None:
 
 
 class SyncParityEntrypointContractsTests(unittest.TestCase):
+    def _helper_projection_fixture(
+        self,
+        root: Path,
+    ) -> tuple[Path, Path, Path, Path, dict[str, str]]:
+        source = root / "source"
+        backend = (
+            source
+            / "mechanics"
+            / "config-projection"
+            / "parts"
+            / "sync"
+            / SYNC_CONFIGS.name
+        )
+        backend.parent.mkdir(parents=True)
+        shutil.copyfile(SYNC_CONFIGS, backend)
+        aoa_lib = source / "scripts" / "aoa-lib.sh"
+        aoa_lib.parent.mkdir(parents=True)
+        shutil.copyfile(REPO_ROOT / "scripts" / "aoa-lib.sh", aoa_lib)
+        write_text(source / "README.md", "source README\n")
+        write_text(
+            source / "mechanics" / "diagnostic-spine" / "README.md",
+            "source mechanics\n",
+        )
+        source_helper = source / "scripts" / "abyss_stack_source_identity.py"
+        source_helper.write_bytes(b"source-bytes\n")
+
+        configs = root / "runtime" / "Configs"
+        configs.mkdir(parents=True)
+        target_helper = configs / "scripts" / source_helper.name
+        target_helper.parent.mkdir(parents=True)
+        target_helper.write_bytes(b"stale-bytes!\n")
+        write_text(configs / "scripts" / "unrelated-target.txt", "keep\n")
+        write_text(configs / "mechanics" / "stale.txt", "remove\n")
+        matching_mtime = 1_700_000_000
+        os.utime(source_helper, (matching_mtime, matching_mtime))
+        os.utime(target_helper, (matching_mtime, matching_mtime))
+
+        env = os.environ.copy()
+        env["AOA_STACK_ROOT"] = str(root / "runtime")
+        env["AOA_CONFIGS_ROOT"] = str(configs)
+        return source, backend, source_helper, target_helper, env
+
     def test_mcp_sync_fails_closed_while_runtime_provisioning_holds_lock(
         self,
     ) -> None:
@@ -131,6 +173,155 @@ class SyncParityEntrypointContractsTests(unittest.TestCase):
             self.assertEqual(
                 (configs / "README.md").read_bytes(),
                 (REPO_ROOT / "README.md").read_bytes(),
+            )
+
+    def test_mechanics_subset_projects_shared_source_identity_helper(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            source = root / "source"
+            backend = source / "mechanics" / "config-projection" / "parts" / "sync" / SYNC_CONFIGS.name
+            backend.parent.mkdir(parents=True)
+            shutil.copyfile(SYNC_CONFIGS, backend)
+            aoa_lib = source / "scripts" / "aoa-lib.sh"
+            aoa_lib.parent.mkdir(parents=True)
+            shutil.copyfile(REPO_ROOT / "scripts" / "aoa-lib.sh", aoa_lib)
+            write_text(
+                source / "mechanics" / "diagnostic-spine" / "README.md",
+                "diagnostic\n",
+            )
+            helper = source / "scripts" / "abyss_stack_source_identity.py"
+            write_text(helper, "shared source identity helper\n")
+
+            configs = root / "runtime" / "Configs"
+            configs.mkdir(parents=True)
+            env = os.environ.copy()
+            env["AOA_STACK_ROOT"] = str(root / "runtime")
+            env["AOA_CONFIGS_ROOT"] = str(configs)
+            result = subprocess.run(
+                ["bash", str(backend), "--item", "mechanics"],
+                cwd=source,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(
+                (configs / "scripts" / helper.name).read_text(encoding="utf-8"),
+                helper.read_text(encoding="utf-8"),
+            )
+
+    def test_mechanics_helper_projection_is_content_safe_and_isolated(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            source, backend, source_helper, target_helper, env = (
+                self._helper_projection_fixture(root)
+            )
+            result = subprocess.run(
+                ["bash", str(backend), "--item", "mechanics"],
+                cwd=source,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(target_helper.read_bytes(), source_helper.read_bytes())
+            self.assertTrue(
+                (
+                    root
+                    / "runtime"
+                    / "Configs"
+                    / "scripts"
+                    / "unrelated-target.txt"
+                ).is_file()
+            )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            source, backend, source_helper, target_helper, env = (
+                self._helper_projection_fixture(root)
+            )
+            result = subprocess.run(
+                ["bash", str(backend), "--dry-run", "--item=mechanics"],
+                cwd=source,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn(source_helper.name, result.stdout)
+            self.assertEqual(target_helper.read_bytes(), b"stale-bytes!\n")
+            self.assertTrue(
+                (
+                    root
+                    / "runtime"
+                    / "Configs"
+                    / "mechanics"
+                    / "stale.txt"
+                ).is_file()
+            )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            source, backend, source_helper, target_helper, env = (
+                self._helper_projection_fixture(root)
+            )
+            result = subprocess.run(
+                ["bash", str(backend), "--delete", "--item", "mechanics"],
+                cwd=source,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(target_helper.read_bytes(), source_helper.read_bytes())
+            self.assertFalse(
+                (
+                    root
+                    / "runtime"
+                    / "Configs"
+                    / "mechanics"
+                    / "stale.txt"
+                ).exists()
+            )
+            self.assertTrue(
+                (
+                    root
+                    / "runtime"
+                    / "Configs"
+                    / "scripts"
+                    / "unrelated-target.txt"
+                ).is_file()
+            )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            source, backend, _source_helper, target_helper, env = (
+                self._helper_projection_fixture(root)
+            )
+            result = subprocess.run(
+                ["bash", str(backend), "--item", "README.md"],
+                cwd=source,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(target_helper.read_bytes(), b"stale-bytes!\n")
+            self.assertEqual(
+                (root / "runtime" / "Configs" / "README.md").read_text(
+                    encoding="utf-8"
+                ),
+                "source README\n",
             )
 
     def test_sync_subset_rejects_unknown_managed_item(self) -> None:

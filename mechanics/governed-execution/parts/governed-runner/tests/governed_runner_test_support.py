@@ -41,6 +41,12 @@ def init_minimal_repo(root: Path) -> None:
     (root / "docs" / "install").mkdir(parents=True, exist_ok=True)
     (root / "scripts").mkdir(parents=True, exist_ok=True)
     (root / "tests").mkdir(parents=True, exist_ok=True)
+    (root / "mechanics").mkdir(parents=True, exist_ok=True)
+    (root / "AGENTS.md").write_text(
+        "Root route card for `abyss-stack`.\n",
+        encoding="utf-8",
+    )
+    (root / "README.md").write_text("# abyss-stack\n", encoding="utf-8")
     (root / "CONTRIBUTING.md").write_text("contrib\n", encoding="utf-8")
     (root / "docs" / "install" / "DEPLOYMENT.md").write_text(
         "deploy\n",
@@ -48,6 +54,16 @@ def init_minimal_repo(root: Path) -> None:
     )
     (root / "docs" / "target.md").write_text("alpha\nbeta\n", encoding="utf-8")
     (root / "scripts" / "validate_stack.py").write_text("print('ok')\n", encoding="utf-8")
+    runtime_surfaces = {
+        "scripts/abyss_stack_source_identity.py": "# source identity helper\n",
+        "mechanics/diagnostic-spine/parts/diagnose-wrapper/aoa_diagnose.py": "# diagnose consumer\n",
+        "mechanics/governed-execution/parts/autonomy-status/aoa_status_autonomy.py": "# autonomy consumer\n",
+        "mechanics/governed-execution/parts/governed-runner/aoa_governed_execution.py": "# governed consumer\n",
+    }
+    for relative, content in runtime_surfaces.items():
+        surface = root / relative
+        surface.parent.mkdir(parents=True, exist_ok=True)
+        surface.write_text(content, encoding="utf-8")
     subprocess.run(["git", "init"], cwd=root, check=True, capture_output=True, text=True)
     subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=root, check=True, capture_output=True, text=True)
     subprocess.run(["git", "config", "user.name", "Test User"], cwd=root, check=True, capture_output=True, text=True)
@@ -55,8 +71,13 @@ def init_minimal_repo(root: Path) -> None:
     subprocess.run(["git", "commit", "-m", "init"], cwd=root, check=True, capture_output=True, text=True)
 
 
-def governed_request(repo_root: Path, *, target_id: str = "abyss-stack") -> dict:
-    return {
+def governed_request(
+    repo_root: Path,
+    *,
+    target_id: str = "abyss-stack",
+    source_identity: dict | None = None,
+) -> dict:
+    request = {
         "goal": "Change beta to gamma in the target doc.",
         "target_id": target_id,
         "playbook_id": "AOA-P-0011",
@@ -65,6 +86,9 @@ def governed_request(repo_root: Path, *, target_id: str = "abyss-stack") -> dict
         "memo": None,
         "break_glass_reason": None,
     }
+    if source_identity is not None:
+        request["source_identity"] = source_identity
+    return request
 
 
 def make_policy(enabled_break_glass: bool = False) -> dict:
@@ -196,7 +220,16 @@ class GovernedRunnerTestCase(unittest.TestCase):
         self.canary_catalog_path = self.root / "canaries.json"
         write_json(self.canary_catalog_path, make_canary_catalog())
         self.request_path = self.root / "request.json"
-        write_json(self.request_path, governed_request(self.repo_root))
+        write_json(
+            self.request_path,
+            governed_request(
+                self.repo_root,
+                source_identity=self.module.SOURCE_IDENTITY.make_source_identity(
+                    self.repo_root,
+                    consumer="governed-runner",
+                ),
+            ),
+        )
 
     def gate_payload(self, *, overall_status: str = "pass") -> dict:
         return {

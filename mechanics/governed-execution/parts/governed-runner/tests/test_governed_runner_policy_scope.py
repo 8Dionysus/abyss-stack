@@ -23,6 +23,10 @@ class GovernedRunnerPolicyScopeTests(GovernedRunnerTestCase):
             "docs-truth-wording-alignment",
             catalog_path=self.canary_catalog_path,
             repo_root=self.repo_root,
+            source_identity=self.module.SOURCE_IDENTITY.make_source_identity(
+                self.repo_root,
+                consumer="governed-runner",
+            ),
         )
         self.assertEqual(payload["playbook_id"], "AOA-P-0011")
         self.assertEqual(payload["target_id"], "abyss-stack")

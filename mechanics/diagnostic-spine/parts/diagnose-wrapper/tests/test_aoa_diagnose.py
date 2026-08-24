@@ -4,6 +4,8 @@ import argparse
 import importlib.util
 import json
 import os
+import shutil
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -31,9 +33,55 @@ def load_module():
     return module
 
 
+def make_source_checkout(
+    root: Path,
+    *,
+    owner_marker: str = "abyss-stack",
+    readme_title: str | None = None,
+    agents_owner_line: str | None = None,
+    include_runtime_surfaces: bool = True,
+) -> Path:
+    (root / "scripts").mkdir(parents=True)
+    (root / "docs" / "install").mkdir(parents=True)
+    (root / "mechanics").mkdir()
+    (root / "AGENTS.md").write_text(
+        (agents_owner_line or f"Root route card for `{owner_marker}`.") + "\n",
+        encoding="utf-8",
+    )
+    (root / "README.md").write_text(
+        (readme_title or f"# {owner_marker}") + "\n",
+        encoding="utf-8",
+    )
+    (root / "CONTRIBUTING.md").write_text("contributing\n", encoding="utf-8")
+    (root / "scripts" / "validate_stack.py").write_text("# validator\n", encoding="utf-8")
+    (root / "docs" / "install" / "DEPLOYMENT.md").write_text("deploy\n", encoding="utf-8")
+    if include_runtime_surfaces:
+        runtime_surfaces = {
+            "scripts/abyss_stack_source_identity.py": "# source identity helper\n",
+            "mechanics/diagnostic-spine/parts/diagnose-wrapper/aoa_diagnose.py": "# diagnose consumer\n",
+            "mechanics/governed-execution/parts/autonomy-status/aoa_status_autonomy.py": "# autonomy consumer\n",
+            "mechanics/governed-execution/parts/governed-runner/aoa_governed_execution.py": "# governed consumer\n",
+        }
+        for relative, content in runtime_surfaces.items():
+            surface = root / relative
+            surface.parent.mkdir(parents=True, exist_ok=True)
+            surface.write_text(content, encoding="utf-8")
+    subprocess.run(["git", "init", "-q"], cwd=root, check=True, capture_output=True, text=True)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=root, check=True, capture_output=True, text=True)
+    subprocess.run(["git", "config", "user.name", "Test User"], cwd=root, check=True, capture_output=True, text=True)
+    subprocess.run(["git", "add", "."], cwd=root, check=True, capture_output=True, text=True)
+    subprocess.run(["git", "commit", "-qm", "fixture"], cwd=root, check=True, capture_output=True, text=True)
+    return root
+
+
 def write_json(path: Path, payload: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, ensure_ascii=True) + "\n", encoding="utf-8")
+
+
+def write_source_identity(module, root: Path, receipt_path: Path, *, consumer: str = "diagnose") -> Path:
+    write_json(receipt_path, module.SOURCE_IDENTITY.make_source_identity(root, consumer=consumer))
+    return receipt_path
 
 
 def load_schema(relative_path: str) -> dict:
@@ -93,14 +141,118 @@ class AoADiagnoseTests(unittest.TestCase):
     def test_resolve_source_root_accepts_current_install_deployment_marker(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             source_root = Path(tmpdir) / "source"
-            (source_root / "scripts").mkdir(parents=True)
-            (source_root / "docs" / "install").mkdir(parents=True)
-            (source_root / "CONTRIBUTING.md").write_text("contributing\n", encoding="utf-8")
-            (source_root / "scripts" / "validate_stack.py").write_text("# validator\n", encoding="utf-8")
-            (source_root / "docs" / "install" / "DEPLOYMENT.md").write_text("deploy\n", encoding="utf-8")
+            make_source_checkout(source_root)
+            receipt_path = write_source_identity(self.module, source_root, Path(tmpdir) / "source-identity.json", consumer="shared")
 
-            with patch.dict(os.environ, {"AOA_SOURCE_ROOT": str(source_root)}):
+            with patch.dict(os.environ, {"AOA_SOURCE_ROOT": str(source_root), "AOA_SOURCE_IDENTITY": str(receipt_path)}):
                 self.assertEqual(self.module.resolve_source_root(), source_root.resolve())
+
+    def test_explicit_override_wins_over_conflicting_script_root(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            explicit_root = make_source_checkout(Path(tmpdir) / "explicit")
+            script_root = make_source_checkout(Path(tmpdir) / "script")
+            receipt_path = write_source_identity(self.module, explicit_root, Path(tmpdir) / "source-identity.json", consumer="shared")
+
+            with patch.dict(os.environ, {"AOA_SOURCE_ROOT": str(explicit_root), "AOA_SOURCE_IDENTITY": str(receipt_path)}):
+                with patch.object(self.module, "SCRIPT_ROOT", script_root):
+                    self.assertEqual(self.module.resolve_source_root(), explicit_root.resolve())
+
+    def test_invalid_explicit_override_does_not_fall_back_to_script_root(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            script_root = make_source_checkout(Path(tmpdir) / "script")
+            invalid_root = Path(tmpdir) / "foreign"
+            invalid_root.mkdir()
+
+            with patch.dict(os.environ, {"AOA_SOURCE_ROOT": str(invalid_root)}):
+                with patch.object(self.module, "SCRIPT_ROOT", script_root):
+                    self.assertEqual(self.module.source_root_candidates()[0][0], "explicit_override")
+                    self.assertIsNone(self.module.resolve_source_root())
+
+    def test_forged_prefix_suffix_and_substring_markers_are_rejected(self) -> None:
+        cases = (
+            {"readme_title": "# abyss-stack-fork"},
+            {"readme_title": "# fork-abyss-stack"},
+            {"agents_owner_line": "Root route card for `abyss-stack-fork`."},
+            {"agents_owner_line": "owner: abyss-stack"},
+        )
+        for index, markers in enumerate(cases):
+            with self.subTest(case=index):
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    foreign_root = make_source_checkout(Path(tmpdir) / "foreign", **markers)
+
+                    with patch.dict(os.environ, {"AOA_SOURCE_ROOT": str(foreign_root)}):
+                        self.assertIsNone(self.module.resolve_source_root())
+
+    def test_runtime_projection_is_not_discovered_as_source(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            stack_root = Path(tmpdir) / "stack"
+            configs_root = make_source_checkout(stack_root / "Configs")
+
+            with patch.dict(os.environ, {}, clear=True):
+                with patch.object(self.module, "STACK_ROOT", stack_root):
+                    with patch.object(self.module, "CONFIGS_ROOT", configs_root):
+                        with patch.object(self.module, "SCRIPT_ROOT", configs_root):
+                            self.assertIsNone(self.module.resolve_source_root())
+
+    def test_deployed_projection_never_uses_home_source_fallback(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            stack_root = Path(tmpdir) / "stack"
+            configs_root = make_source_checkout(stack_root / "Configs")
+            home_source_root = make_source_checkout(Path(tmpdir) / "home" / "src" / "abyss-stack")
+
+            with patch.dict(os.environ, {}, clear=True):
+                with patch.object(self.module, "STACK_ROOT", stack_root):
+                    with patch.object(self.module, "CONFIGS_ROOT", configs_root):
+                        with patch.object(self.module, "SCRIPT_ROOT", configs_root):
+                            with patch.object(self.module, "HOME_SOURCE_ROOT", home_source_root, create=True):
+                                self.assertIsNone(self.module.resolve_source_root())
+
+    def test_same_shape_foreign_checkout_requires_exact_identity_and_alias_is_allowed(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            foreign_root = make_source_checkout(Path(tmpdir) / "foreign")
+            alias_root = Path(tmpdir) / "foreign-alias"
+            alias_root.symlink_to(foreign_root, target_is_directory=True)
+            receipt_path = write_source_identity(self.module, foreign_root, Path(tmpdir) / "foreign-identity.json", consumer="shared")
+
+            with patch.dict(os.environ, {"AOA_SOURCE_ROOT": str(foreign_root)}, clear=True):
+                self.assertIsNone(self.module.resolve_source_root())
+
+            with patch.dict(
+                os.environ,
+                {"AOA_SOURCE_ROOT": str(alias_root), "AOA_SOURCE_IDENTITY": str(receipt_path)},
+                clear=True,
+            ):
+                self.assertEqual(self.module.resolve_source_root(), foreign_root.resolve())
+
+    def test_identity_rejects_unknown_invoked_consumer(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source_root = make_source_checkout(Path(tmpdir) / "source")
+            identity = self.module.SOURCE_IDENTITY.make_source_identity(source_root, consumer="shared")
+            with self.assertRaises(self.module.SOURCE_IDENTITY.SourceIdentityError):
+                self.module.SOURCE_IDENTITY.verify_source_identity(
+                    source_root,
+                    identity,
+                    consumer="shared",
+                )
+
+    def test_source_replacement_fails_binding_revalidation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source_root = make_source_checkout(Path(tmpdir) / "source")
+            receipt_path = write_source_identity(self.module, source_root, Path(tmpdir) / "source-identity.json", consumer="shared")
+            with patch.dict(
+                os.environ,
+                {"AOA_SOURCE_ROOT": str(source_root), "AOA_SOURCE_IDENTITY": str(receipt_path)},
+                clear=True,
+            ):
+                binding = self.module.resolve_source_root_binding()
+                self.assertIsNotNone(binding)
+                replacement_root = make_source_checkout(Path(tmpdir) / "replacement")
+                (replacement_root / "README.md").write_text("# abyss-stack\nreplacement\n", encoding="utf-8")
+                shutil.rmtree(source_root)
+                replacement_root.rename(source_root)
+                with self.assertRaises(self.module.SOURCE_IDENTITY.SourceIdentityError):
+                    self.module.SOURCE_IDENTITY.revalidate_source_binding(binding)
+                self.assertFalse(self.module.fallback_truth_status()["source_authored"])
 
     def green_doctor(self) -> dict:
         return {
