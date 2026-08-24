@@ -41,6 +41,40 @@
         "dirty": {"const": false}
       }
     },
+    "finalization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["method", "status", "admitted_at", "destination", "release"],
+      "properties": {
+        "method": {"const": "locked-manifest-destination-cas-v1"},
+        "status": {"const": "admitted"},
+        "admitted_at": {"type": "string", "format": "date-time"},
+        "destination": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["target", "link_text", "device", "inode", "mode"],
+          "properties": {
+            "target": {"$ref": "#/$defs/absolutePath"},
+            "link_text": {"type": "string", "minLength": 1},
+            "device": {"type": "integer", "minimum": 0},
+            "inode": {"type": "integer", "minimum": 1},
+            "mode": {"type": "integer", "minimum": 0}
+          }
+        },
+        "release": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "root_device", "root_inode", "manifest_sha256", "seal_sha256"],
+          "properties": {
+            "path": {"$ref": "#/$defs/absolutePath"},
+            "root_device": {"type": "integer", "minimum": 0},
+            "root_inode": {"type": "integer", "minimum": 1},
+            "manifest_sha256": {"$ref": "#/$defs/hex64"},
+            "seal_sha256": {"$ref": "#/$defs/hex64"}
+          }
+        }
+      }
+    },
     "admission": {
       "type": "object",
       "additionalProperties": false,
@@ -105,7 +139,8 @@
         "activated_release": {"$ref": "#/$defs/absolutePath"},
         "release_seal": {"$ref": "#/$defs/releaseSeal"},
         "predecessor": {"$ref": "#/$defs/snapshot"},
-        "admission": {"$ref": "#/$defs/admission"}
+        "admission": {"$ref": "#/$defs/admission"},
+        "finalization": {"$ref": "#/$defs/finalization"}
       }
     },
     "recoveryReference": {
@@ -151,14 +186,16 @@
         "switch",
         "destination_identity_checked",
         "predecessor_identity_checked",
-        "release_binding"
+        "release_binding",
+        "destination_cas"
       ],
       "properties": {
         "same_filesystem": {"const": true},
         "switch": {"const": "relative-symlink-os-replace"},
         "destination_identity_checked": {"const": true},
         "predecessor_identity_checked": {"const": true},
-        "release_binding": {"const": "content-manifest-root-inode-v1"}
+        "release_binding": {"const": "content-manifest-root-inode-v1"},
+        "destination_cas": {"const": "rename-noreplace-displaced-v1"}
       }
     }
   },

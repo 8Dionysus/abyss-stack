@@ -64,10 +64,14 @@ release identity are rechecked immediately before the switch while a
 non-blocking deployment lock is held. The lock coordinates cooperating route
 writers; it cannot prevent a same-UID writer from replacing a prepared path.
 Activation therefore verifies the release and destination again after the
-switch. Any content, root-inode, or destination drift causes a durable
-rollback to the predecessor and no activation receipt. A privileged actor
-that changes permissions or bypasses the filesystem boundary remains outside
-this source-only guarantee.
+switch. Live activation and `recover --action finalize` enter the same locked
+finalization admission: the post-switch verifier is followed by a second
+destination/seal snapshot and a destination inode/link identity token. That
+token is durably bound to the recovery journal before an activation receipt
+can be written. Any content, root-inode, or destination drift at either read
+causes the same durable rollback to the predecessor and no activation receipt.
+A privileged actor that changes permissions or bypasses the filesystem
+boundary remains outside this source-only guarantee.
 
 The durable journal records intent before the switch and permits deterministic
 `recover --action finalize|rollback` after switch or receipt-write interruption.
@@ -75,11 +79,16 @@ Activation and rollback receipt references carry the journal binding, state
 digest, operation, source, destination, release, predecessor, and admission;
 cross-state references are rejected. Rollback records `rollback_intent` before
 the predecessor switch and `rollback_switch_complete` before writing the
-rollback receipt. Any directory-open/fsync or receipt persistence failure is a
-typed `activation_recovery_required` result with the journal path; no completed
-receipt is claimed. Rollback never deletes a release; it restores the exact
-predecessor symlink or the exact absent state, rechecking its recorded ref,
-tree, clean mutable state, and seal.
+rollback receipt. Its compare-and-swap moves the observed destination to a
+displaced path with `renameat2(RENAME_NOREPLACE)`, checks the moved inode/link
+identity, and installs a predecessor only with another no-replace rename. A
+same-UID writer that replaces the destination between observation and commit
+is preserved and the route fails closed with recovery required; it is never
+unlinked or overwritten. Any directory-open/fsync or receipt persistence
+failure is a typed `activation_recovery_required` result with the journal path;
+no completed receipt is claimed. Rollback never deletes a release; it restores
+the exact predecessor symlink or the exact absent state, rechecking its
+recorded ref, tree, clean mutable state, and seal.
 
 Ignored cache paths are excluded from Git's source identity check and are not
 introduced by staging. If ignored content is already present in a release,
@@ -108,8 +117,11 @@ with ignored poison after final verification, predecessor and activated release
 ref/tree/clean tamper, ignored-cache packaging, manifest/symlink policy,
 nested emitted schema instances, cross-state journal references,
 directory-fsync failure, rollback receipt persistence failure, and
-interruption/retry recovery at each activation boundary. No live `/srv/AbyssOS`
-root is used by the tests.
+interruption/retry recovery at each activation boundary. Dedicated
+interleavings cover mutation after the shared post-switch verifier, mutation
+during recovery finalization, and a same-target writer during rollback CAS;
+they assert seal/inode policy, no receipt claim, and the durable journal state.
+No live `/srv/AbyssOS` root is used by the tests.
 
 ```bash
 scripts/aoa-deploy-owner-package --help

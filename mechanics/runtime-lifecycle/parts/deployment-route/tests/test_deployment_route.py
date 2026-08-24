@@ -407,6 +407,85 @@ def test_activation_rolls_back_tracked_mutation_after_final_verification(
     assert not Path(journal["activation_receipt_path"]).exists()
 
 
+def test_activation_finalization_rejects_mutation_after_post_switch_verification(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fixture = route_fixture(tmp_path)
+    prepared = output(invoke(*prepare_command(fixture)))
+    release_path = Path(prepared["release_path"])
+    destination = Path(fixture["destination"])
+    original_verify = ROUTE._verify_post_switch_state
+    mutated = False
+
+    def mutate_after_post_switch_verify(*args: object, **kwargs: object) -> object:
+        nonlocal mutated
+        result = original_verify(*args, **kwargs)
+        if not mutated:
+            mutated = True
+            make_release_writable(release_path)
+            (release_path / "payload.txt").write_text("mutation after final check\n", encoding="utf-8")
+        return result
+
+    monkeypatch.setattr(ROUTE, "_verify_post_switch_state", mutate_after_post_switch_verify)
+    with pytest.raises(ROUTE.DeploymentError) as raised:
+        direct_activate(prepared)
+
+    assert raised.value.code == "activation_recovery_required"
+    assert mutated is True
+    assert not os.path.lexists(destination)
+    journal_path = next(Path(fixture["receipt_dir"]).glob("activate-*.recovery.json"))
+    journal = validate_instance(journal_path, "recovery-receipt.v1.json")
+    assert journal["status"] == "rollback_switch_complete"
+    assert "finalization" not in journal
+    assert "activation_receipt" not in journal
+    assert not Path(journal["activation_receipt_path"]).exists()
+
+
+def test_post_switch_rollback_compare_and_swap_preserves_same_target_writer(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fixture = route_fixture(tmp_path)
+    prepared = output(invoke(*prepare_command(fixture)))
+    release_path = Path(prepared["release_path"])
+    destination = Path(fixture["destination"])
+    original_verify = ROUTE._verify_post_switch_state
+    original_link_target = ROUTE._destination_link_target
+    observed_identity: dict[str, object] = {}
+    replaced = False
+
+    def fail_after_post_switch_verify(*args: object, **kwargs: object) -> object:
+        original_verify(*args, **kwargs)
+        raise ROUTE.DeploymentError("injected_post_switch_failure", "test rollback CAS interleaving")
+
+    def replace_after_rollback_observation(path: Path) -> Path:
+        nonlocal replaced
+        observed = original_link_target(path)
+        if not replaced:
+            replaced = True
+            observed_identity.update(ROUTE._destination_identity(path))
+            replacement = path.parent / f".{path.name}.same-target-writer"
+            replacement.unlink(missing_ok=True)
+            replacement.symlink_to(release_path)
+            os.replace(replacement, path)
+        return observed
+
+    monkeypatch.setattr(ROUTE, "_verify_post_switch_state", fail_after_post_switch_verify)
+    monkeypatch.setattr(ROUTE, "_destination_link_target", replace_after_rollback_observation)
+    with pytest.raises(ROUTE.DeploymentError) as raised:
+        direct_activate(prepared)
+
+    assert raised.value.code == "activation_recovery_required"
+    assert replaced is True
+    assert destination.is_symlink()
+    assert destination.resolve() == release_path
+    assert ROUTE._destination_identity(destination)["inode"] != observed_identity["inode"]
+    journal_path = next(Path(fixture["receipt_dir"]).glob("activate-*.recovery.json"))
+    journal = validate_instance(journal_path, "recovery-receipt.v1.json")
+    assert journal["status"] == "rollback_intent"
+    assert "rollback_switch_complete_sha256" not in journal
+    assert "activation_receipt" not in journal
+
+
 def test_activation_rejects_same_ref_replacement_with_ignored_poison_after_final_verification(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -687,6 +766,59 @@ def test_activation_interruption_is_durable_and_recoverable(
     validate_instance(journal_path, "recovery-receipt.v1.json")
     retry = output(invoke("recover", "--recovery-journal", str(journal_path), "--action", "rollback"))
     assert retry["receipt_path"] == rolled_back["receipt_path"]
+
+
+def test_recovery_finalization_uses_shared_admission_and_rolls_back_late_mutation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fixture = route_fixture(tmp_path)
+    prepared = output(invoke(*prepare_command(fixture)))
+    original_write = ROUTE._write_json
+    interrupted = False
+
+    def interrupt_after_switch_complete(path: Path, payload: dict[str, object]) -> dict[str, object]:
+        nonlocal interrupted
+        result = original_write(path, payload)
+        if not interrupted and path.name.endswith(".recovery.json") and payload.get("status") == "switch_complete":
+            interrupted = True
+            raise ROUTE.DeploymentError("injected_switch_complete_boundary", "test recovery finalization boundary")
+        return result
+
+    monkeypatch.setattr(ROUTE, "_write_json", interrupt_after_switch_complete)
+    with pytest.raises(ROUTE.DeploymentError) as raised:
+        direct_activate(prepared)
+    assert raised.value.code == "activation_recovery_required"
+    assert interrupted is True
+    monkeypatch.undo()
+
+    release_path = Path(prepared["release_path"])
+    destination = Path(fixture["destination"])
+    journal_path = next(Path(fixture["receipt_dir"]).glob("activate-*.recovery.json"))
+    validate_instance(journal_path, "recovery-receipt.v1.json")
+    original_verify = ROUTE._verify_post_switch_state
+    mutated = False
+
+    def mutate_during_recovery_finalization(*args: object, **kwargs: object) -> object:
+        nonlocal mutated
+        result = original_verify(*args, **kwargs)
+        if not mutated:
+            mutated = True
+            make_release_writable(release_path)
+            (release_path / "payload.txt").write_text("mutation during recovery finalize\n", encoding="utf-8")
+        return result
+
+    monkeypatch.setattr(ROUTE, "_verify_post_switch_state", mutate_during_recovery_finalization)
+    with pytest.raises(ROUTE.DeploymentError) as recovered:
+        ROUTE._recover_finalize(journal_path)
+
+    assert recovered.value.code == "activation_recovery_required"
+    assert mutated is True
+    assert not os.path.lexists(destination)
+    journal = validate_instance(journal_path, "recovery-receipt.v1.json")
+    assert journal["status"] == "rollback_switch_complete"
+    assert "finalization" not in journal
+    assert "activation_receipt" not in journal
+    assert not Path(journal["activation_receipt_path"]).exists()
 
 
 def test_rollback_receipt_persistence_failure_requires_recovery(
