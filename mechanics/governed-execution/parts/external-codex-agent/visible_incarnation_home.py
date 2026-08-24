@@ -7953,12 +7953,12 @@ def _finish_preparation_owner(owner: dict[str, Any] | None) -> None:
             raise IncarnationHomeError(
                 "incarnation preparation owner token changed before publication cleanup"
             ) from exc
-        try:
-            os.unlink(owner_path.name, dir_fd=parent_fd)
-        except OSError as exc:
-            raise IncarnationHomeError(
-                "incarnation preparation owner token could not be retired"
-            ) from exc
+        _remove_staged_file_at(
+            parent_fd,
+            owner_path.name,
+            descriptor,
+            "incarnation preparation owner token retirement",
+        )
     finally:
         if descriptor is not None:
             os.close(descriptor)

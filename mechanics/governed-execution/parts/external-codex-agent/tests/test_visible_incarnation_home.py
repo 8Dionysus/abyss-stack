@@ -2422,6 +2422,74 @@ def test_owner_cleanup_rejects_token_replacement_before_unlink(
     assert not published_path.exists()
 
 
+def test_owner_cleanup_preserves_replacement_after_final_revalidation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    realization_root = tmp_path / "realization-root"
+    incarnation_root = tmp_path / "incarnation-root"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    realization_root.mkdir()
+    incarnation_root.mkdir()
+    owner = MODULE._preparation_owner_record(
+        ambient_home=ambient,
+        runtime_root=runtime_root,
+        realization_root=realization_root,
+        incarnation_root=incarnation_root,
+        coordinate="sha256:" + "2" * 64,
+        holder_coordinate=None,
+    )
+    owner_path = incarnation_root / MODULE.PREPARATION_OWNER_FILE_NAME
+    MODULE._write_new_json(
+        owner_path,
+        owner,
+        "fixture preparation owner token",
+    )
+    published_path = incarnation_root / "published-marker.json"
+    published_path.write_bytes(b"published-marker")
+    moved_owner_path = tmp_path / "owner-token-moved"
+    original_revalidate = MODULE._revalidate_regular_file_at
+    replaced = False
+
+    def replace_after_revalidation(
+        parent_fd: int,
+        name: str,
+        descriptor: int,
+        initial: os.stat_result,
+        *,
+        label: str,
+        ambient_identities: set[tuple[int, int]],
+    ) -> None:
+        nonlocal replaced
+        original_revalidate(
+            parent_fd,
+            name,
+            descriptor,
+            initial,
+            label=label,
+            ambient_identities=ambient_identities,
+        )
+        if label == "incarnation preparation owner token" and not replaced:
+            owner_path.rename(moved_owner_path)
+            published_path.rename(owner_path)
+            replaced = True
+
+    monkeypatch.setattr(
+        MODULE, "_revalidate_regular_file_at", replace_after_revalidation
+    )
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="retirement staging entry changed before cleanup",
+    ):
+        MODULE._finish_preparation_owner(owner)
+
+    assert replaced
+    assert moved_owner_path.read_bytes() == MODULE.canonical_bytes(owner) + b"\n"
+    assert owner_path.read_bytes() == b"published-marker"
+
+
 def test_stale_recovery_rejects_root_replacement_before_delete(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
