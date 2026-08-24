@@ -54,6 +54,9 @@ CAPABILITY_CLASS_POLICIES = {
 }
 CAPABILITY_CLASS_ID_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
 CAPABILITY_ENTRY_NAME_PATTERN = re.compile(r"^(?!\.\.?$)[^/]+$")
+STAGED_FILE_NAME_PATTERN = re.compile(
+    r"^\.(?P<target>[^/]+)\.stage-(?P<token>[0-9a-f]{32})$"
+)
 HOLDER_RECEIPT_SCHEMA_VERSION = "abyss_stack_visible_incarnation_holder_terminal_v1"
 HOLDER_BINDING_CONTEXT_SCHEMA_VERSION = (
     "abyss_stack_visible_incarnation_holder_binding_context_v1"
@@ -721,33 +724,162 @@ def _holder_incarnation_root(
 
 
 def _ambient_inode_identities(ambient_home: Path) -> set[tuple[int, int]]:
-    """Collect ambient inode identities without following ambient symlinks."""
+    """Collect ambient inode identities from retained directory entries.
 
-    identities: set[tuple[int, int]] = set()
-    pending = [ambient_home]
-    visited_directories: set[tuple[int, int]] = set()
-    while pending:
-        current = pending.pop()
+    ``DirEntry.inode()`` is the identity returned by the directory's readdir
+    snapshot, so it survives a rename between enumeration and the later stat
+    of that name.  The descriptor-relative walk never follows an ambient
+    symlink and refuses a replacement directory rather than traversing it.
+    """
+
+    try:
+        initial = os.lstat(ambient_home)
+    except OSError as exc:
+        raise IncarnationHomeError(
+            f"ambient capability entry cannot be inspected: {ambient_home}"
+        ) from exc
+    if stat.S_ISLNK(initial.st_mode) or not stat.S_ISDIR(initial.st_mode):
+        raise IncarnationHomeError(
+            f"ambient capability entry is not a real directory: {ambient_home}"
+        )
+    flags = (
+        os.O_RDONLY
+        | getattr(os, "O_DIRECTORY", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_CLOEXEC", 0)
+    )
+    try:
+        root_fd = os.open(ambient_home, flags)
+    except OSError as exc:
+        raise IncarnationHomeError(
+            f"ambient capability directory cannot be opened: {ambient_home}"
+        ) from exc
+    pending: list[tuple[int, os.stat_result]] = []
+    try:
+        root_opened = os.fstat(root_fd)
+        if (
+            (root_opened.st_dev, root_opened.st_ino, root_opened.st_mode)
+            != (initial.st_dev, initial.st_ino, initial.st_mode)
+        ):
+            raise IncarnationHomeError(
+                f"ambient capability directory changed during safe open: {ambient_home}"
+            )
+        root_identity = (root_opened.st_dev, root_opened.st_ino)
+        identities: set[tuple[int, int]] = {root_identity}
+        visited_directories: set[tuple[int, int]] = {root_identity}
+        pending.append((root_fd, root_opened))
+        root_fd = -1
+        while pending:
+            descriptor, opened_directory = pending.pop()
+            try:
+                try:
+                    with os.scandir(descriptor) as entries:
+                        entries_snapshot = list(entries)
+                    after_listing = os.fstat(descriptor)
+                except OSError as exc:
+                    raise IncarnationHomeError(
+                        "ambient capability directory cannot be enumerated"
+                    ) from exc
+                if (
+                    (after_listing.st_dev, after_listing.st_ino, after_listing.st_mode)
+                    != (
+                        opened_directory.st_dev,
+                        opened_directory.st_ino,
+                        opened_directory.st_mode,
+                    )
+                ):
+                    raise IncarnationHomeError(
+                        "ambient capability directory changed during enumeration"
+                    )
+                parent_device = after_listing.st_dev
+                for entry in entries_snapshot:
+                    try:
+                        directory_entry_inode = entry.inode()
+                    except OSError as exc:
+                        raise IncarnationHomeError(
+                            f"ambient capability entry cannot be inspected: {entry.name}"
+                        ) from exc
+                    if isinstance(directory_entry_inode, int) and directory_entry_inode > 0:
+                        identities.add((parent_device, directory_entry_inode))
+                    try:
+                        observed = entry.stat(follow_symlinks=False)
+                    except FileNotFoundError:
+                        # The directory entry identity above is the retained
+                        # provenance when the name was renamed away before
+                        # stat could inspect it.
+                        if not isinstance(directory_entry_inode, int) or directory_entry_inode < 1:
+                            raise IncarnationHomeError(
+                                f"ambient capability entry cannot be inspected: {entry.name}"
+                            )
+                        continue
+                    except OSError as exc:
+                        raise IncarnationHomeError(
+                            f"ambient capability entry cannot be inspected: {entry.name}"
+                        ) from exc
+                    observed_identity = (observed.st_dev, observed.st_ino)
+                    identities.add(observed_identity)
+                    if not stat.S_ISDIR(observed.st_mode):
+                        continue
+                    child_flags = (
+                        os.O_RDONLY
+                        | getattr(os, "O_DIRECTORY", 0)
+                        | getattr(os, "O_NOFOLLOW", 0)
+                        | getattr(os, "O_CLOEXEC", 0)
+                    )
+                    try:
+                        child_fd = os.open(
+                            entry.name,
+                            child_flags,
+                            dir_fd=descriptor,
+                        )
+                    except FileNotFoundError:
+                        continue
+                    except OSError as exc:
+                        raise IncarnationHomeError(
+                            f"ambient capability directory cannot be opened: {entry.name}"
+                        ) from exc
+                    try:
+                        child_opened = os.fstat(child_fd)
+                    except OSError as exc:
+                        os.close(child_fd)
+                        raise IncarnationHomeError(
+                            f"ambient capability directory cannot be inspected: {entry.name}"
+                        ) from exc
+                    child_identity = (child_opened.st_dev, child_opened.st_ino)
+                    if (
+                        not stat.S_ISDIR(child_opened.st_mode)
+                        or child_identity != observed_identity
+                    ):
+                        os.close(child_fd)
+                        continue
+                    if child_identity in visited_directories:
+                        os.close(child_fd)
+                        continue
+                    visited_directories.add(child_identity)
+                    identities.add(child_identity)
+                    pending.append((child_fd, child_opened))
+            finally:
+                os.close(descriptor)
         try:
-            observed = current.lstat()
+            current_root = os.lstat(ambient_home)
         except OSError as exc:
             raise IncarnationHomeError(
-                f"ambient capability entry cannot be inspected: {current}"
+                f"ambient capability directory changed during enumeration: {ambient_home}"
             ) from exc
-        identity = (observed.st_dev, observed.st_ino)
-        identities.add(identity)
-        if not stat.S_ISDIR(observed.st_mode) or current.is_symlink():
-            continue
-        if identity in visited_directories:
-            continue
-        visited_directories.add(identity)
-        try:
-            pending.extend(current.iterdir())
-        except OSError as exc:
+        if (
+            (current_root.st_dev, current_root.st_ino, current_root.st_mode)
+            != (initial.st_dev, initial.st_ino, initial.st_mode)
+        ):
             raise IncarnationHomeError(
-                f"ambient capability directory cannot be enumerated: {current}"
-            ) from exc
-    return identities
+                f"ambient capability directory changed during enumeration: {ambient_home}"
+            )
+        return identities
+    finally:
+        if root_fd >= 0:
+            os.close(root_fd)
+        while pending:
+            descriptor, _opened = pending.pop()
+            os.close(descriptor)
 
 
 def _entry_identity(path: Path, label: str) -> tuple[int, int] | None:
@@ -1488,7 +1620,13 @@ def _stage_unnameable_file_at(
 def _remove_staged_file_at(
     parent_fd: int, name: str, descriptor: int, label: str
 ) -> None:
-    """Remove only the exact private staging link retained by descriptor."""
+    """Remove only the exact private staging link retained by descriptor.
+
+    The staging name is first moved into a private, newly-created directory.
+    The final unlink therefore targets the quarantined inode rather than a
+    mutable destination pathname; a replacement at the original name is
+    preserved and causes a fail-closed error.
+    """
 
     try:
         observed = os.lstat(name, dir_fd=parent_fd)
@@ -1507,12 +1645,157 @@ def _remove_staged_file_at(
         or opened.st_nlink != 1
     ):
         raise IncarnationHomeError(f"{label} staging entry changed before cleanup")
+    quarantine_name: str | None = None
+    quarantine_fd: int | None = None
+    quarantine_entry_moved = False
     try:
-        os.unlink(name, dir_fd=parent_fd)
-    except FileNotFoundError:
-        return
+        for _attempt in range(8):
+            candidate = f".{name}.quarantine-{secrets.token_hex(16)}"
+            try:
+                os.mkdir(candidate, 0o700, dir_fd=parent_fd)
+            except FileExistsError:
+                continue
+            quarantine_name = candidate
+            break
+        if quarantine_name is None:
+            raise IncarnationHomeError(
+                f"{label} could not allocate a private cleanup directory"
+            )
+        quarantine_flags = (
+            os.O_RDONLY
+            | getattr(os, "O_DIRECTORY", 0)
+            | getattr(os, "O_NOFOLLOW", 0)
+            | getattr(os, "O_CLOEXEC", 0)
+        )
+        try:
+            quarantine_fd = os.open(
+                quarantine_name,
+                quarantine_flags,
+                dir_fd=parent_fd,
+            )
+            quarantine_opened = os.fstat(quarantine_fd)
+            quarantine_observed = os.lstat(quarantine_name, dir_fd=parent_fd)
+            if (
+                (quarantine_opened.st_dev, quarantine_opened.st_ino, quarantine_opened.st_mode)
+                != (
+                    quarantine_observed.st_dev,
+                    quarantine_observed.st_ino,
+                    quarantine_observed.st_mode,
+                )
+                or not stat.S_ISDIR(quarantine_opened.st_mode)
+            ):
+                raise IncarnationHomeError(
+                    f"{label} cleanup directory changed during safe open"
+                )
+            try:
+                os.rename(
+                    name,
+                    name,
+                    src_dir_fd=parent_fd,
+                    dst_dir_fd=quarantine_fd,
+                )
+            except FileNotFoundError:
+                return
+            except OSError as exc:
+                raise IncarnationHomeError(
+                    f"{label} staging entry could not be quarantined"
+                ) from exc
+            quarantine_entry_moved = True
+            quarantined = os.lstat(name, dir_fd=quarantine_fd)
+            retained = os.fstat(descriptor)
+            if (
+                (quarantined.st_dev, quarantined.st_ino, quarantined.st_mode)
+                != (retained.st_dev, retained.st_ino, retained.st_mode)
+                or not stat.S_ISREG(retained.st_mode)
+                or retained.st_nlink != 1
+            ):
+                raise IncarnationHomeError(
+                    f"{label} staging entry changed during quarantine"
+                )
+            os.unlink(name, dir_fd=quarantine_fd)
+            quarantine_entry_moved = False
+        except FileNotFoundError:
+            if not quarantine_entry_moved:
+                return
+            raise
+    except IncarnationHomeError:
+        raise
     except OSError as exc:
         raise IncarnationHomeError(f"{label} staging entry could not be removed") from exc
+    finally:
+        if quarantine_fd is not None:
+            os.close(quarantine_fd)
+        if quarantine_name is not None:
+            try:
+                os.rmdir(quarantine_name, dir_fd=parent_fd)
+            except FileNotFoundError:
+                pass
+            except OSError:
+                if quarantine_entry_moved:
+                    # Preserve any inode whose identity did not match the
+                    # retained descriptor; the caller is already failing
+                    # closed and must not turn a race into data loss.
+                    pass
+                else:
+                    raise IncarnationHomeError(
+                        f"{label} cleanup directory could not be removed"
+                    )
+
+
+def _recover_abandoned_staged_files(
+    codex_home: Path,
+    *,
+    ambient_identities: set[tuple[int, int]],
+) -> None:
+    """Remove only inode-validated stages left by an interrupted publication."""
+
+    parent_fd = _open_pinned_parent_directory(
+        codex_home / "config.toml", "incarnation Codex home staging recovery"
+    )
+    changed = False
+    try:
+        try:
+            names = sorted(os.listdir(parent_fd))
+        except OSError as exc:
+            raise IncarnationHomeError(
+                "incarnation Codex home staging entries cannot be enumerated"
+            ) from exc
+        for name in names:
+            match = STAGED_FILE_NAME_PATTERN.fullmatch(name)
+            if match is None or not match.group("target"):
+                continue
+            try:
+                observed = os.lstat(name, dir_fd=parent_fd)
+            except FileNotFoundError:
+                continue
+            except OSError as exc:
+                raise IncarnationHomeError(
+                    f"abandoned staging entry cannot be inspected: {name}"
+                ) from exc
+            if stat.S_ISLNK(observed.st_mode) or not stat.S_ISREG(observed.st_mode):
+                raise IncarnationHomeError(
+                    f"abandoned staging entry is not an isolated regular file: {name}"
+                )
+            descriptor, _opened = _open_stable_regular_file_at(
+                parent_fd,
+                name,
+                label=f"abandoned staging entry {name}",
+                ambient_identities=ambient_identities,
+            )
+            try:
+                _remove_staged_file_at(
+                    parent_fd,
+                    name,
+                    descriptor,
+                    f"abandoned staging entry {name}",
+                )
+                changed = True
+            finally:
+                os.close(descriptor)
+        if changed:
+            os.fsync(parent_fd)
+    finally:
+        os.close(parent_fd)
 
 
 def _replace_with_staged_file_at(
@@ -7319,6 +7602,10 @@ def _prepare_home_impl(
     codex_home.mkdir(mode=0o700, exist_ok=True)
     if incarnation_root.is_symlink() or codex_home.is_symlink():
         raise IncarnationHomeError("incarnation home may not be a symlink")
+    _recover_abandoned_staged_files(
+        codex_home,
+        ambient_identities=ambient_identities,
+    )
     incarnation_root.chmod(0o700)
     codex_home.chmod(0o700)
     for name in ("cache", "log", "tmp", DESCENDANT_BIN_NAME):

@@ -61,14 +61,19 @@ the local tree is unchanged, so unlink/replace cannot turn a previously
 ambient-derived alias into accepted holder-local state. The record is bounded
 by the current projection and is not a filename/history denylist. During one
 materialization, the initial ambient inode snapshot is retained through the
-final local-tree walk as a runtime-owned freshness boundary; it is discarded
-after that attempt and is not a filename/history denylist. Every file writer
+final local-tree walk as a runtime-owned freshness boundary; its directory-entry
+identities are retained from descriptor-relative enumeration, so a rename during
+stat cannot erase the original inode from the snapshot. A replaced directory is
+never traversed as ambient provenance. The snapshot is discarded after that
+attempt and is not a filename/history denylist. Every file writer
 pins and revalidates the target parent descriptor before creating, replacing,
 or mode-updating a file, safely admits the existing target before its first
 effect, and stages replacement bytes through a separate unnameable descriptor
 before atomic publication. A parent rename, symlink replacement, or staged
 write failure is rejected without changing ambient bytes or mode or destroying
-the prior target.
+the prior target. An interrupted named staging link is recovered only after
+moving it into a private quarantine and revalidating its retained inode; an
+aliased or replaced stage fails closed without deleting the foreign inode.
 
 New homes require the exact bytes of a typed holder/task/run responsibility
 context. The digest of that context selects a holder-local directory below the

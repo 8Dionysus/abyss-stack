@@ -486,6 +486,108 @@ def test_initial_denied_inode_is_rejected_if_moved_during_materialization(
     assert not list(runtime_root.glob("sha256-*/holder-sha256-*/incarnation-home.json"))
 
 
+def test_initial_dirent_inode_is_retained_if_ambient_stat_races(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    denied_name = _unknown_fixture_name(tmp_path)
+    ambient_entry = ambient / denied_name
+    ambient_entry.write_bytes(b"ambient-secret-before-dirent-race")
+    realization = _realization(tmp_path / "realization.json")
+    ambient_identity = (ambient.stat().st_dev, ambient.stat().st_ino)
+    original_scandir = MODULE.os.scandir
+    original_write_exact = MODULE._write_exact
+    scan_count = 0
+    moved = False
+    moved_target: Path | None = None
+
+    class EntryProxy:
+        def __init__(self, entry: object, trigger: bool) -> None:
+            self._entry = entry
+            self._trigger = trigger
+
+        @property
+        def name(self) -> str:
+            return str(self._entry.name)  # type: ignore[attr-defined]
+
+        def inode(self) -> int:
+            return int(self._entry.inode())  # type: ignore[attr-defined]
+
+        def stat(self, *args: object, **kwargs: object) -> os.stat_result:
+            nonlocal moved, moved_target
+            if self._trigger and self.name == denied_name and not moved:
+                moved = True
+                moved_target = tmp_path / "moved-original"
+                os.rename(ambient_entry, moved_target)
+                ambient_entry.write_bytes(b"ambient-path-replacement")
+            return self._entry.stat(*args, **kwargs)  # type: ignore[attr-defined]
+
+    class ScannerProxy:
+        def __init__(self, iterator: object, trigger: bool) -> None:
+            self._iterator = iterator
+            self._trigger = trigger
+
+        def __enter__(self) -> "ScannerProxy":
+            self._iterator.__enter__()  # type: ignore[attr-defined]
+            return self
+
+        def __exit__(self, *args: object) -> object:
+            return self._iterator.__exit__(*args)  # type: ignore[attr-defined]
+
+        def __iter__(self) -> object:
+            for entry in self._iterator:  # type: ignore[operator]
+                yield EntryProxy(entry, self._trigger)
+
+    def racing_scandir(path: object) -> object:
+        nonlocal scan_count
+        if isinstance(path, int):
+            opened = os.fstat(path)
+            if (opened.st_dev, opened.st_ino) == ambient_identity:
+                scan_count += 1
+                return ScannerProxy(original_scandir(path), scan_count == 2)
+        return original_scandir(path)
+
+    def move_retained_inode_into_holder(
+        path: Path,
+        content: bytes,
+        mode: int,
+        *,
+        ambient_identities: set[tuple[int, int]] | None = None,
+    ) -> None:
+        original_write_exact(
+            path,
+            content,
+            mode,
+            ambient_identities=ambient_identities,
+        )
+        if path.name == "config.toml" and moved_target is not None:
+            moved_target.rename(path.parent / denied_name)
+
+    monkeypatch.setattr(MODULE.os, "scandir", racing_scandir)
+    monkeypatch.setattr(MODULE, "_write_exact", move_retained_inode_into_holder)
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="actor-local capability entry aliases ambient state",
+    ):
+        _ORIGINAL_PREPARE_HOME(
+            ambient_home=ambient,
+            realization_path=realization,
+            runtime_root=runtime_root,
+            binding_context=_holder_binding_context(runtime_root, "dirent-race"),
+        )
+
+    assert moved
+    assert scan_count >= 2
+    assert ambient_entry.read_bytes() == b"ambient-path-replacement"
+    assert moved_target is not None
+    assert not moved_target.exists()
+    assert not list(runtime_root.glob("sha256-*/holder-sha256-*/incarnation-home.json"))
+
+
 def test_config_alias_rejection_preserves_ambient_bytes_and_mode(
     tmp_path: Path,
 ) -> None:
@@ -619,6 +721,74 @@ def test_atomic_existing_file_failure_preserves_bytes_mode_and_inode(
     assert path.read_bytes() == before_bytes
     assert stat.S_IMODE(path.stat().st_mode) == before_mode
     assert path.stat().st_ino == before_inode
+
+
+def test_interrupted_staging_link_is_recovered_before_reprepare(tmp_path: Path) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    realization = _realization(tmp_path / "realization.json")
+    context = _holder_binding_context(runtime_root, "staging-recovery")
+    manifest = _ORIGINAL_PREPARE_HOME(
+        ambient_home=ambient,
+        realization_path=realization,
+        runtime_root=runtime_root,
+        binding_context=context,
+    )
+    actor_home = Path(manifest["codex_home"])
+    stage = actor_home / (".config.toml.stage-" + "a" * 32)
+    stage.write_bytes(b"abandoned staged replacement")
+    stage.chmod(0o600)
+    before_config = (actor_home / "config.toml").read_bytes()
+
+    refreshed = _ORIGINAL_PREPARE_HOME(
+        ambient_home=ambient,
+        realization_path=realization,
+        runtime_root=runtime_root,
+        binding_context=context,
+    )
+
+    assert refreshed["codex_home"] == str(actor_home)
+    assert not stage.exists()
+    assert (actor_home / "config.toml").read_bytes() == before_config
+    assert not list(actor_home.glob("*.quarantine-*"))
+
+
+def test_abandoned_staging_alias_is_rejected_without_external_mutation(
+    tmp_path: Path,
+) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    realization = _realization(tmp_path / "realization.json")
+    manifest = _ORIGINAL_PREPARE_HOME(
+        ambient_home=ambient,
+        realization_path=realization,
+        runtime_root=runtime_root,
+        binding_context=_holder_binding_context(runtime_root, "staging-alias"),
+    )
+    actor_home = Path(manifest["codex_home"])
+    external = tmp_path / "external-staged-bytes"
+    external.write_bytes(b"must-survive-recovery-rejection")
+    stage = actor_home / (".config.toml.stage-" + "b" * 32)
+    os.link(external, stage)
+    before = external.read_bytes()
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="multiply linked|not an isolated regular file|changed during safe validation",
+    ):
+        _ORIGINAL_PREPARE_HOME(
+            ambient_home=ambient,
+            realization_path=realization,
+            runtime_root=runtime_root,
+            binding_context=_holder_binding_context(runtime_root, "staging-alias"),
+        )
+    assert external.read_bytes() == before
+    assert stage.read_bytes() == before
 
 
 def test_preparation_lock_alias_rejection_preserves_external_mode_and_bytes(

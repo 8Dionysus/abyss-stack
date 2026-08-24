@@ -888,7 +888,10 @@ tree only when its digest is unchanged; a new or altered local tree is denied.
 During one materialization, the initial ambient inode snapshot is also retained
 through the final local-tree walk, so a denied inode moved into the holder home
 cannot become acceptable merely because its ambient pathname was replaced. The
-snapshot is bounded to that preparation and is not a filename/history denylist.
+snapshot is collected from retained descriptor-relative directory entries, so
+a rename during entry stat retains the original device/inode identity; a
+replacement directory is never traversed as ambient provenance. The snapshot
+is bounded to that preparation and is not a filename/history denylist.
 Every file writer pins and revalidates the target parent descriptor before
 creating, replacing, or mode-updating a file, so a parent rename or symlink
 replacement cannot redirect an effect into ambient state. New files are
@@ -897,7 +900,10 @@ replaceable temporary pathname; existing admitted regular files are opened
 read-only for identity admission, written completely through a separate
 unnameable descriptor, and atomically replaced only after both descriptors are
 revalidated. A staging write or fsync failure therefore leaves the prior bytes,
-mode, and inode intact. The preparation lock serializes through the pinned runtime directory
+mode, and inode intact. If a process is interrupted after linking a private
+stage, the next unclaimed preparation removes only an inode-validated stage
+through a private quarantine directory; a multiply linked or replaced stage
+fails closed without deleting the foreign inode. The preparation lock serializes through the pinned runtime directory
 and revalidates its named single-link file after acquisition, so a lock-name
 replacement cannot split critical sections or chmod an external inode.
 Legacy v2 manifests remain schema-valid without this field on the explicit
