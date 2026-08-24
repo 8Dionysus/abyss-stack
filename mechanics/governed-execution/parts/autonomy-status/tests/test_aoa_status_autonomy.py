@@ -36,12 +36,24 @@ def load_module():
     return module
 
 
-def make_source_checkout(root: Path, *, owner_marker: str = "abyss-stack") -> Path:
+def make_source_checkout(
+    root: Path,
+    *,
+    owner_marker: str = "abyss-stack",
+    readme_title: str | None = None,
+    agents_owner_line: str | None = None,
+) -> Path:
     (root / "scripts").mkdir(parents=True)
     (root / "docs" / "install").mkdir(parents=True)
     (root / "mechanics").mkdir()
-    (root / "AGENTS.md").write_text(f"root owner: {owner_marker}\n", encoding="utf-8")
-    (root / "README.md").write_text(f"# {owner_marker}\n", encoding="utf-8")
+    (root / "AGENTS.md").write_text(
+        (agents_owner_line or f"Root route card for `{owner_marker}`.") + "\n",
+        encoding="utf-8",
+    )
+    (root / "README.md").write_text(
+        (readme_title or f"# {owner_marker}") + "\n",
+        encoding="utf-8",
+    )
     (root / "CONTRIBUTING.md").write_text("contributing\n", encoding="utf-8")
     (root / "scripts" / "validate_stack.py").write_text("# validator\n", encoding="utf-8")
     (root / "docs" / "install" / "DEPLOYMENT.md").write_text("deploy\n", encoding="utf-8")
@@ -227,6 +239,21 @@ class AutonomyCollectorTests(unittest.TestCase):
 
             with patch.dict(os.environ, {"AOA_SOURCE_ROOT": str(foreign_root)}):
                 self.assertIsNone(self.module.resolve_source_root())
+
+    def test_forged_prefix_suffix_and_substring_markers_are_rejected(self) -> None:
+        cases = (
+            {"readme_title": "# abyss-stack-fork"},
+            {"readme_title": "# fork-abyss-stack"},
+            {"agents_owner_line": "Root route card for `abyss-stack-fork`."},
+            {"agents_owner_line": "owner: abyss-stack"},
+        )
+        for index, markers in enumerate(cases):
+            with self.subTest(case=index):
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    foreign_root = make_source_checkout(Path(tmpdir) / "foreign", **markers)
+
+                    with patch.dict(os.environ, {"AOA_SOURCE_ROOT": str(foreign_root)}):
+                        self.assertIsNone(self.module.resolve_source_root())
 
     def test_absent_canonical_source_is_explicitly_unresolved(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

@@ -32,15 +32,78 @@ class GovernedRunnerPathTests(GovernedRunnerTestCase):
 
         self.assertFalse(self.module.is_abyss_stack_checkout(stale_root))
 
-    def test_resolve_default_repo_root_expands_portable_home_default(self) -> None:
+    def test_forged_prefix_suffix_and_substring_markers_are_rejected(self) -> None:
+        cases = (
+            ("# abyss-stack-fork", "Root route card for `abyss-stack`."),
+            ("# fork-abyss-stack", "Root route card for `abyss-stack`."),
+            ("# abyss-stack", "Root route card for `abyss-stack-fork`."),
+            ("# abyss-stack", "owner: abyss-stack"),
+        )
+        for index, (readme_title, agents_owner_line) in enumerate(cases):
+            with self.subTest(case=index):
+                foreign_root = self.root / f"foreign-{index}"
+                (foreign_root / "docs" / "install").mkdir(parents=True)
+                (foreign_root / "scripts").mkdir()
+                (foreign_root / "mechanics").mkdir()
+                (foreign_root / "README.md").write_text(readme_title + "\n", encoding="utf-8")
+                (foreign_root / "AGENTS.md").write_text(agents_owner_line + "\n", encoding="utf-8")
+                (foreign_root / "CONTRIBUTING.md").write_text("contrib\n", encoding="utf-8")
+                (foreign_root / "scripts" / "validate_stack.py").write_text("# validator\n", encoding="utf-8")
+                (foreign_root / "docs" / "install" / "DEPLOYMENT.md").write_text("deploy\n", encoding="utf-8")
+
+                self.assertFalse(self.module.is_abyss_stack_checkout(foreign_root))
+
+    def test_explicit_override_wins_and_invalid_override_does_not_fall_through(self) -> None:
+        explicit_root = self.root / "explicit"
+        script_root = self.root / "script"
+        init_minimal_repo(explicit_root)
+        init_minimal_repo(script_root)
+
+        with patch.dict("os.environ", {"AOA_SOURCE_ROOT": str(explicit_root)}, clear=False):
+            with patch.object(self.module, "SCRIPT_ROOT", script_root):
+                self.assertEqual(
+                    self.module.resolve_default_repo_root("abyss-stack", policy=make_policy()),
+                    explicit_root.resolve(),
+                )
+
+        invalid_root = self.root / "invalid"
+        invalid_root.mkdir()
+        with patch.dict("os.environ", {"AOA_SOURCE_ROOT": str(invalid_root)}, clear=False):
+            with patch.object(self.module, "SCRIPT_ROOT", script_root):
+                self.assertEqual(
+                    self.module.candidate_repo_roots_for_target("abyss-stack", policy=make_policy()),
+                    [invalid_root],
+                )
+                with self.assertRaisesRegex(RuntimeError, "source_root_unresolved"):
+                    self.module.resolve_default_repo_root("abyss-stack", policy=make_policy())
+
+    def test_source_local_root_is_the_only_implicit_candidate(self) -> None:
+        script_root = self.root / "script"
+        init_minimal_repo(script_root)
+
+        with patch.dict("os.environ", {}, clear=True):
+            with patch.object(self.module, "SCRIPT_ROOT", script_root):
+                self.assertEqual(
+                    self.module.resolve_default_repo_root("abyss-stack", policy=make_policy()),
+                    script_root.resolve(),
+                )
+
+    def test_home_default_stack_root_and_projection_are_not_source_candidates(self) -> None:
         portable_home = self.root / "portable-home"
-        portable_repo_root = portable_home / "src" / "abyss-stack"
-        init_minimal_repo(portable_repo_root)
+        home_repo_root = portable_home / "src" / "abyss-stack"
+        init_minimal_repo(home_repo_root)
+        stack_root = self.root / "stack"
+        configs_root = stack_root / "Configs"
+        init_minimal_repo(configs_root)
 
-        policy = make_policy()
-        policy["targets"]["abyss-stack"]["default_repo_root"] = "~/src/abyss-stack"
-
-        with patch.dict("os.environ", {"HOME": str(portable_home)}, clear=False):
-            resolved = self.module.resolve_default_repo_root("abyss-stack", policy=policy)
-
-        self.assertEqual(resolved, portable_repo_root.resolve())
+        with patch.dict("os.environ", {"HOME": str(portable_home)}, clear=True):
+            with patch.object(self.module, "SCRIPT_ROOT", self.root / "missing"):
+                with patch.object(self.module, "STACK_ROOT", stack_root):
+                    with patch.object(self.module, "CONFIGS_ROOT", configs_root):
+                        self.assertEqual(
+                            self.module.candidate_repo_roots_for_target("abyss-stack", policy=make_policy()),
+                            [],
+                        )
+                        with self.assertRaisesRegex(RuntimeError, "source_root_unresolved"):
+                            self.module.resolve_default_repo_root("abyss-stack", policy=make_policy())
+                        self.assertFalse(self.module.is_abyss_stack_checkout(configs_root))

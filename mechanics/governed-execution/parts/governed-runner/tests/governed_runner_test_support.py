@@ -41,6 +41,12 @@ def init_minimal_repo(root: Path) -> None:
     (root / "docs" / "install").mkdir(parents=True, exist_ok=True)
     (root / "scripts").mkdir(parents=True, exist_ok=True)
     (root / "tests").mkdir(parents=True, exist_ok=True)
+    (root / "mechanics").mkdir(parents=True, exist_ok=True)
+    (root / "AGENTS.md").write_text(
+        "Root route card for `abyss-stack`.\n",
+        encoding="utf-8",
+    )
+    (root / "README.md").write_text("# abyss-stack\n", encoding="utf-8")
     (root / "CONTRIBUTING.md").write_text("contrib\n", encoding="utf-8")
     (root / "docs" / "install" / "DEPLOYMENT.md").write_text(
         "deploy\n",

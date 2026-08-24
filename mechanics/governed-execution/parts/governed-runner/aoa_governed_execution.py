@@ -8,6 +8,7 @@ import importlib.machinery
 import importlib.util
 import json
 import os
+from itertools import islice
 from pathlib import Path, PurePosixPath
 import re
 import textwrap
@@ -34,6 +35,10 @@ def find_repo_root(start: Path) -> Path:
 SCRIPT_ROOT = find_repo_root(SCRIPT_PATH.parent)
 STACK_ROOT = Path(os.environ.get("AOA_STACK_ROOT", "/srv/AbyssOS/abyss-stack"))
 CONFIGS_ROOT = Path(os.environ.get("AOA_CONFIGS_ROOT", str(STACK_ROOT / "Configs")))
+SOURCE_ROOT_ENV = "AOA_SOURCE_ROOT"
+SOURCE_README_TITLE = "# abyss-stack"
+SOURCE_AGENTS_OWNER_LINE = "Root route card for `abyss-stack`."
+SOURCE_AGENTS_SCAN_LINES = 8
 ROUTE_API_BASE_URL = os.environ.get("AOA_ROUTE_API_BASE_URL", "http://127.0.0.1:5402").rstrip("/")
 LANGCHAIN_API_BASE_URL = os.environ.get("AOA_LANGCHAIN_API_BASE_URL", "http://127.0.0.1:5403").rstrip("/")
 LOG_ROOT_DEFAULT = Path(
@@ -373,12 +378,45 @@ def validate_canary_catalog(catalog: dict[str, Any]) -> None:
             raise RuntimeError(f"unsupported canary task_class for {canary_id}: {entry['task_class']}")
 
 
+def is_runtime_projection(path: Path) -> bool:
+    try:
+        resolved = path.resolve()
+    except OSError:
+        return False
+    for runtime_root in (STACK_ROOT, CONFIGS_ROOT):
+        try:
+            resolved_runtime_root = runtime_root.resolve()
+        except OSError:
+            continue
+        if resolved == resolved_runtime_root or resolved_runtime_root in resolved.parents:
+            return True
+    return False
+
+
 def is_abyss_stack_checkout(path: Path) -> bool:
-    return (
-        (path / "CONTRIBUTING.md").exists()
-        and (path / "scripts" / "validate_stack.py").exists()
-        and (path / "docs" / "install" / "DEPLOYMENT.md").exists()
-    )
+    if is_runtime_projection(path) or not (
+        (path / "AGENTS.md").is_file()
+        and (path / "README.md").is_file()
+        and (path / "CONTRIBUTING.md").is_file()
+        and (path / "mechanics").is_dir()
+        and (path / "scripts" / "validate_stack.py").is_file()
+        and (path / "docs" / "install" / "DEPLOYMENT.md").is_file()
+    ):
+        return False
+    try:
+        with (path / "README.md").open(encoding="utf-8") as readme_file:
+            readme_title = next(
+                (line.strip() for line in readme_file if line.strip()),
+                None,
+            )
+        with (path / "AGENTS.md").open(encoding="utf-8") as agents_file:
+            agents_owner_line = any(
+                line.rstrip("\r\n") == SOURCE_AGENTS_OWNER_LINE
+                for line in islice(agents_file, SOURCE_AGENTS_SCAN_LINES)
+            )
+    except OSError:
+        return False
+    return readme_title == SOURCE_README_TITLE and agents_owner_line
 
 
 def target_checkout_detector(target_id: str) -> Callable[[Path], bool]:
@@ -417,40 +455,38 @@ def candidate_repo_roots_for_target(
     *,
     policy: dict[str, Any] | None = None,
 ) -> list[Path]:
-    candidates: list[Path] = []
-    if policy is not None:
-        try:
-            target_policy = resolve_target_policy(policy, target_id)
-        except RuntimeError:
-            target_policy = {}
-        default_repo_root = target_policy.get("default_repo_root")
-        if isinstance(default_repo_root, str) and default_repo_root.strip():
-            candidates.append(Path(default_repo_root).expanduser())
-    if target_id == "abyss-stack":
-        env_root = os.environ.get("AOA_SOURCE_ROOT")
-        if env_root:
-            candidates.append(Path(env_root).expanduser())
-        if is_abyss_stack_checkout(SCRIPT_ROOT):
-            candidates.append(SCRIPT_ROOT)
-        candidates.append(Path.home() / "src" / "abyss-stack")
-        candidates.append(STACK_ROOT)
-    else:
+    if target_id != "abyss-stack":
         raise RuntimeError(f"unsupported governed target_id: {target_id}")
-    return candidates
+    explicit_root = os.environ.get(SOURCE_ROOT_ENV)
+    if explicit_root:
+        # An explicit operator binding is authoritative and must not silently
+        # fall through to a source-local or default candidate when invalid.
+        return [Path(explicit_root).expanduser()]
+    # The policy's default_repo_root is a portable template value, not source
+    # authority. Only the executing owner checkout is an implicit candidate.
+    if is_abyss_stack_checkout(SCRIPT_ROOT):
+        return [SCRIPT_ROOT]
+    return []
 
 
 def resolve_default_repo_root(target_id: str = "abyss-stack", *, policy: dict[str, Any] | None = None) -> Path:
     detector = target_checkout_detector(target_id)
+    candidates = candidate_repo_roots_for_target(target_id, policy=policy)
+    explicit_root = bool(os.environ.get(SOURCE_ROOT_ENV))
+    if candidates and not explicit_root:
+        return candidates[0].resolve()
     seen: set[str] = set()
-    for candidate in candidate_repo_roots_for_target(target_id, policy=policy):
+    for candidate in candidates:
         key = str(candidate)
         if key in seen:
             continue
         seen.add(key)
         if detector(candidate):
             return candidate.resolve()
-    fallback = candidate_repo_roots_for_target(target_id, policy=policy)[0]
-    return fallback.resolve()
+    raise RuntimeError(
+        "source_root_unresolved: governed execution requires a valid explicit "
+        "AOA_SOURCE_ROOT or an executing abyss-stack source checkout"
+    )
 
 
 def default_request_template() -> dict[str, Any]:

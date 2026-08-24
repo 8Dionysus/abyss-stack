@@ -50,9 +50,14 @@ The request contract is runtime-owned and JSON-shaped:
 - optional `canary_id`
 - optional `task_class`
 
-An `abyss-stack` checkout is admitted only when its canonical owner markers are
-present, including `docs/install/DEPLOYMENT.md`; the retired
-`docs/DEPLOYMENT.md` path is not a valid checkout marker.
+An `abyss-stack` checkout is admitted only when its source shape is present,
+the first non-empty `README.md` line is exactly `# abyss-stack`, and the exact
+owner line 'Root route card for `abyss-stack`.' appears within the first eight
+lines of `AGENTS.md`, including `docs/install/DEPLOYMENT.md`; the retired
+`docs/DEPLOYMENT.md` path is not a valid checkout marker. `AOA_SOURCE_ROOT` is
+the only authoritative override. When it is absent, only the executing
+owner-qualified source checkout is eligible; policy `default_repo_root`, home,
+`STACK_ROOT`, and deployed projections are not implicit candidates.
 
 The green repo-scope expansion gate serves as evidence for later review only; it does not widen governed repo scope implicitly during the current governed run. The default governed target remains mutation-only and `abyss-stack`-owned, while any external target still requires explicit policy coverage and evidence-backed scope promotion.
 

@@ -23,7 +23,9 @@ Parity-aware source selection is fail-closed and owner-qualified:
    If it is invalid, the resolver does not silently fall through to another
    checkout.
 2. When the helper is executed from source, its own root is accepted only when
-   the `abyss-stack` owner markers and source shape are present.
+   the source shape is present, the first non-empty `README.md` line is exactly
+   `# abyss-stack`, and the owner line in the first eight `AGENTS.md` lines is
+   exactly 'Root route card for `abyss-stack`.'.
 3. The deployed `Configs` projection, `~/src/abyss-stack`, and sibling or
    workspace discovery are not implicit source candidates.
 

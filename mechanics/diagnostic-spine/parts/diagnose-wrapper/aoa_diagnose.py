@@ -5,6 +5,7 @@ import argparse
 import json
 import os
 from datetime import datetime, timezone
+from itertools import islice
 from pathlib import Path
 import re
 import subprocess
@@ -15,7 +16,9 @@ from typing import Any
 STACK_ROOT = Path(os.environ.get("AOA_STACK_ROOT", "/srv/AbyssOS/abyss-stack"))
 CONFIGS_ROOT = Path(os.environ.get("AOA_CONFIGS_ROOT", str(STACK_ROOT / "Configs")))
 SOURCE_ROOT_ENV = "AOA_SOURCE_ROOT"
-SOURCE_OWNER_MARKER = "abyss-stack"
+SOURCE_README_TITLE = "# abyss-stack"
+SOURCE_AGENTS_OWNER_LINE = "Root route card for `abyss-stack`."
+SOURCE_AGENTS_SCAN_LINES = 8
 SCRIPT_PATH = Path(__file__).resolve()
 
 
@@ -159,14 +162,19 @@ def is_source_checkout(path: Path) -> bool:
     ):
         return False
     try:
-        readme_head = (path / "README.md").read_text(encoding="utf-8")
-        agents_text = (path / "AGENTS.md").read_text(encoding="utf-8")
+        with (path / "README.md").open(encoding="utf-8") as readme_file:
+            readme_title = next(
+                (line.strip() for line in readme_file if line.strip()),
+                None,
+            )
+        with (path / "AGENTS.md").open(encoding="utf-8") as agents_file:
+            agents_owner_line = any(
+                line.rstrip("\r\n") == SOURCE_AGENTS_OWNER_LINE
+                for line in islice(agents_file, SOURCE_AGENTS_SCAN_LINES)
+            )
     except OSError:
         return False
-    return (
-        readme_head.lstrip().startswith(f"# {SOURCE_OWNER_MARKER}")
-        and SOURCE_OWNER_MARKER in agents_text
-    )
+    return readme_title == SOURCE_README_TITLE and agents_owner_line
 
 
 def is_runtime_projection(path: Path) -> bool:

@@ -62,14 +62,16 @@ That separation is what allows `abyss-stack` to be Fedora-first while still usab
 | optional `aoa-sdk` source root | `/srv/AbyssOS/aoa-sdk` |
 
 The source checkout path is a Fedora-first default, not a universal host constant.
-If the repository is intentionally relocated on another machine, set `AOA_SOURCE_ROOT` to the actual source checkout path.
+If the repository is intentionally relocated on another machine, set `AOA_SOURCE_ROOT` to the actual source checkout path. A source candidate is owner-qualified only when its source shape is present, the first non-empty `README.md` line is exactly `# abyss-stack`, and the exact line 'Root route card for `abyss-stack`.' appears within the first eight `AGENTS.md` lines.
 Parity-aware helpers do not search `~/src/abyss-stack`, sibling checkouts, or
 the workspace root as an implicit fallback. An explicit binding wins; when a
-helper runs from an owner-marked source checkout it may use that checkout; when
-neither route is valid it reports `source_root_unresolved` instead of selecting
-a dirty or stale tree. This source binding identifies an owner-qualified input
-path only; it does not prove remote currentness, deployment, runtime health, or
-semantic acceptance.
+helper runs from an owner-qualified source checkout it may use that checkout;
+when neither route is valid it reports `source_root_unresolved` instead of
+selecting a dirty or stale tree. The governed runner follows the same rule and
+does not promote policy `default_repo_root` or `STACK_ROOT` into source
+authority. This source binding identifies an owner-qualified input path only;
+it does not prove remote currentness, deployment, runtime health, or semantic
+acceptance.
 
 The runtime-root decision is recorded in [2026-05-07 Runtime Root Under AbyssOS](../decisions/ABYSS-STACK-D-0001-runtime-root-under-abyssos.md).
 
