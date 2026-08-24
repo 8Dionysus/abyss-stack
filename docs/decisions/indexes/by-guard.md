@@ -42,6 +42,7 @@
 - [ABYSS-STACK-D-0072 AoA 4PDA Connector MCP Access Plane](../ABYSS-STACK-D-0072-aoa-4pda-connector-mcp-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0072-aoa-4pda-connector-mcp-access-plane.md`)
 - [ABYSS-STACK-D-0074 Telegram and Discord Connector MCP Access Planes](../ABYSS-STACK-D-0074-telegram-discord-connector-mcp-access-planes.md) (`docs/decisions/ABYSS-STACK-D-0074-telegram-discord-connector-mcp-access-planes.md`)
 - [ABYSS-STACK-D-0083 Tree of Sophia Foundation Laboratory Boundary](../ABYSS-STACK-D-0083-tree-of-sophia-foundation-laboratory-boundary.md) (`docs/decisions/ABYSS-STACK-D-0083-tree-of-sophia-foundation-laboratory-boundary.md`)
+- [ABYSS-STACK-D-0136 Fail-Closed Source-Root Binding for Parity-Aware Helpers](../ABYSS-STACK-D-0136-fail-closed-source-root-binding.md) (`docs/decisions/ABYSS-STACK-D-0136-fail-closed-source-root-binding.md`)
 
 ## runtime topology
 
@@ -536,6 +537,10 @@
 
 - [ABYSS-STACK-D-0131 Codex PreToolUse Agent-Routing Adapter](../ABYSS-STACK-D-0131-codex-pretool-agent-routing-adapter.md) (`docs/decisions/ABYSS-STACK-D-0131-codex-pretool-agent-routing-adapter.md`)
 
+## fail-closed routing
+
+- [ABYSS-STACK-D-0136 Fail-Closed Source-Root Binding for Parity-Aware Helpers](../ABYSS-STACK-D-0136-fail-closed-source-root-binding.md) (`docs/decisions/ABYSS-STACK-D-0136-fail-closed-source-root-binding.md`)
+
 ## fail-fast ordering
 
 - [ABYSS-STACK-D-0130 Frontload Release Artifact Guard Before the Complete Suite](../ABYSS-STACK-D-0130-frontload-release-artifact-guard.md) (`docs/decisions/ABYSS-STACK-D-0130-frontload-release-artifact-guard.md`)
@@ -1020,6 +1025,7 @@
 ## source identity
 
 - [ABYSS-STACK-D-0132 Durable Codex Hook Install Profile](../ABYSS-STACK-D-0132-durable-codex-hook-install-profile.md) (`docs/decisions/ABYSS-STACK-D-0132-durable-codex-hook-install-profile.md`)
+- [ABYSS-STACK-D-0136 Fail-Closed Source-Root Binding for Parity-Aware Helpers](../ABYSS-STACK-D-0136-fail-closed-source-root-binding.md) (`docs/decisions/ABYSS-STACK-D-0136-fail-closed-source-root-binding.md`)
 
 ## source topology
 

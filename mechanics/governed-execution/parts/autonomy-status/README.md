@@ -14,3 +14,19 @@ the live route-api independently reports the exact receipt-bound
 predecessor, trusted subject, and archive-denied G5 authority. This is a
 consumer evidence fallback for the autonomy readout; it does not make
 route-api or the status command an owner or archival authority.
+
+## Source binding
+
+Parity-aware source selection is fail-closed and owner-qualified:
+
+1. An explicit `AOA_SOURCE_ROOT` is the operator binding and has precedence.
+   If it is invalid, the resolver does not silently fall through to another
+   checkout.
+2. When the helper is executed from source, its own root is accepted only when
+   the `abyss-stack` owner markers and source shape are present.
+3. The deployed `Configs` projection, `~/src/abyss-stack`, and sibling or
+   workspace discovery are not implicit source candidates.
+
+If no valid binding exists, the parity check reports
+`source_root_unresolved`. That is a source-input truth gap, not runtime health,
+deployment, or semantic acceptance evidence.

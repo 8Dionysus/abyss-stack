@@ -36,6 +36,18 @@ def load_module():
     return module
 
 
+def make_source_checkout(root: Path, *, owner_marker: str = "abyss-stack") -> Path:
+    (root / "scripts").mkdir(parents=True)
+    (root / "docs" / "install").mkdir(parents=True)
+    (root / "mechanics").mkdir()
+    (root / "AGENTS.md").write_text(f"root owner: {owner_marker}\n", encoding="utf-8")
+    (root / "README.md").write_text(f"# {owner_marker}\n", encoding="utf-8")
+    (root / "CONTRIBUTING.md").write_text("contributing\n", encoding="utf-8")
+    (root / "scripts" / "validate_stack.py").write_text("# validator\n", encoding="utf-8")
+    (root / "docs" / "install" / "DEPLOYMENT.md").write_text("deploy\n", encoding="utf-8")
+    return root
+
+
 def make_check(*, status: str, summary: str, detail: dict | None = None) -> dict:
     payload = {"status": status, "summary": summary}
     if detail is not None:
@@ -152,14 +164,76 @@ class AutonomyCollectorTests(unittest.TestCase):
     def test_resolve_source_root_accepts_current_install_deployment_marker(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             source_root = Path(tmpdir) / "source"
-            (source_root / "scripts").mkdir(parents=True)
-            (source_root / "docs" / "install").mkdir(parents=True)
-            (source_root / "CONTRIBUTING.md").write_text("contributing\n", encoding="utf-8")
-            (source_root / "scripts" / "validate_stack.py").write_text("# validator\n", encoding="utf-8")
-            (source_root / "docs" / "install" / "DEPLOYMENT.md").write_text("deploy\n", encoding="utf-8")
+            make_source_checkout(source_root)
 
             with patch.dict(os.environ, {"AOA_SOURCE_ROOT": str(source_root)}):
                 self.assertEqual(self.module.resolve_source_root(), source_root.resolve())
+
+    def test_explicit_override_wins_over_conflicting_script_root(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            explicit_root = make_source_checkout(Path(tmpdir) / "explicit")
+            script_root = make_source_checkout(Path(tmpdir) / "script")
+
+            with patch.dict(os.environ, {"AOA_SOURCE_ROOT": str(explicit_root)}):
+                with patch.object(self.module, "SCRIPT_ROOT", script_root):
+                    self.assertEqual(self.module.resolve_source_root(), explicit_root.resolve())
+
+    def test_invalid_explicit_override_does_not_fall_back_to_script_root(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            script_root = make_source_checkout(Path(tmpdir) / "script")
+            invalid_root = Path(tmpdir) / "foreign"
+            invalid_root.mkdir()
+
+            with patch.dict(os.environ, {"AOA_SOURCE_ROOT": str(invalid_root)}):
+                with patch.object(self.module, "SCRIPT_ROOT", script_root):
+                    self.assertEqual(self.module.source_root_candidates()[0][0], "explicit_override")
+                    self.assertIsNone(self.module.resolve_source_root())
+
+    def test_clean_script_root_is_discovered_without_home_fallback(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            script_root = make_source_checkout(Path(tmpdir) / "script")
+
+            with patch.dict(os.environ, {}, clear=True):
+                with patch.object(self.module, "SCRIPT_ROOT", script_root):
+                    self.assertEqual(self.module.resolve_source_root(), script_root.resolve())
+
+    def test_runtime_projection_is_rejected_even_when_it_has_source_markers(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            stack_root = Path(tmpdir) / "stack"
+            configs_root = make_source_checkout(stack_root / "Configs")
+
+            with patch.dict(os.environ, {}, clear=True):
+                with patch.object(self.module, "STACK_ROOT", stack_root):
+                    with patch.object(self.module, "CONFIGS_ROOT", configs_root):
+                        with patch.object(self.module, "SCRIPT_ROOT", configs_root):
+                            self.assertIsNone(self.module.resolve_source_root())
+
+    def test_deployed_projection_never_uses_home_source_fallback(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            stack_root = Path(tmpdir) / "stack"
+            configs_root = make_source_checkout(stack_root / "Configs")
+            home_source_root = make_source_checkout(Path(tmpdir) / "home" / "src" / "abyss-stack")
+
+            with patch.dict(os.environ, {}, clear=True):
+                with patch.object(self.module, "STACK_ROOT", stack_root):
+                    with patch.object(self.module, "CONFIGS_ROOT", configs_root):
+                        with patch.object(self.module, "SCRIPT_ROOT", configs_root):
+                            with patch.object(self.module, "HOME_SOURCE_ROOT", home_source_root, create=True):
+                                self.assertIsNone(self.module.resolve_source_root())
+
+    def test_foreign_owner_marker_is_not_a_source_binding(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            foreign_root = make_source_checkout(Path(tmpdir) / "foreign", owner_marker="other-repo")
+
+            with patch.dict(os.environ, {"AOA_SOURCE_ROOT": str(foreign_root)}):
+                self.assertIsNone(self.module.resolve_source_root())
+
+    def test_absent_canonical_source_is_explicitly_unresolved(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with patch.dict(os.environ, {}, clear=True):
+                with patch.object(self.module, "SCRIPT_ROOT", Path(tmpdir) / "missing"):
+                    self.assertEqual(self.module.source_root_candidates(), [])
+                    self.assertIsNone(self.module.resolve_source_root())
 
     def collect_payload(
         self,
@@ -263,6 +337,18 @@ class AutonomyCollectorTests(unittest.TestCase):
         self.assertEqual(payload["overall_status"], "fail")
         self.assertIn("source_runtime_drift", payload["degradation_reasons"])
         self.assertFalse(payload["truth_status"]["control_plane"]["live_available"])
+
+    def test_unresolved_source_root_stays_distinct_from_parity_drift(self) -> None:
+        payload = self.collect_payload(
+            parity=make_check(
+                status="fail",
+                summary="source root unresolved",
+                detail={"reason": "source_root_unresolved"},
+            ),
+        )
+
+        self.assertIn("source_root_unresolved", payload["degradation_reasons"])
+        self.assertNotIn("source_runtime_drift", payload["degradation_reasons"])
 
     def test_llamacpp_verify_failure_returns_fail(self) -> None:
         payload = self.collect_payload(

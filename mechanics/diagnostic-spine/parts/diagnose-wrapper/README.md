@@ -7,3 +7,13 @@ Routes `scripts/aoa-diagnose`,
 
 The wrapper produces bounded diagnosis artifacts and stays subordinate to the
 diagnostic surface contracts.
+
+## Source binding
+
+The diagnostic fallback truth check follows the same bounded route as autonomy
+status: explicit `AOA_SOURCE_ROOT` first, then the executing owner-marked
+source checkout, with no home-directory, sibling, workspace, or deployed
+`Configs` fallback. An invalid explicit binding is not replaced silently.
+When no valid source input exists, the diagnostic result preserves an explicit
+`source_root_unresolved` truth gap; it does not convert source absence into
+runtime health, deployment, or repair completion.

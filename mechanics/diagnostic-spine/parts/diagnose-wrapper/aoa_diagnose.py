@@ -14,7 +14,8 @@ from typing import Any
 
 STACK_ROOT = Path(os.environ.get("AOA_STACK_ROOT", "/srv/AbyssOS/abyss-stack"))
 CONFIGS_ROOT = Path(os.environ.get("AOA_CONFIGS_ROOT", str(STACK_ROOT / "Configs")))
-HOME_SOURCE_ROOT = Path.home() / "src" / "abyss-stack"
+SOURCE_ROOT_ENV = "AOA_SOURCE_ROOT"
+SOURCE_OWNER_MARKER = "abyss-stack"
 SCRIPT_PATH = Path(__file__).resolve()
 
 
@@ -148,33 +149,64 @@ def parse_utc_timestamp(value: str) -> datetime | None:
 
 
 def is_source_checkout(path: Path) -> bool:
+    if not (
+        (path / "AGENTS.md").is_file()
+        and (path / "README.md").is_file()
+        and (path / "CONTRIBUTING.md").is_file()
+        and (path / "mechanics").is_dir()
+        and (path / "scripts" / "validate_stack.py").is_file()
+        and (path / "docs" / "install" / "DEPLOYMENT.md").is_file()
+    ):
+        return False
+    try:
+        readme_head = (path / "README.md").read_text(encoding="utf-8")
+        agents_text = (path / "AGENTS.md").read_text(encoding="utf-8")
+    except OSError:
+        return False
     return (
-        (path / "CONTRIBUTING.md").exists()
-        and (path / "scripts" / "validate_stack.py").exists()
-        and (path / "docs" / "install" / "DEPLOYMENT.md").exists()
+        readme_head.lstrip().startswith(f"# {SOURCE_OWNER_MARKER}")
+        and SOURCE_OWNER_MARKER in agents_text
     )
 
 
-def resolve_source_root() -> Path | None:
-    candidates: list[Path] = []
-    env_root = os.environ.get("AOA_SOURCE_ROOT")
-    if env_root:
-        candidates.append(Path(env_root).expanduser())
-    if is_source_checkout(SCRIPT_ROOT):
-        candidates.append(SCRIPT_ROOT)
-    candidates.append(HOME_SOURCE_ROOT)
+def is_runtime_projection(path: Path) -> bool:
+    try:
+        resolved = path.resolve()
+    except OSError:
+        return False
+    for runtime_root in (STACK_ROOT, CONFIGS_ROOT):
+        try:
+            resolved_runtime_root = runtime_root.resolve()
+        except OSError:
+            continue
+        if resolved == resolved_runtime_root or resolved_runtime_root in resolved.parents:
+            return True
+    return False
 
+
+def source_root_candidates() -> list[tuple[str, Path]]:
+    explicit_root = os.environ.get(SOURCE_ROOT_ENV)
+    if explicit_root:
+        # An explicit operator binding is authoritative and must not silently
+        # fall through to another candidate when it is invalid.
+        return [("explicit_override", Path(explicit_root).expanduser())]
+    if not is_runtime_projection(SCRIPT_ROOT) and is_source_checkout(SCRIPT_ROOT):
+        return [("script_root", SCRIPT_ROOT)]
+    return []
+
+
+def resolve_source_root() -> Path | None:
     seen: set[str] = set()
-    for candidate in candidates:
+    for _method, candidate in source_root_candidates():
         try:
             resolved = candidate.resolve()
-        except FileNotFoundError:
+        except OSError:
             resolved = candidate
         key = str(resolved)
         if key in seen:
             continue
         seen.add(key)
-        if is_source_checkout(resolved):
+        if not is_runtime_projection(resolved) and is_source_checkout(resolved):
             return resolved
     return None
 

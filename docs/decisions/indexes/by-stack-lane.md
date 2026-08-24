@@ -71,6 +71,7 @@
 - [ABYSS-STACK-D-0080 Diagnostic Skill Owner Home](../ABYSS-STACK-D-0080-diagnostic-skill-owner-home.md) (`docs/decisions/ABYSS-STACK-D-0080-diagnostic-skill-owner-home.md`)
 - [ABYSS-STACK-D-0084 Routing Mirror Provenance Readiness](../ABYSS-STACK-D-0084-routing-mirror-provenance-readiness.md) (`docs/decisions/ABYSS-STACK-D-0084-routing-mirror-provenance-readiness.md`)
 - [ABYSS-STACK-D-0085 SDK Routing Canary Intake](../ABYSS-STACK-D-0085-sdk-routing-canary-intake.md) (`docs/decisions/ABYSS-STACK-D-0085-sdk-routing-canary-intake.md`)
+- [ABYSS-STACK-D-0136 Fail-Closed Source-Root Binding for Parity-Aware Helpers](../ABYSS-STACK-D-0136-fail-closed-source-root-binding.md) (`docs/decisions/ABYSS-STACK-D-0136-fail-closed-source-root-binding.md`)
 
 ## config projection
 
@@ -214,6 +215,7 @@
 ## diagnostics
 
 - [ABYSS-STACK-D-0080 Diagnostic Skill Owner Home](../ABYSS-STACK-D-0080-diagnostic-skill-owner-home.md) (`docs/decisions/ABYSS-STACK-D-0080-diagnostic-skill-owner-home.md`)
+- [ABYSS-STACK-D-0136 Fail-Closed Source-Root Binding for Parity-Aware Helpers](../ABYSS-STACK-D-0136-fail-closed-source-root-binding.md) (`docs/decisions/ABYSS-STACK-D-0136-fail-closed-source-root-binding.md`)
 
 ## decision lane
 
@@ -424,6 +426,7 @@
 - [ABYSS-STACK-D-0085 SDK Routing Canary Intake](../ABYSS-STACK-D-0085-sdk-routing-canary-intake.md) (`docs/decisions/ABYSS-STACK-D-0085-sdk-routing-canary-intake.md`)
 - [ABYSS-STACK-D-0086 Receipt-Bound SDK Routing Cutover](../ABYSS-STACK-D-0086-receipt-bound-sdk-routing-cutover.md) (`docs/decisions/ABYSS-STACK-D-0086-receipt-bound-sdk-routing-cutover.md`)
 - [ABYSS-STACK-D-0101 Retire Routing Predecessor Checkout Consumers](../ABYSS-STACK-D-0101-retire-routing-predecessor-checkout-consumers.md) (`docs/decisions/ABYSS-STACK-D-0101-retire-routing-predecessor-checkout-consumers.md`)
+- [ABYSS-STACK-D-0136 Fail-Closed Source-Root Binding for Parity-Aware Helpers](../ABYSS-STACK-D-0136-fail-closed-source-root-binding.md) (`docs/decisions/ABYSS-STACK-D-0136-fail-closed-source-root-binding.md`)
 
 ## source
 
