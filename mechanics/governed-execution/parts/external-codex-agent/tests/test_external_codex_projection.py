@@ -174,6 +174,109 @@ def test_projection_accepts_exact_pre_full_index_source_manifest(
     assert filter_marker.exists() is False
 
 
+def test_projection_rejects_real_intent_to_add_zero_oid_before_private_git_reconstruction(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source, _ = _source_repo(tmp_path)
+    (source / "intent.txt").write_text("intent bytes\n", encoding="utf-8")
+    _git(source, "add", "-N", "intent.txt")
+    source_manifest = build_workspace_manifest(source)
+    original_git = PROJECTION._git
+    calls: list[tuple[str, ...]] = []
+    staged_records: list[bytes] = []
+
+    def traced_git(
+        workspace: Path,
+        *arguments: str,
+        **kwargs: object,
+    ) -> bytes:
+        calls.append(arguments)
+        result = original_git(workspace, *arguments, **kwargs)
+        if arguments == ("ls-files", "--stage", "-z"):
+            staged_records.append(result)
+            # Recent Git versions expose the real intent entry as an empty
+            # blob; exercise the lower-level all-zero sentinel as well.
+            rewritten: list[bytes] = []
+            for record in result.split(b"\0"):
+                if record.endswith(b"\tintent.txt"):
+                    metadata, separator, path = record.partition(b"\t")
+                    assert separator
+                    fields = metadata.split()
+                    assert len(fields) == 3
+                    fields[1] = b"0" * 40
+                    record = b" ".join(fields) + b"\t" + path
+                rewritten.append(record)
+            return b"\0".join(rewritten)
+        return result
+
+    monkeypatch.setattr(PROJECTION, "_git", traced_git)
+    target = tmp_path / "runtime" / "actor-workspace"
+
+    with pytest.raises(
+        ProjectionError,
+        match="malformed or zero object ID",
+    ):
+        materialize_actor_projection(
+            source,
+            target,
+            source_manifest=source_manifest,
+            source_manifest_digest="sha256:" + "a" * 64,
+        )
+
+    assert _git(source, "status", "--porcelain=v1") == "A intent.txt"
+    assert staged_records and b"intent.txt" in staged_records[0]
+    assert calls[-1] == ("ls-files", "--stage", "-z")
+    assert not any(
+        argument in {"pack-objects", "init", "index-pack", "update-index"}
+        for call in calls
+        for argument in call
+    )
+    assert target.exists() is False
+
+
+def test_projection_rejects_malformed_staged_oid_before_intent_to_add_reconstruction(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source, source_manifest = _source_repo(tmp_path)
+    original_git = PROJECTION._git
+    calls: list[tuple[str, ...]] = []
+    malformed_record = b"100644 " + (b"A" * 40) + b" 0\ttracked.txt\0"
+
+    def controlled_git(
+        workspace: Path,
+        *arguments: str,
+        **kwargs: object,
+    ) -> bytes:
+        calls.append(arguments)
+        if arguments == ("ls-files", "--stage", "-z"):
+            return malformed_record
+        return original_git(workspace, *arguments, **kwargs)
+
+    monkeypatch.setattr(PROJECTION, "_git", controlled_git)
+    target = tmp_path / "runtime" / "actor-workspace"
+
+    with pytest.raises(
+        ProjectionError,
+        match="malformed or zero object ID",
+    ):
+        materialize_actor_projection(
+            source,
+            target,
+            source_manifest=source_manifest,
+            source_manifest_digest="sha256:" + "b" * 64,
+        )
+
+    assert calls[-1] == ("ls-files", "--stage", "-z")
+    assert not any(
+        argument in {"pack-objects", "init", "index-pack", "update-index"}
+        for call in calls
+        for argument in call
+    )
+    assert target.exists() is False
+
+
 def test_inventory_distinguishes_disappearing_directory_from_other_scandir_errors(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

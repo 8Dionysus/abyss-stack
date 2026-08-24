@@ -1029,7 +1029,7 @@ def _construct_private_git(
     elif expected_shallow != shallow_snapshot:
         raise ProjectionError("source Git shallow boundary drifted from its manifest")
     index_entries = _git(source, "ls-files", "--stage", "-z")
-    object_ids = {source_head}
+    staged_object_ids: list[str] = []
     for record in index_entries.split(b"\0"):
         if not record:
             continue
@@ -1044,8 +1044,16 @@ def _construct_private_git(
             raise ProjectionError(
                 "source Git index contains an unsupported path"
             ) from exc
+        if (
+            GIT_OBJECT_ID_PATTERN.fullmatch(object_id) is None
+            or object_id == "0" * 40
+        ):
+            raise ProjectionError(
+                "source Git index contains a malformed or zero object ID"
+            )
         _safe_relative(path)
-        object_ids.add(object_id)
+        staged_object_ids.append(object_id)
+    object_ids = {source_head, *staged_object_ids}
     if shallow_snapshot["present"]:
         boundary_types = _git(
             source,
