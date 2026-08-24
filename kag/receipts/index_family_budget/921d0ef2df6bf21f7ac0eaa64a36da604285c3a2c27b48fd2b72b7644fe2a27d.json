@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 30309239,
+  "allowed_tracked_bytes": 38516455,
+  "approved_by": "repository-owner",
+  "base_ref": "efa14a2c0cbd4ab2d3b4044f851742f323f27c96",
+  "changed_generated_bytes": 30309239,
+  "changed_generated_files": 331,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "921d0ef2df6bf21f7ac0eaa64a36da604285c3a2c27b48fd2b72b7644fe2a27d",
+  "reason": "This narrow PR refreshes the owner family for retained directory-entry provenance and interrupted staging recovery; the receipt admits the measured generated delta and tracked corpus under the standing owner budget.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 38516455,
+  "tracked_bytes_max": 24117248
+}
