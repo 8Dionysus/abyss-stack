@@ -16,6 +16,7 @@ import aoa_sdk
 import pytest
 import yaml
 from aoa_sdk import AoASDK
+from scripts import abyss_stack_source_identity as SOURCE_IDENTITY
 
 from aoa_sdk.contracts.control_plane import (
     AgentRef,
@@ -133,6 +134,13 @@ def _write_json(path: Path, payload: Any) -> None:
     path.write_text(
         json.dumps(payload, ensure_ascii=True, indent=2) + "\n",
         encoding="utf-8",
+    )
+
+
+def _fixture_source_identity(repo_root: Path) -> dict[str, Any]:
+    return SOURCE_IDENTITY.make_source_identity(
+        repo_root,
+        consumer="governed-runner",
     )
 
 
@@ -402,7 +410,10 @@ def _live_input_payloads(
         return {
             "bounded_request": (
                 "agent-session",
-                SUPPORT.governed_request(repo_root),
+                SUPPORT.governed_request(
+                    repo_root,
+                    source_identity=_fixture_source_identity(repo_root),
+                ),
             )
         }
     if scenario_id == "a2a_summon_return_checkpoint":
@@ -1488,7 +1499,13 @@ def harness(tmp_path: Path) -> Harness:
     policy_path = tmp_path / "policy.yaml"
     _write_json(policy_path, policy)
     request_path = tmp_path / "request.json"
-    _write_json(request_path, SUPPORT.governed_request(repo_root))
+    _write_json(
+        request_path,
+        SUPPORT.governed_request(
+            repo_root,
+            source_identity=_fixture_source_identity(repo_root),
+        ),
+    )
     plan, binding, source_paths = _build_plan_and_binding(
         tmp_path,
         request_path=request_path,

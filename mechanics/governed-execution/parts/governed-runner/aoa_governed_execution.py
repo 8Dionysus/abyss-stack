@@ -4236,15 +4236,41 @@ def prepare_run(
             next_action="Restore aoa-status --autonomy --json to pass or use an allowed break-glass reason.",
         )
 
-    source_binding = _bind_repo_root(
-        repo_root,
-        expected_identity=source_identity,
-    )
-    repo_root = source_binding.root
-    base_head = _source_bound_call(
-        source_binding,
-        lambda: TRIALS.git_head(repo_root),
-    )
+    try:
+        source_binding = _bind_repo_root(
+            repo_root,
+            expected_identity=source_identity,
+        )
+        repo_root = source_binding.root
+        base_head = _source_bound_call(
+            source_binding,
+            lambda: TRIALS.git_head(repo_root),
+        )
+    except (RuntimeError, SOURCE_IDENTITY.SourceIdentityError) as exc:
+        state = {
+            "run_id": run_id,
+            "target_id": target_id,
+            "repo_root": str(repo_root),
+            "playbook_id": advisory["playbook_id"],
+            "task_class": task_class,
+            "trust_state_snapshot": trust_state_snapshot,
+            "canary_id": request.get("canary_id"),
+            "request_path": request_path_text,
+            "phase": "preflight",
+            "status": "fail",
+            "break_glass_used": bool(gate_result["break_glass_used"]),
+        }
+        return failure_result(
+            run_dir,
+            state=state,
+            phase="preflight",
+            failure_class="policy_denied",
+            reasons=[
+                "source identity changed after autonomy gate: "
+                f"{type(exc).__name__}: {exc}"
+            ],
+            next_action="Restore the exact source identity and retry the governed run.",
+        )
     state = {
         "artifact_kind": "aoa.governed-run.state",
         "schema_version": "v1",

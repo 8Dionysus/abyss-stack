@@ -33,6 +33,10 @@ scripts/aoa-sync-configs --item mcp --item schemas --item systemd --item scripts
 
 Include `scripts` and `mechanics` with the bounded MCP lifecycle projection so
 new unit arguments and the deployed installer implementation cannot drift.
+Selecting `mechanics` also projects the shared
+`scripts/abyss_stack_source_identity.py` helper, because the diagnostic,
+autonomy-status, and governed-runner mechanics consume that source-local
+identity contract.
 
 Unknown items and `Secrets` are rejected. Preview requires an existing target.
 Source-control and interpreter/test cache material (`.git`, `__pycache__`,

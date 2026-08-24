@@ -64,6 +64,36 @@ class GovernedRunnerLifecycleTests(GovernedRunnerTestCase):
         self.assertEqual(result["status"], "fail")
         self.assertEqual(result["failure_class"], "autonomy_gate_failed")
 
+    def test_source_drift_after_autonomy_gate_returns_failure_result(self) -> None:
+        def drifting_gate() -> dict:
+            (self.repo_root / "README.md").write_text(
+                "# changed after gate\n",
+                encoding="utf-8",
+            )
+            return self.gate_payload()
+
+        result = self.module.prepare_run(
+            self.request_path,
+            policy_path=self.policy_path,
+            log_root=self.logs_root,
+            gate_provider=drifting_gate,
+            advisory_provider=self.advisory_provider,
+            proposal_provider=self.proposal_provider,
+        )
+
+        self.assertEqual(result["status"], "fail")
+        self.assertEqual(result["failure_class"], "policy_denied")
+        run_dir = self.logs_root / result["run_id"]
+        state = json.loads((run_dir / "run.state.json").read_text(encoding="utf-8"))
+        self.assertTrue(
+            any(
+                "source identity changed after autonomy gate" in reason
+                for reason in state["failure_reasons"]
+            )
+        )
+        self.assertTrue((run_dir / "result.summary.json").is_file())
+        self.assertTrue((run_dir / "report.md").is_file())
+
     def test_dirty_repo_blocks_execution(self) -> None:
         (self.repo_root / "docs" / "dirty.md").write_text("dirty\n", encoding="utf-8")
         subprocess.run(["git", "add", "docs/dirty.md"], cwd=self.repo_root, check=True, capture_output=True, text=True)

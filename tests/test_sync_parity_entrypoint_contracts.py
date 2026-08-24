@@ -133,6 +133,43 @@ class SyncParityEntrypointContractsTests(unittest.TestCase):
                 (REPO_ROOT / "README.md").read_bytes(),
             )
 
+    def test_mechanics_subset_projects_shared_source_identity_helper(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            source = root / "source"
+            backend = source / "mechanics" / "config-projection" / "parts" / "sync" / SYNC_CONFIGS.name
+            backend.parent.mkdir(parents=True)
+            shutil.copyfile(SYNC_CONFIGS, backend)
+            aoa_lib = source / "scripts" / "aoa-lib.sh"
+            aoa_lib.parent.mkdir(parents=True)
+            shutil.copyfile(REPO_ROOT / "scripts" / "aoa-lib.sh", aoa_lib)
+            write_text(
+                source / "mechanics" / "diagnostic-spine" / "README.md",
+                "diagnostic\n",
+            )
+            helper = source / "scripts" / "abyss_stack_source_identity.py"
+            write_text(helper, "shared source identity helper\n")
+
+            configs = root / "runtime" / "Configs"
+            configs.mkdir(parents=True)
+            env = os.environ.copy()
+            env["AOA_STACK_ROOT"] = str(root / "runtime")
+            env["AOA_CONFIGS_ROOT"] = str(configs)
+            result = subprocess.run(
+                ["bash", str(backend), "--item", "mechanics"],
+                cwd=source,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(
+                (configs / "scripts" / helper.name).read_text(encoding="utf-8"),
+                helper.read_text(encoding="utf-8"),
+            )
+
     def test_sync_subset_rejects_unknown_managed_item(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             configs = Path(tmpdir) / "Configs"
