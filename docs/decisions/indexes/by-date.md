@@ -268,3 +268,4 @@
 ## 2026-08-23
 
 - [ABYSS-STACK-D-0135 Typed Incarnation Capability Projection](../ABYSS-STACK-D-0135-typed-incarnation-capability-projection.md) (`docs/decisions/ABYSS-STACK-D-0135-typed-incarnation-capability-projection.md`)
+- [ABYSS-STACK-D-0136 Holder-Local Incarnation Mutable State](../ABYSS-STACK-D-0136-holder-local-incarnation-mutable-state.md) (`docs/decisions/ABYSS-STACK-D-0136-holder-local-incarnation-mutable-state.md`)

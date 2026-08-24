@@ -127,6 +127,19 @@ and replay only through their matching legacy wake reservation. A retry after a 
   must carry its complete `explicit_grant`
   object under that key. Denied entries carry `explicit_grant: null`, with no
   detached grant list or grant-ID-only relation;
+- treats the typed denied projection as the boundary for actor-local mutable
+  state. A denied ambient entry may have a regular-file or real-directory
+  shadow created by Codex in the projected home; that shadow is never a shared
+  capability link. Top-level symlinks, special files, foreign link targets, and
+  names absent from the current typed projection remain fail-closed. The
+  manifest records the derived `actor_local_state_names` set for new homes and
+  recomputes it for older v2 manifests, so this is a registry-derived
+  invariant rather than a filename exception;
+- gives each newly created home an opaque, digest-bound holder namespace below
+  the realization root. Repeated preparation with the same namespace is
+  idempotent, distinct holders receive distinct mutable homes, and the
+  realization-scoped legacy path is accepted without a namespace only when an
+  existing ownership marker proves that it is an older v2 home;
 - exposes the installed `aoa-external-codex-return` leaf for the final external
   return contour. The leaf receives an explicit return-owner binding and exact
   handoff/holder paths, uses a connectable local Codex app-server as a

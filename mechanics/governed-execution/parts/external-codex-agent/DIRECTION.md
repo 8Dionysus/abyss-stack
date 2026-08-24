@@ -41,6 +41,16 @@ re-entry, owner acceptance, master wake, or a model/role verdict; those remain
 separate evidence. A future live canary must prove both the exact holder and
 Kitty disappearance while preserving an unrelated live holder.
 
+The projected home now separates realization identity from holder-local
+mutability. New preparation requires a digest-bound opaque holder namespace;
+same-namespace retries are idempotent and different holders receive different
+Codex state coordinates. Denied ambient entries may retain actor-created
+regular files or directories only when the current typed projection names them;
+shared links remain exact and symlinks or undeclared top-level state fail
+closed. The realization-scoped v2 path remains a compatibility route only for
+an already marked home, so legacy continuity does not reintroduce concurrent
+mutable-state sharing.
+
 The canonical external return leaf now owns the transport bridge around that
 typed lifecycle. It accepts an explicit owner binding, uses the current local
 Codex app-server to activate a paused Goal and steer or start its session,

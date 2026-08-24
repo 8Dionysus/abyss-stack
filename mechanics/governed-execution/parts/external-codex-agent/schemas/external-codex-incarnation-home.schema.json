@@ -36,8 +36,14 @@
     "ambient_home_identity": {"$ref": "#/$defs/digest"},
     "runtime_root": {"$ref": "#/$defs/absolutePath"},
     "codex_home": {"$ref": "#/$defs/absolutePath"},
+    "holder_namespace_coordinate": {"$ref": "#/$defs/digest"},
     "config_digest": {"$ref": "#/$defs/digest"},
     "shared_state_names": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/name"}
+    },
+    "actor_local_state_names": {
       "type": "array",
       "uniqueItems": true,
       "items": {"$ref": "#/$defs/name"}

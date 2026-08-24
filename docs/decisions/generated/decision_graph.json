@@ -1,19 +1,19 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
-  "decision_count": 135,
-  "edge_count": 3034,
+  "decision_count": 136,
+  "edge_count": 3056,
   "edge_type_counts": {
-    "CITES_SOURCE_SURFACE": 1104,
-    "DATED": 135,
-    "GUARDED_BY": 417,
-    "HAS_STATUS": 135,
-    "HAS_SURFACE_CLASS": 368,
-    "IN_STACK_LANE": 322,
-    "NEXT_DECISION": 134,
-    "OWNED_BY_SURFACE": 141,
-    "OWNS_DECISION": 135,
+    "CITES_SOURCE_SURFACE": 1111,
+    "DATED": 136,
+    "GUARDED_BY": 420,
+    "HAS_STATUS": 136,
+    "HAS_SURFACE_CLASS": 371,
+    "IN_STACK_LANE": 325,
+    "NEXT_DECISION": 135,
+    "OWNED_BY_SURFACE": 142,
+    "OWNS_DECISION": 136,
     "SUPERSEDED_BY": 2,
-    "UNDER_MECHANIC_PARENT": 141
+    "UNDER_MECHANIC_PARENT": 142
   },
   "edges": [
     {
@@ -14503,11 +14503,116 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0135",
+      "target": "decision:ABYSS-STACK-D-0136",
+      "type": "NEXT_DECISION"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0135",
       "target": "owner_surface:mechanics/governed-execution/parts/external-codex-agent/visible_incarnation_home.py",
       "type": "OWNED_BY_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0135",
+      "target": "mechanic_parent:governed-execution",
+      "type": "UNDER_MECHANIC_PARENT"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0136",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/CONTRACT.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0136",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/DIRECTION.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0136",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/README.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0136",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/VALIDATION.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0136",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-incarnation-home.schema.json",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0136",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/tests/test_visible_incarnation_home.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0136",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/visible_incarnation_home.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0136",
+      "target": "date:2026-08-23",
+      "type": "DATED"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0136",
+      "target": "guard_family:capability%20projection",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0136",
+      "target": "guard_family:concurrency%20isolation",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0136",
+      "target": "guard_family:incarnation%20identity",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0136",
+      "target": "status:proposed",
+      "type": "HAS_STATUS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0136",
+      "target": "surface_class:public%20contract",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0136",
+      "target": "surface_class:runtime%20containment",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0136",
+      "target": "surface_class:source/runtime%20boundary",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0136",
+      "target": "stack_lane:governed-execution",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0136",
+      "target": "stack_lane:runtime",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0136",
+      "target": "stack_lane:validation",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0136",
+      "target": "owner_surface:mechanics/governed-execution/parts/external-codex-agent/visible_incarnation_home.py",
+      "type": "OWNED_BY_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0136",
       "target": "mechanic_parent:governed-execution",
       "type": "UNDER_MECHANIC_PARENT"
     },
@@ -15185,18 +15290,23 @@
       "source": "repo:abyss-stack",
       "target": "decision:ABYSS-STACK-D-0135",
       "type": "OWNS_DECISION"
+    },
+    {
+      "source": "repo:abyss-stack",
+      "target": "decision:ABYSS-STACK-D-0136",
+      "type": "OWNS_DECISION"
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 1314,
+  "node_count": 1318,
   "node_type_counts": {
     "date": 44,
-    "decision": 135,
-    "guard_family": 227,
+    "decision": 136,
+    "guard_family": 229,
     "mechanic_parent": 11,
     "owner_surface": 68,
     "repo": 1,
-    "source_surface": 623,
+    "source_surface": 624,
     "stack_lane": 51,
     "status": 4,
     "surface_class": 150
@@ -16773,6 +16883,16 @@
       "type": "decision"
     },
     {
+      "date": "2026-08-23",
+      "id": "decision:ABYSS-STACK-D-0136",
+      "label": "ABYSS-STACK-D-0136",
+      "path": "docs/decisions/ABYSS-STACK-D-0136-holder-local-incarnation-mutable-state.md",
+      "posture": "proposed runtime rationale",
+      "status": "proposed",
+      "title": "ABYSS-STACK-D-0136 Holder-Local Incarnation Mutable State",
+      "type": "decision"
+    },
+    {
       "id": "guard_family:A/B/C%20freeze",
       "label": "A/B/C freeze",
       "type": "guard_family"
@@ -16955,6 +17075,11 @@
     {
       "id": "guard_family:composition-first%20runtime%20shape",
       "label": "composition-first runtime shape",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:concurrency%20isolation",
+      "label": "concurrency isolation",
       "type": "guard_family"
     },
     {
@@ -17310,6 +17435,11 @@
     {
       "id": "guard_family:immutable%20inputs",
       "label": "immutable inputs",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:incarnation%20identity",
+      "label": "incarnation identity",
       "type": "guard_family"
     },
     {
@@ -20191,6 +20321,11 @@
     {
       "id": "source_surface:mechanics/governed-execution/parts/external-codex-agent/CONTRACT.md",
       "label": "mechanics/governed-execution/parts/external-codex-agent/CONTRACT.md",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/governed-execution/parts/external-codex-agent/DIRECTION.md",
+      "label": "mechanics/governed-execution/parts/external-codex-agent/DIRECTION.md",
       "type": "source_surface"
     },
     {

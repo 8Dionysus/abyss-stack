@@ -47,6 +47,38 @@ def _realization(path: Path) -> Path:
     return path
 
 
+_ORIGINAL_PREPARE_HOME = MODULE.prepare_home
+
+
+def _prepare_home_for_test(**kwargs: object) -> dict[str, object]:
+    # Every ordinary fixture is one durable holder. Concurrency tests opt into
+    # distinct namespaces explicitly; production callers must do the same for
+    # a new home.
+    kwargs.setdefault("holder_namespace", "fixture-holder")
+    return _ORIGINAL_PREPARE_HOME(**kwargs)
+
+
+MODULE.prepare_home = _prepare_home_for_test
+
+
+def _shared_fixture_name() -> str:
+    _registry, definitions, _unknown = MODULE._load_capability_class_registry()
+    return next(
+        name
+        for name, definition in definitions.items()
+        if definition["projection"] == "shared_link"
+    )
+
+
+def _unknown_fixture_name(seed: Path) -> str:
+    _registry, definitions, _unknown = MODULE._load_capability_class_registry()
+    suffix = MODULE.sha256_bytes(str(seed).encode("utf-8"))[len("sha256:") : 24]
+    candidate = f"ambient-{suffix}"
+    while candidate in definitions or candidate in MODULE.LOCAL_NAMES:
+        candidate += "-next"
+    return candidate
+
+
 def _capability_grant(
     path: Path,
     *,
@@ -229,6 +261,203 @@ def test_prepared_home_binds_nested_default_without_rehoming_parent(tmp_path: Pa
             )
         )
     ).validate(manifest)
+
+
+def test_denied_ambient_entry_can_be_actor_local_regular_state_and_reprepared(
+    tmp_path: Path,
+) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    denied_name = _unknown_fixture_name(tmp_path)
+    shared_name = _shared_fixture_name()
+    (ambient / denied_name).write_bytes(b"ambient-sidecar")
+    (ambient / shared_name).mkdir()
+    realization = _realization(tmp_path / "realization.json")
+
+    manifest = MODULE.prepare_home(
+        ambient_home=ambient,
+        realization_path=realization,
+        runtime_root=runtime_root,
+        holder_namespace="sequential-holder",
+    )
+    actor_home = Path(manifest["codex_home"])
+    local_state = actor_home / denied_name
+    local_state.write_bytes(b"actor-local-state")
+    manifest_path = actor_home.parent / "incarnation-home.json"
+    assert MODULE._load_manifest(manifest_path)["codex_home"] == str(actor_home)
+    assert (actor_home / shared_name).readlink() == ambient / shared_name
+
+    refreshed = MODULE.prepare_home(
+        ambient_home=ambient,
+        realization_path=realization,
+        runtime_root=runtime_root,
+        holder_namespace="sequential-holder",
+    )
+
+    assert refreshed["codex_home"] == str(actor_home)
+    assert local_state.read_bytes() == b"actor-local-state"
+    assert (actor_home / shared_name).readlink() == ambient / shared_name
+    assert denied_name in refreshed["actor_local_state_names"]
+    assert shared_name in refreshed["shared_state_names"]
+
+
+def test_new_home_requires_holder_local_namespace(tmp_path: Path) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+
+    with pytest.raises(MODULE.IncarnationHomeError, match="holder namespace"):
+        _ORIGINAL_PREPARE_HOME(
+            ambient_home=ambient,
+            realization_path=_realization(tmp_path / "realization.json"),
+            runtime_root=runtime_root,
+        )
+
+
+def test_legacy_v2_manifest_derives_denied_local_state_set(tmp_path: Path) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    denied_name = _unknown_fixture_name(tmp_path)
+    (ambient / denied_name).write_bytes(b"ambient-sidecar")
+    realization = _realization(tmp_path / "realization.json")
+    realization_payload = json.loads(realization.read_text(encoding="utf-8"))
+    coordinate = MODULE._incarnation_coordinate(
+        realization_payload["model_realization_id"],
+        realization_payload["configuration_fingerprint"],
+    )
+    incarnation_root = runtime_root / (
+        "sha256-" + coordinate.removeprefix("sha256:")
+    )
+    incarnation_root.mkdir()
+    codex_home = incarnation_root / "codex-home"
+    (incarnation_root / "incarnation-home.json").write_text(
+        json.dumps(
+            {
+                "ambient_codex_home": str(ambient),
+                "ambient_home_identity": MODULE._ambient_home_identity(ambient),
+                "model_realization_id": realization_payload["model_realization_id"],
+                "codex_home": str(codex_home),
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    manifest = _ORIGINAL_PREPARE_HOME(
+        ambient_home=ambient,
+        realization_path=realization,
+        runtime_root=runtime_root,
+    )
+    assert "holder_namespace_coordinate" not in manifest
+    actor_home = Path(manifest["codex_home"])
+    (actor_home / denied_name).write_bytes(b"legacy-local-state")
+    manifest_path = incarnation_root / "incarnation-home.json"
+    legacy_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    legacy_manifest.pop("actor_local_state_names")
+    manifest_path.write_text(json.dumps(legacy_manifest), encoding="utf-8")
+
+    loaded, _raw, _digest = MODULE._load_manifest_snapshot(manifest_path)
+    assert denied_name not in loaded.get("shared_state_names", [])
+    assert (actor_home / denied_name).read_bytes() == b"legacy-local-state"
+
+
+def test_holder_local_namespaces_keep_sequential_duties_isolated(tmp_path: Path) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    denied_name = _unknown_fixture_name(tmp_path)
+    (ambient / denied_name).write_bytes(b"ambient-sidecar")
+    realization = _realization(tmp_path / "realization.json")
+
+    first = _ORIGINAL_PREPARE_HOME(
+        ambient_home=ambient,
+        realization_path=realization,
+        runtime_root=runtime_root,
+        holder_namespace="holder-alpha",
+    )
+    first_home = Path(first["codex_home"])
+    (first_home / denied_name).write_bytes(b"first-duty")
+    second = _ORIGINAL_PREPARE_HOME(
+        ambient_home=ambient,
+        realization_path=realization,
+        runtime_root=runtime_root,
+        holder_namespace="holder-beta",
+    )
+    second_home = Path(second["codex_home"])
+    (second_home / denied_name).write_bytes(b"second-duty")
+
+    assert first_home != second_home
+    assert (
+        _ORIGINAL_PREPARE_HOME(
+            ambient_home=ambient,
+            realization_path=realization,
+            runtime_root=runtime_root,
+            holder_namespace="holder-alpha",
+        )["codex_home"]
+        == str(first_home)
+    )
+    assert (
+        _ORIGINAL_PREPARE_HOME(
+            ambient_home=ambient,
+            realization_path=realization,
+            runtime_root=runtime_root,
+            holder_namespace="holder-beta",
+        )["codex_home"]
+        == str(second_home)
+    )
+    assert (first_home / denied_name).read_bytes() == b"first-duty"
+    assert (second_home / denied_name).read_bytes() == b"second-duty"
+
+
+def test_denied_actor_local_symlink_and_undeclared_state_fail_closed(
+    tmp_path: Path,
+) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    denied_name = _unknown_fixture_name(tmp_path)
+    (ambient / denied_name).write_bytes(b"ambient-sidecar")
+    realization = _realization(tmp_path / "realization.json")
+    manifest = MODULE.prepare_home(
+        ambient_home=ambient,
+        realization_path=realization,
+        runtime_root=runtime_root,
+        holder_namespace="fail-closed-holder",
+    )
+    actor_home = Path(manifest["codex_home"])
+    foreign = tmp_path / "foreign-state"
+    foreign.write_bytes(b"foreign")
+    (actor_home / denied_name).symlink_to(foreign)
+    with pytest.raises(MODULE.IncarnationHomeError, match="may not be a symlink"):
+        MODULE.prepare_home(
+            ambient_home=ambient,
+            realization_path=realization,
+            runtime_root=runtime_root,
+            holder_namespace="fail-closed-holder",
+        )
+
+    (actor_home / denied_name).unlink()
+    (actor_home / "undeclared-top-level").write_text("{}", encoding="utf-8")
+    with pytest.raises(
+        MODULE.IncarnationHomeError, match="unexpected incarnation-home entry"
+    ):
+        MODULE.prepare_home(
+            ambient_home=ambient,
+            realization_path=realization,
+            runtime_root=runtime_root,
+            holder_namespace="fail-closed-holder",
+        )
 
 
 def test_capability_projection_denies_ambient_operator_control_by_default(
@@ -912,6 +1141,63 @@ def test_preparation_removes_obsolete_managed_shared_link(tmp_path: Path) -> Non
     assert "auth.json" not in refreshed["shared_state_names"]
     assert not (actor_home / "auth.json").exists()
     assert not (actor_home / "auth.json").is_symlink()
+
+
+def test_former_shared_link_demotes_only_under_typed_denied_policy(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    shared_name = _shared_fixture_name()
+    (ambient / shared_name).mkdir()
+    realization = _realization(tmp_path / "realization.json")
+
+    first = _ORIGINAL_PREPARE_HOME(
+        ambient_home=ambient,
+        realization_path=realization,
+        runtime_root=runtime_root,
+        holder_namespace="typed-demotion-holder",
+    )
+    actor_home = Path(first["codex_home"])
+    assert (actor_home / shared_name).is_symlink()
+
+    registry = json.loads(
+        MODULE.CAPABILITY_CLASS_REGISTRY_PATH.read_text(encoding="utf-8")
+    )
+    class_id = "fixture_denied_class"
+    while class_id in registry["classes"]:
+        class_id += "_next"
+    registry["classes"][class_id] = {
+        "projection": "denied",
+        "grantable": False,
+    }
+    registry["entries"][shared_name] = class_id
+    registry_path = tmp_path / MODULE.CAPABILITY_CLASS_REGISTRY_NAME
+    registry_path.write_text(json.dumps(registry), encoding="utf-8")
+    monkeypatch.setattr(MODULE, "CAPABILITY_CLASS_REGISTRY_PATH", registry_path)
+
+    demoted = _ORIGINAL_PREPARE_HOME(
+        ambient_home=ambient,
+        realization_path=realization,
+        runtime_root=runtime_root,
+        holder_namespace="typed-demotion-holder",
+    )
+    assert not (actor_home / shared_name).exists()
+    assert not (actor_home / shared_name).is_symlink()
+    assert shared_name in demoted["actor_local_state_names"]
+
+    (actor_home / shared_name).write_bytes(b"local-after-demotion")
+    resumed = _ORIGINAL_PREPARE_HOME(
+        ambient_home=ambient,
+        realization_path=realization,
+        runtime_root=runtime_root,
+        holder_namespace="typed-demotion-holder",
+    )
+    assert resumed["codex_home"] == str(actor_home)
+    assert (actor_home / shared_name).read_bytes() == b"local-after-demotion"
 
 
 def test_preparation_rejects_symlinked_shared_state_entry(tmp_path: Path) -> None:

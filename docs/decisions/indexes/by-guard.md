@@ -292,6 +292,7 @@
 ## capability projection
 
 - [ABYSS-STACK-D-0135 Typed Incarnation Capability Projection](../ABYSS-STACK-D-0135-typed-incarnation-capability-projection.md) (`docs/decisions/ABYSS-STACK-D-0135-typed-incarnation-capability-projection.md`)
+- [ABYSS-STACK-D-0136 Holder-Local Incarnation Mutable State](../ABYSS-STACK-D-0136-holder-local-incarnation-mutable-state.md) (`docs/decisions/ABYSS-STACK-D-0136-holder-local-incarnation-mutable-state.md`)
 
 ## closure authorization
 
@@ -321,6 +322,10 @@
 ## composition-first runtime shape
 
 - [ABYSS-STACK-D-0058 Profile Topology Validator Module](../ABYSS-STACK-D-0058-profile-topology-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0058-profile-topology-validator-module.md`)
+
+## concurrency isolation
+
+- [ABYSS-STACK-D-0136 Holder-Local Incarnation Mutable State](../ABYSS-STACK-D-0136-holder-local-incarnation-mutable-state.md) (`docs/decisions/ABYSS-STACK-D-0136-holder-local-incarnation-mutable-state.md`)
 
 ## consumer zero
 
@@ -627,6 +632,10 @@
 
 - [ABYSS-STACK-D-0117 Recover Review Inputs Without Rewriting Owner Writers](../ABYSS-STACK-D-0117-recover-review-inputs-without-rewriting-owner-writers.md) (`docs/decisions/ABYSS-STACK-D-0117-recover-review-inputs-without-rewriting-owner-writers.md`)
 - [ABYSS-STACK-D-0118 Admit Role-First Owner Reviewers to A2A Return](../ABYSS-STACK-D-0118-admit-role-first-owner-reviewers-to-a2a-return.md) (`docs/decisions/ABYSS-STACK-D-0118-admit-role-first-owner-reviewers-to-a2a-return.md`)
+
+## incarnation identity
+
+- [ABYSS-STACK-D-0136 Holder-Local Incarnation Mutable State](../ABYSS-STACK-D-0136-holder-local-incarnation-mutable-state.md) (`docs/decisions/ABYSS-STACK-D-0136-holder-local-incarnation-mutable-state.md`)
 
 ## independent reference
 

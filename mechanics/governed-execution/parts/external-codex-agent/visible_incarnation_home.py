@@ -644,6 +644,53 @@ def _incarnation_coordinate(realization_id: str, fingerprint: str) -> str:
     )
 
 
+def _holder_namespace_coordinate(holder_namespace: str) -> str:
+    """Bind one durable mutable home to an opaque holder-owned namespace."""
+
+    if not isinstance(holder_namespace, str) or not holder_namespace.strip():
+        raise IncarnationHomeError("holder namespace must be a non-empty string")
+    if any(
+        ord(character) < 0x20 or ord(character) == 0x7F
+        for character in holder_namespace
+    ):
+        raise IncarnationHomeError("holder namespace contains a control character")
+    return sha256_bytes(canonical_bytes({"holder_namespace": holder_namespace}))
+
+
+def _holder_incarnation_root(
+    *, runtime_root: Path, incarnation_coordinate: str, holder_coordinate: str | None
+) -> Path:
+    realization_root = runtime_root / (
+        "sha256-" + incarnation_coordinate.removeprefix("sha256:")
+    )
+    if holder_coordinate is None:
+        return realization_root
+    if SHA256_DIGEST_PATTERN.fullmatch(holder_coordinate) is None:
+        raise IncarnationHomeError("holder namespace coordinate is invalid")
+    return realization_root / (
+        "holder-sha256-" + holder_coordinate.removeprefix("sha256:")
+    )
+
+
+def _validate_actor_local_entry(target: Path, name: str) -> None:
+    """Permit only Codex-owned regular files/directories for denied entries."""
+
+    if target.is_symlink():
+        raise IncarnationHomeError(
+            f"actor-local capability entry may not be a symlink: {target}"
+        )
+    try:
+        mode = target.lstat().st_mode
+    except OSError as exc:
+        raise IncarnationHomeError(
+            f"actor-local capability entry cannot be inspected: {target}"
+        ) from exc
+    if not (stat.S_ISREG(mode) or stat.S_ISDIR(mode)):
+        raise IncarnationHomeError(
+            f"actor-local capability entry is not a regular file or directory: {name}"
+        )
+
+
 def _reject_custom_model_provider(parsed: dict[str, Any]) -> None:
     """Fail closed when ambient config selects a provider outside the realization."""
 
@@ -4814,6 +4861,7 @@ def prepare_home(
     realization_path: Path,
     runtime_root: Path,
     capability_grants: Sequence[Path] = (),
+    holder_namespace: str | None = None,
 ) -> dict[str, Any]:
     ambient_home = _absolute_directory(ambient_home, "ambient Codex home")
     runtime_root = _absolute_directory(runtime_root, "runtime root")
@@ -4828,8 +4876,35 @@ def prepare_home(
     coordinate = _incarnation_coordinate(
         str(realization.get("model_realization_id")), fingerprint
     )
-    fingerprint_value = coordinate.removeprefix("sha256:")
-    incarnation_root = runtime_root / f"sha256-{fingerprint_value}"
+    holder_coordinate = (
+        None
+        if holder_namespace is None
+        else _holder_namespace_coordinate(holder_namespace)
+    )
+    realization_root = _holder_incarnation_root(
+        runtime_root=runtime_root,
+        incarnation_coordinate=coordinate,
+        holder_coordinate=None,
+    )
+    if realization_root.is_symlink():
+        raise IncarnationHomeError("realization incarnation root may not be a symlink")
+    if holder_coordinate is None and not (
+        (realization_root / "incarnation-home.json").is_file()
+        and not (realization_root / "incarnation-home.json").is_symlink()
+    ):
+        raise IncarnationHomeError(
+            "holder namespace is required for a new incarnation home"
+        )
+    if holder_coordinate is not None:
+        realization_root.mkdir(mode=0o700, exist_ok=True)
+        if realization_root.is_symlink() or not realization_root.is_dir():
+            raise IncarnationHomeError("realization incarnation root is not a real directory")
+        realization_root.chmod(0o700)
+    incarnation_root = _holder_incarnation_root(
+        runtime_root=runtime_root,
+        incarnation_coordinate=coordinate,
+        holder_coordinate=holder_coordinate,
+    )
     codex_home = incarnation_root / "codex-home"
     ambient_identity = _ambient_home_identity(ambient_home)
     if incarnation_root.is_symlink():
@@ -4855,6 +4930,12 @@ def prepare_home(
             raise IncarnationHomeError("incarnation model realization identity drift")
         if existing.get("codex_home") != str(codex_home):
             raise IncarnationHomeError("incarnation home coordinate drift")
+        existing_holder_coordinate = existing.get("holder_namespace_coordinate")
+        if holder_coordinate is None:
+            if existing_holder_coordinate is not None:
+                raise IncarnationHomeError("incarnation holder namespace drift")
+        elif existing_holder_coordinate != holder_coordinate:
+            raise IncarnationHomeError("incarnation holder namespace drift")
 
     # Validate ambient inputs before creating a new content-addressed root. A
     # failed first preparation must not leave an unowned directory that blocks
@@ -4876,6 +4957,11 @@ def prepare_home(
         if entry["projection"] == "shared_link"
     }
     shared_names = sorted(projected_entries)
+    actor_local_state_names = sorted(
+        name
+        for name, entry in capability_projection["entries"].items()
+        if entry["projection"] == "denied"
+    )
 
     incarnation_root.mkdir(mode=0o700, exist_ok=True)
     codex_home.mkdir(mode=0o700, exist_ok=True)
@@ -4934,19 +5020,37 @@ def prepare_home(
         else:
             target.symlink_to(source)
 
-    all_capability_names = set(capability_projection["entries"])
-    for name in sorted(
-        (previous_shared_names | all_capability_names) - set(shared_names)
-    ):
+    for name in sorted(previous_shared_names - set(shared_names)):
         target = codex_home / name
         source = ambient_home / name
         if not target.exists() and not target.is_symlink():
             continue
-        if not target.is_symlink() or target.readlink() != source:
+        if target.is_symlink() and target.readlink() == source:
+            target.unlink()
+            continue
+        if name in actor_local_state_names:
+            _validate_actor_local_entry(target, name)
+            continue
+        if not target.is_symlink():
             raise IncarnationHomeError(
                 f"obsolete capability projection link drift: {target}"
             )
-        target.unlink()
+        if target.readlink() != source:
+            raise IncarnationHomeError(
+                f"obsolete capability projection link drift: {target}"
+            )
+
+    for name in actor_local_state_names:
+        target = codex_home / name
+        if target.exists() or target.is_symlink():
+            _validate_actor_local_entry(target, name)
+
+    expected_names = set(shared_names) | set(actor_local_state_names) | LOCAL_NAMES
+    for entry in codex_home.iterdir():
+        if entry.name not in expected_names:
+            raise IncarnationHomeError(
+                f"unexpected incarnation-home entry: {entry.name}"
+            )
 
     manifest = {
         "$schema": "schemas/external-codex-incarnation-home.schema.json",
@@ -4963,10 +5067,13 @@ def prepare_home(
         "codex_home": str(codex_home),
         "config_digest": sha256_bytes(config),
         "shared_state_names": shared_names,
+        "actor_local_state_names": actor_local_state_names,
         "capability_projection": capability_projection,
         "top_level_posture": "incarnation-home",
         "child_posture": "incarnation-home-via-shell-environment-policy",
     }
+    if holder_coordinate is not None:
+        manifest["holder_namespace_coordinate"] = holder_coordinate
     _write_exact(
         incarnation_root / "incarnation-home.json",
         json.dumps(manifest, ensure_ascii=False, sort_keys=True, indent=2).encode("utf-8")
@@ -5019,16 +5126,28 @@ def _load_manifest_snapshot(
         or manifest.get("runtime_version") != runtime_version
     ):
         raise IncarnationHomeError("model realization binding drift")
-    expected_home = (
-        runtime_root
-        / (
-            "sha256-"
-            + _incarnation_coordinate(
-                str(realization.get("model_realization_id")), fingerprint
-            ).removeprefix("sha256:")
-        )
-        / "codex-home"
-    ).resolve()
+    incarnation_coordinate = _incarnation_coordinate(
+        str(realization.get("model_realization_id")), fingerprint
+    )
+    holder_coordinate = manifest.get("holder_namespace_coordinate")
+    if holder_coordinate is not None and (
+        not isinstance(holder_coordinate, str)
+        or SHA256_DIGEST_PATTERN.fullmatch(holder_coordinate) is None
+    ):
+        raise IncarnationHomeError("holder namespace coordinate is invalid")
+    realization_root = _holder_incarnation_root(
+        runtime_root=runtime_root,
+        incarnation_coordinate=incarnation_coordinate,
+        holder_coordinate=None,
+    )
+    expected_root = _holder_incarnation_root(
+        runtime_root=runtime_root,
+        incarnation_coordinate=incarnation_coordinate,
+        holder_coordinate=holder_coordinate,
+    )
+    if realization_root.is_symlink() or expected_root.is_symlink():
+        raise IncarnationHomeError("incarnation root may not be a symlink")
+    expected_home = (expected_root / "codex-home").resolve()
     if codex_home != expected_home:
         raise IncarnationHomeError("incarnation Codex home is not derived from realization")
     try:
@@ -5100,7 +5219,34 @@ def _load_manifest_snapshot(
         raise IncarnationHomeError(
             "shared-state manifest no longer matches capability projection"
         )
-    expected_names = set(shared_names) | LOCAL_NAMES
+    expected_actor_local_names = sorted(
+        name
+        for name, entry in expected_capability_projection["entries"].items()
+        if entry["projection"] == "denied"
+    )
+    actor_local_names = manifest.get("actor_local_state_names")
+    if actor_local_names is None:
+        # Pre-repair v2 manifests did not name the derived denied-state set.
+        # Recompute it from the typed projection for safe live compatibility.
+        actor_local_names = expected_actor_local_names
+    elif (
+        not isinstance(actor_local_names, list)
+        or any(
+            not isinstance(name, str)
+            or not name
+            or name in {".", ".."}
+            or name in LOCAL_NAMES
+            or Path(name).name != name
+            for name in actor_local_names
+        )
+        or len(set(actor_local_names)) != len(actor_local_names)
+    ):
+        raise IncarnationHomeError("actor-local state manifest is invalid")
+    if sorted(actor_local_names) != expected_actor_local_names:
+        raise IncarnationHomeError(
+            "actor-local state manifest no longer matches capability projection"
+        )
+    expected_names = set(shared_names) | set(actor_local_names) | LOCAL_NAMES
     for entry in codex_home.iterdir():
         if entry.name not in expected_names:
             raise IncarnationHomeError(
@@ -5120,6 +5266,10 @@ def _load_manifest_snapshot(
         local = codex_home / name
         if local.is_symlink() or not local.is_dir():
             raise IncarnationHomeError(f"actor-local {name} is not a real directory")
+    for name in actor_local_names:
+        local = codex_home / name
+        if local.exists() or local.is_symlink():
+            _validate_actor_local_entry(local, name)
     return manifest, raw, sha256_bytes(raw)
 
 
@@ -6313,6 +6463,7 @@ def command_prepare(args: argparse.Namespace) -> int:
         realization_path=Path(args.model_realization),
         runtime_root=Path(args.runtime_root),
         capability_grants=[Path(path) for path in (args.capability_grant or [])],
+        holder_namespace=args.holder_namespace,
     )
     print(json.dumps(manifest, ensure_ascii=False, sort_keys=True))
     return 0
@@ -6957,6 +7108,13 @@ def parser() -> argparse.ArgumentParser:
     prepare.add_argument("--ambient-codex-home", required=True)
     prepare.add_argument("--model-realization", required=True)
     prepare.add_argument("--runtime-root", required=True)
+    prepare.add_argument(
+        "--holder-namespace",
+        help=(
+            "opaque durable namespace for one holder-local mutable home; "
+            "required when creating a new home"
+        ),
+    )
     prepare.add_argument(
         "--capability-grant",
         action="append",

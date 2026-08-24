@@ -815,6 +815,28 @@ canonical visible holder itself uses the projected incarnation home; the
 ordinary actor-local `config.toml`, `cache`, `log`, `tmp`, and descendant binary
 remain real incarnation-local paths.
 
+The mutable home has two lifecycle coordinates. A newly created home requires
+an opaque holder namespace; its digest is recorded as
+`holder_namespace_coordinate` and places the home below the realization root,
+so sequential or concurrent holders with the same realization cannot share
+Codex-created databases, sidecars, locks, or other local state. Repeating
+`prepare` with the same namespace addresses the same home. For compatibility,
+the realization-scoped `codex-home` path remains loadable and preparable only
+when its existing v2 ownership marker is present; an unmarked new home cannot
+silently fall back to that shared mutable coordinate.
+
+The projection derives `actor_local_state_names` from every current capability
+entry whose typed projection is `denied`. An entry in that derived set may be
+absent or may be a top-level regular file or real directory created by the
+actor. It is not a shared link, and the runtime never deletes it during
+prepare. A symlink, special file, foreign target, or arbitrary undeclared
+top-level entry fails closed. When a previous shared link becomes denied under
+the current typed policy, the exact old ambient link may be removed; a regular
+local shadow is retained and validated. A shared projection still requires its
+exact ambient symlink, so local files cannot widen a denied capability.
+The new manifest field is optional for schema compatibility with older v2
+manifests; the loader recomputes the exact denied set when it is absent.
+
 An `--capability-grant` input is an exact
 `schemas/external-codex-capability-grant.schema.json` owner artifact for one
 operator-control entry. Admission requires the typed capability ID and
