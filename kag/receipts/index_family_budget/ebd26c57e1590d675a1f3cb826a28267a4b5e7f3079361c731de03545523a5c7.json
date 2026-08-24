@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 30361946,
+  "allowed_tracked_bytes": 38567264,
+  "approved_by": "repository-owner",
+  "base_ref": "efa14a2c0cbd4ab2d3b4044f851742f323f27c96",
+  "changed_generated_bytes": 30361946,
+  "changed_generated_files": 332,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "ebd26c57e1590d675a1f3cb826a28267a4b5e7f3079361c731de03545523a5c7",
+  "reason": "bind pre-receipt payload claim rollback and quarantine cleanup revalidation to the runtime owner boundary",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 38567264,
+  "tracked_bytes_max": 24117248
+}
