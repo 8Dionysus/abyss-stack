@@ -8,6 +8,46 @@
     "hex40": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
     "hex64": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
     "absolutePath": {"type": "string", "pattern": "^/"},
+    "releaseSeal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "release_path", "source_ref", "source_tree", "mode"],
+      "properties": {
+        "path": {"$ref": "#/$defs/absolutePath"},
+        "sha256": {"$ref": "#/$defs/hex64"},
+        "release_path": {"$ref": "#/$defs/absolutePath"},
+        "source_ref": {"$ref": "#/$defs/hex40"},
+        "source_tree": {"$ref": "#/$defs/hex40"},
+        "mode": {"const": "read_only"}
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["root", "ref", "tree", "dirty"],
+      "properties": {
+        "root": {"$ref": "#/$defs/absolutePath"},
+        "ref": {"$ref": "#/$defs/hex40"},
+        "tree": {"$ref": "#/$defs/hex40"},
+        "dirty": {"const": false}
+      }
+    },
+    "admission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "admission_id", "authority_ceiling"],
+      "properties": {
+        "path": {"$ref": "#/$defs/absolutePath"},
+        "sha256": {"$ref": "#/$defs/hex64"},
+        "admission_id": {"type": "string", "minLength": 1},
+        "authority_ceiling": {
+          "enum": [
+            "disposable-source-package-canary",
+            "installed-source-package-activation"
+          ]
+        }
+      }
+    },
     "snapshot": {
       "oneOf": [
         {
@@ -19,13 +59,14 @@
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["kind", "link_text", "target", "source_ref", "source_tree"],
+          "required": ["kind", "link_text", "target", "source_ref", "source_tree", "release_seal"],
           "properties": {
             "kind": {"const": "symlink"},
             "link_text": {"type": "string", "minLength": 1},
             "target": {"$ref": "#/$defs/absolutePath"},
             "source_ref": {"$ref": "#/$defs/hex40"},
-            "source_tree": {"$ref": "#/$defs/hex40"}
+            "source_tree": {"$ref": "#/$defs/hex40"},
+            "release_seal": {"$ref": "#/$defs/releaseSeal"}
           }
         }
       ]
@@ -33,11 +74,50 @@
     "completeReference": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["path", "sha256"],
+      "required": ["path", "sha256", "status", "binding"],
       "properties": {
         "path": {"$ref": "#/$defs/absolutePath"},
         "sha256": {"$ref": "#/$defs/hex64"},
-        "status": {"const": "complete"}
+        "status": {"const": "complete"},
+        "binding": {"$ref": "#/$defs/binding"}
+      }
+    },
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operation_id", "prepare_operation_id", "owner_repo", "source", "destination", "release_root", "activated_release", "release_seal", "predecessor", "admission"],
+      "properties": {
+        "operation_id": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
+        "prepare_operation_id": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
+        "owner_repo": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"},
+        "source": {"$ref": "#/$defs/source"},
+        "destination": {"$ref": "#/$defs/absolutePath"},
+        "release_root": {"$ref": "#/$defs/absolutePath"},
+        "activated_release": {"$ref": "#/$defs/absolutePath"},
+        "release_seal": {"$ref": "#/$defs/releaseSeal"},
+        "predecessor": {"$ref": "#/$defs/snapshot"},
+        "admission": {"$ref": "#/$defs/admission"}
+      }
+    },
+    "recoveryReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "binding_sha256", "status", "binding"],
+      "properties": {
+        "path": {"$ref": "#/$defs/absolutePath"},
+        "sha256": {"$ref": "#/$defs/hex64"},
+        "binding_sha256": {"$ref": "#/$defs/hex64"},
+        "status": {"const": "rollback_switch_complete"},
+        "binding": {"$ref": "#/$defs/binding"}
+      }
+    },
+    "receiptReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"$ref": "#/$defs/absolutePath"},
+        "sha256": {"$ref": "#/$defs/hex64"}
       }
     },
     "activationReference": {
@@ -75,13 +155,18 @@
     "schema_version",
     "status",
     "operation_id",
+    "prepare_operation_id",
     "rolled_back_at",
     "owner_repo",
     "activation_receipt",
+    "prepare_receipt",
+    "source",
     "recovery_journal",
     "destination",
     "release_root",
     "removed_activation",
+    "release_seal",
+    "admission",
     "restored_predecessor",
     "restored_target",
     "atomicity",
@@ -94,13 +179,18 @@
     "schema_version": {"const": "abyss_stack_owner_source_rollback_receipt_v1"},
     "status": {"const": "rolled_back"},
     "operation_id": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
+    "prepare_operation_id": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
     "rolled_back_at": {"type": "string", "format": "date-time"},
     "owner_repo": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"},
     "activation_receipt": {"$ref": "#/$defs/activationReference"},
-    "recovery_journal": {"$ref": "#/$defs/completeReference"},
+    "recovery_journal": {"$ref": "#/$defs/recoveryReference"},
+    "prepare_receipt": {"$ref": "#/$defs/receiptReference"},
+    "source": {"$ref": "#/$defs/source"},
     "destination": {"$ref": "#/$defs/absolutePath"},
     "release_root": {"$ref": "#/$defs/absolutePath"},
     "removed_activation": {"$ref": "#/$defs/absolutePath"},
+    "release_seal": {"$ref": "#/$defs/releaseSeal"},
+    "admission": {"$ref": "#/$defs/admission"},
     "restored_predecessor": {"$ref": "#/$defs/snapshot"},
     "restored_target": {
       "oneOf": [

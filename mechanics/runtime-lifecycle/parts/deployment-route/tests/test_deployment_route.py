@@ -8,6 +8,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import stat
 import subprocess
 import sys
 
@@ -155,6 +156,13 @@ def validate_instance(path: Path, schema_name: str) -> dict[str, object]:
     schema = json.loads((SCHEMA_ROOT / schema_name).read_text(encoding="utf-8"))
     Draft202012Validator(schema).validate(payload)
     return payload
+
+
+def make_release_writable(release: Path) -> None:
+    for path in [release, *release.rglob("*")]:
+        if path.is_symlink():
+            continue
+        os.chmod(path, stat.S_IMODE(os.lstat(path).st_mode) | 0o222)
 
 
 def direct_activate(prepared: dict[str, object]) -> dict[str, object]:
@@ -337,8 +345,66 @@ def test_activation_rejects_destination_race_and_receipt_tampering(tmp_path: Pat
     assert json.loads(result.stderr)["error"]["code"] == "receipt_digest_mismatch"
 
 
+def test_activation_revalidates_release_immediately_before_switch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fixture = route_fixture(tmp_path)
+    prepared = output(invoke(*prepare_command(fixture)))
+    release_path = Path(prepared["release_path"])
+    original_verify = ROUTE._verify_recorded_release
+    mutated = False
+
+    def mutate_after_first_verify(*args: object, **kwargs: object) -> object:
+        nonlocal mutated
+        result = original_verify(*args, **kwargs)
+        if not mutated and kwargs.get("label") == "activated_release":
+            mutated = True
+            make_release_writable(release_path)
+            (release_path / "payload.txt").write_text("non-cooperating writer\n", encoding="utf-8")
+        return result
+
+    monkeypatch.setattr(ROUTE, "_verify_recorded_release", mutate_after_first_verify)
+    with pytest.raises(ROUTE.DeploymentError) as raised:
+        direct_activate(prepared)
+
+    assert raised.value.code == "activation_recovery_required"
+    assert not os.path.lexists(fixture["destination"])
+    journal_path = next(Path(fixture["receipt_dir"]).glob("activate-*.recovery.json"))
+    journal = json.loads(journal_path.read_text(encoding="utf-8"))
+    assert journal["status"] == "intent_written"
+    assert "activation_receipt" not in journal
+
+
+def test_activation_rejects_predecessor_seal_drift(tmp_path: Path) -> None:
+    fixture = route_fixture(tmp_path)
+    first_prepare = output(invoke(*prepare_command(fixture)))
+    first_activate = output(invoke("activate", "--prepare-receipt", first_prepare["receipt_path"]))
+    first_release = Path(first_prepare["release_path"])
+    ref, tree = commit_repo(Path(fixture["source"]), "two\n")
+    fixture["ref"] = ref
+    fixture["tree"] = tree
+    fixture["admission"] = write_admission(
+        tmp_path,
+        source=Path(fixture["source"]),
+        ref=ref,
+        tree=tree,
+        destination=Path(fixture["destination"]),
+        name="second-admission.json",
+    )
+    second_prepare = output(invoke(*prepare_command(fixture)))
+    ROUTE._release_seal_path(first_release).unlink()
+
+    result = invoke("activate", "--prepare-receipt", second_prepare["receipt_path"])
+
+    assert result.returncode == 2
+    assert json.loads(result.stderr)["error"]["code"] == "receipt_missing"
+    assert Path(fixture["destination"]).resolve() == first_release
+    assert first_activate["status"] == "activated"
+
+
 def test_rollback_revalidates_recorded_predecessor_identity(tmp_path: Path) -> None:
     fixture, first_release, second_activate = two_release_fixture(tmp_path)
+    make_release_writable(first_release)
     run_git(first_release, "config", "user.email", "tamper@example.invalid")
     run_git(first_release, "config", "user.name", "tamper")
     (first_release / "payload.txt").write_text("predecessor tamper\n", encoding="utf-8")
@@ -355,6 +421,7 @@ def test_rollback_revalidates_recorded_predecessor_identity(tmp_path: Path) -> N
 def test_rollback_revalidates_activated_release_identity(tmp_path: Path) -> None:
     fixture, _, second_activate = two_release_fixture(tmp_path)
     activated_release = Path(second_activate["activated_release"])
+    make_release_writable(activated_release)
     run_git(activated_release, "config", "user.email", "tamper@example.invalid")
     run_git(activated_release, "config", "user.name", "tamper")
     (activated_release / "payload.txt").write_text("activated ref tamper\n", encoding="utf-8")
@@ -371,6 +438,7 @@ def test_rollback_revalidates_activated_release_identity(tmp_path: Path) -> None
 def test_rollback_rejects_dirty_activated_release(tmp_path: Path) -> None:
     fixture, _, second_activate = two_release_fixture(tmp_path)
     activated_release = Path(second_activate["activated_release"])
+    make_release_writable(activated_release)
     (activated_release / "payload.txt").write_text("tampered\n", encoding="utf-8")
 
     result = invoke("rollback", "--activation-receipt", second_activate["receipt_path"])
@@ -506,14 +574,10 @@ def test_activation_interruption_is_durable_and_recoverable(
     if interruption == "switch":
         monkeypatch.setattr(ROUTE.os, "replace", injected_replace)
 
-    if interruption == "final_journal":
-        activated = direct_activate(prepared)
-        assert activated["status"] == "activated"
-    else:
-        with pytest.raises(ROUTE.DeploymentError) as raised:
-            direct_activate(prepared)
-        assert raised.value.code == "activation_recovery_required"
-        assert raised.value.context["recovery_required"] is True
+    with pytest.raises(ROUTE.DeploymentError) as raised:
+        direct_activate(prepared)
+    assert raised.value.code == "activation_recovery_required"
+    assert raised.value.context["recovery_required"] is True
     journals = list(Path(fixture["receipt_dir"]).glob("activate-*.recovery.json"))
     assert len(journals) == 1
     journal_path = journals[0]
@@ -527,8 +591,6 @@ def test_activation_interruption_is_durable_and_recoverable(
         assert Path(fixture["destination"]).resolve() == Path(prepared["release_path"])
         finalized = output(invoke("recover", "--recovery-journal", str(journal_path), "--action", "finalize"))
         validate_instance(Path(finalized["receipt_path"]), "activate-receipt.v1.json")
-        if interruption == "final_journal":
-            assert finalized["receipt_path"] == activated["receipt_path"]
         finalized_retry = output(invoke("recover", "--recovery-journal", str(journal_path), "--action", "finalize"))
         assert finalized_retry["receipt_path"] == finalized["receipt_path"]
         rolled_back = output(invoke("rollback", "--activation-receipt", finalized["receipt_path"]))
@@ -537,6 +599,69 @@ def test_activation_interruption_is_durable_and_recoverable(
     validate_instance(journal_path, "recovery-receipt.v1.json")
     retry = output(invoke("recover", "--recovery-journal", str(journal_path), "--action", "rollback"))
     assert retry["receipt_path"] == rolled_back["receipt_path"]
+
+
+def test_rollback_receipt_persistence_failure_requires_recovery(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fixture, first_release, second_activate = two_release_fixture(tmp_path)
+    activation_path = Path(second_activate["receipt_path"])
+    original_write = ROUTE._write_json
+    fired = False
+
+    def fail_rollback_receipt(path: Path, payload: dict[str, object]) -> dict[str, object]:
+        nonlocal fired
+        if not fired and path.name.startswith("rollback-") and not path.name.endswith(".recovery.json"):
+            fired = True
+            raise ROUTE.DeploymentError("injected_rollback_receipt_write", "test interruption")
+        return original_write(path, payload)
+
+    monkeypatch.setattr(ROUTE, "_write_json", fail_rollback_receipt)
+    with pytest.raises(ROUTE.DeploymentError) as raised:
+        ROUTE.rollback(argparse.Namespace(activation_receipt=str(activation_path), receipt_dir=None))
+
+    assert raised.value.code == "activation_recovery_required"
+    journal_path = Path(second_activate["recovery_journal"]["path"])
+    journal = json.loads(journal_path.read_text(encoding="utf-8"))
+    assert journal["status"] == "rollback_switch_complete"
+    assert "rollback_receipt" not in journal
+    assert Path(fixture["destination"]).resolve() == first_release
+
+    monkeypatch.undo()
+    recovered = output(invoke("recover", "--recovery-journal", str(journal_path), "--action", "rollback"))
+    validate_instance(Path(recovered["receipt_path"]), "rollback-receipt.v1.json")
+    validate_instance(journal_path, "recovery-receipt.v1.json")
+
+
+def test_directory_fsync_failure_fails_closed_before_receipt_claim(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fixture = route_fixture(tmp_path)
+    prepared = output(invoke(*prepare_command(fixture)))
+    destination_parent = Path(fixture["destination"]).parent
+    original_fsync = ROUTE._fsync_directory
+    fired = False
+
+    def fail_destination_fsync(directory: Path) -> None:
+        nonlocal fired
+        if not fired and directory == destination_parent:
+            fired = True
+            raise OSError("injected directory fsync failure")
+        original_fsync(directory)
+
+    monkeypatch.setattr(ROUTE, "_fsync_directory", fail_destination_fsync)
+    with pytest.raises(ROUTE.DeploymentError) as raised:
+        direct_activate(prepared)
+
+    assert raised.value.code == "activation_recovery_required"
+    journal_path = next(Path(fixture["receipt_dir"]).glob("activate-*.recovery.json"))
+    journal = json.loads(journal_path.read_text(encoding="utf-8"))
+    assert journal["status"] == "intent_written"
+    assert "activation_receipt" not in journal
+    monkeypatch.undo()
+    rolled_back = output(invoke("recover", "--recovery-journal", str(journal_path), "--action", "rollback"))
+    assert rolled_back["activation_receipt"]["status"] == "not_written"
+    validate_instance(journal_path, "recovery-receipt.v1.json")
 
 
 def test_tampered_recovery_journal_is_rejected_before_repair(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -563,6 +688,56 @@ def test_tampered_recovery_journal_is_rejected_before_repair(tmp_path: Path, mon
     assert result.returncode == 2
     assert json.loads(result.stderr)["error"]["code"] == "receipt_digest_mismatch"
     assert not os.path.lexists(fixture["destination"])
+
+
+def test_recovery_status_references_are_exact_and_fail_closed(tmp_path: Path) -> None:
+    fixture = route_fixture(tmp_path)
+    prepared = output(invoke(*prepare_command(fixture)))
+    activated = output(invoke("activate", "--prepare-receipt", prepared["receipt_path"]))
+    journal_path = next(Path(fixture["receipt_dir"]).glob("activate-*.recovery.json"))
+    journal = json.loads(journal_path.read_text(encoding="utf-8"))
+    recovery_schema = json.loads((SCHEMA_ROOT / "recovery-receipt.v1.json").read_text(encoding="utf-8"))
+
+    for status, opposite in (
+        ("intent_written", "activation_receipt"),
+        ("switch_complete", "activation_receipt"),
+        ("finalized", "rollback_receipt"),
+        ("rolled_back", "activation_receipt"),
+    ):
+        malformed = deepcopy(journal)
+        malformed["status"] = status
+        if status in {"intent_written", "switch_complete"}:
+            malformed[opposite] = deepcopy(journal["activation_receipt"])
+        elif status == "finalized":
+            malformed["rollback_receipt"] = deepcopy(journal["activation_receipt"])
+        else:
+            malformed["activation_receipt"] = deepcopy(journal["activation_receipt"])
+        with pytest.raises(ValidationError):
+            Draft202012Validator(recovery_schema).validate(malformed)
+
+    malformed = deepcopy(journal)
+    malformed.pop("activation_receipt")
+    malformed["rollback_receipt"] = deepcopy(journal["activation_receipt"])
+    ROUTE._write_json(journal_path, malformed)
+    result = invoke("recover", "--recovery-journal", str(journal_path), "--action", "finalize")
+    assert result.returncode == 2
+    assert json.loads(result.stderr)["error"]["code"] == "recovery_record_invalid"
+    assert Path(fixture["destination"]).resolve() == Path(activated["activated_release"])
+
+
+def test_rollback_switch_complete_cannot_repair_activated_target(tmp_path: Path) -> None:
+    fixture = route_fixture(tmp_path)
+    prepared = output(invoke(*prepare_command(fixture)))
+    activated = output(invoke("activate", "--prepare-receipt", prepared["receipt_path"]))
+    journal_path = next(Path(fixture["receipt_dir"]).glob("activate-*.recovery.json"))
+    journal = ROUTE._load_recovery_journal(journal_path)
+    ROUTE._write_json(journal_path, ROUTE._rollback_switch_complete_payload(journal))
+
+    result = invoke("recover", "--recovery-journal", str(journal_path), "--action", "rollback")
+
+    assert result.returncode == 2
+    assert json.loads(result.stderr)["error"]["code"] == "recovery_state_unrecognized"
+    assert Path(fixture["destination"]).resolve() == Path(activated["activated_release"])
 
 
 def test_nested_receipt_contract_rejects_malformed_emitted_instances(tmp_path: Path) -> None:

@@ -8,6 +8,19 @@
     "hex40": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
     "hex64": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
     "absolutePath": {"type": "string", "pattern": "^/"},
+    "releaseSeal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "release_path", "source_ref", "source_tree", "mode"],
+      "properties": {
+        "path": {"$ref": "#/$defs/absolutePath"},
+        "sha256": {"$ref": "#/$defs/hex64"},
+        "release_path": {"$ref": "#/$defs/absolutePath"},
+        "source_ref": {"$ref": "#/$defs/hex40"},
+        "source_tree": {"$ref": "#/$defs/hex40"},
+        "mode": {"const": "read_only"}
+      }
+    },
     "source": {
       "type": "object",
       "additionalProperties": false,
@@ -30,39 +43,45 @@
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["kind", "link_text", "target", "source_ref", "source_tree"],
+          "required": ["kind", "link_text", "target", "source_ref", "source_tree", "release_seal"],
           "properties": {
             "kind": {"const": "symlink"},
             "link_text": {"type": "string", "minLength": 1},
             "target": {"$ref": "#/$defs/absolutePath"},
             "source_ref": {"$ref": "#/$defs/hex40"},
-            "source_tree": {"$ref": "#/$defs/hex40"}
+            "source_tree": {"$ref": "#/$defs/hex40"},
+            "release_seal": {"$ref": "#/$defs/releaseSeal"}
           }
         }
       ]
     },
-    "receiptReference": {
-      "oneOf": [
-        {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["path", "sha256"],
-          "properties": {
-            "path": {"$ref": "#/$defs/absolutePath"},
-            "sha256": {"$ref": "#/$defs/hex64"},
-            "status": {"const": "complete"}
-          }
-        },
-        {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["path", "status"],
-          "properties": {
-            "path": {"$ref": "#/$defs/absolutePath"},
-            "status": {"const": "not_written"}
-          }
-        }
-      ]
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operation_id", "prepare_operation_id", "owner_repo", "source", "destination", "release_root", "activated_release", "release_seal", "predecessor", "admission"],
+      "properties": {
+        "operation_id": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
+        "prepare_operation_id": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
+        "owner_repo": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"},
+        "source": {"$ref": "#/$defs/source"},
+        "destination": {"$ref": "#/$defs/absolutePath"},
+        "release_root": {"$ref": "#/$defs/absolutePath"},
+        "activated_release": {"$ref": "#/$defs/absolutePath"},
+        "release_seal": {"$ref": "#/$defs/releaseSeal"},
+        "predecessor": {"$ref": "#/$defs/snapshot"},
+        "admission": {"$ref": "#/$defs/admission"}
+      }
+    },
+    "completedReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "status", "binding"],
+      "properties": {
+        "path": {"$ref": "#/$defs/absolutePath"},
+        "sha256": {"$ref": "#/$defs/hex64"},
+        "status": {"const": "complete"},
+        "binding": {"$ref": "#/$defs/binding"}
+      }
     },
     "admission": {
       "type": "object",
@@ -104,22 +123,26 @@
     "destination",
     "release_root",
     "activated_release",
+    "release_seal",
     "predecessor",
     "admission",
     "activation_receipt_path",
     "rollback_receipt_path",
     "atomicity",
     "claim_ceiling",
+    "binding_sha256",
     "receipt_digest"
   ],
   "properties": {
     "schema_version": {"const": "abyss_stack_owner_source_activation_recovery_v1"},
-    "status": {"enum": ["intent_written", "switch_complete", "finalized", "rolled_back"]},
+    "status": {"enum": ["intent_written", "switch_complete", "finalized", "rollback_intent", "rollback_switch_complete", "rolled_back"]},
     "operation_id": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
     "prepare_operation_id": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
     "created_at": {"type": "string", "format": "date-time"},
     "updated_at": {"type": "string", "format": "date-time"},
     "switched_at": {"type": "string", "format": "date-time"},
+    "rollback_started_at": {"type": "string", "format": "date-time"},
+    "rollback_switched_at": {"type": "string", "format": "date-time"},
     "owner_repo": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"},
     "prepare_receipt": {
       "type": "object",
@@ -134,14 +157,18 @@
     "destination": {"$ref": "#/$defs/absolutePath"},
     "release_root": {"$ref": "#/$defs/absolutePath"},
     "activated_release": {"$ref": "#/$defs/absolutePath"},
+    "release_seal": {"$ref": "#/$defs/releaseSeal"},
     "predecessor": {"$ref": "#/$defs/snapshot"},
     "admission": {"$ref": "#/$defs/admission"},
     "activation_receipt_path": {"$ref": "#/$defs/absolutePath"},
     "rollback_receipt_path": {"$ref": "#/$defs/absolutePath"},
-    "activation_receipt": {"$ref": "#/$defs/receiptReference"},
-    "rollback_receipt": {"$ref": "#/$defs/receiptReference"},
+    "activation_receipt": {"$ref": "#/$defs/completedReference"},
+    "rollback_receipt": {"$ref": "#/$defs/completedReference"},
     "atomicity": {"$ref": "#/$defs/atomicity"},
     "claim_ceiling": {"const": "source_activation_recovery_only_no_runtime_claim"},
+    "binding_sha256": {"$ref": "#/$defs/hex64"},
+    "switch_complete_sha256": {"$ref": "#/$defs/hex64"},
+    "rollback_switch_complete_sha256": {"$ref": "#/$defs/hex64"},
     "receipt_digest": {"$ref": "#/$defs/hex64"}
   },
   "allOf": [
@@ -150,21 +177,57 @@
         "required": ["status"],
         "properties": {"status": {"enum": ["switch_complete", "finalized"]}}
       },
-      "then": {"required": ["switched_at"]}
+      "then": {"required": ["switched_at", "switch_complete_sha256"]}
+    },
+    {
+      "if": {
+        "required": ["status"],
+        "properties": {"status": {"enum": ["rollback_intent", "rollback_switch_complete", "rolled_back"]}}
+      },
+      "then": {"required": ["switch_complete_sha256"]}
+    },
+    {
+      "if": {
+        "required": ["status"],
+        "properties": {"status": {"enum": ["rollback_intent", "rollback_switch_complete", "rolled_back"]}}
+      },
+      "then": {"required": ["rollback_started_at"]}
+    },
+    {
+      "if": {
+        "required": ["status"],
+        "properties": {"status": {"enum": ["rollback_switch_complete", "rolled_back"]}}
+      },
+      "then": {"required": ["rollback_switched_at", "rollback_switch_complete_sha256"]}
     },
     {
       "if": {
         "required": ["status"],
         "properties": {"status": {"const": "finalized"}}
       },
-      "then": {"required": ["activation_receipt"]}
+      "then": {
+        "required": ["activation_receipt"],
+        "not": {"required": ["rollback_receipt"]}
+      }
     },
     {
       "if": {
         "required": ["status"],
         "properties": {"status": {"const": "rolled_back"}}
       },
-      "then": {"required": ["rollback_receipt"]}
+      "then": {
+        "required": ["rollback_receipt"],
+        "not": {"required": ["activation_receipt"]}
+      }
+    },
+    {
+      "if": {
+        "required": ["status"],
+        "properties": {"status": {"enum": ["intent_written", "switch_complete", "rollback_intent", "rollback_switch_complete"]}}
+      },
+      "then": {
+        "not": {"anyOf": [{"required": ["activation_receipt"]}, {"required": ["rollback_receipt"]}]}
+      }
     }
   ]
 }

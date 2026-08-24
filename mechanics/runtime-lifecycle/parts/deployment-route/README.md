@@ -52,14 +52,28 @@ The route emits and persists typed JSON receipts:
 - activation also persists an `abyss_stack_owner_source_activation_recovery_v1`
   journal before the destination switch.
 
-The release is a self-contained Git clone under an immutable-by-identity
-release directory. The destination is switched with a relative symlink and
-`os.replace` only after the current predecessor identity is rechecked while a
-non-blocking deployment lock is held. The durable journal records intent before
-the switch and permits deterministic `recover --action finalize|rollback` after
-switch or receipt-write interruption. Rollback never deletes a release; it
-restores the exact predecessor symlink or the exact absent state, rechecking its
-recorded ref, tree, and clean mutable state.
+The release is a self-contained Git clone under a sealed release directory. A
+sidecar seal records the exact release path and Git ref/tree, and the release
+tree (including its Git metadata) is made read-only before it can be referenced
+by a receipt. The destination is switched with a relative symlink and
+`os.replace` only after the current predecessor and the sealed release identity
+are rechecked immediately before the switch while a non-blocking deployment
+lock is held. This seal protects against ordinary non-cooperating writers; a
+privileged actor that changes permissions or bypasses the filesystem boundary
+is outside this source-only guarantee and is rejected by the next mode, clean
+identity, and seal validation.
+
+The durable journal records intent before the switch and permits deterministic
+`recover --action finalize|rollback` after switch or receipt-write interruption.
+Activation and rollback receipt references carry the journal binding, state
+digest, operation, source, destination, release, predecessor, and admission;
+cross-state references are rejected. Rollback records `rollback_intent` before
+the predecessor switch and `rollback_switch_complete` before writing the
+rollback receipt. Any directory-open/fsync or receipt persistence failure is a
+typed `activation_recovery_required` result with the journal path; no completed
+receipt is claimed. Rollback never deletes a release; it restores the exact
+predecessor symlink or the exact absent state, rechecking its recorded ref,
+tree, clean mutable state, and seal.
 
 Ignored cache paths are excluded from Git's source identity check and are not
 copied into a self-contained release. Tracked edits and non-ignored untracked
@@ -80,10 +94,12 @@ same-filesystem preflight only and creates no route state.
 Focused tests use temporary Git repositories and disposable destinations. They
 cover happy-path prepare/activate/rollback plus dirty source, wrong identity,
 stale admission, stale staging, non-symlink destination, cross-device
-preflight, concurrent lock, destination race, predecessor and activated
-release ref/tree/clean tamper, ignored-cache packaging, nested emitted schema
-instances, malformed journals, and interruption/retry recovery at each
-activation boundary. No live `/srv/AbyssOS` root is used by the tests.
+preflight, concurrent lock, destination race, immediate pre-switch release
+TOCTOU, predecessor and activated release ref/tree/clean tamper, ignored-cache
+packaging, nested emitted schema instances, cross-state journal references,
+directory-fsync failure, rollback receipt persistence failure, and
+interruption/retry recovery at each activation boundary. No live `/srv/AbyssOS`
+root is used by the tests.
 
 ```bash
 scripts/aoa-deploy-owner-package --help

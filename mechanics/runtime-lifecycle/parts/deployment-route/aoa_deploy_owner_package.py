@@ -19,6 +19,7 @@ import os
 from pathlib import Path
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import uuid
@@ -36,6 +37,7 @@ ACTIVATE_SCHEMA = "abyss_stack_owner_source_activate_receipt_v1"
 ROLLBACK_SCHEMA = "abyss_stack_owner_source_rollback_receipt_v1"
 RECOVERY_SCHEMA = "abyss_stack_owner_source_activation_recovery_v1"
 ERROR_SCHEMA = "abyss_stack_owner_source_deployment_error_v1"
+RELEASE_SEAL_SCHEMA = "abyss_stack_owner_source_release_seal_v1"
 SOURCE_ROUTE_ADMISSION_KIND = "owner_source_deployment_route"
 ALLOWED_AUTHORITY_CEILINGS = {
     "disposable-source-package-canary",
@@ -189,6 +191,7 @@ def _verify_recorded_release(
     expected_tree: str,
     *,
     label: str,
+    seal: dict[str, Any] | None = None,
 ) -> dict[str, str]:
     """Revalidate a recorded release before treating it as rollback-capable."""
 
@@ -211,6 +214,7 @@ def _verify_recorded_release(
             f"{release_path} tree {identity['tree']} != recorded {expected_tree}",
         )
     _reject_submodules(release_path)
+    _verify_release_seal(release_path, expected_ref, expected_tree, seal)
     return identity
 
 
@@ -237,9 +241,9 @@ def _write_json(path: Path, payload: dict[str, Any]) -> dict[str, Any]:
         sort_keys=True,
         indent=2,
     ).encode("utf-8") + b"\n"
-    path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
     try:
+        path.parent.mkdir(parents=True, exist_ok=True)
         temporary.write_bytes(data)
         os.chmod(temporary, 0o600)
         with temporary.open("rb") as handle:
@@ -258,12 +262,12 @@ def _write_json(path: Path, payload: dict[str, Any]) -> dict[str, Any]:
 def _fsync_directory(directory: Path) -> None:
     try:
         fd = os.open(directory, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
-    except OSError:
-        return
+    except OSError as exc:
+        raise OSError(f"cannot open directory for fsync: {directory}: {exc}") from exc
     try:
         os.fsync(fd)
-    except OSError:
-        pass
+    except OSError as exc:
+        raise OSError(f"cannot fsync directory: {directory}: {exc}") from exc
     finally:
         os.close(fd)
 
@@ -272,6 +276,101 @@ def _verify_receipt_digest(payload: dict[str, Any], field: str) -> None:
     supplied = payload.get("receipt_digest")
     if not isinstance(supplied, str) or supplied != _digest_payload(payload):
         raise DeploymentError("receipt_digest_mismatch", f"{field} is not self-consistent")
+
+
+def _release_seal_path(release_path: Path) -> Path:
+    return release_path.parent / f".{release_path.name}.seal.json"
+
+
+def _release_entries(release_path: Path) -> Iterator[Path]:
+    for root, directories, files in os.walk(release_path, topdown=False, followlinks=False):
+        for name in files:
+            path = Path(root) / name
+            if not path.is_symlink():
+                yield path
+        for name in directories:
+            path = Path(root) / name
+            if not path.is_symlink():
+                yield path
+
+
+def _set_release_read_only(release_path: Path) -> None:
+    for path in _release_entries(release_path):
+        mode = stat.S_IMODE(os.lstat(path).st_mode)
+        os.chmod(path, mode & ~0o222)
+    mode = stat.S_IMODE(os.lstat(release_path).st_mode)
+    os.chmod(release_path, mode & ~0o222)
+
+
+def _assert_release_read_only(release_path: Path) -> None:
+    paths = [release_path, *_release_entries(release_path)]
+    for path in paths:
+        mode = stat.S_IMODE(os.lstat(path).st_mode)
+        if mode & 0o222:
+            raise DeploymentError(
+                "release_not_sealed",
+                f"release contains a writable path: {path}",
+            )
+
+
+def _release_seal_reference(
+    release_path: Path,
+    seal_payload: dict[str, Any],
+) -> dict[str, str]:
+    return {
+        "path": os.fspath(_release_seal_path(release_path)),
+        "sha256": str(seal_payload["receipt_digest"]),
+        "release_path": os.fspath(release_path),
+        "source_ref": str(seal_payload["source_ref"]),
+        "source_tree": str(seal_payload["source_tree"]),
+        "mode": "read_only",
+    }
+
+
+def _verify_release_seal(
+    release_path: Path,
+    expected_ref: str,
+    expected_tree: str,
+    reference: dict[str, Any] | None = None,
+) -> dict[str, str]:
+    seal_path = _release_seal_path(release_path)
+    payload, _ = _load_json(seal_path, "release seal")
+    _verify_receipt_digest(payload, "release seal")
+    if payload.get("schema_version") != RELEASE_SEAL_SCHEMA:
+        raise DeploymentError("release_seal_invalid", "unsupported release seal schema")
+    if payload.get("release_path") != os.fspath(release_path):
+        raise DeploymentError("release_seal_invalid", "release seal path is not bound")
+    if payload.get("source_ref") != expected_ref or payload.get("source_tree") != expected_tree:
+        raise DeploymentError("release_seal_invalid", "release seal Git identity is not bound")
+    if payload.get("mode") != "read_only":
+        raise DeploymentError("release_seal_invalid", "release seal mode is not read-only")
+    if reference is not None:
+        if reference.get("path") != os.fspath(seal_path):
+            raise DeploymentError("release_seal_invalid", "release seal reference path is not bound")
+        if reference.get("sha256") != payload.get("receipt_digest"):
+            raise DeploymentError("release_seal_invalid", "release seal reference digest does not match")
+        if reference.get("release_path") != os.fspath(release_path):
+            raise DeploymentError("release_seal_invalid", "release seal reference release is not bound")
+        if reference.get("source_ref") != expected_ref or reference.get("source_tree") != expected_tree:
+            raise DeploymentError("release_seal_invalid", "release seal reference identity is not bound")
+        if reference.get("mode") != "read_only":
+            raise DeploymentError("release_seal_invalid", "release seal reference mode is invalid")
+    _assert_release_read_only(release_path)
+    return _release_seal_reference(release_path, payload)
+
+
+def _seal_release(release_path: Path, source_ref: str, source_tree: str) -> dict[str, str]:
+    _verify_clean_identity(release_path, source_ref, source_tree)
+    _set_release_read_only(release_path)
+    seal_payload = {
+        "schema_version": RELEASE_SEAL_SCHEMA,
+        "release_path": os.fspath(release_path),
+        "source_ref": source_ref,
+        "source_tree": source_tree,
+        "mode": "read_only",
+    }
+    written = _write_json(_release_seal_path(release_path), seal_payload)
+    return _verify_release_seal(release_path, source_ref, source_tree, _release_seal_reference(release_path, written))
 
 
 def _canonical_admission_path(value: str, field: str) -> str:
@@ -359,7 +458,12 @@ def _assert_not_nested(path: Path, parent: Path, code: str, label: str) -> None:
     raise DeploymentError(code, f"{label} may not be inside {parent}")
 
 
-def _snapshot_destination(destination: Path, release_root: Path) -> dict[str, Any]:
+def _snapshot_destination(
+    destination: Path,
+    release_root: Path,
+    *,
+    strict_seal: bool = True,
+) -> dict[str, Any]:
     if not os.path.lexists(destination):
         return {"kind": "absent"}
     if not destination.is_symlink():
@@ -385,13 +489,22 @@ def _snapshot_destination(destination: Path, release_root: Path) -> dict[str, An
     if _git_status(target):
         raise DeploymentError("dirty_destination", f"release checkout is dirty: {target}")
     _reject_submodules(target)
-    return {
+    try:
+        seal = _verify_release_seal(target, identity["ref"], identity["tree"])
+    except DeploymentError as exc:
+        if strict_seal or exc.code != "receipt_missing":
+            raise
+        seal = None
+    snapshot = {
         "kind": "symlink",
         "link_text": link_text,
         "target": os.fspath(target),
         "source_ref": identity["ref"],
         "source_tree": identity["tree"],
     }
+    if seal is not None:
+        snapshot["release_seal"] = seal
+    return snapshot
 
 
 def _same_snapshot(left: dict[str, Any], right: dict[str, Any]) -> bool:
@@ -399,7 +512,10 @@ def _same_snapshot(left: dict[str, Any], right: dict[str, Any]) -> bool:
         return False
     if left.get("kind") == "absent":
         return True
-    return all(left.get(key) == right.get(key) for key in ("target", "source_ref", "source_tree"))
+    return all(
+        left.get(key) == right.get(key)
+        for key in ("target", "source_ref", "source_tree", "release_seal")
+    )
 
 
 def _validate_recorded_snapshot(
@@ -425,7 +541,10 @@ def _validate_recorded_snapshot(
         target.relative_to(release_root.resolve(strict=False))
     except ValueError as exc:
         raise DeploymentError(f"{label}_unmanaged", "recorded target is outside release root") from exc
-    _verify_recorded_release(target, expected_ref, expected_tree, label=label)
+    seal = snapshot.get("release_seal")
+    if not isinstance(seal, dict):
+        raise DeploymentError(f"{label}_invalid", "recorded snapshot lacks release seal")
+    _verify_recorded_release(target, expected_ref, expected_tree, label=label, seal=seal)
     return target
 
 
@@ -518,11 +637,430 @@ def _validate_operation_id(value: Any, field: str) -> str:
     return value
 
 
-def _recovery_reference(path: Path, payload: dict[str, Any]) -> dict[str, str]:
+def _receipt_binding(payload: dict[str, Any]) -> dict[str, Any]:
+    source = payload.get("source")
+    predecessor = payload.get("predecessor", payload.get("restored_predecessor"))
+    activated_release = payload.get("activated_release", payload.get("removed_activation"))
+    release_seal = payload.get("release_seal")
+    admission = payload.get("admission")
+    if not isinstance(source, dict) or not isinstance(predecessor, dict):
+        raise DeploymentError("recovery_record_invalid", "receipt binding lacks source or predecessor")
+    if not isinstance(activated_release, str) or not isinstance(release_seal, dict):
+        raise DeploymentError("recovery_record_invalid", "receipt binding lacks activated release or seal")
+    if not isinstance(admission, dict):
+        raise DeploymentError("recovery_record_invalid", "receipt binding lacks admission")
+    return {
+        "operation_id": payload.get("operation_id"),
+        "prepare_operation_id": payload.get("prepare_operation_id"),
+        "owner_repo": payload.get("owner_repo"),
+        "source": source,
+        "destination": payload.get("destination"),
+        "release_root": payload.get("release_root"),
+        "activated_release": activated_release,
+        "release_seal": release_seal,
+        "predecessor": predecessor,
+        "admission": admission,
+    }
+
+
+def _recovery_binding_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "operation_id": payload["operation_id"],
+        "prepare_operation_id": payload["prepare_operation_id"],
+        "owner_repo": payload["owner_repo"],
+        "prepare_receipt": payload["prepare_receipt"],
+        "source": payload["source"],
+        "destination": payload["destination"],
+        "release_root": payload["release_root"],
+        "activated_release": payload["activated_release"],
+        "release_seal": payload["release_seal"],
+        "predecessor": payload["predecessor"],
+        "admission": payload["admission"],
+        "activation_receipt_path": payload["activation_receipt_path"],
+        "rollback_receipt_path": payload["rollback_receipt_path"],
+        "atomicity": payload["atomicity"],
+        "claim_ceiling": payload["claim_ceiling"],
+    }
+
+
+def _recovery_binding_digest(payload: dict[str, Any]) -> str:
+    return _digest_payload(_recovery_binding_payload(payload))
+
+
+def _completed_receipt_reference(path: Path, payload: dict[str, Any]) -> dict[str, Any]:
     digest = payload.get("receipt_digest")
     if not isinstance(digest, str):
-        raise DeploymentError("recovery_record_invalid", "recovery record lacks receipt digest")
-    return {"path": os.fspath(path), "sha256": digest}
+        raise DeploymentError("recovery_record_invalid", "receipt lacks receipt digest")
+    return {
+        "path": os.fspath(path),
+        "sha256": digest,
+        "status": "complete",
+        "binding": _receipt_binding(payload),
+    }
+
+
+def _recovery_journal_reference(
+    path: Path,
+    payload: dict[str, Any],
+    *,
+    status: str,
+) -> dict[str, Any]:
+    binding_digest = payload.get("binding_sha256")
+    if status == "switch_complete":
+        digest = payload.get("switch_complete_sha256")
+    elif status == "rollback_switch_complete":
+        digest = payload.get("rollback_switch_complete_sha256")
+    else:
+        digest = payload.get("receipt_digest")
+    if not isinstance(digest, str) or not isinstance(binding_digest, str):
+        raise DeploymentError("recovery_record_invalid", "recovery journal lacks digest binding")
+    return {
+        "path": os.fspath(path),
+        "sha256": digest,
+        "binding_sha256": binding_digest,
+        "status": payload["status"],
+        "binding": _receipt_binding(payload),
+    }
+
+
+def _validate_journal_reference(
+    reference: dict[str, Any],
+    journal: dict[str, Any],
+    *,
+    label: str,
+    allowed_statuses: set[str],
+) -> None:
+    if not isinstance(reference, dict):
+        raise DeploymentError("recovery_record_invalid", f"{label} is not an object")
+    for key in ("path", "sha256", "binding_sha256", "status", "binding"):
+        if key not in reference:
+            raise DeploymentError("recovery_record_invalid", f"{label} lacks {key}")
+    if not isinstance(reference["path"], str) or not Path(reference["path"]).is_absolute():
+        raise DeploymentError("recovery_record_invalid", f"{label} path is not absolute")
+    if not re.fullmatch(r"[0-9a-f]{64}", str(reference["sha256"])):
+        raise DeploymentError("recovery_record_invalid", f"{label} digest is invalid")
+    if not re.fullmatch(r"[0-9a-f]{64}", str(reference["binding_sha256"])):
+        raise DeploymentError("recovery_record_invalid", f"{label} binding digest is invalid")
+    if reference["binding_sha256"] != journal.get("binding_sha256"):
+        raise DeploymentError("recovery_record_invalid", f"{label} binding digest does not match journal")
+    if reference["binding"] != _receipt_binding(journal):
+        raise DeploymentError("recovery_record_invalid", f"{label} identity binding does not match journal")
+    if reference["status"] not in allowed_statuses:
+        raise DeploymentError("recovery_record_invalid", f"{label} state is not compatible")
+    if reference["status"] == "switch_complete":
+        expected_digest = journal.get("switch_complete_sha256")
+    elif reference["status"] == "rollback_switch_complete":
+        expected_digest = journal.get("rollback_switch_complete_sha256")
+    else:
+        expected_digest = journal.get("receipt_digest")
+    if reference["sha256"] != expected_digest:
+        raise DeploymentError("recovery_record_invalid", f"{label} state digest does not match journal")
+
+
+def _validate_completed_receipt_reference(
+    reference: dict[str, Any],
+    expected_path: Path,
+    payload: dict[str, Any],
+    *,
+    label: str,
+) -> None:
+    if not isinstance(reference, dict):
+        raise DeploymentError("recovery_record_invalid", f"{label} is not an object")
+    if reference.get("path") != os.fspath(expected_path):
+        raise DeploymentError("recovery_record_invalid", f"{label} path is not deterministic")
+    if reference.get("status") != "complete":
+        raise DeploymentError("recovery_record_invalid", f"{label} is not complete")
+    if reference.get("sha256") != payload.get("receipt_digest"):
+        raise DeploymentError("recovery_record_invalid", f"{label} digest does not match receipt")
+    if reference.get("binding") != _receipt_binding(payload):
+        raise DeploymentError("recovery_record_invalid", f"{label} identity binding does not match receipt")
+
+
+def _recovery_state_digest(payload: dict[str, Any], status: str) -> str:
+    state = {
+        "binding_sha256": payload["binding_sha256"],
+        "status": status,
+        "switched_at": payload.get("switched_at"),
+    }
+    if status == "rollback_switch_complete":
+        state.update(
+            {
+                "rollback_started_at": payload.get("rollback_started_at"),
+                "rollback_switched_at": payload.get("rollback_switched_at"),
+            }
+        )
+    return _digest_payload(state)
+
+
+def _validate_admission_binding(admission: Any, label: str) -> dict[str, Any]:
+    if not isinstance(admission, dict):
+        raise DeploymentError("recovery_record_invalid", f"{label} lacks admission binding")
+    for key in ("path", "sha256", "admission_id", "authority_ceiling"):
+        if not isinstance(admission.get(key), str) or not admission[key]:
+            raise DeploymentError("recovery_record_invalid", f"{label} lacks {key}")
+    if not re.fullmatch(r"[0-9a-f]{64}", admission["sha256"]):
+        raise DeploymentError("recovery_record_invalid", f"{label} digest is invalid")
+    _absolute_path(admission["path"], f"{label} path")
+    if admission["authority_ceiling"] not in ALLOWED_AUTHORITY_CEILINGS:
+        raise DeploymentError("recovery_record_invalid", f"{label} authority is invalid")
+    return admission
+
+
+def _validate_receipt_path_reference(reference: Any, label: str) -> dict[str, Any]:
+    if not isinstance(reference, dict):
+        raise DeploymentError("recovery_record_invalid", f"{label} is not an object")
+    if not isinstance(reference.get("path"), str) or not Path(reference["path"]).is_absolute():
+        raise DeploymentError("recovery_record_invalid", f"{label} path is invalid")
+    if not isinstance(reference.get("sha256"), str) or not re.fullmatch(r"[0-9a-f]{64}", reference["sha256"]):
+        raise DeploymentError("recovery_record_invalid", f"{label} digest is invalid")
+    return reference
+
+
+def _validate_activation_receipt_payload(payload: dict[str, Any], path: Path) -> None:
+    _verify_receipt_digest(payload, "activation receipt")
+    if payload.get("schema_version") != ACTIVATE_SCHEMA or payload.get("status") != "activated":
+        raise DeploymentError("activation_receipt_invalid", "activation receipt is not rollback-capable")
+    _validate_operation_id(payload.get("operation_id"), "activation operation_id")
+    prepare_operation_id = _validate_operation_id(payload.get("prepare_operation_id"), "activation prepare_operation_id")
+    _timestamp(str(payload.get("activated_at", "")), "activation activated_at")
+    owner_repo = _validate_owner(str(payload.get("owner_repo", "")))
+    source = payload.get("source")
+    if not isinstance(source, dict) or source.get("dirty") is not False:
+        raise DeploymentError("activation_receipt_invalid", "activation source is not cleanly bound")
+    source_root = _absolute_path(str(source.get("root", "")), "activation source root")
+    source_ref = _validate_commit(str(source.get("ref", "")), "activation source ref")
+    source_tree = _validate_commit(str(source.get("tree", "")), "activation source tree")
+    destination = _absolute_path(str(payload.get("destination", "")), "activation destination")
+    release_root = _absolute_path(str(payload.get("release_root", "")), "activation release root")
+    activated_release = _absolute_path(str(payload.get("activated_release", "")), "activated release")
+    try:
+        activated_release.relative_to(release_root.resolve(strict=False))
+    except ValueError as exc:
+        raise DeploymentError("activation_receipt_invalid", "activated release is unmanaged") from exc
+    release_seal = payload.get("release_seal")
+    if not isinstance(release_seal, dict):
+        raise DeploymentError("activation_receipt_invalid", "activation receipt lacks release seal")
+    _verify_recorded_release(activated_release, source_ref, source_tree, label="activated_release", seal=release_seal)
+    predecessor = payload.get("predecessor")
+    if not isinstance(predecessor, dict):
+        raise DeploymentError("activation_receipt_invalid", "activation receipt lacks predecessor snapshot")
+    _validate_recorded_snapshot(predecessor, release_root, label="predecessor")
+    prepare_reference = _validate_receipt_path_reference(payload.get("prepare_receipt"), "activation prepare receipt")
+    expected_prepare_path = path.parent / f"prepare-{prepare_operation_id}.json"
+    if Path(prepare_reference["path"]) != expected_prepare_path:
+        raise DeploymentError("activation_receipt_invalid", "activation prepare receipt path is not deterministic")
+    prepare_payload, _ = _load_prepare_receipt(expected_prepare_path)
+    if prepare_reference["sha256"] != prepare_payload.get("receipt_digest"):
+        raise DeploymentError("activation_receipt_invalid", "activation prepare receipt digest does not match")
+    _validate_admission_binding(payload.get("admission"), "activation admission")
+    recovery = payload.get("recovery_journal")
+    if not isinstance(recovery, dict):
+        raise DeploymentError("activation_receipt_invalid", "activation recovery journal binding is invalid")
+    if recovery.get("status") != "switch_complete":
+        raise DeploymentError("activation_receipt_invalid", "activation recovery journal is not switch-complete")
+    for key in ("path", "sha256", "binding_sha256", "binding"):
+        if key not in recovery:
+            raise DeploymentError("activation_receipt_invalid", f"activation recovery journal lacks {key}")
+    if not isinstance(recovery.get("path"), str) or not Path(recovery["path"]).is_absolute():
+        raise DeploymentError("activation_receipt_invalid", "activation recovery journal path is invalid")
+    for key in ("sha256", "binding_sha256"):
+        if not isinstance(recovery.get(key), str) or not re.fullmatch(r"[0-9a-f]{64}", recovery[key]):
+            raise DeploymentError("activation_receipt_invalid", "activation recovery journal digest is invalid")
+    if recovery.get("binding") != _receipt_binding(payload):
+        raise DeploymentError("activation_receipt_invalid", "activation recovery journal identity is not bound")
+    expected_recovery_path = path.parent / f"activate-{prepare_operation_id}.recovery.json"
+    if Path(recovery["path"]) != expected_recovery_path:
+        raise DeploymentError("activation_receipt_invalid", "activation recovery journal path is not deterministic")
+    atomicity = payload.get("atomicity")
+    if (
+        not isinstance(atomicity, dict)
+        or atomicity.get("same_filesystem") is not True
+        or atomicity.get("switch") != "relative-symlink-os-replace"
+        or atomicity.get("journal") != "durable-before-switch"
+        or atomicity.get("destination_identity_checked") is not True
+    ):
+        raise DeploymentError("activation_receipt_invalid", "activation atomicity is not bound")
+    if payload.get("claim_ceiling") != "source_activation_only_no_runtime_claim":
+        raise DeploymentError("activation_receipt_invalid", "activation claim ceiling is invalid")
+    if not isinstance(payload.get("effects"), list):
+        raise DeploymentError("activation_receipt_invalid", "activation effects must be a list")
+    if owner_repo != str(payload.get("owner_repo")) or source_root != Path(source["root"]):
+        raise DeploymentError("activation_receipt_invalid", "activation owner/source binding is invalid")
+    if destination == release_root:
+        raise DeploymentError("activation_receipt_invalid", "activation destination and release root are invalid")
+
+
+def _validate_rollback_receipt_payload(payload: dict[str, Any], path: Path) -> None:
+    _verify_receipt_digest(payload, "rollback receipt")
+    if payload.get("schema_version") != ROLLBACK_SCHEMA or payload.get("status") != "rolled_back":
+        raise DeploymentError("rollback_receipt_invalid", "rollback receipt is not complete")
+    _validate_operation_id(payload.get("operation_id"), "rollback operation_id")
+    prepare_operation_id = _validate_operation_id(payload.get("prepare_operation_id"), "rollback prepare_operation_id")
+    _timestamp(str(payload.get("rolled_back_at", "")), "rollback rolled_back_at")
+    _validate_owner(str(payload.get("owner_repo", "")))
+    source = payload.get("source")
+    if not isinstance(source, dict) or source.get("dirty") is not False:
+        raise DeploymentError("rollback_receipt_invalid", "rollback source is not cleanly bound")
+    _absolute_path(str(source.get("root", "")), "rollback source root")
+    source_ref = _validate_commit(str(source.get("ref", "")), "rollback source ref")
+    source_tree = _validate_commit(str(source.get("tree", "")), "rollback source tree")
+    destination = _absolute_path(str(payload.get("destination", "")), "rollback destination")
+    release_root = _absolute_path(str(payload.get("release_root", "")), "rollback release root")
+    removed_activation = _absolute_path(str(payload.get("removed_activation", "")), "rollback removed activation")
+    try:
+        removed_activation.relative_to(release_root.resolve(strict=False))
+    except ValueError as exc:
+        raise DeploymentError("rollback_receipt_invalid", "rollback removed activation is unmanaged") from exc
+    release_seal = payload.get("release_seal")
+    if not isinstance(release_seal, dict):
+        raise DeploymentError("rollback_receipt_invalid", "rollback receipt lacks release seal")
+    _verify_recorded_release(removed_activation, source_ref, source_tree, label="removed_activation", seal=release_seal)
+    predecessor = payload.get("restored_predecessor")
+    if not isinstance(predecessor, dict):
+        raise DeploymentError("rollback_receipt_invalid", "rollback receipt lacks predecessor snapshot")
+    _validate_recorded_snapshot(predecessor, release_root, label="restored_predecessor")
+    restored_target = payload.get("restored_target")
+    if predecessor.get("kind") == "absent":
+        if restored_target is not None:
+            raise DeploymentError("rollback_receipt_invalid", "absent predecessor must restore a null target")
+    elif not isinstance(restored_target, str) or restored_target != predecessor.get("target"):
+        raise DeploymentError("rollback_receipt_invalid", "rollback restored target is not predecessor-bound")
+    prepare_reference = _validate_receipt_path_reference(payload.get("prepare_receipt"), "rollback prepare receipt")
+    expected_prepare_path = path.parent / f"prepare-{prepare_operation_id}.json"
+    if Path(prepare_reference["path"]) != expected_prepare_path:
+        raise DeploymentError("rollback_receipt_invalid", "rollback prepare receipt path is not deterministic")
+    prepare_payload, _ = _load_prepare_receipt(expected_prepare_path)
+    if prepare_reference["sha256"] != prepare_payload.get("receipt_digest"):
+        raise DeploymentError("rollback_receipt_invalid", "rollback prepare receipt digest does not match")
+    _validate_admission_binding(payload.get("admission"), "rollback admission")
+    recovery = payload.get("recovery_journal")
+    if not isinstance(recovery, dict) or recovery.get("status") != "rollback_switch_complete":
+        raise DeploymentError("rollback_receipt_invalid", "rollback recovery journal is not rollback-switch-complete")
+    for key in ("path", "sha256", "binding_sha256", "binding"):
+        if key not in recovery:
+            raise DeploymentError("rollback_receipt_invalid", f"rollback recovery journal lacks {key}")
+    if not isinstance(recovery.get("path"), str) or not Path(recovery["path"]).is_absolute():
+        raise DeploymentError("rollback_receipt_invalid", "rollback recovery journal path is invalid")
+    for key in ("sha256", "binding_sha256"):
+        if not isinstance(recovery.get(key), str) or not re.fullmatch(r"[0-9a-f]{64}", recovery[key]):
+            raise DeploymentError("rollback_receipt_invalid", "rollback recovery journal digest is invalid")
+    if recovery.get("binding") != _receipt_binding(payload):
+        raise DeploymentError("rollback_receipt_invalid", "rollback recovery journal identity is not bound")
+    expected_recovery_path = path.parent / f"activate-{prepare_operation_id}.recovery.json"
+    if Path(recovery["path"]) != expected_recovery_path:
+        raise DeploymentError("rollback_receipt_invalid", "rollback recovery journal path is not deterministic")
+    activation = payload.get("activation_receipt")
+    if not isinstance(activation, dict) or not isinstance(activation.get("path"), str):
+        raise DeploymentError("rollback_receipt_invalid", "rollback activation reference is invalid")
+    if activation.get("status") == "complete":
+        if not re.fullmatch(r"[0-9a-f]{64}", str(activation.get("sha256", ""))):
+            raise DeploymentError("rollback_receipt_invalid", "rollback activation digest is invalid")
+        if not isinstance(activation.get("binding"), dict):
+            raise DeploymentError("rollback_receipt_invalid", "rollback activation identity is missing")
+    elif activation.get("status") != "not_written":
+        raise DeploymentError("rollback_receipt_invalid", "rollback activation reference has invalid status")
+    if not Path(activation["path"]).is_absolute():
+        raise DeploymentError("rollback_receipt_invalid", "rollback activation reference path is invalid")
+    atomicity = payload.get("atomicity")
+    if (
+        not isinstance(atomicity, dict)
+        or atomicity.get("same_filesystem") is not True
+        or atomicity.get("switch") != "relative-symlink-os-replace"
+        or atomicity.get("destination_identity_checked") is not True
+        or atomicity.get("predecessor_identity_checked") is not True
+    ):
+        raise DeploymentError("rollback_receipt_invalid", "rollback atomicity is not bound")
+    if payload.get("claim_ceiling") != "source_activation_rollback_only_no_runtime_claim":
+        raise DeploymentError("rollback_receipt_invalid", "rollback claim ceiling is invalid")
+    if not isinstance(payload.get("effects"), list):
+        raise DeploymentError("rollback_receipt_invalid", "rollback effects must be a list")
+    if destination == release_root:
+        raise DeploymentError("rollback_receipt_invalid", "rollback destination and release root are invalid")
+
+
+def _validate_activation_against_journal(
+    activation: dict[str, Any],
+    activation_path: Path,
+    journal: dict[str, Any],
+    *,
+    require_current: bool,
+) -> None:
+    if activation.get("operation_id") != journal.get("operation_id"):
+        raise DeploymentError("recovery_record_invalid", "activation operation does not match journal")
+    if activation.get("prepare_operation_id") != journal.get("prepare_operation_id"):
+        raise DeploymentError("recovery_record_invalid", "activation prepare operation does not match journal")
+    if _receipt_binding(activation) != _receipt_binding(journal):
+        raise DeploymentError("recovery_record_invalid", "activation receipt identity does not match journal")
+    _validate_journal_reference(
+        activation["recovery_journal"],
+        journal,
+        label="activation recovery journal",
+        allowed_statuses={"switch_complete"},
+    )
+    expected_path = _absolute_path(journal["activation_receipt_path"], "recovery activation receipt")
+    if activation_path != expected_path:
+        raise DeploymentError("recovery_record_invalid", "activation receipt path does not match journal")
+    if require_current:
+        destination = _absolute_path(journal["destination"], "recovery destination")
+        release_root = _absolute_path(journal["release_root"], "recovery release root")
+        current = _snapshot_destination(destination, release_root)
+        expected = _recovery_target_snapshot(journal)
+        if not _same_snapshot(current, expected) or current.get("release_seal") != journal.get("release_seal"):
+            raise DeploymentError("recovery_state_unrecognized", "destination is not the journal's activated release")
+    source = journal["source"]
+    _verify_recorded_release(
+        _absolute_path(journal["activated_release"], "recovery activated release"),
+        source["ref"],
+        source["tree"],
+        label="activated_release",
+        seal=journal["release_seal"],
+    )
+    _validate_recorded_snapshot(
+        journal["predecessor"],
+        _absolute_path(journal["release_root"], "recovery release root"),
+        label="predecessor",
+    )
+
+
+def _validate_rollback_against_journal(
+    rollback: dict[str, Any],
+    rollback_path: Path,
+    journal: dict[str, Any],
+    *,
+    require_current: bool,
+) -> None:
+    if rollback.get("operation_id") != journal.get("operation_id"):
+        raise DeploymentError("recovery_record_invalid", "rollback operation does not match journal")
+    if rollback.get("prepare_operation_id") != journal.get("prepare_operation_id"):
+        raise DeploymentError("recovery_record_invalid", "rollback prepare operation does not match journal")
+    if _receipt_binding(rollback) != _receipt_binding(journal):
+        raise DeploymentError("recovery_record_invalid", "rollback receipt identity does not match journal")
+    _validate_journal_reference(
+        rollback["recovery_journal"],
+        journal,
+        label="rollback recovery journal",
+        allowed_statuses={"rollback_switch_complete"},
+    )
+    expected_path = _absolute_path(journal["rollback_receipt_path"], "recovery rollback receipt")
+    if rollback_path != expected_path:
+        raise DeploymentError("recovery_record_invalid", "rollback receipt path does not match journal")
+    activation = rollback["activation_receipt"]
+    activation_path = _absolute_path(activation["path"], "rollback activation receipt")
+    if activation.get("status") == "complete":
+        activation_payload = _load_activation_receipt(activation_path)
+        if activation_payload.get("receipt_digest") != activation.get("sha256"):
+            raise DeploymentError("recovery_record_invalid", "rollback activation digest does not match receipt")
+        if activation.get("binding") != _receipt_binding(activation_payload):
+            raise DeploymentError("recovery_record_invalid", "rollback activation identity does not match receipt")
+        _validate_activation_against_journal(activation_payload, activation_path, journal, require_current=False)
+    elif activation_path != _absolute_path(journal["activation_receipt_path"], "recovery activation receipt"):
+        raise DeploymentError("recovery_record_invalid", "rollback activation absence path is not bound")
+    if require_current:
+        destination = _absolute_path(journal["destination"], "recovery destination")
+        release_root = _absolute_path(journal["release_root"], "recovery release root")
+        current = _snapshot_destination(destination, release_root)
+        if not _same_snapshot(current, journal["predecessor"]):
+            raise DeploymentError("recovery_state_unrecognized", "destination is not the journal's predecessor")
 
 
 def _validate_recovery_payload(payload: dict[str, Any], path: Path) -> None:
@@ -530,14 +1068,26 @@ def _validate_recovery_payload(payload: dict[str, Any], path: Path) -> None:
     if payload.get("schema_version") != RECOVERY_SCHEMA:
         raise DeploymentError("recovery_record_invalid", "unsupported recovery journal schema")
     status = payload.get("status")
-    if status not in {"intent_written", "switch_complete", "finalized", "rolled_back"}:
+    statuses = {
+        "intent_written",
+        "switch_complete",
+        "finalized",
+        "rollback_intent",
+        "rollback_switch_complete",
+        "rolled_back",
+    }
+    if status not in statuses:
         raise DeploymentError("recovery_record_invalid", "recovery journal has an invalid status")
     _validate_operation_id(payload.get("operation_id"), "recovery operation_id")
-    _validate_operation_id(payload.get("prepare_operation_id"), "recovery prepare_operation_id")
+    prepare_operation_id = _validate_operation_id(payload.get("prepare_operation_id"), "recovery prepare_operation_id")
     _timestamp(str(payload.get("created_at", "")), "recovery created_at")
     _timestamp(str(payload.get("updated_at", "")), "recovery updated_at")
     if status in {"switch_complete", "finalized"}:
         _timestamp(str(payload.get("switched_at", "")), "recovery switched_at")
+    if status in {"rollback_intent", "rollback_switch_complete", "rolled_back"}:
+        _timestamp(str(payload.get("rollback_started_at", "")), "recovery rollback_started_at")
+    if status in {"rollback_switch_complete", "rolled_back"}:
+        _timestamp(str(payload.get("rollback_switched_at", "")), "recovery rollback_switched_at")
     owner_repo = _validate_owner(str(payload.get("owner_repo", "")))
     source = payload.get("source")
     if not isinstance(source, dict) or source.get("dirty") is not False:
@@ -545,80 +1095,97 @@ def _validate_recovery_payload(payload: dict[str, Any], path: Path) -> None:
     source_root = _absolute_path(str(source.get("root", "")), "recovery source root")
     source_ref = _validate_commit(str(source.get("ref", "")), "recovery source ref")
     source_tree = _validate_commit(str(source.get("tree", "")), "recovery source tree")
-    if not isinstance(payload.get("destination"), str) or not isinstance(payload.get("release_root"), str):
-        raise DeploymentError("recovery_record_invalid", "recovery journal lacks destination roots")
-    destination = _absolute_path(payload["destination"], "recovery destination")
-    release_root = _absolute_path(payload["release_root"], "recovery release root")
+    destination = _absolute_path(str(payload.get("destination", "")), "recovery destination")
+    release_root = _absolute_path(str(payload.get("release_root", "")), "recovery release root")
     activated_release = _absolute_path(str(payload.get("activated_release", "")), "recovery activated release")
     try:
         activated_release.relative_to(release_root.resolve(strict=False))
     except ValueError as exc:
         raise DeploymentError("recovery_record_invalid", "recovery activated release is unmanaged") from exc
+    release_seal = payload.get("release_seal")
+    if not isinstance(release_seal, dict):
+        raise DeploymentError("recovery_record_invalid", "recovery journal lacks release seal")
+    _verify_recorded_release(activated_release, source_ref, source_tree, label="activated_release", seal=release_seal)
     predecessor = payload.get("predecessor")
     if not isinstance(predecessor, dict):
         raise DeploymentError("recovery_record_invalid", "recovery journal lacks predecessor snapshot")
     _validate_recorded_snapshot(predecessor, release_root, label="predecessor")
-    prepare_receipt = payload.get("prepare_receipt")
+    prepare_receipt = _validate_receipt_path_reference(payload.get("prepare_receipt"), "recovery prepare receipt")
+    expected_prepare_path = path.parent / f"prepare-{prepare_operation_id}.json"
+    if Path(prepare_receipt["path"]) != expected_prepare_path:
+        raise DeploymentError("recovery_record_invalid", "recovery prepare receipt is not deterministic")
+    prepare_payload, _ = _load_prepare_receipt(expected_prepare_path)
+    if prepare_payload.get("receipt_digest") != prepare_receipt.get("sha256"):
+        raise DeploymentError("recovery_record_invalid", "recovery prepare receipt digest does not match")
     if (
-        not isinstance(prepare_receipt, dict)
-        or not isinstance(prepare_receipt.get("path"), str)
-        or not isinstance(prepare_receipt.get("sha256"), str)
-        or not re.fullmatch(r"[0-9a-f]{64}", prepare_receipt["sha256"])
+        prepare_payload.get("operation_id") != prepare_operation_id
+        or prepare_payload.get("owner_repo") != owner_repo
+        or prepare_payload.get("source") != source
+        or prepare_payload.get("destination") != os.fspath(destination)
+        or prepare_payload.get("release_root") != os.fspath(release_root)
+        or prepare_payload.get("release_path") != os.fspath(activated_release)
+        or prepare_payload.get("release_seal") != release_seal
+        or prepare_payload.get("predecessor") != predecessor
+        or prepare_payload.get("admission") != payload.get("admission")
     ):
-        raise DeploymentError("recovery_record_invalid", "recovery journal lacks prepare receipt binding")
-    _absolute_path(prepare_receipt["path"], "recovery prepare receipt")
-    admission = payload.get("admission")
-    if not isinstance(admission, dict):
-        raise DeploymentError("recovery_record_invalid", "recovery journal lacks admission binding")
-    for key in ("path", "sha256", "admission_id", "authority_ceiling"):
-        if not isinstance(admission.get(key), str) or not admission[key]:
-            raise DeploymentError("recovery_record_invalid", f"recovery admission lacks {key}")
-    if not re.fullmatch(r"[0-9a-f]{64}", admission["sha256"]):
-        raise DeploymentError("recovery_record_invalid", "recovery admission digest is invalid")
-    _absolute_path(admission["path"], "recovery admission path")
-    if admission["authority_ceiling"] not in ALLOWED_AUTHORITY_CEILINGS:
-        raise DeploymentError("recovery_record_invalid", "recovery admission authority is invalid")
+        raise DeploymentError("recovery_record_invalid", "recovery journal is not bound to its prepare receipt")
+    admission = _validate_admission_binding(payload.get("admission"), "recovery admission")
+    admission_payload, admission_raw = _load_json(Path(admission["path"]), "recovery admission receipt")
+    if _digest_bytes(admission_raw) != admission["sha256"]:
+        raise DeploymentError("recovery_record_invalid", "recovery admission digest does not match receipt")
+    if admission_payload.get("admission_id") != admission["admission_id"]:
+        raise DeploymentError("recovery_record_invalid", "recovery admission identity does not match receipt")
     atomicity = payload.get("atomicity")
-    if not isinstance(atomicity, dict) or atomicity.get("same_filesystem") is not True:
+    if (
+        not isinstance(atomicity, dict)
+        or atomicity.get("same_filesystem") is not True
+        or atomicity.get("switch") != "relative-symlink-os-replace"
+        or atomicity.get("journal") != "durable-before-switch"
+    ):
         raise DeploymentError("recovery_record_invalid", "recovery atomicity is not bound")
-    if atomicity.get("switch") != "relative-symlink-os-replace":
-        raise DeploymentError("recovery_record_invalid", "recovery switch is not atomic")
-    receipt_paths: dict[str, Path] = {}
+    if payload.get("claim_ceiling") != "source_activation_recovery_only_no_runtime_claim":
+        raise DeploymentError("recovery_record_invalid", "recovery claim ceiling is invalid")
     for key, prefix in (("activation_receipt_path", "activate"), ("rollback_receipt_path", "rollback")):
         if not isinstance(payload.get(key), str) or not Path(payload[key]).is_absolute():
             raise DeploymentError("recovery_record_invalid", f"recovery journal lacks {key}")
-        receipt_paths[key] = _absolute_path(payload[key], f"recovery {key}")
+        receipt_path = _absolute_path(payload[key], f"recovery {key}")
         expected_path = path.parent / f"{prefix}-{payload['operation_id']}.json"
-        if receipt_paths[key] != expected_path:
+        if receipt_path != expected_path:
             raise DeploymentError("recovery_record_invalid", f"recovery {key} is not deterministic")
-    if source_root == destination or not owner_repo:
-        raise DeploymentError("recovery_record_invalid", "recovery source and destination binding is invalid")
-    _validate_commit(source_ref, "recovery source ref")
-    _validate_commit(source_tree, "recovery source tree")
-    if path.name != f"activate-{payload['prepare_operation_id']}.recovery.json":
+    if path.name != f"activate-{prepare_operation_id}.recovery.json":
         raise DeploymentError("recovery_record_invalid", "recovery journal filename is not deterministic")
-    if status == "intent_written" and any(
-        key in payload for key in ("activation_receipt", "rollback_receipt")
-    ):
-        raise DeploymentError("recovery_record_invalid", "intent journal cannot contain completed receipt references")
-    for key, label in (("activation_receipt", "activation receipt"), ("rollback_receipt", "rollback receipt")):
-        if key in payload:
-            reference = payload[key]
-            if (
-                not isinstance(reference, dict)
-                or not isinstance(reference.get("path"), str)
-                or not isinstance(reference.get("sha256"), str)
-                or not re.fullmatch(r"[0-9a-f]{64}", reference["sha256"])
-            ):
-                raise DeploymentError("recovery_record_invalid", f"recovery {label} reference is invalid")
-            if _absolute_path(reference["path"], f"recovery {label} path") != receipt_paths[
-                "activation_receipt_path" if key == "activation_receipt" else "rollback_receipt_path"
-            ]:
-                raise DeploymentError("recovery_record_invalid", f"recovery {label} path is not bound")
-    if status == "finalized" and "activation_receipt" not in payload:
-        raise DeploymentError("recovery_record_invalid", "finalized recovery lacks activation receipt")
-    if status == "rolled_back" and "rollback_receipt" not in payload:
-        raise DeploymentError("recovery_record_invalid", "rolled-back recovery lacks rollback receipt")
+    if payload.get("binding_sha256") != _recovery_binding_digest(payload):
+        raise DeploymentError("recovery_record_invalid", "recovery journal binding digest is not self-consistent")
+    if status in {"switch_complete", "finalized", "rollback_intent", "rollback_switch_complete", "rolled_back"}:
+        state_digest = payload.get("switch_complete_sha256")
+        if not isinstance(state_digest, str) or not re.fullmatch(r"[0-9a-f]{64}", state_digest):
+            raise DeploymentError("recovery_record_invalid", "recovery journal lacks switch state digest")
+        if state_digest != _recovery_state_digest(payload, "switch_complete"):
+            raise DeploymentError("recovery_record_invalid", "recovery switch state digest is invalid")
+    if status in {"rollback_switch_complete", "rolled_back"}:
+        rollback_state_digest = payload.get("rollback_switch_complete_sha256")
+        if not isinstance(rollback_state_digest, str) or not re.fullmatch(r"[0-9a-f]{64}", rollback_state_digest):
+            raise DeploymentError("recovery_record_invalid", "recovery journal lacks rollback state digest")
+        if rollback_state_digest != _recovery_state_digest(payload, "rollback_switch_complete"):
+            raise DeploymentError("recovery_record_invalid", "recovery rollback state digest is invalid")
+    activation_keys = "activation_receipt" in payload
+    rollback_keys = "rollback_receipt" in payload
+    if status in {"intent_written", "switch_complete", "rollback_intent", "rollback_switch_complete"} and (activation_keys or rollback_keys):
+        raise DeploymentError("recovery_record_invalid", f"{status} journal cannot contain completed receipt references")
+    activation_path = _absolute_path(payload["activation_receipt_path"], "recovery activation receipt")
+    rollback_path = _absolute_path(payload["rollback_receipt_path"], "recovery rollback receipt")
+    if status == "finalized":
+        if not activation_keys or rollback_keys:
+            raise DeploymentError("recovery_record_invalid", "finalized journal has an incompatible receipt state")
+        activation = _load_activation_receipt(activation_path)
+        _validate_completed_receipt_reference(payload["activation_receipt"], activation_path, activation, label="activation receipt")
+        _validate_activation_against_journal(activation, activation_path, payload, require_current=True)
+    if status == "rolled_back":
+        if not rollback_keys or activation_keys:
+            raise DeploymentError("recovery_record_invalid", "rolled-back journal has an incompatible receipt state")
+        rollback_payload = _load_rollback_receipt(rollback_path)
+        _validate_completed_receipt_reference(payload["rollback_receipt"], rollback_path, rollback_payload, label="rollback receipt")
+        _validate_rollback_against_journal(rollback_payload, rollback_path, payload, require_current=True)
 
 
 def _load_recovery_journal(path: Path) -> dict[str, Any]:
@@ -627,7 +1194,33 @@ def _load_recovery_journal(path: Path) -> dict[str, Any]:
     return payload
 
 
-def _clone_release(source_root: Path, release_root: Path, owner_repo: str, source_ref: str, source_tree: str, operation_id: str) -> Path:
+def _remove_release(release_path: Path) -> None:
+    seal_path = _release_seal_path(release_path)
+    try:
+        seal_path.unlink(missing_ok=True)
+    except OSError:
+        pass
+    if release_path.exists() or release_path.is_symlink():
+        try:
+            for path in _release_entries(release_path):
+                mode = stat.S_IMODE(os.lstat(path).st_mode)
+                os.chmod(path, mode | 0o222)
+            if release_path.exists() and not release_path.is_symlink():
+                mode = stat.S_IMODE(os.lstat(release_path).st_mode)
+                os.chmod(release_path, mode | 0o222)
+            shutil.rmtree(release_path, ignore_errors=True)
+        except OSError:
+            pass
+
+
+def _clone_release(
+    source_root: Path,
+    release_root: Path,
+    owner_repo: str,
+    source_ref: str,
+    source_tree: str,
+    operation_id: str,
+) -> tuple[Path, dict[str, str]]:
     release_root.mkdir(parents=True, exist_ok=True)
     staging = release_root.parent / f".{owner_repo}-{operation_id}-staging"
     final = release_root / f"{source_ref}-{source_tree[:12]}-{operation_id}"
@@ -654,15 +1247,18 @@ def _clone_release(source_root: Path, release_root: Path, owner_repo: str, sourc
         _verify_clean_identity(staging, source_ref, source_tree)
         os.replace(staging, final)
         _fsync_directory(release_root)
+        seal = _seal_release(final, source_ref, source_tree)
     except DeploymentError:
         if staging.exists() or os.path.islink(staging):
             shutil.rmtree(staging, ignore_errors=True)
+        _remove_release(final)
         raise
     except OSError as exc:
         if staging.exists() or os.path.islink(staging):
             shutil.rmtree(staging, ignore_errors=True)
+        _remove_release(final)
         raise DeploymentError("release_stage_failed", f"{release_root}: {exc}") from exc
-    return final
+    return final, seal
 
 
 def prepare(args: argparse.Namespace) -> dict[str, Any]:
@@ -721,7 +1317,7 @@ def prepare(args: argparse.Namespace) -> dict[str, Any]:
             receipt_dir=receipt_dir,
             admission_receipt=admission_receipt,
         )
-        release_path = _clone_release(
+        release_path, release_seal = _clone_release(
             source_root,
             release_root,
             owner_repo,
@@ -743,6 +1339,7 @@ def prepare(args: argparse.Namespace) -> dict[str, Any]:
             "destination": os.fspath(destination),
             "release_root": os.fspath(release_root),
             "release_path": os.fspath(release_path),
+            "release_seal": release_seal,
             "predecessor": predecessor,
             "admission": {
                 "path": os.fspath(admission_receipt),
@@ -794,6 +1391,17 @@ def _load_prepare_receipt(path: Path) -> tuple[dict[str, Any], Path]:
     if not isinstance(predecessor, dict):
         raise DeploymentError("prepare_receipt_invalid", "prepare receipt lacks predecessor snapshot")
     _validate_recorded_snapshot(predecessor, release_root, label="predecessor")
+    release_seal = payload.get("release_seal")
+    if not isinstance(release_seal, dict):
+        raise DeploymentError("prepare_receipt_invalid", "prepare receipt lacks release seal")
+    source = payload["source"]
+    _verify_recorded_release(
+        release_path,
+        str(source["ref"]),
+        str(source["tree"]),
+        label="prepared_release",
+        seal=release_seal,
+    )
     admission = payload.get("admission")
     if not isinstance(admission, dict):
         raise DeploymentError("prepare_receipt_invalid", "prepare receipt lacks admission binding")
@@ -867,7 +1475,7 @@ def _new_recovery_payload(
     activation_receipt_path = journal_path.with_name(f"activate-{operation_id}.json")
     rollback_receipt_path = journal_path.with_name(f"rollback-{operation_id}.json")
     now = _iso(_utc_now())
-    return {
+    payload = {
         "schema_version": RECOVERY_SCHEMA,
         "status": "intent_written",
         "operation_id": operation_id,
@@ -888,6 +1496,7 @@ def _new_recovery_payload(
         "destination": os.fspath(destination),
         "release_root": os.fspath(release_root),
         "activated_release": os.fspath(release_path),
+        "release_seal": prepare_payload["release_seal"],
         "predecessor": predecessor,
         "admission": admission,
         "activation_receipt_path": os.fspath(activation_receipt_path),
@@ -899,6 +1508,43 @@ def _new_recovery_payload(
         },
         "claim_ceiling": "source_activation_recovery_only_no_runtime_claim",
     }
+    payload["binding_sha256"] = _recovery_binding_digest(payload)
+    return payload
+
+
+def _switch_complete_payload(journal: dict[str, Any]) -> dict[str, Any]:
+    payload = dict(journal)
+    payload["status"] = "switch_complete"
+    payload["updated_at"] = _iso(_utc_now())
+    payload["switched_at"] = payload.get("switched_at") or _iso(_utc_now())
+    payload["switch_complete_sha256"] = _recovery_state_digest(payload, "switch_complete")
+    return payload
+
+
+def _rollback_intent_payload(journal: dict[str, Any]) -> dict[str, Any]:
+    payload = dict(journal)
+    payload.pop("activation_receipt", None)
+    payload.pop("rollback_receipt", None)
+    payload["status"] = "rollback_intent"
+    payload["updated_at"] = _iso(_utc_now())
+    payload["rollback_started_at"] = payload.get("rollback_started_at") or _iso(_utc_now())
+    if "switch_complete_sha256" not in payload:
+        payload["switch_complete_sha256"] = _recovery_state_digest(payload, "switch_complete")
+    return payload
+
+
+def _rollback_switch_complete_payload(journal: dict[str, Any]) -> dict[str, Any]:
+    payload = dict(journal)
+    payload.pop("activation_receipt", None)
+    payload.pop("rollback_receipt", None)
+    payload["status"] = "rollback_switch_complete"
+    payload["updated_at"] = _iso(_utc_now())
+    payload["rollback_started_at"] = payload.get("rollback_started_at") or _iso(_utc_now())
+    payload["rollback_switched_at"] = payload.get("rollback_switched_at") or _iso(_utc_now())
+    if "switch_complete_sha256" not in payload:
+        payload["switch_complete_sha256"] = _recovery_state_digest(payload, "switch_complete")
+    payload["rollback_switch_complete_sha256"] = _recovery_state_digest(payload, "rollback_switch_complete")
+    return payload
 
 
 def _activation_payload(
@@ -916,12 +1562,13 @@ def _activation_payload(
     predecessor: dict[str, Any],
     admission: dict[str, Any],
     recovery_path: Path,
-    recovery_digest: str,
+    recovery_payload: dict[str, Any],
 ) -> dict[str, Any]:
     return {
         "schema_version": ACTIVATE_SCHEMA,
         "status": "activated",
         "operation_id": operation_id,
+        "prepare_operation_id": prepare_payload["operation_id"],
         "activated_at": _iso(_utc_now()),
         "owner_repo": owner_repo,
         "prepare_receipt": {
@@ -937,12 +1584,14 @@ def _activation_payload(
         "destination": os.fspath(destination),
         "release_root": os.fspath(release_root),
         "activated_release": os.fspath(release_path),
+        "release_seal": prepare_payload["release_seal"],
         "predecessor": predecessor,
         "admission": admission,
-        "recovery_journal": {
-            "path": os.fspath(recovery_path),
-            "sha256": recovery_digest,
-        },
+        "recovery_journal": _recovery_journal_reference(
+            recovery_path,
+            recovery_payload,
+            status="switch_complete",
+        ),
         "atomicity": {
             "same_filesystem": True,
             "switch": "relative-symlink-os-replace",
@@ -970,7 +1619,7 @@ def activate(args: argparse.Namespace) -> dict[str, Any]:
         fresh_payload, _ = _load_prepare_receipt(prepare_path)
         if fresh_payload["receipt_digest"] != payload["receipt_digest"]:
             raise DeploymentError("prepare_receipt_changed", "prepare receipt changed after it was read")
-        current = _snapshot_destination(destination, release_root)
+        current = _snapshot_destination(destination, release_root, strict_seal=False)
         expected = payload.get("predecessor")
         if not isinstance(expected, dict) or not _same_snapshot(current, expected):
             raise DeploymentError("concurrent_deployment", "destination changed after prepare")
@@ -988,7 +1637,13 @@ def activate(args: argparse.Namespace) -> dict[str, Any]:
             raise DeploymentError("admission_changed", "admission identity changed after prepare")
         if admission_digest != admission.get("sha256"):
             raise DeploymentError("admission_changed", "admission receipt digest changed after prepare")
-        _verify_clean_identity(release_path, source_ref, source_tree)
+        _verify_recorded_release(
+            release_path,
+            source_ref,
+            source_tree,
+            label="activated_release",
+            seal=payload["release_seal"],
+        )
         recovery_path = _recovery_journal_path(prepare_path.parent, payload["operation_id"])
         if os.path.lexists(recovery_path):
             raise DeploymentError(
@@ -1019,11 +1674,23 @@ def activate(args: argparse.Namespace) -> dict[str, Any]:
                 raise _recovery_required(recovery_path, exc) from exc
             raise
         try:
+            pre_switch_current = _snapshot_destination(destination, release_root, strict_seal=False)
+            if not _same_snapshot(pre_switch_current, expected):
+                raise DeploymentError("concurrent_deployment", "destination changed immediately before switch")
+            _verify_recorded_release(
+                release_path,
+                source_ref,
+                source_tree,
+                label="activated_release",
+                seal=payload["release_seal"],
+            )
             target_link = os.path.relpath(release_path, destination.parent)
             temporary = destination.parent / f".{destination.name}.{uuid.uuid4().hex}.switch"
             os.symlink(target_link, temporary)
             os.replace(temporary, destination)
             _fsync_directory(destination.parent)
+        except DeploymentError as exc:
+            raise _recovery_required(recovery_path, exc) from exc
         except OSError as exc:
             try:
                 temporary.unlink(missing_ok=True)  # type: ignore[union-attr]
@@ -1033,8 +1700,7 @@ def activate(args: argparse.Namespace) -> dict[str, Any]:
                 recovery_path,
                 DeploymentError("atomic_switch_failed", f"{destination}: {exc}"),
             ) from exc
-        journal_payload = dict(journal)
-        journal_payload.update({"status": "switch_complete", "updated_at": _iso(_utc_now()), "switched_at": _iso(_utc_now())})
+        journal_payload = _switch_complete_payload(journal)
         try:
             journal = _write_json(recovery_path, journal_payload)
         except DeploymentError as exc:
@@ -1053,7 +1719,7 @@ def activate(args: argparse.Namespace) -> dict[str, Any]:
             predecessor=expected,
             admission=admission,
             recovery_path=recovery_path,
-            recovery_digest=journal["receipt_digest"],
+            recovery_payload=journal,
         )
         receipt_dir = prepare_path.parent
         receipt_path = receipt_dir / f"activate-{activation_operation_id}.json"
@@ -1061,89 +1727,30 @@ def activate(args: argparse.Namespace) -> dict[str, Any]:
             receipt = _write_json(receipt_path, payload_out)
         except DeploymentError as exc:
             raise _recovery_required(recovery_path, exc) from exc
-        final_journal = dict(journal)
+        final_journal = {key: value for key, value in journal.items() if key != "_recovery_path"}
         final_journal.update(
             {
                 "status": "finalized",
                 "updated_at": _iso(_utc_now()),
-                "activation_receipt": _recovery_reference(receipt_path, receipt),
+                "activation_receipt": _completed_receipt_reference(receipt_path, receipt),
             }
         )
         try:
             _write_json(recovery_path, final_journal)
-        except DeploymentError:
-            # The activation receipt is already complete.  The journal remains
-            # durable and can be finalized idempotently by `recover`.
-            pass
+        except DeploymentError as exc:
+            raise _recovery_required(recovery_path, exc) from exc
         return {"receipt_path": os.fspath(receipt_path), **receipt}
 
 
 def _load_activation_receipt(path: Path) -> dict[str, Any]:
     payload, _ = _load_json(path, "activation receipt")
-    _verify_receipt_digest(payload, "activation receipt")
-    if payload.get("schema_version") != ACTIVATE_SCHEMA or payload.get("status") != "activated":
-        raise DeploymentError("activation_receipt_invalid", "activation receipt is not rollback-capable")
-    _validate_operation_id(payload.get("operation_id"), "activation operation_id")
-    owner_repo = _validate_owner(str(payload.get("owner_repo", "")))
-    source = payload.get("source")
-    if not isinstance(source, dict) or source.get("dirty") is not False:
-        raise DeploymentError("activation_receipt_invalid", "activation source is not cleanly bound")
-    _absolute_path(str(source.get("root", "")), "activation source root")
-    source_ref = _validate_commit(str(source.get("ref", "")), "activation source ref")
-    source_tree = _validate_commit(str(source.get("tree", "")), "activation source tree")
-    _absolute_path(str(payload.get("destination", "")), "activation destination")
-    release_root = _absolute_path(str(payload.get("release_root", "")), "activation release root")
-    activated_release = _absolute_path(str(payload.get("activated_release", "")), "activated release")
-    try:
-        activated_release.relative_to(release_root.resolve(strict=False))
-    except ValueError as exc:
-        raise DeploymentError("activation_receipt_invalid", "activated release is unmanaged") from exc
-    _validate_recorded_snapshot(
-        {"kind": "symlink", "link_text": "recorded", "target": os.fspath(activated_release), "source_ref": source_ref, "source_tree": source_tree},
-        release_root,
-        label="activated_release",
-    )
-    predecessor = payload.get("predecessor")
-    if not isinstance(predecessor, dict):
-        raise DeploymentError("activation_receipt_invalid", "activation receipt lacks predecessor snapshot")
-    _validate_recorded_snapshot(predecessor, release_root, label="predecessor")
-    prepare_receipt = payload.get("prepare_receipt")
-    if (
-        not isinstance(prepare_receipt, dict)
-        or not isinstance(prepare_receipt.get("path"), str)
-        or not isinstance(prepare_receipt.get("sha256"), str)
-        or not re.fullmatch(r"[0-9a-f]{64}", prepare_receipt["sha256"])
-    ):
-        raise DeploymentError("activation_receipt_invalid", "activation prepare receipt binding is invalid")
-    admission = payload.get("admission")
-    if not isinstance(admission, dict):
-        raise DeploymentError("activation_receipt_invalid", "activation receipt lacks admission binding")
-    for key in ("path", "sha256", "admission_id", "authority_ceiling"):
-        if not isinstance(admission.get(key), str) or not admission[key]:
-            raise DeploymentError("activation_receipt_invalid", f"activation admission lacks {key}")
-    if not re.fullmatch(r"[0-9a-f]{64}", admission["sha256"]):
-        raise DeploymentError("activation_receipt_invalid", "activation admission digest is invalid")
-    recovery = payload.get("recovery_journal")
-    if (
-        not isinstance(recovery, dict)
-        or not isinstance(recovery.get("path"), str)
-        or not isinstance(recovery.get("sha256"), str)
-        or not Path(recovery["path"]).is_absolute()
-        or not re.fullmatch(r"[0-9a-f]{64}", recovery["sha256"])
-    ):
-        raise DeploymentError("activation_receipt_invalid", "activation recovery journal binding is invalid")
-    atomicity = payload.get("atomicity")
-    if (
-        not isinstance(atomicity, dict)
-        or atomicity.get("same_filesystem") is not True
-        or atomicity.get("switch") != "relative-symlink-os-replace"
-        or atomicity.get("journal") != "durable-before-switch"
-    ):
-        raise DeploymentError("activation_receipt_invalid", "activation atomicity is not bound")
-    if payload.get("claim_ceiling") != "source_activation_only_no_runtime_claim":
-        raise DeploymentError("activation_receipt_invalid", "activation claim ceiling is invalid")
-    if owner_repo != str(payload.get("owner_repo")):
-        raise DeploymentError("activation_receipt_invalid", "activation owner binding is invalid")
+    _validate_activation_receipt_payload(payload, path)
+    return payload
+
+
+def _load_rollback_receipt(path: Path) -> dict[str, Any]:
+    payload, _ = _load_json(path, "rollback receipt")
+    _validate_rollback_receipt_payload(payload, path)
     return payload
 
 
@@ -1173,97 +1780,130 @@ def _restore_predecessor(destination: Path, predecessor: dict[str, Any], release
     return os.fspath(target)
 
 
+def _rollback_payload(
+    *,
+    journal: dict[str, Any],
+    recovery_path: Path,
+    activation_reference: dict[str, Any],
+    restored_target: str | None,
+) -> dict[str, Any]:
+    predecessor = journal["predecessor"]
+    return {
+        "schema_version": ROLLBACK_SCHEMA,
+        "status": "rolled_back",
+        "operation_id": journal["operation_id"],
+        "prepare_operation_id": journal["prepare_operation_id"],
+        "rolled_back_at": _iso(_utc_now()),
+        "owner_repo": journal["owner_repo"],
+        "activation_receipt": activation_reference,
+        "prepare_receipt": journal["prepare_receipt"],
+        "source": journal["source"],
+        "destination": journal["destination"],
+        "release_root": journal["release_root"],
+        "removed_activation": journal["activated_release"],
+        "release_seal": journal["release_seal"],
+        "restored_predecessor": predecessor,
+        "restored_target": restored_target,
+        "admission": journal["admission"],
+        "recovery_journal": _recovery_journal_reference(
+            recovery_path,
+            journal,
+            status="rollback_switch_complete",
+        ),
+        "atomicity": {
+            "same_filesystem": True,
+            "switch": "relative-symlink-os-replace",
+            "destination_identity_checked": True,
+            "predecessor_identity_checked": True,
+        },
+        "dependency_posture": "source_only_no_install",
+        "effects": ["destination_symlink_restored" if restored_target else "destination_removed"],
+        "claim_ceiling": "source_activation_rollback_only_no_runtime_claim",
+    }
+
+
 def rollback(args: argparse.Namespace) -> dict[str, Any]:
     activation_path = _existing_path(args.activation_receipt, "activation receipt")
     activation = _load_activation_receipt(activation_path)
-    owner_repo = _validate_owner(str(activation.get("owner_repo", "")))
-    destination = _absolute_path(str(activation.get("destination", "")), "activation destination")
-    release_root = _absolute_path(str(activation.get("release_root", "")), "activation release root")
-    activated_release = _absolute_path(str(activation.get("activated_release", "")), "activated release")
-    source = activation.get("source")
-    if not isinstance(source, dict):
-        raise DeploymentError("activation_receipt_invalid", "activation receipt lacks source identity")
-    source_ref = _validate_commit(str(source.get("ref", "")), "activation source ref")
-    source_tree = _validate_commit(str(source.get("tree", "")), "activation source tree")
-    predecessor = activation.get("predecessor")
-    if not isinstance(predecessor, dict):
-        raise DeploymentError("activation_receipt_invalid", "activation receipt lacks predecessor identity")
+    recovery_reference = activation.get("recovery_journal")
+    if not isinstance(recovery_reference, dict) or not isinstance(recovery_reference.get("path"), str):
+        raise DeploymentError("activation_receipt_invalid", "activation receipt lacks recovery journal path")
+    recovery_path = _absolute_path(recovery_reference["path"], "activation recovery journal")
+    journal = _load_recovery_journal(recovery_path)
+    journal["_recovery_path"] = os.fspath(recovery_path)
+    if journal.get("status") in {"rollback_intent", "rollback_switch_complete", "rolled_back"}:
+        raise DeploymentError("recovery_pending", "activation journal is already in rollback recovery")
+    _validate_activation_against_journal(activation, activation_path, journal, require_current=False)
+    owner_repo = _validate_owner(str(journal["owner_repo"]))
+    release_root = _absolute_path(journal["release_root"], "activation release root")
+    destination = _absolute_path(journal["destination"], "activation destination")
     lock_path = _lock_path(release_root, owner_repo)
     with _deployment_lock(lock_path):
+        fresh = _load_recovery_journal(recovery_path)
+        fresh["_recovery_path"] = os.fspath(recovery_path)
+        if fresh.get("status") in {"rollback_intent", "rollback_switch_complete", "rolled_back"}:
+            raise DeploymentError("recovery_pending", "activation journal is already in rollback recovery")
         fresh_activation = _load_activation_receipt(activation_path)
-        if fresh_activation.get("receipt_digest") != activation.get("receipt_digest"):
-            raise DeploymentError("activation_receipt_changed", "activation receipt changed after it was read")
-        current = _snapshot_destination(destination, release_root)
-        expected_current = {
-            "kind": "symlink",
-            "target": os.fspath(activated_release.resolve(strict=False)),
-            "source_ref": source_ref,
-            "source_tree": source_tree,
-        }
-        if current.get("kind") != "symlink" or current.get("target") != expected_current["target"]:
-            raise DeploymentError("concurrent_deployment", "destination no longer points to activated release")
-        if not _same_snapshot(current, expected_current):
-            raise DeploymentError("concurrent_deployment", "activated release identity changed before rollback")
-        _verify_recorded_release(
-            activated_release,
-            source_ref,
-            source_tree,
-            label="activated_release",
+        _validate_activation_against_journal(fresh_activation, activation_path, fresh, require_current=True)
+        intent = _rollback_intent_payload(fresh)
+        try:
+            journal = _write_json(recovery_path, intent)
+        except DeploymentError as exc:
+            raise _recovery_required(recovery_path, exc) from exc
+        journal["_recovery_path"] = os.fspath(recovery_path)
+        try:
+            current = _snapshot_destination(destination, release_root)
+            if not _same_snapshot(current, _recovery_target_snapshot(journal)):
+                raise DeploymentError("concurrent_deployment", "destination changed before rollback switch")
+            source = journal["source"]
+            _verify_recorded_release(
+                _absolute_path(journal["activated_release"], "activated release"),
+                source["ref"],
+                source["tree"],
+                label="activated_release",
+                seal=journal["release_seal"],
+            )
+            _validate_recorded_snapshot(journal["predecessor"], release_root, label="predecessor")
+            restored = _restore_predecessor(destination, journal["predecessor"], release_root)
+        except DeploymentError as exc:
+            raise _recovery_required(recovery_path, exc) from exc
+        except OSError as exc:
+            raise _recovery_required(
+                recovery_path,
+                DeploymentError("rollback_switch_failed", f"{destination}: {exc}"),
+            ) from exc
+        try:
+            journal = _write_json(recovery_path, _rollback_switch_complete_payload(journal))
+        except DeploymentError as exc:
+            raise _recovery_required(recovery_path, exc) from exc
+        journal["_recovery_path"] = os.fspath(recovery_path)
+        activation_reference = _completed_receipt_reference(activation_path, fresh_activation)
+        receipt_dir = _absolute_path(args.receipt_dir, "receipt_dir") if args.receipt_dir else activation_path.parent
+        receipt_path = receipt_dir / f"rollback-{journal['operation_id']}.json"
+        rollback_payload = _rollback_payload(
+            journal=journal,
+            recovery_path=recovery_path,
+            activation_reference=activation_reference,
+            restored_target=restored,
         )
-        _validate_recorded_snapshot(predecessor, release_root, label="predecessor")
-        restored = _restore_predecessor(destination, predecessor, release_root)
-        payload = {
-            "schema_version": ROLLBACK_SCHEMA,
-            "status": "rolled_back",
-            "operation_id": uuid.uuid4().hex,
-            "rolled_back_at": _iso(_utc_now()),
-            "owner_repo": owner_repo,
-            "activation_receipt": {
-                "path": os.fspath(activation_path),
-                "sha256": activation["receipt_digest"],
-            },
-            "destination": os.fspath(destination),
-            "release_root": os.fspath(release_root),
-            "removed_activation": os.fspath(activated_release),
-            "restored_predecessor": predecessor,
-            "restored_target": restored,
-            "recovery_journal": activation["recovery_journal"],
-            "atomicity": {
-                "same_filesystem": True,
-                "switch": "relative-symlink-os-replace",
-                "destination_identity_checked": True,
-                "predecessor_identity_checked": True,
-            },
-            "dependency_posture": "source_only_no_install",
-            "effects": ["destination_symlink_restored" if restored else "destination_removed"],
-            "claim_ceiling": "source_activation_rollback_only_no_runtime_claim",
-        }
-        receipt_dir = (
-            _absolute_path(args.receipt_dir, "receipt_dir")
-            if args.receipt_dir
-            else activation_path.parent
+        try:
+            receipt = _write_json(receipt_path, rollback_payload)
+        except DeploymentError as exc:
+            raise _recovery_required(recovery_path, exc) from exc
+        final_journal = {key: value for key, value in journal.items() if key != "_recovery_path"}
+        final_journal.pop("activation_receipt", None)
+        final_journal.update(
+            {
+                "status": "rolled_back",
+                "updated_at": _iso(_utc_now()),
+                "rollback_receipt": _completed_receipt_reference(receipt_path, receipt),
+            }
         )
-        receipt_path = receipt_dir / f"rollback-{activation['operation_id']}.json"
-        receipt_out = _write_json(receipt_path, payload)
-        recovery_ref = activation.get("recovery_journal")
-        if isinstance(recovery_ref, dict) and isinstance(recovery_ref.get("path"), str):
-            recovery_path = Path(recovery_ref["path"])
-            if os.path.lexists(recovery_path):
-                try:
-                    journal = _load_recovery_journal(recovery_path)
-                    journal.update(
-                        {
-                            "status": "rolled_back",
-                            "updated_at": _iso(_utc_now()),
-                            "rollback_receipt": _recovery_reference(receipt_path, receipt_out),
-                        }
-                    )
-                    _write_json(recovery_path, journal)
-                except DeploymentError:
-                    # The rollback receipt itself is complete; keep the
-                    # durable journal for an explicit recovery retry.
-                    pass
-        return {"receipt_path": os.fspath(receipt_path), **receipt_out}
+        try:
+            _write_json(recovery_path, final_journal)
+        except DeploymentError as exc:
+            raise _recovery_required(recovery_path, exc) from exc
+        return {"receipt_path": os.fspath(receipt_path), **receipt}
 
 
 def _recovery_target_snapshot(journal: dict[str, Any]) -> dict[str, Any]:
@@ -1273,6 +1913,7 @@ def _recovery_target_snapshot(journal: dict[str, Any]) -> dict[str, Any]:
         "target": journal["activated_release"],
         "source_ref": source["ref"],
         "source_tree": source["tree"],
+        "release_seal": journal["release_seal"],
     }
 
 
@@ -1300,6 +1941,7 @@ def _recovery_activation_receipt(
         prepare_payload={
             "operation_id": journal["prepare_operation_id"],
             "receipt_digest": journal["prepare_receipt"]["sha256"],
+            "release_seal": journal["release_seal"],
         },
         prepare_path=Path(journal["prepare_receipt"]["path"]),
         owner_repo=owner_repo,
@@ -1312,40 +1954,35 @@ def _recovery_activation_receipt(
         predecessor=predecessor,
         admission=admission,
         recovery_path=recovery_path,
-        recovery_digest=journal["receipt_digest"],
+        recovery_payload=journal,
     )
 
 
 def _recover_finalize(recovery_path: Path) -> dict[str, Any]:
     journal = _load_recovery_journal(recovery_path)
     journal["_recovery_path"] = os.fspath(recovery_path)
+    if journal.get("status") in {"rollback_intent", "rollback_switch_complete", "rolled_back"}:
+        raise DeploymentError("recovery_already_rolled_back", "a rollback journal cannot be finalized")
     owner_repo, destination, release_root, activated_release, _, activation_path = _recovery_paths(journal)
     lock_path = _lock_path(release_root, owner_repo)
     with _deployment_lock(lock_path):
         fresh = _load_recovery_journal(recovery_path)
         fresh["_recovery_path"] = os.fspath(recovery_path)
-        if fresh.get("status") == "rolled_back":
-            raise DeploymentError("recovery_already_rolled_back", "a rolled-back journal cannot be finalized")
-        if os.path.lexists(activation_path):
+        if fresh.get("status") in {"rollback_intent", "rollback_switch_complete", "rolled_back"}:
+            raise DeploymentError("recovery_already_rolled_back", "a rollback journal cannot be finalized")
+        if fresh.get("status") == "finalized":
             activation = _load_activation_receipt(activation_path)
-            if activation.get("operation_id") != fresh.get("operation_id"):
-                raise DeploymentError("recovery_record_invalid", "activation receipt operation does not match journal")
-            finalized = {key: value for key, value in fresh.items() if key != "_recovery_path"}
-            finalized.update(
-                {
-                    "status": "finalized",
-                    "updated_at": _iso(_utc_now()),
-                    "activation_receipt": _recovery_reference(activation_path, activation),
-                }
-            )
-            try:
-                _write_json(recovery_path, finalized)
-            except DeploymentError:
-                pass
+            _validate_activation_against_journal(activation, activation_path, fresh, require_current=True)
             return {"receipt_path": os.fspath(activation_path), **activation}
+        if fresh.get("status") == "intent_written":
+            try:
+                fresh = _write_json(recovery_path, _switch_complete_payload(fresh))
+            except DeploymentError as exc:
+                raise _recovery_required(recovery_path, exc) from exc
+            fresh["_recovery_path"] = os.fspath(recovery_path)
         current = _snapshot_destination(destination, release_root)
         expected = _recovery_target_snapshot(fresh)
-        if not _same_snapshot(current, expected):
+        if not _same_snapshot(current, expected) or current.get("release_seal") != fresh.get("release_seal"):
             raise DeploymentError(
                 "recovery_state_unrecognized",
                 "destination is neither the recorded activated release nor a finalizable state",
@@ -1356,35 +1993,37 @@ def _recover_finalize(recovery_path: Path) -> dict[str, Any]:
             source["ref"],
             source["tree"],
             label="activated_release",
+            seal=fresh["release_seal"],
         )
-        payload = _recovery_activation_receipt(journal=fresh, recovery_path=recovery_path)
-        try:
-            receipt = _write_json(activation_path, payload)
-        except DeploymentError as exc:
-            raise _recovery_required(recovery_path, exc) from exc
+        if os.path.lexists(activation_path):
+            activation = _load_activation_receipt(activation_path)
+            _validate_activation_against_journal(activation, activation_path, fresh, require_current=True)
+        else:
+            activation = _recovery_activation_receipt(journal=fresh, recovery_path=recovery_path)
+            try:
+                activation = _write_json(activation_path, activation)
+            except DeploymentError as exc:
+                raise _recovery_required(recovery_path, exc) from exc
         finalized = {key: value for key, value in fresh.items() if key != "_recovery_path"}
         finalized.update(
             {
                 "status": "finalized",
                 "updated_at": _iso(_utc_now()),
-                "activation_receipt": _recovery_reference(activation_path, receipt),
+                "activation_receipt": _completed_receipt_reference(activation_path, activation),
             }
         )
         try:
             _write_json(recovery_path, finalized)
-        except DeploymentError:
-            pass
-        return {"receipt_path": os.fspath(activation_path), **receipt}
+        except DeploymentError as exc:
+            raise _recovery_required(recovery_path, exc) from exc
+        return {"receipt_path": os.fspath(activation_path), **activation}
 
 
 def _recovery_activation_reference(journal: dict[str, Any], activation_path: Path) -> dict[str, Any]:
     if os.path.lexists(activation_path):
         activation = _load_activation_receipt(activation_path)
-        return {
-            "path": os.fspath(activation_path),
-            "sha256": activation["receipt_digest"],
-            "status": "complete",
-        }
+        _validate_activation_against_journal(activation, activation_path, journal, require_current=False)
+        return _completed_receipt_reference(activation_path, activation)
     return {"path": os.fspath(activation_path), "status": "not_written"}
 
 
@@ -1393,86 +2032,98 @@ def _recover_rollback(recovery_path: Path) -> dict[str, Any]:
     journal["_recovery_path"] = os.fspath(recovery_path)
     owner_repo, destination, release_root, activated_release, _, activation_path = _recovery_paths(journal)
     rollback_path = _absolute_path(journal["rollback_receipt_path"], "recovery rollback receipt")
-    if journal.get("status") == "rolled_back" and os.path.lexists(rollback_path):
-        rollback_receipt = _load_json(rollback_path, "rollback receipt")[0]
-        _verify_receipt_digest(rollback_receipt, "rollback receipt")
+    if journal.get("status") == "rolled_back":
+        rollback_receipt = _load_rollback_receipt(rollback_path)
         return {"receipt_path": os.fspath(rollback_path), **rollback_receipt}
     lock_path = _lock_path(release_root, owner_repo)
     with _deployment_lock(lock_path):
         fresh = _load_recovery_journal(recovery_path)
         fresh["_recovery_path"] = os.fspath(recovery_path)
-        if fresh.get("status") == "rolled_back" and os.path.lexists(rollback_path):
-            rollback_receipt = _load_json(rollback_path, "rollback receipt")[0]
-            _verify_receipt_digest(rollback_receipt, "rollback receipt")
-            return {"receipt_path": os.fspath(rollback_path), **rollback_receipt}
         if fresh.get("status") == "rolled_back":
-            raise DeploymentError("recovery_record_invalid", "rolled-back journal lacks rollback receipt")
+            rollback_receipt = _load_rollback_receipt(rollback_path)
+            return {"receipt_path": os.fspath(rollback_path), **rollback_receipt}
+        if fresh.get("status") not in {
+            "intent_written",
+            "switch_complete",
+            "finalized",
+            "rollback_intent",
+            "rollback_switch_complete",
+        }:
+            raise DeploymentError("recovery_record_invalid", "recovery journal cannot be rolled back")
         current = _snapshot_destination(destination, release_root)
         expected_target = _recovery_target_snapshot(fresh)
         predecessor = fresh["predecessor"]
-        if _same_snapshot(current, expected_target):
-            source = fresh["source"]
-            _verify_recorded_release(
-                activated_release,
-                source["ref"],
-                source["tree"],
-                label="activated_release",
-            )
-            _validate_recorded_snapshot(predecessor, release_root, label="predecessor")
-            restored = _restore_predecessor(destination, predecessor, release_root)
-            identity_checked = True
-        elif _same_snapshot(current, predecessor):
-            _validate_recorded_snapshot(predecessor, release_root, label="predecessor")
-            restored = predecessor.get("target") if predecessor.get("kind") == "symlink" else None
-            identity_checked = True
-        else:
+        target_current = _same_snapshot(current, expected_target) and current.get("release_seal") == fresh.get("release_seal")
+        predecessor_current = _same_snapshot(current, predecessor)
+        if not target_current and not predecessor_current:
             raise DeploymentError(
                 "recovery_state_unrecognized",
                 "destination is neither the recorded activated release nor its predecessor",
             )
-        activation_ref = _recovery_activation_reference(fresh, activation_path)
-        payload = {
-            "schema_version": ROLLBACK_SCHEMA,
-            "status": "rolled_back",
-            "operation_id": fresh["operation_id"],
-            "rolled_back_at": _iso(_utc_now()),
-            "owner_repo": owner_repo,
-            "activation_receipt": activation_ref,
-            "recovery_journal": _recovery_reference(recovery_path, fresh),
-            "destination": os.fspath(destination),
-            "release_root": os.fspath(release_root),
-            "removed_activation": os.fspath(activated_release),
-            "restored_predecessor": predecessor,
-            "restored_target": restored,
-            "atomicity": {
-                "same_filesystem": True,
-                "switch": "relative-symlink-os-replace",
-                "destination_identity_checked": identity_checked,
-                "predecessor_identity_checked": True,
-            },
-            "dependency_posture": "source_only_no_install",
-            "effects": [
-                "destination_symlink_restored"
-                if _same_snapshot(current, expected_target) and restored
-                else "destination_removed"
-                if _same_snapshot(current, expected_target)
-                else "destination_unchanged"
-            ],
-            "claim_ceiling": "source_activation_rollback_only_no_runtime_claim",
-        }
-        receipt = _write_json(rollback_path, payload)
-        finalized = {key: value for key, value in fresh.items() if key != "_recovery_path"}
-        finalized.update(
+        if fresh.get("status") == "rollback_switch_complete" and target_current:
+            raise DeploymentError(
+                "recovery_state_unrecognized",
+                "rollback-switch-complete journal points at the activated release",
+            )
+        if fresh.get("status") not in {"rollback_intent", "rollback_switch_complete"}:
+            try:
+                fresh = _write_json(recovery_path, _rollback_intent_payload(fresh))
+            except DeploymentError as exc:
+                raise _recovery_required(recovery_path, exc) from exc
+            fresh["_recovery_path"] = os.fspath(recovery_path)
+        restored: str | None
+        if target_current:
+            source = fresh["source"]
+            try:
+                _verify_recorded_release(
+                    activated_release,
+                    source["ref"],
+                    source["tree"],
+                    label="activated_release",
+                    seal=fresh["release_seal"],
+                )
+                _validate_recorded_snapshot(predecessor, release_root, label="predecessor")
+                restored = _restore_predecessor(destination, predecessor, release_root)
+            except DeploymentError as exc:
+                raise _recovery_required(recovery_path, exc) from exc
+            except OSError as exc:
+                raise _recovery_required(
+                    recovery_path,
+                    DeploymentError("rollback_switch_failed", f"{destination}: {exc}"),
+                ) from exc
+        else:
+            _validate_recorded_snapshot(predecessor, release_root, label="predecessor")
+            restored = predecessor.get("target") if predecessor.get("kind") == "symlink" else None
+        if fresh.get("status") != "rollback_switch_complete":
+            try:
+                fresh = _write_json(recovery_path, _rollback_switch_complete_payload(fresh))
+            except DeploymentError as exc:
+                raise _recovery_required(recovery_path, exc) from exc
+            fresh["_recovery_path"] = os.fspath(recovery_path)
+        activation_reference = _recovery_activation_reference(fresh, activation_path)
+        rollback_payload = _rollback_payload(
+            journal=fresh,
+            recovery_path=recovery_path,
+            activation_reference=activation_reference,
+            restored_target=restored,
+        )
+        try:
+            receipt = _write_json(rollback_path, rollback_payload)
+        except DeploymentError as exc:
+            raise _recovery_required(recovery_path, exc) from exc
+        final_journal = {key: value for key, value in fresh.items() if key != "_recovery_path"}
+        final_journal.pop("activation_receipt", None)
+        final_journal.update(
             {
                 "status": "rolled_back",
                 "updated_at": _iso(_utc_now()),
-                "rollback_receipt": _recovery_reference(rollback_path, receipt),
+                "rollback_receipt": _completed_receipt_reference(rollback_path, receipt),
             }
         )
         try:
-            _write_json(recovery_path, finalized)
-        except DeploymentError:
-            pass
+            _write_json(recovery_path, final_journal)
+        except DeploymentError as exc:
+            raise _recovery_required(recovery_path, exc) from exc
         return {"receipt_path": os.fspath(rollback_path), **receipt}
 
 

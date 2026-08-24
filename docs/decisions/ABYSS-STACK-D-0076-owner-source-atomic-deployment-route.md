@@ -47,11 +47,16 @@ Choose option 3.
 non-alternating Git clone for an exact clean commit/tree under a versioned
 release identity. It refuses dirty source or destination state, stale or mismatched
 admission, incomplete staging, cross-device paths, concurrent deployment, and
-predecessor or activated-release ref/tree/clean drift. Ignored cache content is
-outside the source identity and is excluded from the self-contained clone;
-tracked and non-ignored untracked content remains a hard failure. Activation
-writes a durable recovery journal before the same-filesystem relative symlink
-plus `os.replace` switch. A journaled interruption can be deterministically
+predecessor or activated-release ref/tree/clean drift. Each staged release also
+gets a read-only sidecar seal bound to its exact path and Git identity; the
+route revalidates that seal immediately before switching. The ordinary-writer
+boundary is explicit: a privileged actor that changes modes or bypasses the
+filesystem controls remains outside this source-only guarantee and is rejected
+by the next clean-identity/seal check. Ignored cache content is outside the
+source identity and is excluded from the self-contained clone; tracked and
+non-ignored untracked content remains a hard failure. Activation writes a
+durable recovery journal before the same-filesystem relative symlink plus
+`os.replace` switch. A journaled interruption can be deterministically
 finalized or rolled back, and rollback restores the recorded predecessor
 without deleting releases.
 
@@ -76,10 +81,15 @@ The self-contained clone avoids coupling an installed release to the mutable
 object store of the source checkout. The lock and predecessor check make a
 prepared receipt single-use against the observed destination state. The
 durable intent/switch/receipt sequence makes an active destination explicit
-instead of allowing a plain rejection with an unjournaled new target. Typed
-receipts, including nested source snapshots and recovery states, make the
-authority ceiling explicit so source preparation cannot be mistaken for
-runtime proof.
+instead of allowing a plain rejection with an unjournaled new target. Rollback
+has its own `rollback_intent` and `rollback_switch_complete` states, with the
+rollback receipt written only after the predecessor effect is journaled. Typed
+receipts bind every finalized activation/rollback reference to the journal
+state digest and immutable operation/source/destination/release/predecessor/
+admission identity. Directory-open/fsync and receipt-write failures therefore
+return a recovery-required result instead of claiming a completed durable
+receipt. Nested source snapshots and recovery states make the authority ceiling
+explicit so source preparation cannot be mistaken for runtime proof.
 
 ## Consequences
 

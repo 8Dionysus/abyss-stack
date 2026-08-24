@@ -8,6 +8,19 @@
     "hex40": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
     "hex64": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
     "absolutePath": {"type": "string", "pattern": "^/"},
+    "releaseSeal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "release_path", "source_ref", "source_tree", "mode"],
+      "properties": {
+        "path": {"$ref": "#/$defs/absolutePath"},
+        "sha256": {"$ref": "#/$defs/hex64"},
+        "release_path": {"$ref": "#/$defs/absolutePath"},
+        "source_ref": {"$ref": "#/$defs/hex40"},
+        "source_tree": {"$ref": "#/$defs/hex40"},
+        "mode": {"const": "read_only"}
+      }
+    },
     "source": {
       "type": "object",
       "additionalProperties": false,
@@ -30,13 +43,14 @@
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["kind", "link_text", "target", "source_ref", "source_tree"],
+          "required": ["kind", "link_text", "target", "source_ref", "source_tree", "release_seal"],
           "properties": {
             "kind": {"const": "symlink"},
             "link_text": {"type": "string", "minLength": 1},
             "target": {"$ref": "#/$defs/absolutePath"},
             "source_ref": {"$ref": "#/$defs/hex40"},
-            "source_tree": {"$ref": "#/$defs/hex40"}
+            "source_tree": {"$ref": "#/$defs/hex40"},
+            "release_seal": {"$ref": "#/$defs/releaseSeal"}
           }
         }
       ]
@@ -94,6 +108,7 @@
     "destination": {"$ref": "#/$defs/absolutePath"},
     "release_root": {"$ref": "#/$defs/absolutePath"},
     "release_path": {"$ref": "#/$defs/absolutePath"},
+    "release_seal": {"$ref": "#/$defs/releaseSeal"},
     "predecessor": {"$ref": "#/$defs/snapshot"},
     "admission": {"$ref": "#/$defs/admission"},
     "atomicity": {"$ref": "#/$defs/atomicity"},
@@ -109,7 +124,7 @@
         "properties": {"status": {"const": "prepared"}}
       },
       "then": {
-        "required": ["prepared_at", "expires_at", "release_path", "receipt_digest"],
+        "required": ["prepared_at", "expires_at", "release_path", "release_seal", "receipt_digest"],
         "properties": {"claim_ceiling": {"const": "prepared_not_activated"}}
       }
     },

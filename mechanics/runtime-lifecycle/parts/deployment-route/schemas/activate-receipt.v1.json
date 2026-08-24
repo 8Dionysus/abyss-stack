@@ -8,6 +8,19 @@
     "hex40": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
     "hex64": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
     "absolutePath": {"type": "string", "pattern": "^/"},
+    "releaseSeal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "release_path", "source_ref", "source_tree", "mode"],
+      "properties": {
+        "path": {"$ref": "#/$defs/absolutePath"},
+        "sha256": {"$ref": "#/$defs/hex64"},
+        "release_path": {"$ref": "#/$defs/absolutePath"},
+        "source_ref": {"$ref": "#/$defs/hex40"},
+        "source_tree": {"$ref": "#/$defs/hex40"},
+        "mode": {"const": "read_only"}
+      }
+    },
     "source": {
       "type": "object",
       "additionalProperties": false,
@@ -30,13 +43,14 @@
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["kind", "link_text", "target", "source_ref", "source_tree"],
+          "required": ["kind", "link_text", "target", "source_ref", "source_tree", "release_seal"],
           "properties": {
             "kind": {"const": "symlink"},
             "link_text": {"type": "string", "minLength": 1},
             "target": {"$ref": "#/$defs/absolutePath"},
             "source_ref": {"$ref": "#/$defs/hex40"},
-            "source_tree": {"$ref": "#/$defs/hex40"}
+            "source_tree": {"$ref": "#/$defs/hex40"},
+            "release_seal": {"$ref": "#/$defs/releaseSeal"}
           }
         }
       ]
@@ -48,6 +62,35 @@
       "properties": {
         "path": {"$ref": "#/$defs/absolutePath"},
         "sha256": {"$ref": "#/$defs/hex64"}
+      }
+    },
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operation_id", "prepare_operation_id", "owner_repo", "source", "destination", "release_root", "activated_release", "release_seal", "predecessor", "admission"],
+      "properties": {
+        "operation_id": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
+        "prepare_operation_id": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
+        "owner_repo": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"},
+        "source": {"$ref": "#/$defs/source"},
+        "destination": {"$ref": "#/$defs/absolutePath"},
+        "release_root": {"$ref": "#/$defs/absolutePath"},
+        "activated_release": {"$ref": "#/$defs/absolutePath"},
+        "release_seal": {"$ref": "#/$defs/releaseSeal"},
+        "predecessor": {"$ref": "#/$defs/snapshot"},
+        "admission": {"$ref": "#/$defs/admission"}
+      }
+    },
+    "recoveryReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "binding_sha256", "status", "binding"],
+      "properties": {
+        "path": {"$ref": "#/$defs/absolutePath"},
+        "sha256": {"$ref": "#/$defs/hex64"},
+        "binding_sha256": {"$ref": "#/$defs/hex64"},
+        "status": {"const": "switch_complete"},
+        "binding": {"$ref": "#/$defs/binding"}
       }
     },
     "admission": {
@@ -87,6 +130,7 @@
     "schema_version",
     "status",
     "operation_id",
+    "prepare_operation_id",
     "activated_at",
     "owner_repo",
     "prepare_receipt",
@@ -94,6 +138,7 @@
     "destination",
     "release_root",
     "activated_release",
+    "release_seal",
     "predecessor",
     "admission",
     "recovery_journal",
@@ -107,6 +152,7 @@
     "schema_version": {"const": "abyss_stack_owner_source_activate_receipt_v1"},
     "status": {"const": "activated"},
     "operation_id": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
+    "prepare_operation_id": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
     "activated_at": {"type": "string", "format": "date-time"},
     "owner_repo": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"},
     "prepare_receipt": {"$ref": "#/$defs/receiptReference"},
@@ -114,9 +160,10 @@
     "destination": {"$ref": "#/$defs/absolutePath"},
     "release_root": {"$ref": "#/$defs/absolutePath"},
     "activated_release": {"$ref": "#/$defs/absolutePath"},
+    "release_seal": {"$ref": "#/$defs/releaseSeal"},
     "predecessor": {"$ref": "#/$defs/snapshot"},
     "admission": {"$ref": "#/$defs/admission"},
-    "recovery_journal": {"$ref": "#/$defs/receiptReference"},
+    "recovery_journal": {"$ref": "#/$defs/recoveryReference"},
     "atomicity": {"$ref": "#/$defs/atomicity"},
     "dependency_posture": {"const": "source_only_no_install"},
     "effects": {"type": "array", "items": {"type": "string"}},
