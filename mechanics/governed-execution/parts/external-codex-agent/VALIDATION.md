@@ -81,7 +81,9 @@ including typed and provenance-bearing variants, is rejected by canonical
 loading until preparation migrates it to v3, and provenance-bearing v2 is
 rejected even on the non-canonical loader route because the public v2 branch
 forbids that field. A multiply linked preparation lock is rejected before
-`fchmod`, with the external inode's bytes and mode preserved.
+`fchmod`, with the external inode's bytes and mode preserved. Canonical launch
+also reloads and digest-checks the manifest while holding the preparation lock,
+rejecting a deterministic replacement race before claim publication.
 Incomplete holder receipts missing `runtime_state_root` or `closeout_route`
 are rejected by both the receipt schema and runtime binding validator. These
 are source and fixture claims; they

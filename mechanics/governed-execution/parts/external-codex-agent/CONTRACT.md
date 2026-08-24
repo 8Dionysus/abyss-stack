@@ -828,7 +828,10 @@ against every later `prepare`: no config, capability projection, denied-state
 provenance, permission, or manifest rewrite is permitted, so ambient changes
 and newly supplied grants cannot widen a live holder. Canonical claim
 publication and preparation share the runtime-owned lock to close the
-publication/re-preparation race. Distinct contexts therefore receive distinct
+publication/re-preparation race. Canonical launch reloads and digest-checks
+the named manifest while holding that lock before publishing its claim; a
+changed snapshot is rejected rather than bound to stale launch evidence.
+Distinct contexts therefore receive distinct
 mutable homes, manifests, configs, databases, credentials, temporary paths,
 and receipt reservations. For compatibility, a realization-scoped legacy v2
 `codex-home` remains loadable and preparable only when its existing ownership

@@ -5521,6 +5521,7 @@ def _reserve_holder_claim_for_launch(
     manifest: dict[str, Any],
     manifest_digest: str,
     binding_context_digest: str,
+    binding_context: dict[str, str],
     holder_receipt_path: Path,
 ) -> tuple[Path, str]:
     """Publish a launch claim under the same lock that freezes preparation."""
@@ -5539,6 +5540,16 @@ def _reserve_holder_claim_for_launch(
     )
     ambient_identities = _ambient_inode_identities(ambient_home)
     with _incarnation_preparation_lock(runtime_root, ambient_identities):
+        _locked_manifest, _locked_bytes, locked_digest = _load_manifest_snapshot(
+            manifest_path,
+            binding_context=binding_context,
+            binding_context_digest=binding_context_digest,
+            require_holder_binding=True,
+        )
+        if locked_digest != manifest_digest:
+            raise IncarnationHomeError(
+                "incarnation-home manifest changed before holder claim"
+            )
         return _reserve_holder_claim(
             manifest_path=manifest_path,
             manifest=manifest,
@@ -8058,6 +8069,7 @@ def command_launch(args: argparse.Namespace) -> int:
             manifest=manifest,
             manifest_digest=manifest_digest,
             binding_context_digest=binding_context_digest,
+            binding_context=binding_context,
             holder_receipt_path=holder_receipt_path,
         )
         try:
@@ -8345,6 +8357,7 @@ def command_launch(args: argparse.Namespace) -> int:
         manifest=manifest,
         manifest_digest=manifest_digest,
         binding_context_digest=binding_context_digest,
+        binding_context=binding_context,
         holder_receipt_path=holder_receipt_path,
     )
     holder_receipt_published = False

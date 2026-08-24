@@ -145,7 +145,10 @@ and replay only through their matching legacy wake reservation. A retry after a 
   reassigned, overlapping, and sequential reuse fail closed. The published
   claim freezes the complete home against every later preparation, so ambient
   changes or newly supplied grants cannot rewrite or widen a live holder;
-  canonical claim publication and preparation use the same runtime-owned lock.
+  canonical claim publication and preparation use the same runtime-owned lock,
+  and launch reloads and digest-checks the manifest under that lock before
+  publishing a claim, rejecting a changed snapshot instead of binding stale
+  launch evidence.
   The preparation lock is itself a single-link runtime-owned regular file
   validated before any mode effect, so an aliased lock cannot mutate an
   external inode.

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import contextlib
 import importlib.util
 import json
 import multiprocessing as mp
@@ -726,6 +727,62 @@ def test_claimed_home_rejects_repreparation_before_any_projection_effect(
     assert stat.S_IMODE(ambient_config.stat().st_mode) == before_ambient_mode
     assert not (actor_home / "app-server-control").exists()
     assert claim_digest == MODULE.sha256_bytes(claim_path.read_bytes())
+
+
+def test_launch_claim_rejects_manifest_replacement_after_snapshot_before_lock(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    realization = _realization(tmp_path / "realization.json")
+    replacement_realization = _realization(
+        tmp_path / "replacement-realization.json"
+    )
+    context = _holder_binding_context(runtime_root, "launch-manifest-race")
+    manifest = _ORIGINAL_PREPARE_HOME(
+        ambient_home=ambient,
+        realization_path=realization,
+        runtime_root=runtime_root,
+        binding_context=context,
+    )
+    manifest_path = Path(manifest["codex_home"]).parent / "incarnation-home.json"
+    manifest_bytes = manifest_path.read_bytes()
+    manifest_digest = MODULE.sha256_bytes(manifest_bytes)
+    replacement = dict(manifest)
+    replacement["model_realization_ref"] = str(replacement_realization)
+
+    @contextlib.contextmanager
+    def prepare_completes_before_claim(
+        _runtime_root: Path, _ambient_identities: set[tuple[int, int]]
+    ) -> object:
+        # This is the deterministic equivalent of a concurrent prepare
+        # completing after command_launch's initial snapshot and before its
+        # claim lock. The replacement remains valid, but its digest no longer
+        # describes the launch snapshot.
+        manifest_path.write_bytes(MODULE.canonical_bytes(replacement))
+        yield
+
+    monkeypatch.setattr(
+        MODULE, "_incarnation_preparation_lock", prepare_completes_before_claim
+    )
+    context_digest = MODULE.sha256_bytes(MODULE.canonical_bytes(context))
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="incarnation-home manifest changed before holder claim",
+    ):
+        MODULE._reserve_holder_claim_for_launch(
+            manifest_path=manifest_path,
+            manifest=manifest,
+            manifest_digest=manifest_digest,
+            binding_context_digest=context_digest,
+            binding_context=context,
+            holder_receipt_path=tmp_path / "holder.json",
+        )
+    assert not manifest_path.with_name(MODULE.HOLDER_CLAIM_FILE_NAME).exists()
+    assert manifest_path.read_bytes() != manifest_bytes
 
 
 def test_two_synchronized_first_prepares_are_serializable_and_idempotent(
