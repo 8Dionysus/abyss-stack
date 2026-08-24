@@ -858,8 +858,10 @@ def _ambient_inode_identities(ambient_home: Path) -> set[tuple[int, int]]:
                             child_flags,
                             dir_fd=descriptor,
                         )
-                    except FileNotFoundError:
-                        continue
+                    except FileNotFoundError as exc:
+                        raise IncarnationHomeError(
+                            "ambient capability directory changed before safe open"
+                        ) from exc
                     except OSError as exc:
                         raise IncarnationHomeError(
                             f"ambient capability directory cannot be opened: {entry.name}"
@@ -1160,7 +1162,14 @@ def _walk_stable_actor_local_tree(
                     parent_fd, child_name, descriptor, initial, relative
                 )
         finally:
-            os.close(descriptor)
+            try:
+                if parent_fd is not None:
+                    assert child_name is not None
+                    _revalidate_actor_local_child(
+                        parent_fd, child_name, descriptor, initial, relative
+                    )
+            finally:
+                os.close(descriptor)
 
     visit(
         root_fd,
@@ -1763,7 +1772,7 @@ def _remove_staged_file_at(
                     raise IncarnationHomeError(
                         f"{label} cleanup directory was not safely opened"
                     )
-                _revalidate_recovery_entry(
+                _revalidate_recovery_entry_before_removal(
                     parent_fd,
                     quarantine_name,
                     quarantine_fd,
@@ -1997,28 +2006,37 @@ def _recover_staging_quarantine_directory_at(
             raise IncarnationHomeError(
                 f"staging quarantine cannot be enumerated: {name}"
             ) from exc
-        if any(child != stage_name for child in children):
+        for child in children:
+            if child == stage_name:
+                child_descriptor, _child_opened = _open_stable_regular_file_at(
+                    descriptor,
+                    child,
+                    label=f"staging quarantine entry {name}/{child}",
+                    ambient_identities=ambient_identities,
+                )
+                try:
+                    _remove_staged_file_at(
+                        descriptor,
+                        child,
+                        child_descriptor,
+                        f"staging quarantine entry {name}/{child}",
+                    )
+                finally:
+                    os.close(child_descriptor)
+                continue
+            nested = STAGED_QUARANTINE_NAME_PATTERN.fullmatch(child)
+            if nested is not None and nested.group("stage") == stage_name:
+                _recover_staging_quarantine_directory_at(
+                    descriptor,
+                    child,
+                    stage_name=stage_name,
+                    ambient_identities=ambient_identities,
+                )
+                continue
             raise IncarnationHomeError(
                 f"staging quarantine contains an unexpected entry: {name}"
             )
-        if children:
-            child = children[0]
-            child_descriptor, _child_opened = _open_stable_regular_file_at(
-                descriptor,
-                child,
-                label=f"staging quarantine entry {name}/{child}",
-                ambient_identities=ambient_identities,
-            )
-            try:
-                _remove_staged_file_at(
-                    descriptor,
-                    child,
-                    child_descriptor,
-                    f"staging quarantine entry {name}/{child}",
-                )
-            finally:
-                os.close(child_descriptor)
-        _revalidate_recovery_entry(
+        _revalidate_recovery_entry_before_removal(
             parent_fd,
             name,
             descriptor,
@@ -3030,6 +3048,22 @@ def _validate_receipt_binding_consistency(
         raise IncarnationHomeError(
             "embedded terminal binding terminal identity or socket disagrees with top-level terminal"
         )
+    runtime = receipt.get("runtime")
+    runtime_holder_binding = (
+        runtime.get("holder_binding")
+        if isinstance(runtime, dict)
+        else None
+    )
+    if runtime_holder_binding is not None:
+        if not isinstance(runtime_holder_binding, dict):
+            raise IncarnationHomeError(
+                "embedded terminal binding holder context is invalid"
+            )
+        for key in TERMINAL_BINDING_CONTEXT_FIELDS:
+            if binding.get(key) != runtime_holder_binding.get(key):
+                raise IncarnationHomeError(
+                    "embedded terminal binding context disagrees with runtime holder binding"
+                )
 
 
 def _validate_terminal_binding_shape(binding: object) -> dict[str, object]:
@@ -4098,16 +4132,28 @@ def _release_holder_claim(
         receipt_path=receipt_path,
     ):
         return
+    parent_fd = _open_pinned_parent_directory(claim_path, label)
+    descriptor: int | None = None
     try:
-        raw = _regular_file(claim_path, label).read_bytes()
+        descriptor, _opened = _open_stable_regular_file_at(
+            parent_fd,
+            claim_path.name,
+            label=label,
+            ambient_identities=set(),
+        )
+        raw = _read_descriptor_bytes(descriptor, label)
+        if sha256_bytes(raw) != claim_digest:
+            raise IncarnationHomeError(f"{label} changed before rollback")
+        _remove_staged_file_at(parent_fd, claim_path.name, descriptor, label)
+        os.fsync(parent_fd)
     except IncarnationHomeError:
         raise
-    if sha256_bytes(raw) != claim_digest:
-        raise IncarnationHomeError(f"{label} changed before rollback")
-    try:
-        claim_path.unlink()
     except OSError as exc:
         raise IncarnationHomeError(f"cannot roll back {label}") from exc
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+        os.close(parent_fd)
 
 
 def _write_reservation_json(
@@ -7214,6 +7260,19 @@ def _revalidate_recovery_entry(
     return observed
 
 
+def _revalidate_recovery_entry_before_removal(
+    parent_fd: int,
+    name: str,
+    descriptor: int,
+    initial: os.stat_result,
+    label: str,
+) -> None:
+    """Require two adjacent identity checks before removing an empty directory."""
+
+    _revalidate_recovery_entry(parent_fd, name, descriptor, initial, label)
+    _revalidate_recovery_entry(parent_fd, name, descriptor, initial, label)
+
+
 def _validate_recoverable_entry_at(
     parent_fd: int,
     name: str,
@@ -7266,7 +7325,9 @@ def _validate_recoverable_entry_at(
                 ambient_identities=ambient_identities,
                 label=f"{label}/{child_name}",
             )
-        _revalidate_recovery_entry(parent_fd, name, descriptor, initial, label)
+        _revalidate_recovery_entry_before_removal(
+            parent_fd, name, descriptor, initial, label
+        )
     finally:
         os.close(descriptor)
 
@@ -7343,7 +7404,9 @@ def _remove_recoverable_entry_at(
                 ambient_identities=ambient_identities,
                 label=f"{label}/{child_name}",
             )
-        _revalidate_recovery_entry(parent_fd, name, descriptor, initial, label)
+        _revalidate_recovery_entry_before_removal(
+            parent_fd, name, descriptor, initial, label
+        )
         try:
             os.rmdir(name, dir_fd=parent_fd)
         except OSError as exc:
@@ -7433,7 +7496,7 @@ def _recover_stale_preparation_root(
                     ambient_identities=ambient_identities,
                     label=child_name,
                 )
-            _revalidate_recovery_entry(
+            _revalidate_recovery_entry_before_removal(
                 parent_fd,
                 incarnation_root.name,
                 root_fd,
@@ -7447,7 +7510,7 @@ def _recover_stale_preparation_root(
                     ambient_identities=ambient_identities,
                     label=child_name,
                 )
-            _revalidate_recovery_entry(
+            _revalidate_recovery_entry_before_removal(
                 parent_fd,
                 incarnation_root.name,
                 root_fd,
@@ -7490,7 +7553,9 @@ def _remove_empty_directory_if_stable(path: Path, label: str) -> None:
                     return
             except OSError as exc:
                 raise IncarnationHomeError(f"{label} cannot be enumerated safely") from exc
-            _revalidate_recovery_entry(parent_fd, path.name, descriptor, initial, label)
+            _revalidate_recovery_entry_before_removal(
+                parent_fd, path.name, descriptor, initial, label
+            )
             try:
                 os.rmdir(path.name, dir_fd=parent_fd)
             except FileNotFoundError:
@@ -9640,7 +9705,7 @@ def command_payload_launch(args: argparse.Namespace) -> int:
     try:
         return _command_payload_launch_impl(args, claim_state=claim_state)
     except BaseException:
-        if claim_state.get("validated") and not claim_state.get("published"):
+        if claim_state.get("reserved") and not claim_state.get("published"):
             claim_path = Path(args.holder_claim)
             claim_digest = args.holder_claim_digest
             try:
@@ -9667,6 +9732,12 @@ def _command_payload_launch_impl(
         raise IncarnationHomeError(
             "canonical payload launch requires a holder receipt"
         )
+    claim_argument = getattr(args, "holder_claim", None)
+    claim_digest = getattr(args, "holder_claim_digest", None)
+    if not isinstance(claim_argument, str) or not isinstance(claim_digest, str):
+        raise IncarnationHomeError("canonical payload launch requires a holder claim")
+    if claim_state is not None:
+        claim_state["reserved"] = True
     binding_context: dict[str, str]
     binding_context_path = getattr(args, "binding_context", None)
     binding_context_snapshot_b64 = getattr(args, "binding_context_snapshot_b64", None)
@@ -9755,10 +9826,6 @@ def _command_payload_launch_impl(
         raise IncarnationHomeError(
             "canonical payload launch requires a holder receipt and admission gate"
         )
-    claim_argument = getattr(args, "holder_claim", None)
-    claim_digest = getattr(args, "holder_claim_digest", None)
-    if not isinstance(claim_argument, str) or not isinstance(claim_digest, str):
-        raise IncarnationHomeError("canonical payload launch requires a holder claim")
     holder_claim_path = Path(claim_argument)
     _validate_holder_claim(
         claim_path=holder_claim_path,
@@ -9954,6 +10021,7 @@ def command_launch(args: argparse.Namespace) -> int:
             _release_holder_claim(
                 claim_path=holder_claim_path,
                 claim_digest=holder_claim_digest,
+                receipt_path=Path(holder_receipt_argument),
             )
             raise
         launcher_fd: int | None = None
@@ -10194,6 +10262,7 @@ def command_launch(args: argparse.Namespace) -> int:
                 _release_holder_claim(
                     claim_path=holder_claim_path,
                     claim_digest=holder_claim_digest,
+                    receipt_path=holder_receipt_path,
                 )
             if (
                 executable_snapshot_dir is not None
@@ -10392,6 +10461,7 @@ def command_launch(args: argparse.Namespace) -> int:
             _release_holder_claim(
                 claim_path=holder_claim_path,
                 claim_digest=holder_claim_digest,
+                receipt_path=Path(args.holder_receipt),
             )
 
 

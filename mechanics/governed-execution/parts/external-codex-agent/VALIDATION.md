@@ -69,8 +69,9 @@ manifest, persistent sequential reuse, and overlapping claim attempts rejected.
 Same-filesystem hard links to ambient denied state, severed ambient aliases,
 denied inodes moved during materialization, multiply linked regular files,
 device/inode aliases, a directory-entry rename/stat race that could lose
-descendants, and replacement during no-follow validation fail closed before
-manifest admission or launch;
+descendants, replacement during no-follow validation, and a child swap after
+its complete descriptor-relative walk fail closed before manifest admission or
+launch;
 the adversarial fixtures also verify that ambient bytes and config mode remain
 unchanged. Existing-file updates stage the new bytes through an unnameable
 descriptor and atomically exchange them only after verifying the displaced
@@ -102,9 +103,10 @@ before claim publication. The exact writer pins the target parent descriptor,
 publishes new files from an unnameable descriptor, and stages existing-file
 updates through a fully written unnameable descriptor before atomic publication;
 deterministic parent and temporary-name replacement cannot change ambient bytes
-or mode. A payload-side private-payload drift or occupied-receipt failure after
-claim validation releases the exact unpublished claim even when the outer
-launcher has already exec'd into bubblewrap; a published receipt retains it.
+or mode. A pre-validation manifest failure, payload-side private-payload drift,
+or occupied-receipt failure releases the exact unpublished claim even when the
+outer launcher has already exec'd into bubblewrap; a published receipt retains
+it.
 Incomplete holder receipts missing `runtime_state_root` or `closeout_route`
 are rejected by both the receipt schema and runtime binding validator. A
 receipt carrying an immutable manifest snapshot must also carry the complete

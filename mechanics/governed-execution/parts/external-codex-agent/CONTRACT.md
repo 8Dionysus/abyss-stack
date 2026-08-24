@@ -849,9 +849,10 @@ publication and preparation share the runtime-owned lock to close the
 publication/re-preparation race. Canonical launch reloads and digest-checks
 the named manifest while holding that lock before publishing its claim; a
     changed snapshot is rejected rather than bound to stale launch evidence. The
-    payload-side pre-receipt failure path releases that exact unpublished claim
-    even after the parent has exec'd into bubblewrap; a published receipt keeps
-    the claim frozen for the holder lifecycle.
+    payload-side pre-receipt admission failure path, including failures before
+    claim validation, releases that exact unpublished claim even after the
+    parent has exec'd into bubblewrap; a published receipt keeps the claim
+    frozen for the holder lifecycle.
     Rollback and stale-owner retirement retain and revalidate the owner or
     claim descriptor before unlinking it, so a same-name publication cannot
     turn cleanup into deletion of another attempt's marker. Rebind also
@@ -916,7 +917,8 @@ no-replace move, or exchanged back while the newer occupant is retained
 and recovery fails closed. A staging write or fsync failure therefore leaves the prior bytes,
 mode, and inode intact. If a process is interrupted after linking a private
 stage for an owner-local file target, and recovers matching interrupted
-quarantine directories through the same descriptor validation. A legitimate
+quarantine directories, including nested recovery quarantine, through the same
+descriptor validation. A legitimate
 denied entry that merely resembles a stage, or a multiply linked or replaced
 artifact, fails closed without deletion. The preparation lock serializes through the pinned runtime directory
 and revalidates its named single-link file after acquisition, so a lock-name

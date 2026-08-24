@@ -662,6 +662,108 @@ def test_ambient_directory_rename_race_is_rejected_before_descendant_loss(
     assert replacement.is_dir()
 
 
+def test_ambient_directory_vanish_before_safe_open_is_rejected(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ambient = tmp_path / "ambient"
+    ambient.mkdir()
+    denied_directory = ambient / "denied-directory"
+    denied_directory.mkdir()
+    (denied_directory / "secret.json").write_bytes(b"ambient-descendant-secret")
+    moved_directory = tmp_path / "moved-denied-directory"
+    original_open = MODULE.os.open
+    root_fd: int | None = None
+    moved = False
+
+    def racing_open(
+        path: object,
+        flags: int,
+        mode: int = 0o777,
+        *,
+        dir_fd: int | None = None,
+    ) -> int:
+        nonlocal root_fd, moved
+        opened = original_open(path, flags, mode, dir_fd=dir_fd)
+        if path == ambient and dir_fd is None:
+            root_fd = opened
+            return opened
+        os.close(opened)
+        if (
+            path == denied_directory.name
+            and dir_fd == root_fd
+            and not moved
+        ):
+            denied_directory.rename(moved_directory)
+            moved = True
+        return original_open(path, flags, mode, dir_fd=dir_fd)
+
+    monkeypatch.setattr(MODULE.os, "open", racing_open)
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="ambient capability directory changed before safe open",
+    ):
+        MODULE._ambient_inode_identities(ambient)
+
+    assert moved
+    assert (moved_directory / "secret.json").read_bytes() == (
+        b"ambient-descendant-secret"
+    )
+
+
+def test_actor_local_child_replacement_after_walk_revalidation_is_rejected(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ambient = tmp_path / "ambient"
+    ambient.mkdir()
+    ambient_secret = ambient / "secret.json"
+    ambient_secret.write_bytes(b"ambient-secret")
+    local = tmp_path / "local"
+    local.mkdir()
+    child = local / "child"
+    child.write_bytes(b"actor-local")
+    moved_child = local / "moved-child"
+    ambient_identities = MODULE._ambient_inode_identities(ambient)
+    original_revalidate = MODULE._revalidate_actor_local_child
+    raced = False
+
+    def replace_after_revalidation(
+        parent_fd: int,
+        child_name: str,
+        descriptor: int,
+        initial: os.stat_result,
+        label: str,
+    ) -> None:
+        nonlocal raced
+        original_revalidate(parent_fd, child_name, descriptor, initial, label)
+        if child_name == child.name and not raced:
+            os.rename(
+                child_name,
+                moved_child.name,
+                src_dir_fd=parent_fd,
+                dst_dir_fd=parent_fd,
+            )
+            os.link(ambient_secret, child_name, dst_dir_fd=parent_fd)
+            raced = True
+
+    monkeypatch.setattr(
+        MODULE, "_revalidate_actor_local_child", replace_after_revalidation
+    )
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="actor-local capability entry changed during validation",
+    ):
+        MODULE._validate_actor_local_entry(
+            local,
+            local.name,
+            ambient_identities=ambient_identities,
+        )
+
+    assert raced
+    assert moved_child.read_bytes() == b"actor-local"
+    assert child.read_bytes() == b"ambient-secret"
+    assert ambient_secret.read_bytes() == b"ambient-secret"
+
+
 def test_config_alias_rejection_preserves_ambient_bytes_and_mode(
     tmp_path: Path,
 ) -> None:
@@ -942,6 +1044,43 @@ def test_interrupted_staging_quarantine_is_recovered_before_reprepare(
     assert (actor_home / "config.toml").read_bytes() == before_config
 
 
+def test_nested_interrupted_staging_quarantine_is_recovered_before_reprepare(
+    tmp_path: Path,
+) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    realization = _realization(tmp_path / "realization.json")
+    context = _holder_binding_context(runtime_root, "nested-quarantine-recovery")
+    manifest = _ORIGINAL_PREPARE_HOME(
+        ambient_home=ambient,
+        realization_path=realization,
+        runtime_root=runtime_root,
+        binding_context=context,
+    )
+    actor_home = Path(manifest["codex_home"])
+    stage_name = ".config.toml.stage-" + "1" * 32
+    outer = actor_home / ("." + stage_name + ".quarantine-" + "2" * 32)
+    inner = outer / ("." + stage_name + ".quarantine-" + "3" * 32)
+    inner.mkdir(mode=0o700, parents=True)
+    (inner / stage_name).write_bytes(b"abandoned-stage")
+    before_config = (actor_home / "config.toml").read_bytes()
+
+    refreshed = _ORIGINAL_PREPARE_HOME(
+        ambient_home=ambient,
+        realization_path=realization,
+        runtime_root=runtime_root,
+        binding_context=context,
+    )
+
+    assert refreshed["codex_home"] == str(actor_home)
+    assert not outer.exists()
+    assert not inner.exists()
+    assert (actor_home / "config.toml").read_bytes() == before_config
+
+
 def test_staging_cleanup_preserves_quarantine_replacement_after_open(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -977,6 +1116,67 @@ def test_staging_cleanup_preserves_quarantine_replacement_after_open(
         )
 
     monkeypatch.setattr(MODULE, "_revalidate_recovery_entry", replace_after_open)
+    parent_fd = os.open(parent, os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC)
+    try:
+        with pytest.raises(MODULE.IncarnationHomeError, match="changed during recovery"):
+            MODULE._remove_staged_file_at(
+                parent_fd,
+                stage_name,
+                descriptor,
+                "staging cleanup",
+            )
+    finally:
+        os.close(parent_fd)
+        os.close(descriptor)
+
+    assert raced
+    assert not stage.exists()
+    assert (parent / moved_name).is_dir()
+    quarantine_replacement = [
+        path
+        for path in parent.iterdir()
+        if path.name != moved_name and path.name.startswith("..config.toml.stage-")
+    ]
+    assert len(quarantine_replacement) == 1
+    assert quarantine_replacement[0].is_dir()
+
+
+def test_staging_cleanup_preserves_quarantine_replacement_after_revalidation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    parent = tmp_path / "parent"
+    parent.mkdir()
+    stage_name = ".config.toml.stage-" + "c" * 32
+    stage = parent / stage_name
+    stage.write_bytes(b"staged-bytes")
+    descriptor = os.open(stage, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+    moved_name = "moved-quarantine"
+    raced = False
+    original_revalidate = MODULE._revalidate_recovery_entry
+
+    def replace_after_revalidation(
+        parent_fd: int,
+        name: str,
+        opened_descriptor: int,
+        initial: os.stat_result,
+        label: str,
+    ) -> os.stat_result:
+        nonlocal raced
+        result = original_revalidate(
+            parent_fd, name, opened_descriptor, initial, label
+        )
+        if label.endswith("cleanup directory") and not raced:
+            os.rename(
+                name,
+                moved_name,
+                src_dir_fd=parent_fd,
+                dst_dir_fd=parent_fd,
+            )
+            os.mkdir(name, 0o700, dir_fd=parent_fd)
+            raced = True
+        return result
+
+    monkeypatch.setattr(MODULE, "_revalidate_recovery_entry", replace_after_revalidation)
     parent_fd = os.open(parent, os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC)
     try:
         with pytest.raises(MODULE.IncarnationHomeError, match="changed during recovery"):
@@ -3634,6 +3834,50 @@ def test_payload_launch_releases_claim_after_pre_receipt_payload_drift(
         MODULE.command_payload_launch(args)
 
     assert not claim_path.exists()
+
+
+def test_payload_launch_releases_claim_after_pre_validation_manifest_drift(
+    tmp_path: Path,
+) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    manifest = MODULE.prepare_home(
+        ambient_home=ambient,
+        realization_path=_realization(tmp_path / "realization.json"),
+        runtime_root=runtime_root,
+    )
+    manifest_path = Path(manifest["codex_home"]).parent / "incarnation-home.json"
+    manifest_bytes = manifest_path.read_bytes()
+    payload = tmp_path / "private-codex"
+    payload_bytes = b"#!/bin/sh\nexit 0\n"
+    payload.write_bytes(payload_bytes)
+    payload.chmod(0o500)
+    holder_path = tmp_path / "holder.json"
+    binding_args = _payload_binding_arguments(
+        runtime_root, manifest, manifest_path, holder_path
+    )
+    claim_path = Path(binding_args["holder_claim"])
+
+    args = MODULE.argparse.Namespace(
+        manifest=str(manifest_path),
+        holder_receipt=str(holder_path),
+        codex_executable=str(tmp_path / "codex"),
+        payload_executable=str(payload),
+        manifest_digest="sha256:" + "0" * 64,
+        executable_digest=MODULE.sha256_bytes(payload_bytes),
+        **binding_args,
+        codex_arguments=[str(payload), "exec", "--help"],
+    )
+
+    with pytest.raises(MODULE.IncarnationHomeError, match="manifest digest drifted"):
+        MODULE.command_payload_launch(args)
+
+    assert not claim_path.exists()
+    assert not holder_path.exists()
+    assert manifest_path.read_bytes() == manifest_bytes
 
 
 def test_payload_launch_releases_claim_when_receipt_path_becomes_occupied(
@@ -6883,6 +7127,48 @@ def test_receipt_binding_must_match_top_level_holder_and_terminal() -> None:
     binding["terminal"]["window_id"] = "7"
     binding["terminal"]["control_socket"]["inode"] = 3
     with pytest.raises(MODULE.IncarnationHomeError, match="socket"):
+        MODULE._validate_receipt_binding_consistency(receipt, binding)
+
+
+def test_receipt_binding_must_match_runtime_holder_context() -> None:
+    boot_id = MODULE._proc_boot_id()
+    context = {
+        "goal_ref": "goal:test-context",
+        "actor_ref": "actor:test-context",
+        "incarnation_ref": "incarnation:test-context",
+        "session_ref": "session:test-context",
+        "runtime_state_root": "/tmp/runtime-context",
+        "closeout_route": "/tmp/closeout-context",
+    }
+    binding = {
+        **context,
+        "boot_id": boot_id,
+        "holder": {"pid": 101, "start_ticks": 1001},
+        "terminal": {
+            "pid": 202,
+            "start_ticks": 2002,
+            "window_id": "7",
+            "tty": "/dev/pts/7",
+            "title": "visible-holder",
+            "control_socket": {
+                "address": "unix:/tmp/kitty-context.sock",
+                "path": "/tmp/kitty-context.sock",
+                "mode": 0o600,
+                "device": 1,
+                "inode": 2,
+            },
+        },
+    }
+    receipt = {
+        "boot_id": boot_id,
+        "holder": {"pid": 101, "start_ticks": 1001},
+        "terminal": binding["terminal"],
+        "runtime": {"holder_binding": dict(context)},
+    }
+    MODULE._validate_receipt_binding_consistency(receipt, binding)
+
+    binding["closeout_route"] = "/tmp/other-closeout"
+    with pytest.raises(MODULE.IncarnationHomeError, match="context"):
         MODULE._validate_receipt_binding_consistency(receipt, binding)
 
 

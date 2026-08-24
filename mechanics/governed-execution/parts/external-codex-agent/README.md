@@ -142,7 +142,8 @@ and replay only through their matching legacy wake reservation. A retry after a 
   directory entries, preserving the original device/inode identity even when
   a name is renamed away while it is being inspected; a directory identity or
   type race fails closed rather than traversing a replacement and losing its
-  descendants;
+  descendants, and every visited child name is revalidated after its complete
+  descriptor-relative walk;
 - binds each newly created home below the realization root to the exact bytes
   of a typed holder/task/run responsibility context. The context carries the
   existing goal/actor/incarnation/session runtime coordinates plus owner-bound
@@ -167,8 +168,9 @@ until preparation rewrites it as v3. Every first preparation is serialized by
   exact owner token; owner-token retirement retains and revalidates that
   descriptor before unlinking, and rebind restores a superseded claim if
   replacement-receipt publication fails. The private payload helper also
-  releases the exact validated claim on any pre-receipt payload or receipt-path
-  failure after the outer launcher has exec'd into bubblewrap; immediately
+  releases the exact validated claim on any pre-receipt admission, payload, or
+  receipt-path failure, including failures before claim validation after the
+  outer launcher has exec'd into bubblewrap; immediately
   before rollback it rechecks whether the exact canonical receipt was already
   published, and a published receipt keeps the claim frozen. The exact writer
   pins the target
