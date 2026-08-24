@@ -1,19 +1,19 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
-  "decision_count": 136,
-  "edge_count": 3056,
+  "decision_count": 137,
+  "edge_count": 3075,
   "edge_type_counts": {
-    "CITES_SOURCE_SURFACE": 1111,
-    "DATED": 136,
-    "GUARDED_BY": 420,
-    "HAS_STATUS": 136,
-    "HAS_SURFACE_CLASS": 371,
-    "IN_STACK_LANE": 325,
-    "NEXT_DECISION": 135,
-    "OWNED_BY_SURFACE": 142,
-    "OWNS_DECISION": 136,
+    "CITES_SOURCE_SURFACE": 1115,
+    "DATED": 137,
+    "GUARDED_BY": 423,
+    "HAS_STATUS": 137,
+    "HAS_SURFACE_CLASS": 374,
+    "IN_STACK_LANE": 328,
+    "NEXT_DECISION": 136,
+    "OWNED_BY_SURFACE": 143,
+    "OWNS_DECISION": 137,
     "SUPERSEDED_BY": 2,
-    "UNDER_MECHANIC_PARENT": 142
+    "UNDER_MECHANIC_PARENT": 143
   },
   "edges": [
     {
@@ -14518,72 +14518,57 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0136",
-      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/CONTRACT.md",
+      "target": "source_surface:docs/runtime/PATHS.md",
       "type": "CITES_SOURCE_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0136",
-      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/DIRECTION.md",
+      "target": "source_surface:mcp/services/aoa-kag-mcp/src/aoa_kag_mcp/canonical.py",
       "type": "CITES_SOURCE_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0136",
-      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/README.md",
+      "target": "source_surface:mcp/services/aoa-kag-mcp/src/aoa_kag_mcp/core.py",
       "type": "CITES_SOURCE_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0136",
-      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/VALIDATION.md",
+      "target": "source_surface:scripts/aoa-lib.sh",
       "type": "CITES_SOURCE_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0136",
-      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-incarnation-home.schema.json",
-      "type": "CITES_SOURCE_SURFACE"
-    },
-    {
-      "source": "decision:ABYSS-STACK-D-0136",
-      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/tests/test_visible_incarnation_home.py",
-      "type": "CITES_SOURCE_SURFACE"
-    },
-    {
-      "source": "decision:ABYSS-STACK-D-0136",
-      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/visible_incarnation_home.py",
-      "type": "CITES_SOURCE_SURFACE"
-    },
-    {
-      "source": "decision:ABYSS-STACK-D-0136",
-      "target": "date:2026-08-23",
+      "target": "date:2026-08-24",
       "type": "DATED"
     },
     {
       "source": "decision:ABYSS-STACK-D-0136",
-      "target": "guard_family:capability%20projection",
+      "target": "guard_family:fail-closed%20delivery",
       "type": "GUARDED_BY"
     },
     {
       "source": "decision:ABYSS-STACK-D-0136",
-      "target": "guard_family:concurrency%20isolation",
+      "target": "guard_family:public-safe%20projection",
       "type": "GUARDED_BY"
     },
     {
       "source": "decision:ABYSS-STACK-D-0136",
-      "target": "guard_family:incarnation%20identity",
+      "target": "guard_family:source-owned%20authority",
       "type": "GUARDED_BY"
     },
     {
       "source": "decision:ABYSS-STACK-D-0136",
-      "target": "status:proposed",
+      "target": "status:accepted",
       "type": "HAS_STATUS"
     },
     {
       "source": "decision:ABYSS-STACK-D-0136",
-      "target": "surface_class:public%20contract",
+      "target": "surface_class:MCP%20access%20plane",
       "type": "HAS_SURFACE_CLASS"
     },
     {
       "source": "decision:ABYSS-STACK-D-0136",
-      "target": "surface_class:runtime%20containment",
+      "target": "surface_class:public%20contract",
       "type": "HAS_SURFACE_CLASS"
     },
     {
@@ -14593,26 +14578,131 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0136",
-      "target": "stack_lane:governed-execution",
+      "target": "stack_lane:KAG%20seam",
       "type": "IN_STACK_LANE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0136",
-      "target": "stack_lane:runtime",
+      "target": "stack_lane:MCP%20read",
       "type": "IN_STACK_LANE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0136",
-      "target": "stack_lane:validation",
+      "target": "stack_lane:deployment%20configuration",
       "type": "IN_STACK_LANE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0136",
-      "target": "owner_surface:mechanics/governed-execution/parts/external-codex-agent/visible_incarnation_home.py",
+      "target": "decision:ABYSS-STACK-D-0137",
+      "type": "NEXT_DECISION"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0136",
+      "target": "owner_surface:mcp/services/aoa-kag-mcp/",
       "type": "OWNED_BY_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0136",
+      "target": "mechanic_parent:%60mechanics/federation-seams/parts/kag-seam%60",
+      "type": "UNDER_MECHANIC_PARENT"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0137",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/CONTRACT.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0137",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/DIRECTION.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0137",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/README.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0137",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/VALIDATION.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0137",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-incarnation-home.schema.json",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0137",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/tests/test_visible_incarnation_home.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0137",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/visible_incarnation_home.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0137",
+      "target": "date:2026-08-23",
+      "type": "DATED"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0137",
+      "target": "guard_family:capability%20projection",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0137",
+      "target": "guard_family:concurrency%20isolation",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0137",
+      "target": "guard_family:incarnation%20identity",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0137",
+      "target": "status:proposed",
+      "type": "HAS_STATUS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0137",
+      "target": "surface_class:public%20contract",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0137",
+      "target": "surface_class:runtime%20containment",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0137",
+      "target": "surface_class:source/runtime%20boundary",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0137",
+      "target": "stack_lane:governed-execution",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0137",
+      "target": "stack_lane:runtime",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0137",
+      "target": "stack_lane:validation",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0137",
+      "target": "owner_surface:mechanics/governed-execution/parts/external-codex-agent/visible_incarnation_home.py",
+      "type": "OWNED_BY_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0137",
       "target": "mechanic_parent:governed-execution",
       "type": "UNDER_MECHANIC_PARENT"
     },
@@ -15295,19 +15385,24 @@
       "source": "repo:abyss-stack",
       "target": "decision:ABYSS-STACK-D-0136",
       "type": "OWNS_DECISION"
+    },
+    {
+      "source": "repo:abyss-stack",
+      "target": "decision:ABYSS-STACK-D-0137",
+      "type": "OWNS_DECISION"
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 1318,
+  "node_count": 1328,
   "node_type_counts": {
-    "date": 44,
-    "decision": 136,
-    "guard_family": 229,
-    "mechanic_parent": 11,
+    "date": 45,
+    "decision": 137,
+    "guard_family": 232,
+    "mechanic_parent": 12,
     "owner_surface": 68,
     "repo": 1,
-    "source_surface": 624,
-    "stack_lane": 51,
+    "source_surface": 625,
+    "stack_lane": 54,
     "status": 4,
     "surface_class": 150
   },
@@ -15530,6 +15625,11 @@
     {
       "id": "date:2026-08-23",
       "label": "2026-08-23",
+      "type": "date"
+    },
+    {
+      "id": "date:2026-08-24",
+      "label": "2026-08-24",
       "type": "date"
     },
     {
@@ -16883,13 +16983,23 @@
       "type": "decision"
     },
     {
-      "date": "2026-08-23",
+      "date": "2026-08-24",
       "id": "decision:ABYSS-STACK-D-0136",
       "label": "ABYSS-STACK-D-0136",
-      "path": "docs/decisions/ABYSS-STACK-D-0136-holder-local-incarnation-mutable-state.md",
+      "path": "docs/decisions/ABYSS-STACK-D-0136-canonical-kag-cold-cas-binding.md",
+      "posture": "accepted rationale",
+      "status": "accepted",
+      "title": "ABYSS-STACK-D-0136 Canonical KAG Cold-CAS Binding",
+      "type": "decision"
+    },
+    {
+      "date": "2026-08-23",
+      "id": "decision:ABYSS-STACK-D-0137",
+      "label": "ABYSS-STACK-D-0137",
+      "path": "docs/decisions/ABYSS-STACK-D-0137-holder-local-incarnation-mutable-state.md",
       "posture": "proposed runtime rationale",
       "status": "proposed",
-      "title": "ABYSS-STACK-D-0136 Holder-Local Incarnation Mutable State",
+      "title": "ABYSS-STACK-D-0137 Holder-Local Incarnation Mutable State",
       "type": "decision"
     },
     {
@@ -17313,6 +17423,11 @@
       "type": "guard_family"
     },
     {
+      "id": "guard_family:fail-closed%20delivery",
+      "label": "fail-closed delivery",
+      "type": "guard_family"
+    },
+    {
       "id": "guard_family:fail-closed%20freshness",
       "label": "fail-closed freshness",
       "type": "guard_family"
@@ -17728,6 +17843,11 @@
       "type": "guard_family"
     },
     {
+      "id": "guard_family:public-safe%20projection",
+      "label": "public-safe projection",
+      "type": "guard_family"
+    },
+    {
       "id": "guard_family:questbook",
       "label": "questbook",
       "type": "guard_family"
@@ -17938,6 +18058,11 @@
       "type": "guard_family"
     },
     {
+      "id": "guard_family:source-owned%20authority",
+      "label": "source-owned authority",
+      "type": "guard_family"
+    },
+    {
       "id": "guard_family:source-return%20route",
       "label": "source-return route",
       "type": "guard_family"
@@ -18036,6 +18161,11 @@
       "id": "guard_family:validation%20lane",
       "label": "validation lane",
       "type": "guard_family"
+    },
+    {
+      "id": "mechanic_parent:%60mechanics/federation-seams/parts/kag-seam%60",
+      "label": "`mechanics/federation-seams/parts/kag-seam`",
+      "type": "mechanic_parent"
     },
     {
       "id": "mechanic_parent:%60mechanics/governed-execution%60",
@@ -19701,6 +19831,11 @@
     {
       "id": "source_surface:mcp/services/aoa-kag-mcp/scripts/validate_kag_mcp.py",
       "label": "mcp/services/aoa-kag-mcp/scripts/validate_kag_mcp.py",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mcp/services/aoa-kag-mcp/src/aoa_kag_mcp/canonical.py",
+      "label": "mcp/services/aoa-kag-mcp/src/aoa_kag_mcp/canonical.py",
       "type": "source_surface"
     },
     {
@@ -21564,6 +21699,11 @@
       "type": "stack_lane"
     },
     {
+      "id": "stack_lane:KAG%20seam",
+      "label": "KAG seam",
+      "type": "stack_lane"
+    },
+    {
       "id": "stack_lane:MCP",
       "label": "MCP",
       "type": "stack_lane"
@@ -21571,6 +21711,11 @@
     {
       "id": "stack_lane:MCP%20access%20plane",
       "label": "MCP access plane",
+      "type": "stack_lane"
+    },
+    {
+      "id": "stack_lane:MCP%20read",
+      "label": "MCP read",
       "type": "stack_lane"
     },
     {
@@ -21616,6 +21761,11 @@
     {
       "id": "stack_lane:decision%20lane",
       "label": "decision lane",
+      "type": "stack_lane"
+    },
+    {
+      "id": "stack_lane:deployment%20configuration",
+      "label": "deployment configuration",
       "type": "stack_lane"
     },
     {

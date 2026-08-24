@@ -1,6 +1,6 @@
 # Holder-Local Incarnation Mutable State
 
-- Decision ID: ABYSS-STACK-D-0136
+- Decision ID: ABYSS-STACK-D-0137
 - Status: proposed
 - Date: 2026-08-23
 - Owner surface: `mechanics/governed-execution/parts/external-codex-agent/visible_incarnation_home.py`

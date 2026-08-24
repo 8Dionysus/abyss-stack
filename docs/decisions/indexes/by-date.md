@@ -268,4 +268,8 @@
 ## 2026-08-23
 
 - [ABYSS-STACK-D-0135 Typed Incarnation Capability Projection](../ABYSS-STACK-D-0135-typed-incarnation-capability-projection.md) (`docs/decisions/ABYSS-STACK-D-0135-typed-incarnation-capability-projection.md`)
-- [ABYSS-STACK-D-0136 Holder-Local Incarnation Mutable State](../ABYSS-STACK-D-0136-holder-local-incarnation-mutable-state.md) (`docs/decisions/ABYSS-STACK-D-0136-holder-local-incarnation-mutable-state.md`)
+- [ABYSS-STACK-D-0137 Holder-Local Incarnation Mutable State](../ABYSS-STACK-D-0137-holder-local-incarnation-mutable-state.md) (`docs/decisions/ABYSS-STACK-D-0137-holder-local-incarnation-mutable-state.md`)
+
+## 2026-08-24
+
+- [ABYSS-STACK-D-0136 Canonical KAG Cold-CAS Binding](../ABYSS-STACK-D-0136-canonical-kag-cold-cas-binding.md) (`docs/decisions/ABYSS-STACK-D-0136-canonical-kag-cold-cas-binding.md`)

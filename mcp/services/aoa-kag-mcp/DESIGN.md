@@ -27,6 +27,11 @@ Canonical repo-local reads are the source-grounded fallback. Runtime SQLite,
 Qdrant, and Neo4j are replaceable projections. A backend outage changes route
 quality and capability state rather than the MCP tool ABI.
 
+For a v4 canonical family, `AOA_KAG_ARTIFACT_ROOT` is the explicit consumer
+configuration seam for the owner-approved cold CAS. The adapter passes the
+root to `load_family` and rejects shadow-Git fallback for that read; source
+ownership, artifact admission, and runtime activation remain separate routes.
+
 Owner-family hydration and prefetch are explicit materializer operations.
 Selective hydration remains candidate state until the complete release is
 present and verified. MCP does not discover mirrors, fetch unbounded packs,

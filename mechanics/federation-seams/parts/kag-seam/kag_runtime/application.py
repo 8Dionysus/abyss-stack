@@ -832,6 +832,7 @@ class KagApplication:
                         detail=detail,
                         offset=0,
                         limit=lane_limit,
+                        allow_text_fallback=False,
                     )
                     records, record_latency = exact.search_records_exact(
                         connection,
@@ -847,7 +848,46 @@ class KagApplication:
                         detail=detail,
                         offset=0,
                         limit=lane_limit,
+                        allow_text_fallback=False,
                     )
+                    if not documents and not records:
+                        # Do not scan either large text lane when an indexed
+                        # exact hit already identifies the requested record.
+                        # The bounded substring fallback is only needed when
+                        # both indexed lanes miss (for evidence refs and
+                        # readiness phrases).
+                        documents, document_latency = exact.search_documents_exact(
+                            connection,
+                            query,
+                            repo=owner,
+                            node_class=record_class,
+                            kind=kind,
+                            document_role=document_role,
+                            surface_state=surface_state,
+                            path=path,
+                            path_prefix=path_prefix,
+                            access_scopes=self.access_scopes,
+                            detail=detail,
+                            offset=0,
+                            limit=lane_limit,
+                            allow_text_fallback=True,
+                        )
+                        records, record_latency = exact.search_records_exact(
+                            connection,
+                            query,
+                            repo=owner,
+                            node_class=record_class,
+                            kind=kind,
+                            document_role=document_role,
+                            surface_state=surface_state,
+                            path=path,
+                            path_prefix=path_prefix,
+                            access_scopes=self.access_scopes,
+                            detail=detail,
+                            offset=0,
+                            limit=lane_limit,
+                            allow_text_fallback=True,
+                        )
                     hits = self._merge_exact_hits(
                         documents,
                         records,

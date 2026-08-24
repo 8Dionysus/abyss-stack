@@ -79,6 +79,7 @@ def _uri(resource_class: str, identifier: str, owner: str | None = None) -> str:
 def build_server(
     workspace_root: str | Path | None = None,
     aoa_kag_root: str | Path | None = None,
+    artifact_root: str | Path | None = None,
     provider_map_path: str | Path | None = None,
     readiness_path: str | Path | None = None,
     coverage_path: str | Path | None = None,
@@ -95,6 +96,7 @@ def build_server(
     state = AoAKagMCPState.discover(
         workspace_root=workspace_root,
         aoa_kag_root=aoa_kag_root,
+        artifact_root=artifact_root,
         provider_map_path=provider_map_path,
         readiness_path=readiness_path,
         coverage_path=coverage_path,
