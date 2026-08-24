@@ -72,8 +72,10 @@ device/inode aliases, a directory-entry rename/stat race, and replacement
 during no-follow validation fail closed before manifest admission or launch;
 the adversarial fixtures also verify that ambient bytes and config mode remain
 unchanged. Existing-file updates stage the new bytes through an unnameable
-descriptor and publish them atomically, so a deterministic truncate/write
-failure preserves the prior bytes, mode, and inode. An interrupted staging
+descriptor and atomically exchange them only after verifying the displaced
+target inode, so a concurrent target replacement cannot delete a victim and a
+deterministic truncate/write failure preserves the prior bytes, mode, and inode.
+An interrupted staging
 link is recovered only after inode validation through a private quarantine;
 an aliased stage remains intact and preserves the external inode.
 Distinct contexts receive separate manifest, config, cache, log,

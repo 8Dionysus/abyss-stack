@@ -898,8 +898,9 @@ replacement cannot redirect an effect into ambient state. New files are
 published directly from an unnameable `O_TMPFILE` descriptor rather than a
 replaceable temporary pathname; existing admitted regular files are opened
 read-only for identity admission, written completely through a separate
-unnameable descriptor, and atomically replaced only after both descriptors are
-revalidated. A staging write or fsync failure therefore leaves the prior bytes,
+unnameable descriptor, and atomically exchanged only after both descriptors are
+revalidated; the displaced name is checked against the retained target inode,
+and a mismatch is exchanged back without deleting the victim. A staging write or fsync failure therefore leaves the prior bytes,
 mode, and inode intact. If a process is interrupted after linking a private
 stage, the next unclaimed preparation removes only an inode-validated stage
 through a private quarantine directory; a multiply linked or replaced stage

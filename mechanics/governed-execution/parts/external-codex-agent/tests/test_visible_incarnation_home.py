@@ -723,6 +723,44 @@ def test_atomic_existing_file_failure_preserves_bytes_mode_and_inode(
     assert path.stat().st_ino == before_inode
 
 
+def test_atomic_existing_target_race_preserves_replacement_victim(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = tmp_path / "receipt.json"
+    path.write_bytes(b"original-target")
+    original_target = tmp_path / "original-target-retained"
+    victim = tmp_path / "replacement-victim"
+    victim.write_bytes(b"must-survive-target-race")
+    original_exchange = MODULE._rename_exchange_at
+    exchanged = False
+
+    def replace_target_before_exchange(
+        parent_fd: int, source_name: str, target_name: str, label: str
+    ) -> None:
+        nonlocal exchanged
+        if target_name == path.name and not exchanged:
+            exchanged = True
+            path.rename(original_target)
+            victim.rename(path)
+        original_exchange(parent_fd, source_name, target_name, label)
+
+    monkeypatch.setattr(
+        MODULE, "_rename_exchange_at", replace_target_before_exchange
+    )
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="target changed during exchange",
+    ):
+        MODULE._write_exact(path, b"new-target", 0o600)
+
+    assert exchanged
+    assert path.read_bytes() == b"must-survive-target-race"
+    assert original_target.read_bytes() == b"original-target"
+    assert not victim.exists()
+    assert not list(tmp_path.glob(".*.stage-*"))
+    assert not list(tmp_path.glob("*.quarantine-*"))
+
+
 def test_interrupted_staging_link_is_recovered_before_reprepare(tmp_path: Path) -> None:
     ambient = tmp_path / "ambient"
     runtime_root = tmp_path / "runtime"

@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import base64
 import contextlib
+import ctypes
 import fcntl
 import hashlib
 import json
@@ -1798,6 +1799,39 @@ def _recover_abandoned_staged_files(
         os.close(parent_fd)
 
 
+def _rename_exchange_at(
+    parent_fd: int, source_name: str, target_name: str, label: str
+) -> None:
+    """Atomically exchange two names without unlinking an unvalidated target."""
+
+    try:
+        libc = ctypes.CDLL(None, use_errno=True)
+        renameat2 = libc.renameat2
+    except (AttributeError, OSError) as exc:
+        raise IncarnationHomeError(
+            f"{label} requires atomic exchange support"
+        ) from exc
+    renameat2.argtypes = [
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_uint,
+    ]
+    renameat2.restype = ctypes.c_int
+    result = renameat2(
+        parent_fd,
+        os.fsencode(source_name),
+        parent_fd,
+        os.fsencode(target_name),
+        0x2,  # Linux renameat2 RENAME_EXCHANGE.
+    )
+    if result != 0:
+        error_number = ctypes.get_errno()
+        detail = os.strerror(error_number) if error_number else "unknown error"
+        raise IncarnationHomeError(f"{label} atomic exchange failed: {detail}")
+
+
 def _replace_with_staged_file_at(
     *,
     parent_fd: int,
@@ -1832,29 +1866,58 @@ def _replace_with_staged_file_at(
             label=label,
             ambient_identities=ambient_identities,
         )
-        try:
-            os.replace(
-                staged_name,
-                target_name,
-                src_dir_fd=parent_fd,
-                dst_dir_fd=parent_fd,
-            )
-        except OSError as exc:
-            raise IncarnationHomeError(f"cannot atomically publish {label}") from exc
-        staged_name = None
+        _rename_exchange_at(parent_fd, staged_name, target_name, label)
         try:
             published = os.lstat(target_name, dir_fd=parent_fd)
+            displaced = os.lstat(staged_name, dir_fd=parent_fd)
             staged = os.fstat(staged_descriptor)
+            retained_target = os.fstat(target_descriptor)
         except OSError as exc:
-            raise IncarnationHomeError(f"{label} changed after publication") from exc
-        if (
+            raise IncarnationHomeError(f"{label} changed after exchange") from exc
+        published_matches_stage = (
             (published.st_dev, published.st_ino, published.st_mode)
-            != (staged.st_dev, staged.st_ino, staged.st_mode)
-            or not stat.S_ISREG(staged.st_mode)
-            or staged.st_nlink != 1
-            or (staged.st_dev, staged.st_ino) in ambient_identities
-        ):
-            raise IncarnationHomeError(f"{label} changed after publication")
+            == (staged.st_dev, staged.st_ino, staged.st_mode)
+            and stat.S_ISREG(staged.st_mode)
+            and staged.st_nlink == 1
+            and (staged.st_dev, staged.st_ino) not in ambient_identities
+        )
+        displaced_matches_target = (
+            (displaced.st_dev, displaced.st_ino, displaced.st_mode)
+            == (
+                retained_target.st_dev,
+                retained_target.st_ino,
+                retained_target.st_mode,
+            )
+            and stat.S_ISREG(retained_target.st_mode)
+        )
+        if not (published_matches_stage and displaced_matches_target):
+            if published_matches_stage:
+                try:
+                    _rename_exchange_at(
+                        parent_fd,
+                        target_name,
+                        staged_name,
+                        f"{label} rollback",
+                    )
+                except IncarnationHomeError:
+                    staged_name = None
+                    raise
+                _remove_staged_file_at(
+                    parent_fd,
+                    staged_name,
+                    staged_descriptor,
+                    f"{label} rollback staged file",
+                )
+                staged_name = None
+            raise IncarnationHomeError(f"{label} target changed during exchange")
+        displaced_name = staged_name
+        staged_name = None
+        _remove_staged_file_at(
+            parent_fd,
+            displaced_name,
+            target_descriptor,
+            f"{label} displaced target",
+        )
     finally:
         if staged_name is not None:
             _remove_staged_file_at(

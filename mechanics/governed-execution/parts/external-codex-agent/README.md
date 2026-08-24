@@ -168,9 +168,10 @@ until preparation rewrites it as v3. Every first preparation is serialized by
   replacement-receipt publication fails. The exact writer pins the target
   parent descriptor, publishes new files from an unnameable descriptor, and
   stages every existing-file replacement through a separate fully written
-  unnameable descriptor before atomic rename. Deterministic parent, target, and
-  temporary-name replacement cannot change ambient bytes or mode; a staged write
-  failure leaves the prior target intact. If a process is interrupted after
+  unnameable descriptor before an atomic exchange that verifies the displaced
+  target inode. Deterministic parent, target, and temporary-name replacement
+  cannot delete an unvalidated victim or change ambient bytes or mode; a staged
+  write failure leaves the prior target intact. If a process is interrupted after
   creating a private staging link, the next unclaimed preparation removes only
   an inode-validated stage through a private quarantine directory; a multiply
   linked or replaced stage fails closed and is not deleted.

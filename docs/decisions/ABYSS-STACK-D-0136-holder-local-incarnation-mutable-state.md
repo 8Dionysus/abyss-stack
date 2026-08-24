@@ -69,7 +69,8 @@ attempt and is not a filename/history denylist. Every file writer
 pins and revalidates the target parent descriptor before creating, replacing,
 or mode-updating a file, safely admits the existing target before its first
 effect, and stages replacement bytes through a separate unnameable descriptor
-before atomic publication. A parent rename, symlink replacement, or staged
+before atomic exchange. The displaced name must match the retained target
+inode; a mismatch is exchanged back without deleting the victim. A parent rename, symlink replacement, or staged
 write failure is rejected without changing ambient bytes or mode or destroying
 the prior target. An interrupted named staging link is recovered only after
 moving it into a private quarantine and revalidating its retained inode; an
