@@ -194,6 +194,26 @@ def test_state_honors_explicit_canonical_provider_root(
     )
 
 
+def test_state_honors_absolute_artifact_root_and_rejects_relative_root(
+    tmp_path: Path,
+) -> None:
+    state = _state(tmp_path)
+    artifact_root = tmp_path / "cold-cas"
+    refreshed = AoAKagMCPState.discover(
+        workspace_root=state.workspace_root,
+        aoa_kag_root=state.aoa_kag_root,
+        artifact_root=artifact_root,
+    )
+
+    assert refreshed.artifact_root == artifact_root.resolve()
+    with pytest.raises(ValueError, match="absolute path"):
+        AoAKagMCPState.discover(
+            workspace_root=state.workspace_root,
+            aoa_kag_root=state.aoa_kag_root,
+            artifact_root="relative-cas",
+        )
+
+
 def test_state_resolves_portable_family_identity(tmp_path: Path) -> None:
     state = _state(tmp_path)
     manifest = _use_portable_family(state)
@@ -277,17 +297,59 @@ def test_canonical_query_loads_portable_family_without_v2_monolith(
     query_path.parent.mkdir(parents=True, exist_ok=True)
     query_path.write_text(
         "class RepoKagQuery:\n"
-        "    def __init__(self, source_index, family):\n"
+        "    def __init__(self, source_index, family, repo_root=None):\n"
         "        self.source_index = source_index\n"
         "    def discover(self):\n"
         "        return {'storage': self.source_index['storage']}\n"
-        "def load_family(repo_root):\n"
-        "    return {'storage': 'portable-v3'}, {}\n",
+        "def load_family(repo_root, **kwargs):\n"
+        "    return {'storage': 'portable-v3'}, {}, None, None\n",
         encoding="utf-8",
     )
 
     assert CanonicalRepoKag(state).discover_owner("repo-a") == {
         "storage": "portable-v3"
+    }
+
+
+def test_canonical_query_passes_cold_cas_binding_to_owner_loader(
+    tmp_path: Path,
+) -> None:
+    state = _state(tmp_path)
+    _use_portable_family(state)
+    artifact_root = tmp_path / "cold-cas"
+    artifact_root.mkdir()
+    state = AoAKagMCPState.discover(
+        workspace_root=state.workspace_root,
+        aoa_kag_root=state.aoa_kag_root,
+        artifact_root=artifact_root,
+    )
+    query_path = state.aoa_kag_root / "scripts" / "query_repo_local_kag.py"
+    query_path.parent.mkdir(parents=True, exist_ok=True)
+    query_path.write_text(
+        "SEEN = {}\n"
+        "class RepoKagQuery:\n"
+        "    def __init__(self, source_index, family, repo_root=None):\n"
+        "        self.source_index = source_index\n"
+        "        SEEN['query_repo_root'] = repo_root\n"
+        "    def discover(self):\n"
+        "        return {'storage': self.source_index['storage']}\n"
+        "def load_family(repo_root, **kwargs):\n"
+        "    SEEN['loader_repo_root'] = repo_root\n"
+        "    SEEN['kwargs'] = kwargs\n"
+        "    return {'storage': 'portable-v4'}, {}, None, {'complete': True}\n",
+        encoding="utf-8",
+    )
+
+    canonical = CanonicalRepoKag(state)
+    assert canonical.discover_owner("repo-a") == {
+        "storage": "portable-v4"
+    }
+    module = canonical._query_module()
+    assert module.SEEN["loader_repo_root"] == state.provider_root("repo-a")
+    assert module.SEEN["query_repo_root"] == state.provider_root("repo-a")
+    assert module.SEEN["kwargs"] == {
+        "artifact_root": artifact_root.resolve(),
+        "allow_shadow_git": False,
     }
 
 

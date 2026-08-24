@@ -873,6 +873,57 @@ class KagRuntimeProjectionTests(unittest.TestCase):
         )
         self.assertEqual(objects, {"nodes": "view"})
 
+    def test_sqlite_exact_preserves_event_evidence_refs_and_literal_readiness_phrase(
+        self,
+    ) -> None:
+        evidence_root = self.root / "evidence-bundle"
+        evidence_root.mkdir()
+        manifest = copy.deepcopy(self.bundle.manifest)
+        records = {
+            key: _read_jsonl(self.bundle.path(key))
+            for key in ("owners", "nodes", "relations", "external_references", "documents")
+        }
+        event = next(item for item in records["nodes"] if item["node_class"] == "event")
+        immutable_ref = "f46f146cc79a26fa81ad0f400b9c5774df293e57"
+        event["evidence_refs"] = [{"kind": "git_commit", "ref": immutable_ref}]
+        event["search_text"] = (
+            f"{event['search_text']} git_commit {immutable_ref} "
+            "aoa-dashboard source_preparation"
+        )
+        evidence_bundle = _finalize_bundle(evidence_root, manifest, records)
+        destination = self.root / "runtime" / "evidence.sqlite3"
+        exact.materialize(evidence_bundle, destination)
+        connection = sqlite3.connect(destination)
+        connection.row_factory = sqlite3.Row
+        try:
+            event_hits, _ = exact.search_records_exact(
+                connection,
+                immutable_ref,
+                node_class="event",
+                detail="full",
+                limit=5,
+            )
+            readiness_hits, _ = exact.search_records_exact(
+                connection,
+                "aoa-dashboard source_preparation",
+                detail="full",
+                limit=5,
+            )
+        finally:
+            connection.close()
+
+        self.assertEqual(1, len(event_hits))
+        self.assertEqual(
+            [{"kind": "git_commit", "ref": immutable_ref}],
+            event_hits[0]["evidence_refs"],
+        )
+        self.assertEqual(
+            [{"kind": "git_commit", "ref": immutable_ref}],
+            event_hits[0]["record"]["evidence_refs"],
+        )
+        self.assertEqual(1, len(readiness_hits))
+        self.assertEqual("event", readiness_hits[0]["node_class"])
+
     def test_sqlite_owner_incremental_update_reuses_unaffected_owner_slice(
         self,
     ) -> None:

@@ -25,6 +25,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(prog="aoa-kag-mcp")
     parser.add_argument("--workspace-root")
     parser.add_argument("--aoa-kag-root")
+    parser.add_argument("--artifact-root")
     parser.add_argument("--provider-map-path")
     parser.add_argument("--readiness-path")
     parser.add_argument("--coverage-path")
@@ -80,6 +81,7 @@ def main() -> None:
     state = AoAKagMCPState.discover(
         workspace_root=args.workspace_root,
         aoa_kag_root=args.aoa_kag_root,
+        artifact_root=Path(args.artifact_root) if args.artifact_root else None,
         provider_map_path=(
             Path(args.provider_map_path) if args.provider_map_path else None
         ),

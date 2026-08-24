@@ -19,6 +19,9 @@ the canonical fallback.
 - Access filtering runs before retrieval and ranking.
 - Provider refs and `aoa-kag://` identifiers resolve inside the declared owner
   root; ambiguous or escaping paths fail closed.
+- A configured `AOA_KAG_ARTIFACT_ROOT` must be absolute and is passed to the
+  owner v4 loader with shadow-Git fallback disabled; the MCP adapter never
+  treats that binding as artifact admission.
 - Unicode controls are reported as content inspection findings and never alter
   tool metadata.
 - Page size, traversal depth, full-text expansion, trace retention, SQLite

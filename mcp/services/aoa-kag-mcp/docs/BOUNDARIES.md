@@ -16,6 +16,11 @@ materialization, and subject-specific operations remain on their owner
 lifecycles. It cannot turn a partial hydration into a complete result and
 cannot fetch or promote artifacts as a side effect of a read.
 
+`AOA_KAG_ARTIFACT_ROOT` is only a source-managed consumer binding. The
+`abyss-machine` artifact owner still decides allow/warn/deny/
+manual_review_required/unknown, and `abyss-stack` does not rewrite that
+verdict.
+
 An `aoa-kag://` result is an addressable evidence route. Authored meaning is
 changed at the returned source owner, and runtime state is operated through the
 stack-owned projection route.

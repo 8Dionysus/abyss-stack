@@ -56,6 +56,13 @@ def _read_object(path: Path) -> dict[str, Any]:
     return payload
 
 
+def _field(value: Any, *names: str) -> Any:
+    for name in names:
+        if hasattr(value, name):
+            return getattr(value, name)
+    return None
+
+
 def _validate_owner_contract(state: AoAKagMCPState) -> int:
     for label, exists in (
         ("provider map", state.provider_map_exists()),
@@ -117,18 +124,24 @@ def _validate_server_contract(state: AoAKagMCPState) -> tuple[int, int]:
     for tool in tools.values():
         annotations = tool.annotations
         if (
-            not tool.outputSchema
+            not _field(tool, "output_schema", "outputSchema")
             or annotations is None
-            or annotations.readOnlyHint is not True
-            or annotations.destructiveHint is not False
-            or annotations.idempotentHint is not True
-            or annotations.openWorldHint is not False
+            or _field(annotations, "read_only_hint", "readOnlyHint") is not True
+            or _field(annotations, "destructive_hint", "destructiveHint") is not False
+            or _field(annotations, "idempotent_hint", "idempotentHint") is not True
+            or _field(annotations, "open_world_hint", "openWorldHint") is not False
         ):
             raise SystemExit(f"{tool.name} must keep its read-only structured contract")
 
-    search_limit = tools["kag_search"].inputSchema["properties"]["limit"]
-    traversal_depth = tools["kag_traverse"].inputSchema["properties"]["max_depth"]
-    traversal_limit = tools["kag_traverse"].inputSchema["properties"]["limit"]
+    search_limit = _field(tools["kag_search"], "input_schema", "inputSchema")[
+        "properties"
+    ]["limit"]
+    traversal_depth = _field(tools["kag_traverse"], "input_schema", "inputSchema")[
+        "properties"
+    ]["max_depth"]
+    traversal_limit = _field(tools["kag_traverse"], "input_schema", "inputSchema")[
+        "properties"
+    ]["limit"]
     if (search_limit.get("minimum"), search_limit.get("maximum")) != (1, 10):
         raise SystemExit("kag_search limit contract drifted")
     if (traversal_limit.get("minimum"), traversal_limit.get("maximum")) != (1, 10):
@@ -138,7 +151,8 @@ def _validate_server_contract(state: AoAKagMCPState) -> tuple[int, int]:
 
     resources = {str(item.uri) for item in asyncio.run(server.list_resources())}
     resources.update(
-        str(item.uriTemplate) for item in asyncio.run(server.list_resource_templates())
+        str(_field(item, "uri_template", "uriTemplate"))
+        for item in asyncio.run(server.list_resource_templates())
     )
     if resources != EXPECTED_RESOURCES:
         raise SystemExit("aoa-kag MCP server resource surface drifted")

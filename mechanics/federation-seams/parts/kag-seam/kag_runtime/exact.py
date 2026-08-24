@@ -943,7 +943,12 @@ def _exact_union_rows(
     branches: list[str] = []
     values: list[Any] = []
     for priority, field in enumerate(query_fields):
-        branch_clauses = [f"{field}=?"]
+        if field in {"search_text", "text"} and query:
+            branch_clauses = [
+                f"instr(lower(COALESCE({field},'')), lower(?)) > 0"
+            ]
+        else:
+            branch_clauses = [f"{field}=?"]
         branch_values: list[Any] = [query]
         for previous in query_fields[:priority]:
             branch_clauses.append(f"{previous}!=?")
@@ -1379,7 +1384,7 @@ def search_records_exact(
         connection,
         table="records",
         query=query,
-        query_fields=("id", "path", "label"),
+        query_fields=("id", "path", "label", "search_text"),
         clauses=clauses,
         clause_values=values,
         order_by="repo,node_class,kind,id",
@@ -1806,7 +1811,7 @@ def search_documents_exact(
         connection,
         table="documents",
         query=query,
-        query_fields=("id", "node_id", "path", "label"),
+        query_fields=("id", "node_id", "path", "label", "text"),
         clauses=clauses,
         clause_values=values,
         order_by="repo,path,start_line,chunk_index,id",
