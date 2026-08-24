@@ -375,6 +375,94 @@ def test_activation_revalidates_release_immediately_before_switch(
     assert "activation_receipt" not in journal
 
 
+def test_activation_rolls_back_tracked_mutation_after_final_verification(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fixture = route_fixture(tmp_path)
+    prepared = output(invoke(*prepare_command(fixture)))
+    release_path = Path(prepared["release_path"])
+    destination = Path(fixture["destination"])
+    original_replace = ROUTE.os.replace
+    fired = False
+
+    def mutate_before_switch(source: Path, target: Path) -> None:
+        nonlocal fired
+        if not fired and Path(target) == destination:
+            fired = True
+            make_release_writable(release_path)
+            (release_path / "payload.txt").write_text("late non-cooperating writer\n", encoding="utf-8")
+        original_replace(source, target)
+
+    monkeypatch.setattr(ROUTE.os, "replace", mutate_before_switch)
+    with pytest.raises(ROUTE.DeploymentError) as raised:
+        direct_activate(prepared)
+
+    assert raised.value.code == "activation_recovery_required"
+    assert not os.path.lexists(destination)
+    assert fired is True
+    journal_path = next(Path(fixture["receipt_dir"]).glob("activate-*.recovery.json"))
+    journal = validate_instance(journal_path, "recovery-receipt.v1.json")
+    assert journal["status"] == "rollback_switch_complete"
+    assert "activation_receipt" not in journal
+    assert not Path(journal["activation_receipt_path"]).exists()
+
+
+def test_activation_rejects_same_ref_replacement_with_ignored_poison_after_final_verification(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fixture = route_fixture(tmp_path)
+    source = Path(fixture["source"])
+    (source / ".gitignore").write_text("ignored-cache/\n", encoding="utf-8")
+    run_git(source, "add", ".gitignore")
+    run_git(source, "commit", "-qm", "define ignored cache policy")
+    fixture["ref"] = run_git(source, "rev-parse", "HEAD")
+    fixture["tree"] = run_git(source, "rev-parse", "HEAD^{tree}")
+    fixture["admission"] = write_admission(
+        tmp_path,
+        source=source,
+        ref=str(fixture["ref"]),
+        tree=str(fixture["tree"]),
+        destination=Path(fixture["destination"]),
+        name="same-ref-replacement-admission.json",
+    )
+    prepared = output(invoke(*prepare_command(fixture)))
+    release_path = Path(prepared["release_path"])
+    destination = Path(fixture["destination"])
+    replacement = release_path.with_name(f"{release_path.name}.replacement")
+    displaced = release_path.with_name(f"{release_path.name}.displaced")
+    original_replace = ROUTE.os.replace
+    fired = False
+
+    def replace_with_ignored_poison(source_path: Path, target: Path) -> None:
+        nonlocal fired
+        if not fired and Path(target) == destination:
+            fired = True
+            shutil.copytree(release_path, replacement, symlinks=True)
+            make_release_writable(replacement)
+            poison = replacement / "ignored-cache" / "poison.txt"
+            poison.parent.mkdir()
+            poison.write_text("ignored poison\n", encoding="utf-8")
+            ROUTE._set_release_read_only(replacement)
+            original_replace(release_path, displaced)
+            original_replace(replacement, release_path)
+        original_replace(source_path, target)
+
+    monkeypatch.setattr(ROUTE.os, "replace", replace_with_ignored_poison)
+    with pytest.raises(ROUTE.DeploymentError) as raised:
+        direct_activate(prepared)
+
+    assert raised.value.code == "activation_recovery_required"
+    assert not os.path.lexists(destination)
+    assert fired is True
+    assert (release_path / "ignored-cache" / "poison.txt").read_text(encoding="utf-8") == "ignored poison\n"
+    assert run_git(release_path, "status", "--porcelain=v1") == ""
+    journal_path = next(Path(fixture["receipt_dir"]).glob("activate-*.recovery.json"))
+    journal = validate_instance(journal_path, "recovery-receipt.v1.json")
+    assert journal["status"] == "rollback_switch_complete"
+    assert "activation_receipt" not in journal
+    assert not Path(journal["activation_receipt_path"]).exists()
+
+
 def test_activation_rejects_predecessor_seal_drift(tmp_path: Path) -> None:
     fixture = route_fixture(tmp_path)
     first_prepare = output(invoke(*prepare_command(fixture)))

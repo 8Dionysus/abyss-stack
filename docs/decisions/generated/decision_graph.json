@@ -1,11 +1,11 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
   "decision_count": 76,
-  "edge_count": 1658,
+  "edge_count": 1661,
   "edge_type_counts": {
     "CITES_SOURCE_SURFACE": 662,
     "DATED": 76,
-    "GUARDED_BY": 199,
+    "GUARDED_BY": 202,
     "HAS_STATUS": 76,
     "HAS_SURFACE_CLASS": 185,
     "IN_STACK_LANE": 151,
@@ -7863,6 +7863,11 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0076",
+      "target": "guard_family:content%20manifest",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
       "target": "guard_family:deployment%20lock",
       "type": "GUARDED_BY"
     },
@@ -7878,7 +7883,17 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0076",
+      "target": "guard_family:post-switch%20rollback",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
       "target": "guard_family:predecessor%20rollback",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
+      "target": "guard_family:release-root%20inode%20binding",
       "type": "GUARDED_BY"
     },
     {
@@ -8308,11 +8323,11 @@
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 703,
+  "node_count": 706,
   "node_type_counts": {
     "date": 19,
     "decision": 76,
-    "guard_family": 79,
+    "guard_family": 82,
     "mechanic_parent": 10,
     "owner_surface": 38,
     "repo": 1,
@@ -9228,6 +9243,11 @@
       "type": "guard_family"
     },
     {
+      "id": "guard_family:content%20manifest",
+      "label": "content manifest",
+      "type": "guard_family"
+    },
+    {
       "id": "guard_family:decision%20graph%20coverage",
       "label": "decision graph coverage",
       "type": "guard_family"
@@ -9368,6 +9388,11 @@
       "type": "guard_family"
     },
     {
+      "id": "guard_family:post-switch%20rollback",
+      "label": "post-switch rollback",
+      "type": "guard_family"
+    },
+    {
       "id": "guard_family:predecessor%20rollback",
       "label": "predecessor rollback",
       "type": "guard_family"
@@ -9415,6 +9440,11 @@
     {
       "id": "guard_family:release%20governance",
       "label": "release governance",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:release-root%20inode%20binding",
+      "label": "release-root inode binding",
       "type": "guard_family"
     },
     {

@@ -53,15 +53,21 @@ The route emits and persists typed JSON receipts:
   journal before the destination switch.
 
 The release is a self-contained Git clone under a sealed release directory. A
-sidecar seal records the exact release path and Git ref/tree, and the release
-tree (including its Git metadata) is made read-only before it can be referenced
-by a receipt. The destination is switched with a relative symlink and
-`os.replace` only after the current predecessor and the sealed release identity
-are rechecked immediately before the switch while a non-blocking deployment
-lock is held. This seal protects against ordinary non-cooperating writers; a
-privileged actor that changes permissions or bypasses the filesystem boundary
-is outside this source-only guarantee and is rejected by the next mode, clean
-identity, and seal validation.
+sidecar seal records the exact release path and Git ref/tree, the release-root
+device/inode, and a content manifest. The manifest covers every regular file
+and directory actually present, including ignored entries, records modes and
+metadata, records symlink targets without following them, and rejects special
+files. The release tree (including its Git metadata) is made read-only before
+it can be referenced by a receipt. The destination is switched with a relative
+symlink and `os.replace` only after the current predecessor and the sealed
+release identity are rechecked immediately before the switch while a
+non-blocking deployment lock is held. The lock coordinates cooperating route
+writers; it cannot prevent a same-UID writer from replacing a prepared path.
+Activation therefore verifies the release and destination again after the
+switch. Any content, root-inode, or destination drift causes a durable
+rollback to the predecessor and no activation receipt. A privileged actor
+that changes permissions or bypasses the filesystem boundary remains outside
+this source-only guarantee.
 
 The durable journal records intent before the switch and permits deterministic
 `recover --action finalize|rollback` after switch or receipt-write interruption.
@@ -76,9 +82,11 @@ predecessor symlink or the exact absent state, rechecking its recorded ref,
 tree, clean mutable state, and seal.
 
 Ignored cache paths are excluded from Git's source identity check and are not
-copied into a self-contained release. Tracked edits and non-ignored untracked
-content remain hard failures; ignored content is never part of the immutable
-release identity.
+introduced by staging. If ignored content is already present in a release,
+however, it is included in the sealed manifest and is covered by post-switch
+verification. Tracked edits and non-ignored untracked content remain hard
+failures; symlink targets are recorded without traversal and unsupported
+special files are rejected.
 
 ### Must not claim
 
@@ -95,8 +103,10 @@ Focused tests use temporary Git repositories and disposable destinations. They
 cover happy-path prepare/activate/rollback plus dirty source, wrong identity,
 stale admission, stale staging, non-symlink destination, cross-device
 preflight, concurrent lock, destination race, immediate pre-switch release
-TOCTOU, predecessor and activated release ref/tree/clean tamper, ignored-cache
-packaging, nested emitted schema instances, cross-state journal references,
+TOCTOU, tracked mutation after final verification, same-ref/tree replacement
+with ignored poison after final verification, predecessor and activated release
+ref/tree/clean tamper, ignored-cache packaging, manifest/symlink policy,
+nested emitted schema instances, cross-state journal references,
 directory-fsync failure, rollback receipt persistence failure, and
 interruption/retry recovery at each activation boundary. No live `/srv/AbyssOS`
 root is used by the tests.

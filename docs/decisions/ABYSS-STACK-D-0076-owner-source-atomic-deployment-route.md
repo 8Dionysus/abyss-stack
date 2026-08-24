@@ -11,7 +11,7 @@
 - Surface classes: runtime topology, source/runtime boundary, deployment route
 - Stack lanes: runtime lifecycle, source checkout, operator deployment
 - Mechanic parents: runtime-lifecycle
-- Guard families: clean source identity, ignored-cache boundary, atomic switch, durable activation recovery, predecessor rollback, deployment lock
+- Guard families: clean source identity, ignored-cache boundary, content manifest, release-root inode binding, post-switch rollback, atomic switch, durable activation recovery, predecessor rollback, deployment lock
 - Posture: accepted owner-source deployment rationale
 
 ## Context
@@ -45,20 +45,26 @@ Choose option 3.
 `abyss-stack` owns the route implementation under
 `mechanics/runtime-lifecycle/parts/deployment-route/`. It stages a full
 non-alternating Git clone for an exact clean commit/tree under a versioned
-release identity. It refuses dirty source or destination state, stale or mismatched
-admission, incomplete staging, cross-device paths, concurrent deployment, and
-predecessor or activated-release ref/tree/clean drift. Each staged release also
-gets a read-only sidecar seal bound to its exact path and Git identity; the
-route revalidates that seal immediately before switching. The ordinary-writer
-boundary is explicit: a privileged actor that changes modes or bypasses the
-filesystem controls remains outside this source-only guarantee and is rejected
-by the next clean-identity/seal check. Ignored cache content is outside the
-source identity and is excluded from the self-contained clone; tracked and
-non-ignored untracked content remains a hard failure. Activation writes a
-durable recovery journal before the same-filesystem relative symlink plus
-`os.replace` switch. A journaled interruption can be deterministically
-finalized or rolled back, and rollback restores the recorded predecessor
-without deleting releases.
+release identity. It refuses dirty source or destination state, stale or
+mismatched admission, incomplete staging, cross-device paths, concurrent
+deployment, and predecessor or activated-release ref/tree/clean drift. Each
+staged release also gets a read-only sidecar seal bound to its exact path, root
+device/inode, Git identity, and a content manifest of all present files,
+directories, ignored entries, modes, metadata, and symlink targets. Special
+files are rejected and symlinks are recorded without traversal. The route
+revalidates that seal immediately before switching and again after the
+destination switch. The lock coordinates cooperating route writers, but
+staged rename alone cannot exclude a same-UID path replacement. If that
+interleave changes the release or destination, the route durably restores the
+predecessor and emits no activation receipt. A privileged actor that changes
+modes or bypasses the filesystem controls remains outside this source-only
+guarantee. Ignored cache content is outside Git's source identity and is not
+introduced by staging, but any ignored content present in a release is covered
+by the release manifest; tracked and non-ignored untracked content remains a
+hard failure. Activation writes a durable recovery journal before the
+same-filesystem relative symlink plus `os.replace` switch. A journaled
+interruption can be deterministically finalized or rolled back, and rollback
+restores the recorded predecessor without deleting releases.
 
 The route admission is an input contract, not an `abyss-machine` artifact
 signature. Artifact classes, signatures, SBOM/provenance, registry selection,
@@ -79,8 +85,14 @@ transactional, inspectable, and repeatable.
 
 The self-contained clone avoids coupling an installed release to the mutable
 object store of the source checkout. The lock and predecessor check make a
-prepared receipt single-use against the observed destination state. The
-durable intent/switch/receipt sequence makes an active destination explicit
+prepared receipt single-use against the observed destination state, but are
+not a complete exclusion mechanism for a same-UID non-cooperating writer.
+Alternatives such as a cooperative lock, a staged `os.replace`, or an inode
+check only before the switch each leave a final-check-to-effect gap. A
+pre-switch manifest/root-inode check catches staged tampering; the chosen
+post-switch manifest/root-inode/destination verification closes the observable
+interleave and the durable predecessor restore provides a fail-closed outcome.
+The durable intent/switch/receipt sequence makes an active destination explicit
 instead of allowing a plain rejection with an unjournaled new target. Rollback
 has its own `rollback_intent` and `rollback_switch_complete` states, with the
 rollback receipt written only after the predecessor effect is journaled. Typed
@@ -101,6 +113,9 @@ explicit so source preparation cannot be mistaken for runtime proof.
   management by the owning deployment operator.
 - The route adds a root wrapper, mechanic-local tests, nested receipt schemas,
   a recovery-journal schema, and validation topology entries.
+- Release seals add a closed content manifest and root-inode binding; activation
+  performs a post-switch verification and durable predecessor rollback before
+  any activation receipt is emitted.
 - Configs sync remains the source/runtime mirror route for ordinary stack
   changes; this route is not a replacement for it.
 

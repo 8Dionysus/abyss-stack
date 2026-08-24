@@ -38,6 +38,13 @@ ROLLBACK_SCHEMA = "abyss_stack_owner_source_rollback_receipt_v1"
 RECOVERY_SCHEMA = "abyss_stack_owner_source_activation_recovery_v1"
 ERROR_SCHEMA = "abyss_stack_owner_source_deployment_error_v1"
 RELEASE_SEAL_SCHEMA = "abyss_stack_owner_source_release_seal_v1"
+RELEASE_MANIFEST_SCHEMA = "abyss_stack_owner_source_release_manifest_v1"
+RELEASE_BINDING_METHOD = "content-manifest-root-inode-v1"
+RELEASE_IGNORED_POLICY = "included_in_manifest"
+RELEASE_SYMLINK_POLICY = "record_target_no_follow"
+RELEASE_SPECIAL_FILE_POLICY = "reject"
+POST_SWITCH_VERIFICATION = "required_before_activation_receipt"
+POST_SWITCH_ROLLBACK = "durable-predecessor-restore"
 SOURCE_ROUTE_ADMISSION_KIND = "owner_source_deployment_route"
 ALLOWED_AUTHORITY_CEILINGS = {
     "disposable-source-package-canary",
@@ -282,6 +289,143 @@ def _release_seal_path(release_path: Path) -> Path:
     return release_path.parent / f".{release_path.name}.seal.json"
 
 
+def _release_stat_fingerprint(value: os.stat_result) -> tuple[int, int, int, int, int, int]:
+    return (
+        int(value.st_dev),
+        int(value.st_ino),
+        int(value.st_mode),
+        int(value.st_size),
+        int(value.st_mtime_ns),
+        int(value.st_ctime_ns),
+    )
+
+
+def _release_root_identity(release_path: Path) -> dict[str, int]:
+    try:
+        value = os.lstat(release_path)
+    except OSError as exc:
+        raise DeploymentError("release_seal_invalid", f"cannot stat release root: {release_path}") from exc
+    if not stat.S_ISDIR(value.st_mode) or stat.S_ISLNK(value.st_mode):
+        raise DeploymentError("release_seal_invalid", f"release root is not a directory: {release_path}")
+    return {
+        "root_device": int(value.st_dev),
+        "root_inode": int(value.st_ino),
+        "root_mode": int(stat.S_IMODE(value.st_mode)),
+    }
+
+
+def _hash_release_file(path: Path, expected: os.stat_result) -> str:
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        fd = os.open(path, flags)
+    except OSError as exc:
+        raise DeploymentError("release_manifest_unreadable", f"cannot open release file: {path}") from exc
+    try:
+        opened = os.fstat(fd)
+        if _release_stat_fingerprint(opened) != _release_stat_fingerprint(expected):
+            raise DeploymentError("release_manifest_changed", f"release file changed before hashing: {path}")
+        digest = hashlib.sha256()
+        while True:
+            chunk = os.read(fd, 1024 * 1024)
+            if not chunk:
+                break
+            digest.update(chunk)
+        closed = os.fstat(fd)
+        if _release_stat_fingerprint(closed) != _release_stat_fingerprint(expected):
+            raise DeploymentError("release_manifest_changed", f"release file changed while hashing: {path}")
+        return digest.hexdigest()
+    except OSError as exc:
+        raise DeploymentError("release_manifest_unreadable", f"cannot hash release file: {path}") from exc
+    finally:
+        os.close(fd)
+
+
+def _release_manifest(release_path: Path) -> tuple[str, int]:
+    """Hash every release entry without following symlinks or trusting Git status."""
+
+    entries: list[dict[str, Any]] = []
+
+    def visit(path: Path, relative: str) -> None:
+        try:
+            before = os.lstat(path)
+        except OSError as exc:
+            raise DeploymentError("release_manifest_unreadable", f"cannot stat release entry: {path}") from exc
+        mode = before.st_mode
+        if stat.S_ISLNK(mode):
+            try:
+                target = os.readlink(path)
+                after = os.lstat(path)
+            except OSError as exc:
+                raise DeploymentError("release_manifest_unreadable", f"cannot read release symlink: {path}") from exc
+            if _release_stat_fingerprint(before) != _release_stat_fingerprint(after):
+                raise DeploymentError("release_manifest_changed", f"release symlink changed while sealing: {path}")
+            entries.append(
+                {
+                    "kind": "symlink",
+                    "path": relative,
+                    "target": target,
+                }
+            )
+            return
+        if stat.S_ISREG(mode):
+            digest = _hash_release_file(path, before)
+            try:
+                after = os.lstat(path)
+            except OSError as exc:
+                raise DeploymentError("release_manifest_unreadable", f"cannot restat release file: {path}") from exc
+            if _release_stat_fingerprint(before) != _release_stat_fingerprint(after):
+                raise DeploymentError("release_manifest_changed", f"release file changed while sealing: {path}")
+            entries.append(
+                {
+                    "kind": "file",
+                    "mode": int(stat.S_IMODE(mode)),
+                    "mtime_ns": int(before.st_mtime_ns),
+                    "path": relative,
+                    "sha256": digest,
+                    "size": int(before.st_size),
+                }
+            )
+            return
+        if stat.S_ISDIR(mode):
+            entries.append(
+                {
+                    "kind": "directory",
+                    "mode": int(stat.S_IMODE(mode)),
+                    "mtime_ns": int(before.st_mtime_ns),
+                    "path": relative,
+                }
+            )
+            try:
+                with os.scandir(path) as directory:
+                    names = sorted(entry.name for entry in directory)
+            except OSError as exc:
+                raise DeploymentError("release_manifest_unreadable", f"cannot enumerate release directory: {path}") from exc
+            for name in names:
+                child_relative = name if relative == "." else f"{relative}/{name}"
+                visit(path / name, child_relative)
+            try:
+                after = os.lstat(path)
+            except OSError as exc:
+                raise DeploymentError("release_manifest_unreadable", f"cannot restat release directory: {path}") from exc
+            if _release_stat_fingerprint(before) != _release_stat_fingerprint(after):
+                raise DeploymentError("release_manifest_changed", f"release directory changed while sealing: {path}")
+            return
+        raise DeploymentError(
+            "release_manifest_unsupported_entry",
+            f"release contains an unsupported filesystem entry: {path}",
+        )
+
+    visit(release_path, ".")
+    manifest = {
+        "schema_version": RELEASE_MANIFEST_SCHEMA,
+        "entries": entries,
+        "ignored_policy": RELEASE_IGNORED_POLICY,
+        "special_file_policy": RELEASE_SPECIAL_FILE_POLICY,
+        "symlink_policy": RELEASE_SYMLINK_POLICY,
+    }
+    return _digest_payload(manifest), len(entries)
+
+
 def _release_entries(release_path: Path) -> Iterator[Path]:
     for root, directories, files in os.walk(release_path, topdown=False, followlinks=False):
         for name in files:
@@ -316,7 +460,7 @@ def _assert_release_read_only(release_path: Path) -> None:
 def _release_seal_reference(
     release_path: Path,
     seal_payload: dict[str, Any],
-) -> dict[str, str]:
+) -> dict[str, Any]:
     return {
         "path": os.fspath(_release_seal_path(release_path)),
         "sha256": str(seal_payload["receipt_digest"]),
@@ -324,6 +468,15 @@ def _release_seal_reference(
         "source_ref": str(seal_payload["source_ref"]),
         "source_tree": str(seal_payload["source_tree"]),
         "mode": "read_only",
+        "root_device": int(seal_payload["root_device"]),
+        "root_inode": int(seal_payload["root_inode"]),
+        "root_mode": int(seal_payload["root_mode"]),
+        "manifest_schema": str(seal_payload["manifest_schema"]),
+        "manifest_sha256": str(seal_payload["manifest_sha256"]),
+        "manifest_entries": int(seal_payload["manifest_entries"]),
+        "ignored_policy": str(seal_payload["ignored_policy"]),
+        "symlink_policy": str(seal_payload["symlink_policy"]),
+        "special_file_policy": str(seal_payload["special_file_policy"]),
     }
 
 
@@ -332,7 +485,7 @@ def _verify_release_seal(
     expected_ref: str,
     expected_tree: str,
     reference: dict[str, Any] | None = None,
-) -> dict[str, str]:
+) -> dict[str, Any]:
     seal_path = _release_seal_path(release_path)
     payload, _ = _load_json(seal_path, "release seal")
     _verify_receipt_digest(payload, "release seal")
@@ -344,6 +497,18 @@ def _verify_release_seal(
         raise DeploymentError("release_seal_invalid", "release seal Git identity is not bound")
     if payload.get("mode") != "read_only":
         raise DeploymentError("release_seal_invalid", "release seal mode is not read-only")
+    root_identity = _release_root_identity(release_path)
+    for key in ("root_device", "root_inode", "root_mode"):
+        if payload.get(key) != root_identity[key]:
+            raise DeploymentError("release_seal_inode_mismatch", "release root inode binding does not match")
+    if payload.get("manifest_schema") != RELEASE_MANIFEST_SCHEMA:
+        raise DeploymentError("release_seal_invalid", "release manifest schema is not bound")
+    if payload.get("ignored_policy") != RELEASE_IGNORED_POLICY:
+        raise DeploymentError("release_seal_invalid", "release ignored-content policy is not bound")
+    if payload.get("symlink_policy") != RELEASE_SYMLINK_POLICY:
+        raise DeploymentError("release_seal_invalid", "release symlink policy is not bound")
+    if payload.get("special_file_policy") != RELEASE_SPECIAL_FILE_POLICY:
+        raise DeploymentError("release_seal_invalid", "release special-file policy is not bound")
     if reference is not None:
         if reference.get("path") != os.fspath(seal_path):
             raise DeploymentError("release_seal_invalid", "release seal reference path is not bound")
@@ -355,19 +520,47 @@ def _verify_release_seal(
             raise DeploymentError("release_seal_invalid", "release seal reference identity is not bound")
         if reference.get("mode") != "read_only":
             raise DeploymentError("release_seal_invalid", "release seal reference mode is invalid")
+        for key in (
+            "root_device",
+            "root_inode",
+            "root_mode",
+            "manifest_schema",
+            "manifest_sha256",
+            "manifest_entries",
+            "ignored_policy",
+            "symlink_policy",
+            "special_file_policy",
+        ):
+            if reference.get(key) != payload.get(key):
+                raise DeploymentError("release_seal_invalid", f"release seal reference {key} does not match")
+    _assert_release_read_only(release_path)
+    manifest_sha256, manifest_entries = _release_manifest(release_path)
+    if payload.get("manifest_sha256") != manifest_sha256 or payload.get("manifest_entries") != manifest_entries:
+        raise DeploymentError("release_seal_content_mismatch", "release content manifest does not match its seal")
+    if _release_root_identity(release_path) != root_identity:
+        raise DeploymentError("release_seal_inode_mismatch", "release root changed while validating its seal")
     _assert_release_read_only(release_path)
     return _release_seal_reference(release_path, payload)
 
 
-def _seal_release(release_path: Path, source_ref: str, source_tree: str) -> dict[str, str]:
+def _seal_release(release_path: Path, source_ref: str, source_tree: str) -> dict[str, Any]:
     _verify_clean_identity(release_path, source_ref, source_tree)
     _set_release_read_only(release_path)
+    root_identity = _release_root_identity(release_path)
+    manifest_sha256, manifest_entries = _release_manifest(release_path)
     seal_payload = {
         "schema_version": RELEASE_SEAL_SCHEMA,
         "release_path": os.fspath(release_path),
         "source_ref": source_ref,
         "source_tree": source_tree,
         "mode": "read_only",
+        **root_identity,
+        "manifest_schema": RELEASE_MANIFEST_SCHEMA,
+        "manifest_sha256": manifest_sha256,
+        "manifest_entries": manifest_entries,
+        "ignored_policy": RELEASE_IGNORED_POLICY,
+        "symlink_policy": RELEASE_SYMLINK_POLICY,
+        "special_file_policy": RELEASE_SPECIAL_FILE_POLICY,
     }
     written = _write_json(_release_seal_path(release_path), seal_payload)
     return _verify_release_seal(release_path, source_ref, source_tree, _release_seal_reference(release_path, written))
@@ -878,6 +1071,9 @@ def _validate_activation_receipt_payload(payload: dict[str, Any], path: Path) ->
         or atomicity.get("switch") != "relative-symlink-os-replace"
         or atomicity.get("journal") != "durable-before-switch"
         or atomicity.get("destination_identity_checked") is not True
+        or atomicity.get("release_binding") != RELEASE_BINDING_METHOD
+        or atomicity.get("post_switch_verification") != POST_SWITCH_VERIFICATION
+        or atomicity.get("post_switch_rollback") != POST_SWITCH_ROLLBACK
     ):
         raise DeploymentError("activation_receipt_invalid", "activation atomicity is not bound")
     if payload.get("claim_ceiling") != "source_activation_only_no_runtime_claim":
@@ -968,6 +1164,7 @@ def _validate_rollback_receipt_payload(payload: dict[str, Any], path: Path) -> N
         or atomicity.get("switch") != "relative-symlink-os-replace"
         or atomicity.get("destination_identity_checked") is not True
         or atomicity.get("predecessor_identity_checked") is not True
+        or atomicity.get("release_binding") != RELEASE_BINDING_METHOD
     ):
         raise DeploymentError("rollback_receipt_invalid", "rollback atomicity is not bound")
     if payload.get("claim_ceiling") != "source_activation_rollback_only_no_runtime_claim":
@@ -1141,6 +1338,7 @@ def _validate_recovery_payload(payload: dict[str, Any], path: Path) -> None:
         or atomicity.get("same_filesystem") is not True
         or atomicity.get("switch") != "relative-symlink-os-replace"
         or atomicity.get("journal") != "durable-before-switch"
+        or atomicity.get("release_binding") != RELEASE_BINDING_METHOD
     ):
         raise DeploymentError("recovery_record_invalid", "recovery atomicity is not bound")
     if payload.get("claim_ceiling") != "source_activation_recovery_only_no_runtime_claim":
@@ -1299,6 +1497,7 @@ def prepare(args: argparse.Namespace) -> dict[str, Any]:
                 "same_filesystem": True,
                 "staging": "self-contained-git-clone",
                 "switch": "relative-symlink-os-replace",
+                "release_binding": RELEASE_BINDING_METHOD,
             },
             "dependency_posture": "source_only_no_install",
             "effects": [],
@@ -1351,6 +1550,7 @@ def prepare(args: argparse.Namespace) -> dict[str, Any]:
                 "same_filesystem": True,
                 "staging": "self-contained-git-clone",
                 "switch": "relative-symlink-os-replace",
+                "release_binding": RELEASE_BINDING_METHOD,
             },
             "dependency_posture": "source_only_no_install",
             "effects": ["release_directory_created"],
@@ -1415,6 +1615,7 @@ def _load_prepare_receipt(path: Path) -> tuple[dict[str, Any], Path]:
         not isinstance(atomicity, dict)
         or atomicity.get("same_filesystem") is not True
         or atomicity.get("switch") != "relative-symlink-os-replace"
+        or atomicity.get("release_binding") != RELEASE_BINDING_METHOD
     ):
         raise DeploymentError("prepare_receipt_invalid", "prepare atomicity is not bound")
     if payload.get("claim_ceiling") != "prepared_not_activated":
@@ -1454,6 +1655,89 @@ def _recovery_required(path: Path, error: DeploymentError) -> DeploymentError:
         f"activation state may need recovery; use the durable journal {path}: {error.detail}",
         {"recovery_journal": os.fspath(path), "recovery_required": True},
     )
+
+
+def _destination_link_target(destination: Path) -> Path:
+    if not os.path.lexists(destination):
+        raise DeploymentError("destination_missing", f"destination is missing: {destination}")
+    if not destination.is_symlink():
+        raise DeploymentError("destination_not_atomic_switchable", f"destination is not a symlink: {destination}")
+    return (destination.parent / os.readlink(destination)).resolve(strict=False)
+
+
+def _verify_post_switch_state(
+    *,
+    destination: Path,
+    release_root: Path,
+    release_path: Path,
+    source_ref: str,
+    source_tree: str,
+    release_seal: dict[str, Any],
+) -> None:
+    _verify_recorded_release(
+        release_path,
+        source_ref,
+        source_tree,
+        label="activated_release",
+        seal=release_seal,
+    )
+    current = _snapshot_destination(destination, release_root)
+    expected = {
+        "kind": "symlink",
+        "target": os.fspath(release_path.resolve(strict=False)),
+        "source_ref": source_ref,
+        "source_tree": source_tree,
+        "release_seal": release_seal,
+    }
+    if not _same_snapshot(current, expected):
+        raise DeploymentError(
+            "post_switch_state_invalid",
+            "destination does not point at the verified sealed release after switch",
+        )
+
+
+def _rollback_after_post_switch_failure(
+    *,
+    recovery_path: Path,
+    journal: dict[str, Any],
+    destination: Path,
+    release_root: Path,
+    release_path: Path,
+    predecessor: dict[str, Any],
+    failure: DeploymentError,
+) -> DeploymentError:
+    """Durably remove an unreceipted target after post-switch validation fails."""
+
+    try:
+        journal = _write_json(recovery_path, _rollback_intent_payload(journal))
+        if _destination_link_target(destination) != release_path.resolve(strict=False):
+            raise DeploymentError(
+                "concurrent_deployment",
+                "destination changed before post-switch rollback",
+            )
+        _validate_recorded_snapshot(predecessor, release_root, label="predecessor")
+        _restore_predecessor(destination, predecessor, release_root)
+        journal = _write_json(recovery_path, _rollback_switch_complete_payload(journal))
+        restored = _snapshot_destination(destination, release_root)
+        if not _same_snapshot(restored, predecessor):
+            raise DeploymentError(
+                "post_switch_rollback_failed",
+                "destination does not match its recorded predecessor after rollback",
+            )
+    except DeploymentError as rollback_error:
+        return _recovery_required(
+            recovery_path,
+            DeploymentError(
+                "post_switch_rollback_failed",
+                f"{failure.detail}; rollback failed: {rollback_error.detail}",
+            ),
+        )
+    except OSError as exc:
+        return _recovery_required(
+            recovery_path,
+            DeploymentError("post_switch_rollback_failed", f"{failure.detail}; rollback failed: {exc}"),
+        )
+    return _recovery_required(recovery_path, failure)
 
 
 def _new_recovery_payload(
@@ -1505,6 +1789,7 @@ def _new_recovery_payload(
             "same_filesystem": True,
             "switch": "relative-symlink-os-replace",
             "journal": "durable-before-switch",
+            "release_binding": RELEASE_BINDING_METHOD,
         },
         "claim_ceiling": "source_activation_recovery_only_no_runtime_claim",
     }
@@ -1597,6 +1882,9 @@ def _activation_payload(
             "switch": "relative-symlink-os-replace",
             "destination_identity_checked": True,
             "journal": "durable-before-switch",
+            "release_binding": RELEASE_BINDING_METHOD,
+            "post_switch_verification": POST_SWITCH_VERIFICATION,
+            "post_switch_rollback": POST_SWITCH_ROLLBACK,
         },
         "dependency_posture": "source_only_no_install",
         "effects": ["destination_symlink_replaced"],
@@ -1699,6 +1987,25 @@ def activate(args: argparse.Namespace) -> dict[str, Any]:
             raise _recovery_required(
                 recovery_path,
                 DeploymentError("atomic_switch_failed", f"{destination}: {exc}"),
+            ) from exc
+        try:
+            _verify_post_switch_state(
+                destination=destination,
+                release_root=release_root,
+                release_path=release_path,
+                source_ref=source_ref,
+                source_tree=source_tree,
+                release_seal=payload["release_seal"],
+            )
+        except DeploymentError as exc:
+            raise _rollback_after_post_switch_failure(
+                recovery_path=recovery_path,
+                journal=journal,
+                destination=destination,
+                release_root=release_root,
+                release_path=release_path,
+                predecessor=expected,
+                failure=exc,
             ) from exc
         journal_payload = _switch_complete_payload(journal)
         try:
@@ -1815,6 +2122,7 @@ def _rollback_payload(
             "switch": "relative-symlink-os-replace",
             "destination_identity_checked": True,
             "predecessor_identity_checked": True,
+            "release_binding": RELEASE_BINDING_METHOD,
         },
         "dependency_posture": "source_only_no_install",
         "effects": ["destination_symlink_restored" if restored_target else "destination_removed"],
