@@ -17,7 +17,6 @@
     "ambient_home_identity",
     "runtime_root",
     "codex_home",
-    "holder_binding",
     "config_digest",
     "shared_state_names",
     "capability_projection",
@@ -26,7 +25,12 @@
   ],
   "properties": {
     "$schema": {"const": "schemas/external-codex-incarnation-home.schema.json"},
-    "schema_version": {"const": "abyss_stack_codex_incarnation_home_v2"},
+    "schema_version": {
+      "enum": [
+        "abyss_stack_codex_incarnation_home_v2",
+        "abyss_stack_codex_incarnation_home_v3"
+      ]
+    },
     "model_realization_id": {"type": "string", "minLength": 1},
     "model_realization_ref": {"$ref": "#/$defs/absolutePath"},
     "configuration_fingerprint": {"$ref": "#/$defs/digest"},
@@ -48,6 +52,11 @@
       "type": "array",
       "uniqueItems": true,
       "items": {"$ref": "#/$defs/name"}
+    },
+    "denied_state_provenance": {
+      "type": "object",
+      "propertyNames": {"$ref": "#/$defs/name"},
+      "additionalProperties": {"$ref": "#/$defs/deniedStateProvenance"}
     },
     "capability_projection": {"$ref": "#/$defs/capabilityProjection"},
     "top_level_posture": {"const": "incarnation-home"},
@@ -93,6 +102,34 @@
         "holder_ref": {"type": "string", "minLength": 1},
         "task_ref": {"type": "string", "minLength": 1},
         "run_ref": {"type": "string", "minLength": 1}
+      }
+    },
+    "deniedStateProvenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ambient_entry", "local_tree_digest"],
+      "properties": {
+        "ambient_entry": {
+          "anyOf": [
+            {"type": "null"},
+            {"$ref": "#/$defs/inodeIdentity"}
+          ]
+        },
+        "local_tree_digest": {
+          "anyOf": [
+            {"type": "null"},
+            {"$ref": "#/$defs/digest"}
+          ]
+        }
+      }
+    },
+    "inodeIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["device", "inode"],
+      "properties": {
+        "device": {"type": "integer", "minimum": 0},
+        "inode": {"type": "integer", "minimum": 1}
       }
     },
     "capabilityProjection": {
@@ -272,5 +309,29 @@
         "sha256": {"$ref": "#/$defs/digest"}
       }
     }
-  }
+  },
+  "oneOf": [
+    {
+      "title": "Current typed v3 incarnation home",
+      "properties": {
+        "schema_version": {
+          "const": "abyss_stack_codex_incarnation_home_v3"
+        }
+      },
+      "required": [
+        "holder_binding",
+        "actor_local_state_names",
+        "denied_state_provenance"
+      ]
+    },
+    {
+      "title": "Readable legacy v2 incarnation home",
+      "properties": {
+        "schema_version": {
+          "const": "abyss_stack_codex_incarnation_home_v2"
+        }
+      },
+      "not": {"required": ["denied_state_provenance"]}
+    }
+  ]
 }

@@ -801,7 +801,7 @@ containment route.
 
 ## Incarnation-home capability projection
 
-`prepare` writes a v2 `incarnation-home.json` whose `$schema` points to
+`prepare` writes a current v3 `incarnation-home.json` whose `$schema` points to
 `schemas/external-codex-incarnation-home.schema.json`. The manifest carries a
 model-neutral `capability_projection` with one typed entry for every non-local
 ambient-home entry. The projection's `entries` value is an object keyed by the
@@ -825,10 +825,14 @@ published beside the manifest and remains the durable single-lifecycle
 reservation: a mismatched context, reassignment, simultaneous launch, or
 sequential reuse fails closed. Distinct contexts therefore receive distinct
 mutable homes, manifests, configs, databases, credentials, temporary paths,
-and receipt reservations. For compatibility, a realization-scoped legacy
-`codex-home` remains loadable and preparable only when its existing v2
-ownership marker is present; it cannot satisfy a canonical launch without the
-typed holder binding.
+and receipt reservations. For compatibility, a realization-scoped legacy v2
+`codex-home` remains loadable and preparable only when its existing ownership
+marker is present. A v2 marker without typed binding remains a
+readable/preparation compatibility shape and cannot satisfy canonical launch.
+A v2 marker with an older typed binding is also readable for migration, but
+canonical launch rejects it until `prepare` rewrites the home as v3 with
+denied-state provenance; current typed holder requirements are therefore not
+weakened by the compatibility route.
 
 The projection derives `actor_local_state_names` from every current capability
 entry whose typed projection is `denied`. An entry in that derived set may be
@@ -844,8 +848,21 @@ manifest admission or launch. When a previous shared link becomes denied under
 the current typed policy, the exact old ambient link may be removed; a regular
 local shadow is retained and validated. A shared projection still requires its
 exact ambient symlink, so local files cannot widen a denied capability.
-The new manifest field is optional for schema compatibility with older v2
-manifests; the loader recomputes the exact denied set when it is absent.
+The v3 `denied_state_provenance` field is required for current typed homes. It
+records only the current denied projection: each name has the ambient entry's
+current device/inode identity, when present, and a digest of the admitted local
+tree. After an ambient unlink/replace, the loader permits the existing local
+tree only when its digest is unchanged; a new or altered local tree is denied.
+Legacy v2 manifests remain schema-valid without this field, but typed v2
+manifests cannot pass canonical launch until migration produces v3. The loader
+recomputes the exact denied set for older untyped v2 reads when that optional
+field is absent.
+
+All preparation attempts in one runtime state root hold the persistent
+`.incarnation-home.lock`. A first unpublished holder home is marked with the
+exact `.prepare-owner.json` token before materialization. Rollback removes only
+that tokened, unmarked root; a later attempt may recover the same stale tokened
+root under the lock, while a published home is never treated as stale.
 
 An `--capability-grant` input is an exact
 `schemas/external-codex-capability-grant.schema.json` owner artifact for one

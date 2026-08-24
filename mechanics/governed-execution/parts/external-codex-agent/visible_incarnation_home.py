@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import contextlib
 import fcntl
 import hashlib
 import json
@@ -32,7 +33,9 @@ from pathlib import Path
 from typing import Any, Sequence
 
 
-SCHEMA_VERSION = "abyss_stack_codex_incarnation_home_v2"
+LEGACY_SCHEMA_VERSION = "abyss_stack_codex_incarnation_home_v2"
+SCHEMA_VERSION = "abyss_stack_codex_incarnation_home_v3"
+SUPPORTED_SCHEMA_VERSIONS = frozenset({LEGACY_SCHEMA_VERSION, SCHEMA_VERSION})
 CAPABILITY_PROJECTION_SCHEMA_VERSION = (
     "abyss_stack_codex_capability_projection_v2"
 )
@@ -66,6 +69,11 @@ TERMINAL_BINDING_CONTEXT_FIELDS = (
 )
 HOLDER_CLAIM_SCHEMA_VERSION = "abyss_stack_visible_incarnation_holder_claim_v1"
 HOLDER_CLAIM_FILE_NAME = "holder-claim.json"
+PREPARATION_LOCK_FILE_NAME = ".incarnation-home.lock"
+PREPARATION_OWNER_FILE_NAME = ".prepare-owner.json"
+PREPARATION_OWNER_SCHEMA_VERSION = (
+    "abyss_stack_visible_incarnation_prepare_owner_v1"
+)
 HOLDER_LOSS_REENTRY_SCHEMA_VERSION = (
     "task_local_external_actor_holder_loss_reentry_v1"
 )
@@ -742,6 +750,43 @@ def _ambient_inode_identities(ambient_home: Path) -> set[tuple[int, int]]:
     return identities
 
 
+def _entry_identity(path: Path, label: str) -> tuple[int, int] | None:
+    """Read one pathname identity without following a symlink or alias."""
+
+    try:
+        observed = os.lstat(path)
+    except FileNotFoundError:
+        return None
+    except OSError as exc:
+        raise IncarnationHomeError(f"{label} cannot be inspected: {path}") from exc
+    return observed.st_dev, observed.st_ino
+
+
+def _identity_record(identity: tuple[int, int] | None) -> dict[str, int] | None:
+    if identity is None:
+        return None
+    return {"device": identity[0], "inode": identity[1]}
+
+
+def _identity_from_record(value: object, label: str) -> tuple[int, int] | None:
+    if value is None:
+        return None
+    if not isinstance(value, dict) or set(value) != {"device", "inode"}:
+        raise IncarnationHomeError(f"{label} identity is invalid")
+    device = value.get("device")
+    inode = value.get("inode")
+    if (
+        not isinstance(device, int)
+        or isinstance(device, bool)
+        or device < 0
+        or not isinstance(inode, int)
+        or isinstance(inode, bool)
+        or inode < 1
+    ):
+        raise IncarnationHomeError(f"{label} identity is invalid")
+    return device, inode
+
+
 def _open_stable_actor_local_entry(target: Path, name: str) -> os.stat_result:
     """Open one entry without following a replacement symlink and recheck it."""
 
@@ -860,6 +905,126 @@ def _validate_actor_local_entries(
             )
 
 
+def _local_tree_digest(target: Path, name: str) -> str | None:
+    """Digest one local tree's bounded inode topology, never its mutable bytes."""
+
+    if not target.exists() and not target.is_symlink():
+        return None
+    rows: list[dict[str, object]] = []
+    visited_directories: set[tuple[int, int]] = set()
+
+    def visit(path: Path, relative: str) -> None:
+        observed = _open_stable_actor_local_entry(path, relative)
+        identity = (observed.st_dev, observed.st_ino)
+        rows.append(
+            {
+                "path": relative,
+                "device": observed.st_dev,
+                "inode": observed.st_ino,
+                "mode": stat.S_IMODE(observed.st_mode),
+                "kind": "directory" if stat.S_ISDIR(observed.st_mode) else "file",
+                "links": observed.st_nlink,
+            }
+        )
+        if not stat.S_ISDIR(observed.st_mode):
+            return
+        if identity in visited_directories:
+            raise IncarnationHomeError(
+                f"actor-local capability directory is aliased: {path}"
+            )
+        visited_directories.add(identity)
+        try:
+            children = sorted(path.iterdir(), key=lambda child: child.name)
+        except OSError as exc:
+            raise IncarnationHomeError(
+                f"actor-local capability directory cannot be enumerated: {path}"
+            ) from exc
+        for child in children:
+            visit(child, f"{relative}/{child.name}")
+
+    visit(target, name)
+    return sha256_bytes(canonical_bytes(rows))
+
+
+def _denied_state_provenance(
+    *, codex_home: Path, ambient_home: Path, names: Sequence[str]
+) -> dict[str, dict[str, object]]:
+    """Record one current ambient identity and one local-tree digest per denied name."""
+
+    return {
+        name: {
+            "ambient_entry": _identity_record(
+                _entry_identity(ambient_home / name, f"ambient denied entry {name}")
+            ),
+            "local_tree_digest": _local_tree_digest(codex_home / name, name),
+        }
+        for name in names
+    }
+
+
+def _validate_denied_state_provenance(
+    *,
+    manifest: dict[str, Any],
+    codex_home: Path,
+    ambient_home: Path,
+    names: Sequence[str],
+    required: bool,
+    allow_projection_expansion: bool = False,
+) -> None:
+    """Reject unknown local state after an ambient denied-entry transition.
+
+    The record is bounded by the current typed denied projection: it stores no
+    path/history denylist.  A changed ambient identity is safe only when the
+    local tree is the exact tree already admitted by the previous manifest.
+    """
+
+    raw = manifest.get("denied_state_provenance")
+    if raw is None:
+        if required:
+            raise IncarnationHomeError(
+                "current incarnation-home manifest lacks denied-state provenance"
+            )
+        return
+    if not isinstance(raw, dict) or (
+        set(raw) != set(names)
+        and (
+            not allow_projection_expansion
+            or not set(raw) <= set(names)
+        )
+    ):
+        raise IncarnationHomeError("denied-state provenance does not match projection")
+    for name in names:
+        record = raw.get(name)
+        if record is None and allow_projection_expansion:
+            continue
+        if not isinstance(record, dict) or set(record) != {
+            "ambient_entry",
+            "local_tree_digest",
+        }:
+            raise IncarnationHomeError(
+                f"denied-state provenance is invalid for {name}"
+            )
+        previous_ambient = _identity_from_record(
+            record.get("ambient_entry"), f"denied-state ambient {name}"
+        )
+        previous_local = record.get("local_tree_digest")
+        if previous_local is not None and (
+            not isinstance(previous_local, str)
+            or SHA256_DIGEST_PATTERN.fullmatch(previous_local) is None
+        ):
+            raise IncarnationHomeError(
+                f"denied-state local provenance is invalid for {name}"
+            )
+        current_ambient = _entry_identity(
+            ambient_home / name, f"ambient denied entry {name}"
+        )
+        current_local = _local_tree_digest(codex_home / name, name)
+        if current_ambient != previous_ambient and current_local != previous_local:
+            raise IncarnationHomeError(
+                f"denied-state provenance changed across ambient replacement: {name}"
+            )
+
+
 def _reject_custom_model_provider(parsed: dict[str, Any]) -> None:
     """Fail closed when ambient config selects a provider outside the realization."""
 
@@ -911,21 +1076,99 @@ def _bound_config(ambient_config: bytes, model_slug: str, effort: str) -> bytes:
     return bound.encode("utf-8")
 
 
-def _write_exact(path: Path, content: bytes, mode: int) -> None:
-    if path.exists() or path.is_symlink():
-        if path.is_symlink() or not path.is_file():
-            raise IncarnationHomeError(f"refusing to replace non-file: {path}")
-        if path.read_bytes() == content:
-            path.chmod(mode)
+def _write_exact(
+    path: Path,
+    content: bytes,
+    mode: int,
+    *,
+    ambient_identities: set[tuple[int, int]] | None = None,
+) -> None:
+    """Publish bytes only after the current target has passed alias admission."""
+
+    ambient_identities = ambient_identities or set()
+    parent = path.parent
+    if (
+        not path.is_absolute()
+        or parent.is_symlink()
+        or not parent.is_dir()
+        or path.is_symlink()
+    ):
+        raise IncarnationHomeError(f"refusing to replace unsafe file path: {path}")
+    existing = path.exists()
+    if existing and not path.is_file():
+        raise IncarnationHomeError(f"refusing to replace non-file: {path}")
+    if existing:
+        _validate_actor_local_entry(
+            path,
+            path.name,
+            ambient_identities=ambient_identities,
+        )
+        try:
+            same_content = path.read_bytes() == content
+        except OSError as exc:
+            raise IncarnationHomeError(f"cannot inspect existing file: {path}") from exc
+        if same_content:
+            flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0)
+            flags |= getattr(os, "O_NOFOLLOW", 0)
+            try:
+                descriptor = os.open(path, flags)
+            except OSError as exc:
+                raise IncarnationHomeError(
+                    f"cannot open existing file for safe metadata update: {path}"
+                ) from exc
+            try:
+                opened = os.fstat(descriptor)
+                observed = os.lstat(path)
+                if (
+                    (opened.st_dev, opened.st_ino, opened.st_mode)
+                    != (observed.st_dev, observed.st_ino, observed.st_mode)
+                    or (opened.st_dev, opened.st_ino) in ambient_identities
+                    or not stat.S_ISREG(opened.st_mode)
+                    or opened.st_nlink != 1
+                ):
+                    raise IncarnationHomeError(
+                        f"existing file changed before safe metadata update: {path}"
+                    )
+                if stat.S_IMODE(opened.st_mode) != mode:
+                    os.fchmod(descriptor, mode)
+            except OSError as exc:
+                if isinstance(exc, IncarnationHomeError):
+                    raise
+                raise IncarnationHomeError(
+                    f"cannot safely update existing file metadata: {path}"
+                ) from exc
+            finally:
+                os.close(descriptor)
             return
-    temporary = path.with_name(path.name + f".tmp-{os.getpid()}")
+    descriptor: int | None = None
+    temporary: Path | None = None
     try:
-        temporary.write_bytes(content)
-        temporary.chmod(mode)
+        descriptor, temporary_name = tempfile.mkstemp(
+            prefix=path.name + ".tmp-", dir=str(parent)
+        )
+        temporary = Path(temporary_name)
+        os.fchmod(descriptor, mode)
+        view = memoryview(content)
+        while view:
+            view = view[os.write(descriptor, view) :]
+        os.fsync(descriptor)
+        if path.exists() or path.is_symlink():
+            _validate_actor_local_entry(
+                path,
+                path.name,
+                ambient_identities=ambient_identities,
+            )
         os.replace(temporary, path)
+        temporary = None
+    except IncarnationHomeError:
+        raise
+    except OSError as exc:
+        raise IncarnationHomeError(f"cannot safely publish file: {path}") from exc
     finally:
-        if temporary.exists():
-            temporary.unlink()
+        if descriptor is not None:
+            os.close(descriptor)
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
 
 
 def _utc_now() -> str:
@@ -3109,7 +3352,7 @@ def _decode_holder_manifest_snapshot(runtime: dict[str, Any]) -> bytes | None:
         raise IncarnationHomeError(
             "holder incarnation manifest snapshot is not valid JSON"
         ) from exc
-    if not isinstance(manifest, dict) or manifest.get("schema_version") != SCHEMA_VERSION:
+    if not isinstance(manifest, dict) or manifest.get("schema_version") not in SUPPORTED_SCHEMA_VERSIONS:
         raise IncarnationHomeError("holder incarnation manifest snapshot is unsupported")
     for manifest_key, runtime_key in (
         ("model_slug", "model"),
@@ -5209,6 +5452,341 @@ def command_close(args: argparse.Namespace) -> int:
     return 0
 
 
+@contextlib.contextmanager
+def _incarnation_preparation_lock(
+    runtime_root: Path, ambient_identities: set[tuple[int, int]]
+) -> Any:
+    """Serialize every preparation in one runtime state root."""
+
+    lock_path = runtime_root / PREPARATION_LOCK_FILE_NAME
+    if lock_path.is_symlink():
+        raise IncarnationHomeError(
+            f"incarnation preparation lock may not be a symlink: {lock_path}"
+        )
+    flags = os.O_CREAT | os.O_RDWR | getattr(os, "O_CLOEXEC", 0)
+    flags |= getattr(os, "O_NOFOLLOW", 0)
+    lock_fd: int | None = None
+    try:
+        lock_fd = os.open(lock_path, flags, 0o600)
+        opened = os.fstat(lock_fd)
+        observed = os.lstat(lock_path)
+        if (
+            (opened.st_dev, opened.st_ino, opened.st_mode)
+            != (observed.st_dev, observed.st_ino, observed.st_mode)
+            or not stat.S_ISREG(opened.st_mode)
+            or (opened.st_dev, opened.st_ino) in ambient_identities
+        ):
+            raise IncarnationHomeError(
+                f"incarnation preparation lock is not an isolated regular file: {lock_path}"
+            )
+        if stat.S_IMODE(opened.st_mode) != 0o600:
+            os.fchmod(lock_fd, 0o600)
+        fcntl.flock(lock_fd, fcntl.LOCK_EX)
+        yield
+    except IncarnationHomeError:
+        raise
+    except OSError as exc:
+        raise IncarnationHomeError(
+            f"incarnation preparation lock cannot be acquired: {lock_path}"
+        ) from exc
+    finally:
+        if lock_fd is not None:
+            try:
+                fcntl.flock(lock_fd, fcntl.LOCK_UN)
+            finally:
+                os.close(lock_fd)
+
+
+def _preparation_owner_record(
+    *,
+    ambient_home: Path,
+    runtime_root: Path,
+    realization_root: Path,
+    incarnation_root: Path,
+    coordinate: str,
+    holder_coordinate: str | None,
+) -> dict[str, Any]:
+    return {
+        "schema_version": PREPARATION_OWNER_SCHEMA_VERSION,
+        "owner_token": sha256_bytes(secrets.token_bytes(32)),
+        "ambient_home": str(ambient_home),
+        "runtime_root": str(runtime_root),
+        "realization_root": str(realization_root),
+        "incarnation_root": str(incarnation_root),
+        "coordinate": coordinate,
+        "holder_coordinate": holder_coordinate,
+        "pid": os.getpid(),
+        "start_ticks": _proc_start_ticks(os.getpid()),
+        "created_at": _utc_now(),
+    }
+
+
+def _validate_preparation_owner_record(
+    value: object,
+    *,
+    ambient_home: Path,
+    runtime_root: Path,
+    realization_root: Path,
+    incarnation_root: Path,
+    coordinate: str,
+    holder_coordinate: str | None,
+) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise IncarnationHomeError("incarnation preparation owner token is invalid")
+    expected_fields = {
+        "schema_version",
+        "owner_token",
+        "ambient_home",
+        "runtime_root",
+        "realization_root",
+        "incarnation_root",
+        "coordinate",
+        "holder_coordinate",
+        "pid",
+        "start_ticks",
+        "created_at",
+    }
+    if set(value) != expected_fields:
+        raise IncarnationHomeError(
+            "incarnation preparation owner token fields are not exact"
+        )
+    if value.get("schema_version") != PREPARATION_OWNER_SCHEMA_VERSION:
+        raise IncarnationHomeError("unsupported incarnation preparation owner token")
+    token = value.get("owner_token")
+    if not isinstance(token, str) or SHA256_DIGEST_PATTERN.fullmatch(token) is None:
+        raise IncarnationHomeError("incarnation preparation owner token digest is invalid")
+    if (
+        value.get("ambient_home") != str(ambient_home)
+        or value.get("runtime_root") != str(runtime_root)
+        or value.get("realization_root") != str(realization_root)
+        or value.get("incarnation_root") != str(incarnation_root)
+        or value.get("coordinate") != coordinate
+        or value.get("holder_coordinate") != holder_coordinate
+    ):
+        raise IncarnationHomeError(
+            "incarnation preparation owner token target does not match"
+        )
+    if (
+        not isinstance(value.get("pid"), int)
+        or isinstance(value.get("pid"), bool)
+        or value["pid"] < 1
+        or not isinstance(value.get("start_ticks"), int)
+        or isinstance(value.get("start_ticks"), bool)
+        or value["start_ticks"] < 1
+        or not isinstance(value.get("created_at"), str)
+        or not value["created_at"].strip()
+    ):
+        raise IncarnationHomeError("incarnation preparation owner token identity is invalid")
+    return dict(value)
+
+
+def _recover_stale_preparation_root(
+    *,
+    incarnation_root: Path,
+    ambient_home: Path,
+    realization_root: Path,
+    runtime_root: Path,
+    coordinate: str,
+    holder_coordinate: str | None,
+    ambient_identities: set[tuple[int, int]],
+) -> None:
+    """Remove only a runtime-tokened, unpublished root after the lock is held."""
+
+    marker = incarnation_root / "incarnation-home.json"
+    if marker.exists() or marker.is_symlink():
+        raise IncarnationHomeError(
+            "published incarnation home cannot be treated as stale preparation"
+        )
+    owner_path = incarnation_root / PREPARATION_OWNER_FILE_NAME
+    owner = _load_json(owner_path, "incarnation preparation owner token")
+    _validate_preparation_owner_record(
+        owner,
+        ambient_home=ambient_home,
+        runtime_root=runtime_root,
+        realization_root=realization_root,
+        incarnation_root=incarnation_root,
+        coordinate=coordinate,
+        holder_coordinate=holder_coordinate,
+    )
+
+    def validate_recoverable(path: Path, label: str) -> None:
+        try:
+            observed = os.lstat(path)
+        except OSError as exc:
+            raise IncarnationHomeError(
+                f"stale incarnation preparation entry cannot be inspected: {path}"
+            ) from exc
+        if stat.S_ISLNK(observed.st_mode):
+            return
+        identity = (observed.st_dev, observed.st_ino)
+        if identity in ambient_identities:
+            raise IncarnationHomeError(
+                f"stale incarnation preparation aliases ambient state: {path}"
+            )
+        if stat.S_ISREG(observed.st_mode):
+            if observed.st_nlink != 1:
+                raise IncarnationHomeError(
+                    f"stale incarnation preparation entry is multiply linked: {path}"
+                )
+            return
+        if not stat.S_ISDIR(observed.st_mode):
+            raise IncarnationHomeError(
+                f"stale incarnation preparation contains a special file: {label}"
+            )
+        try:
+            children = sorted(path.iterdir(), key=lambda child: child.name)
+        except OSError as exc:
+            raise IncarnationHomeError(
+                f"stale incarnation preparation directory cannot be enumerated: {path}"
+            ) from exc
+        for child in children:
+            validate_recoverable(child, f"{label}/{child.name}")
+
+    for child in incarnation_root.iterdir():
+        if child == owner_path or child.is_symlink():
+            continue
+        validate_recoverable(child, child.name)
+    try:
+        shutil.rmtree(incarnation_root)
+    except OSError as exc:
+        raise IncarnationHomeError(
+            "stale incarnation preparation root could not be recovered"
+        ) from exc
+
+
+def _claim_preparation_root(
+    *,
+    incarnation_root: Path,
+    ambient_home: Path,
+    realization_root: Path,
+    runtime_root: Path,
+    coordinate: str,
+    holder_coordinate: str | None,
+    ambient_identities: set[tuple[int, int]],
+    owner_token: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    """Create a token before materialization, or recover an old tokened root."""
+
+    marker = incarnation_root / "incarnation-home.json"
+    if marker.exists() or marker.is_symlink():
+        return None
+    if incarnation_root.exists():
+        if incarnation_root.is_symlink() or not incarnation_root.is_dir():
+            raise IncarnationHomeError(
+                "unpublished incarnation root is not a real directory"
+            )
+        _recover_stale_preparation_root(
+            incarnation_root=incarnation_root,
+            ambient_home=ambient_home,
+            realization_root=realization_root,
+            runtime_root=runtime_root,
+            coordinate=coordinate,
+            holder_coordinate=holder_coordinate,
+            ambient_identities=ambient_identities,
+        )
+    incarnation_root.mkdir(mode=0o700, exist_ok=False)
+    record = owner_token or _preparation_owner_record(
+        ambient_home=ambient_home,
+        runtime_root=runtime_root,
+        realization_root=realization_root,
+        incarnation_root=incarnation_root,
+        coordinate=coordinate,
+        holder_coordinate=holder_coordinate,
+    )
+    try:
+        _validate_preparation_owner_record(
+            record,
+            ambient_home=ambient_home,
+            runtime_root=runtime_root,
+            realization_root=realization_root,
+            incarnation_root=incarnation_root,
+            coordinate=coordinate,
+            holder_coordinate=holder_coordinate,
+        )
+        _write_new_json(
+            incarnation_root / PREPARATION_OWNER_FILE_NAME,
+            record,
+            "incarnation preparation owner token",
+        )
+    except BaseException:
+        # The root has no published marker and no other attempt can observe it
+        # while the runtime preparation lock is held.  Remove only this empty
+        # root if token creation itself failed, so the caller never leaves an
+        # unowned first-preparation coordinate behind.
+        try:
+            incarnation_root.rmdir()
+        except OSError:
+            pass
+        raise
+    return record
+
+
+def _finish_preparation_owner(owner: dict[str, Any] | None) -> None:
+    if owner is None:
+        return
+    owner_path = Path(str(owner["incarnation_root"])) / PREPARATION_OWNER_FILE_NAME
+    if not owner_path.exists() or owner_path.is_symlink():
+        return
+    observed = _load_json(owner_path, "incarnation preparation owner token")
+    if observed != owner:
+        raise IncarnationHomeError(
+            "incarnation preparation owner token changed before publication cleanup"
+        )
+    try:
+        owner_path.unlink()
+    except OSError as exc:
+        raise IncarnationHomeError(
+            "incarnation preparation owner token could not be retired"
+        ) from exc
+
+
+def _prepare_home_attempt_owner(
+    *,
+    ambient_home: Path,
+    realization_path: Path,
+    runtime_root: Path,
+    binding_context: Path | dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    if binding_context is None:
+        return None
+    try:
+        runtime_root = _absolute_directory(runtime_root, "runtime root")
+        ambient_home = _absolute_directory(ambient_home, "ambient Codex home")
+        realization_path = _regular_file(realization_path, "model realization")
+        realization, _model, _effort, _version, fingerprint = _realization(
+            realization_path
+        )
+        context, _raw, context_digest = _holder_binding_context_input(binding_context)
+        if Path(context["runtime_state_root"]).resolve() != runtime_root:
+            return None
+        coordinate = _incarnation_coordinate(
+            str(realization.get("model_realization_id")), fingerprint
+        )
+        holder_coordinate = _holder_binding_context_coordinate(
+            context, context_digest
+        )
+        realization_root = _holder_incarnation_root(
+            runtime_root=runtime_root,
+            incarnation_coordinate=coordinate,
+            holder_coordinate=None,
+        )
+        incarnation_root = _holder_incarnation_root(
+            runtime_root=runtime_root,
+            incarnation_coordinate=coordinate,
+            holder_coordinate=holder_coordinate,
+        )
+        return _preparation_owner_record(
+            ambient_home=ambient_home,
+            runtime_root=runtime_root,
+            realization_root=realization_root,
+            incarnation_root=incarnation_root,
+            coordinate=coordinate,
+            holder_coordinate=holder_coordinate,
+        )
+    except IncarnationHomeError:
+        return None
+
+
 def _prepare_home_impl(
     *,
     ambient_home: Path,
@@ -5217,6 +5795,7 @@ def _prepare_home_impl(
     capability_grants: Sequence[Path] = (),
     binding_context: Path | dict[str, Any] | None = None,
     holder_namespace: str | None = None,
+    _owner_token: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     if holder_namespace is not None:
         raise IncarnationHomeError(
@@ -5263,11 +5842,6 @@ def _prepare_home_impl(
         raise IncarnationHomeError(
             "typed holder binding context is required for a new incarnation home"
         )
-    if holder_coordinate is not None:
-        realization_root.mkdir(mode=0o700, exist_ok=True)
-        if realization_root.is_symlink() or not realization_root.is_dir():
-            raise IncarnationHomeError("realization incarnation root is not a real directory")
-        realization_root.chmod(0o700)
     incarnation_root = _holder_incarnation_root(
         runtime_root=runtime_root,
         incarnation_coordinate=coordinate,
@@ -5279,40 +5853,47 @@ def _prepare_home_impl(
         raise IncarnationHomeError("incarnation root may not be a symlink")
     existing_marker = incarnation_root / "incarnation-home.json"
     existing: dict[str, Any] = {}
+    unpublished_root = False
     if incarnation_root.exists():
-        if existing_marker.is_symlink() or not existing_marker.is_file():
+        if existing_marker.is_symlink():
             raise IncarnationHomeError(
-                "existing incarnation home lacks an ownership marker"
+                "existing incarnation home marker may not be a symlink"
             )
-        existing = _load_json(existing_marker, "existing incarnation-home manifest")
-        if existing.get("ambient_codex_home") != str(ambient_home):
-            raise IncarnationHomeError(
-                "incarnation home is owned by another ambient Codex home"
-            )
-        if existing.get("ambient_home_identity") not in {None, ambient_identity}:
-            raise IncarnationHomeError("incarnation ambient-home identity drift")
-        if existing.get("model_realization_id") not in {
-            None,
-            realization.get("model_realization_id"),
-        }:
-            raise IncarnationHomeError("incarnation model realization identity drift")
-        if existing.get("codex_home") != str(codex_home):
-            raise IncarnationHomeError("incarnation home coordinate drift")
-        existing_holder_binding = existing.get("holder_binding")
-        if holder_context is None:
-            if existing_holder_binding is not None:
-                raise IncarnationHomeError(
-                    "typed holder binding context is required for this incarnation home"
-                )
+        if not existing_marker.is_file():
+            unpublished_root = True
         else:
-            if not isinstance(existing_holder_binding, dict):
+            existing = _load_json(existing_marker, "existing incarnation-home manifest")
+        if unpublished_root:
+            pass
+        else:
+            if existing.get("ambient_codex_home") != str(ambient_home):
                 raise IncarnationHomeError(
-                    "incarnation home lacks its typed holder binding"
+                    "incarnation home is owned by another ambient Codex home"
                 )
-            if existing_holder_binding.get("coordinate") != holder_coordinate:
-                raise IncarnationHomeError("incarnation holder binding drift")
-            if existing_holder_binding.get("binding_digest") != holder_context_digest:
-                raise IncarnationHomeError("incarnation holder binding digest drift")
+            if existing.get("ambient_home_identity") not in {None, ambient_identity}:
+                raise IncarnationHomeError("incarnation ambient-home identity drift")
+            if existing.get("model_realization_id") not in {
+                None,
+                realization.get("model_realization_id"),
+            }:
+                raise IncarnationHomeError("incarnation model realization identity drift")
+            if existing.get("codex_home") != str(codex_home):
+                raise IncarnationHomeError("incarnation home coordinate drift")
+            existing_holder_binding = existing.get("holder_binding")
+            if holder_context is None:
+                if existing_holder_binding is not None:
+                    raise IncarnationHomeError(
+                        "typed holder binding context is required for this incarnation home"
+                    )
+            else:
+                if not isinstance(existing_holder_binding, dict):
+                    raise IncarnationHomeError(
+                        "incarnation home lacks its typed holder binding"
+                    )
+                if existing_holder_binding.get("coordinate") != holder_coordinate:
+                    raise IncarnationHomeError("incarnation holder binding drift")
+                if existing_holder_binding.get("binding_digest") != holder_context_digest:
+                    raise IncarnationHomeError("incarnation holder binding digest drift")
 
     # Validate ambient inputs before creating a new content-addressed root. A
     # failed first preparation must not leave an unowned directory that blocks
@@ -5341,31 +5922,16 @@ def _prepare_home_impl(
     )
     ambient_identities = _ambient_inode_identities(ambient_home)
 
-    incarnation_root.mkdir(mode=0o700, exist_ok=True)
-    codex_home.mkdir(mode=0o700, exist_ok=True)
-    if incarnation_root.is_symlink() or codex_home.is_symlink():
-        raise IncarnationHomeError("incarnation home may not be a symlink")
-    incarnation_root.chmod(0o700)
-    codex_home.chmod(0o700)
-    for name in ("cache", "log", "tmp", DESCENDANT_BIN_NAME):
-        local = codex_home / name
-        local.mkdir(mode=0o700, exist_ok=True)
-        if local.is_symlink() or not local.is_dir():
-            raise IncarnationHomeError(f"actor-local {name} is not a real directory")
-        local.chmod(0o700)
-
-    _write_exact(codex_home / "config.toml", config, 0o600)
-
     previous_shared_names: set[str] = set()
-    if incarnation_root.exists() and isinstance(existing.get("shared_state_names"), list):
+    if isinstance(existing.get("shared_state_names"), list):
         previous_shared_names = {
             name
             for name in existing["shared_state_names"]
-            if isinstance(name, str) and name not in LOCAL_NAMES and Path(name).name == name
+            if isinstance(name, str)
+            and name not in LOCAL_NAMES
+            and Path(name).name == name
         }
-    if incarnation_root.exists() and isinstance(
-        existing.get("capability_projection"), dict
-    ):
+    if isinstance(existing.get("capability_projection"), dict):
         existing_entries = existing["capability_projection"].get("entries", {})
         if isinstance(existing_entries, dict):
             existing_entries_iter = existing_entries.values()
@@ -5380,6 +5946,95 @@ def _prepare_home_impl(
                 and isinstance(entry.get("name"), str)
             ):
                 previous_shared_names.add(entry["name"])
+
+    if incarnation_root.exists() and not unpublished_root:
+        if incarnation_root.is_symlink() or not incarnation_root.is_dir():
+            raise IncarnationHomeError("incarnation root is not a real directory")
+        if codex_home.exists() or codex_home.is_symlink():
+            observed_home = _open_stable_actor_local_entry(codex_home, "codex-home")
+            if not stat.S_ISDIR(observed_home.st_mode):
+                raise IncarnationHomeError("incarnation Codex home is not a directory")
+            prevalidated_names = [
+                name
+                for name in sorted(set(actor_local_state_names) | set(LOCAL_NAMES))
+                if not (
+                    name in previous_shared_names
+                    and (codex_home / name).is_symlink()
+                    and (codex_home / name).readlink() == ambient_home / name
+                )
+            ]
+            _validate_actor_local_entries(
+                codex_home,
+                prevalidated_names,
+                ambient_home,
+            )
+        _validate_denied_state_provenance(
+            manifest=existing,
+            codex_home=codex_home,
+            ambient_home=ambient_home,
+            names=actor_local_state_names,
+            required=existing.get("schema_version") == SCHEMA_VERSION,
+            allow_projection_expansion=True,
+        )
+    elif not unpublished_root and (codex_home.exists() or codex_home.is_symlink()):
+        raise IncarnationHomeError(
+            "unpublished incarnation home requires an ownership token"
+        )
+    for name in sorted(previous_shared_names - set(shared_names)):
+        target = codex_home / name
+        source = ambient_home / name
+        if not target.exists() and not target.is_symlink():
+            continue
+        if target.is_symlink() and target.readlink() == source:
+            continue
+        if name in actor_local_state_names:
+            _validate_actor_local_entry(
+                target,
+                name,
+                ambient_identities=ambient_identities,
+            )
+            continue
+        raise IncarnationHomeError(
+            f"obsolete capability projection link drift: {target}"
+        )
+
+    if holder_coordinate is not None:
+        realization_root.mkdir(mode=0o700, exist_ok=True)
+        if realization_root.is_symlink() or not realization_root.is_dir():
+            raise IncarnationHomeError("realization incarnation root is not a real directory")
+        realization_root.chmod(0o700)
+    active_owner = _claim_preparation_root(
+        incarnation_root=incarnation_root,
+        ambient_home=ambient_home,
+        realization_root=realization_root,
+        runtime_root=runtime_root,
+        coordinate=coordinate,
+        holder_coordinate=holder_coordinate,
+        ambient_identities=ambient_identities,
+        owner_token=_owner_token,
+    )
+
+    codex_home.mkdir(mode=0o700, exist_ok=True)
+    if incarnation_root.is_symlink() or codex_home.is_symlink():
+        raise IncarnationHomeError("incarnation home may not be a symlink")
+    incarnation_root.chmod(0o700)
+    codex_home.chmod(0o700)
+    for name in ("cache", "log", "tmp", DESCENDANT_BIN_NAME):
+        local = codex_home / name
+        if local.is_symlink():
+            raise IncarnationHomeError(f"actor-local {name} is not a real directory")
+        if not local.exists():
+            local.mkdir(mode=0o700, exist_ok=False)
+        if local.is_symlink() or not local.is_dir():
+            raise IncarnationHomeError(f"actor-local {name} is not a real directory")
+        local.chmod(0o700)
+
+    _write_exact(
+        codex_home / "config.toml",
+        config,
+        0o600,
+        ambient_identities=ambient_identities,
+    )
 
     for name in shared_names:
         source = ambient_home / name
@@ -5433,10 +6088,17 @@ def _prepare_home_impl(
         sorted(set(actor_local_state_names) | set(LOCAL_NAMES)),
         ambient_home,
     )
+    denied_provenance = _denied_state_provenance(
+        codex_home=codex_home,
+        ambient_home=ambient_home,
+        names=actor_local_state_names,
+    )
 
     manifest = {
         "$schema": "schemas/external-codex-incarnation-home.schema.json",
-        "schema_version": SCHEMA_VERSION,
+        "schema_version": (
+            SCHEMA_VERSION if holder_context is not None else LEGACY_SCHEMA_VERSION
+        ),
         "model_realization_id": realization.get("model_realization_id"),
         "model_realization_ref": str(realization_path),
         "configuration_fingerprint": fingerprint,
@@ -5455,6 +6117,7 @@ def _prepare_home_impl(
         "child_posture": "incarnation-home-via-shell-environment-policy",
     }
     if holder_context is not None and holder_context_digest is not None:
+        manifest["denied_state_provenance"] = denied_provenance
         manifest["holder_binding"] = _holder_binding_manifest_record(
             holder_context,
             holder_context_digest,
@@ -5465,32 +6128,67 @@ def _prepare_home_impl(
         json.dumps(manifest, ensure_ascii=False, sort_keys=True, indent=2).encode("utf-8")
         + b"\n",
         0o600,
+        ambient_identities=ambient_identities,
     )
+    _finish_preparation_owner(active_owner)
     return manifest
 
 
 def _rollback_unpublished_home(
     *,
-    incarnation_root: Path,
-    realization_root: Path,
-    home_preexisted: bool,
-    realization_preexisted: bool,
+    owner_token: dict[str, Any] | None,
 ) -> None:
-    """Remove only roots created by a failed first preparation."""
+    """Remove only the unpublished root carrying this attempt's exact token."""
 
-    if home_preexisted or incarnation_root.is_symlink() or not incarnation_root.is_dir():
+    if owner_token is None:
+        return
+    incarnation_root = Path(str(owner_token["incarnation_root"]))
+    realization_root = Path(str(owner_token["realization_root"]))
+    runtime_root = Path(str(owner_token["runtime_root"]))
+    coordinate = str(owner_token["coordinate"])
+    holder_coordinate = owner_token.get("holder_coordinate")
+    if incarnation_root.is_symlink() or not incarnation_root.is_dir():
         return
     marker = incarnation_root / "incarnation-home.json"
     if marker.exists() or marker.is_symlink():
         return
-    try:
-        shutil.rmtree(incarnation_root)
-        if not realization_preexisted and realization_root.is_dir():
-            realization_root.rmdir()
-    except OSError as exc:
+    owner_path = incarnation_root / PREPARATION_OWNER_FILE_NAME
+    owner = _load_json(owner_path, "incarnation preparation owner token")
+    _validate_preparation_owner_record(
+        owner,
+        ambient_home=Path(str(owner_token["ambient_home"])),
+        runtime_root=runtime_root,
+        realization_root=realization_root,
+        incarnation_root=incarnation_root,
+        coordinate=coordinate,
+        holder_coordinate=holder_coordinate,
+    )
+    if owner != owner_token:
         raise IncarnationHomeError(
-            "failed home preparation left an unpublished owner root"
-        ) from exc
+            "failed home preparation is owned by another attempt"
+        )
+    ambient_identities: set[tuple[int, int]] = set()
+    ambient_path = owner_token.get("ambient_home")
+    if isinstance(ambient_path, str):
+        ambient = Path(ambient_path)
+        if ambient.is_dir() and not ambient.is_symlink():
+            ambient_identities = _ambient_inode_identities(ambient)
+    _recover_stale_preparation_root(
+        incarnation_root=incarnation_root,
+        ambient_home=Path(str(owner_token["ambient_home"])),
+        realization_root=realization_root,
+        runtime_root=runtime_root,
+        coordinate=coordinate,
+        holder_coordinate=holder_coordinate,
+        ambient_identities=ambient_identities,
+    )
+    if realization_root.is_dir() and not any(realization_root.iterdir()):
+        try:
+            realization_root.rmdir()
+        except OSError as exc:
+            raise IncarnationHomeError(
+                "failed home preparation left an empty realization root"
+            ) from exc
 
 
 def prepare_home(
@@ -5502,64 +6200,35 @@ def prepare_home(
     binding_context: Path | dict[str, Any] | None = None,
     holder_namespace: str | None = None,
 ) -> dict[str, Any]:
-    """Prepare one home and roll back an unpublished first-attempt root."""
+    """Prepare one home under a stable runtime lock and owner-token rollback."""
 
-    rollback: tuple[Path, Path, bool, bool] | None = None
-    if binding_context is not None and holder_namespace is None:
-        try:
-            _absolute_directory(ambient_home, "ambient Codex home")
-            runtime = _absolute_directory(runtime_root, "runtime root")
-            realization_file = _regular_file(
-                realization_path, "model realization"
-            )
-            realization, _model, _effort, _version, fingerprint = _realization(
-                realization_file
-            )
-            context, _raw, context_digest = _holder_binding_context_input(
-                binding_context
-            )
-            if Path(context["runtime_state_root"]).resolve() == runtime:
-                coordinate = _incarnation_coordinate(
-                    str(realization.get("model_realization_id")), fingerprint
-                )
-                holder_coordinate = _holder_binding_context_coordinate(
-                    context, context_digest
-                )
-                realization_root = _holder_incarnation_root(
-                    runtime_root=runtime,
-                    incarnation_coordinate=coordinate,
-                    holder_coordinate=None,
-                )
-                incarnation_root = _holder_incarnation_root(
-                    runtime_root=runtime,
-                    incarnation_coordinate=coordinate,
-                    holder_coordinate=holder_coordinate,
-                )
-                rollback = (
-                    incarnation_root,
-                    realization_root,
-                    incarnation_root.exists(),
-                    realization_root.exists(),
-                )
-        except IncarnationHomeError:
-            rollback = None
-    try:
-        return _prepare_home_impl(
-            ambient_home=ambient_home,
+    ambient = _absolute_directory(ambient_home, "ambient Codex home")
+    runtime = _absolute_directory(runtime_root, "runtime root")
+    ambient_identities = _ambient_inode_identities(ambient)
+    owner_token = None
+    if holder_namespace is None:
+        owner_token = _prepare_home_attempt_owner(
+            ambient_home=ambient,
             realization_path=realization_path,
-            runtime_root=runtime_root,
-            capability_grants=capability_grants,
+            runtime_root=runtime,
             binding_context=binding_context,
-            holder_namespace=holder_namespace,
         )
+    try:
+        with _incarnation_preparation_lock(runtime, ambient_identities):
+            try:
+                return _prepare_home_impl(
+                    ambient_home=ambient,
+                    realization_path=realization_path,
+                    runtime_root=runtime,
+                    capability_grants=capability_grants,
+                    binding_context=binding_context,
+                    holder_namespace=holder_namespace,
+                    _owner_token=owner_token,
+                )
+            except BaseException:
+                _rollback_unpublished_home(owner_token=owner_token)
+                raise
     except BaseException:
-        if rollback is not None:
-            _rollback_unpublished_home(
-                incarnation_root=rollback[0],
-                realization_root=rollback[1],
-                home_preexisted=rollback[2],
-                realization_preexisted=rollback[3],
-            )
         raise
 
 
@@ -5627,13 +6296,14 @@ def _load_manifest_snapshot(
         manifest = _decode_json_snapshot(
             raw, "incarnation-home manifest snapshot"
         )
-    if manifest.get("schema_version") != SCHEMA_VERSION:
+    manifest_schema_version = manifest.get("schema_version")
+    if manifest_schema_version not in SUPPORTED_SCHEMA_VERSIONS:
         raise IncarnationHomeError("unsupported incarnation-home manifest")
     if manifest.get("$schema") != "schemas/external-codex-incarnation-home.schema.json":
         raise IncarnationHomeError("incarnation-home manifest schema binding is invalid")
     holder_binding_value = manifest.get("holder_binding")
     if holder_binding_value is None:
-        if require_holder_binding:
+        if require_holder_binding or manifest_schema_version == SCHEMA_VERSION:
             raise IncarnationHomeError(
                 "incarnation-home manifest lacks a typed holder binding"
             )
@@ -5647,6 +6317,14 @@ def _load_manifest_snapshot(
     else:
         holder_binding = _validate_holder_binding_manifest_record(holder_binding_value)
         holder_coordinate = holder_binding["coordinate"]
+        if (
+            manifest_schema_version == LEGACY_SCHEMA_VERSION
+            and require_holder_binding
+            and "denied_state_provenance" not in manifest
+        ):
+            raise IncarnationHomeError(
+                "legacy typed v2 incarnation-home manifest requires migration"
+            )
     if binding_context is not None:
         binding_context = _validate_holder_binding_context(binding_context)
         if binding_context_digest is None:
@@ -5801,8 +6479,12 @@ def _load_manifest_snapshot(
     )
     actor_local_names = manifest.get("actor_local_state_names")
     if actor_local_names is None:
+        if manifest_schema_version == SCHEMA_VERSION:
+            raise IncarnationHomeError(
+                "current incarnation-home manifest lacks actor-local state names"
+            )
         # Pre-repair v2 manifests did not name the derived denied-state set.
-        # Recompute it from the typed projection for safe live compatibility.
+        # Recompute it only on the explicitly legacy compatibility route.
         actor_local_names = expected_actor_local_names
     elif (
         not isinstance(actor_local_names, list)
@@ -5821,6 +6503,13 @@ def _load_manifest_snapshot(
         raise IncarnationHomeError(
             "actor-local state manifest no longer matches capability projection"
         )
+    _validate_denied_state_provenance(
+        manifest=manifest,
+        codex_home=codex_home,
+        ambient_home=ambient_home,
+        names=actor_local_names,
+        required=manifest_schema_version == SCHEMA_VERSION,
+    )
     expected_names = set(shared_names) | set(actor_local_names) | LOCAL_NAMES
     for entry in codex_home.iterdir():
         if entry.name not in expected_names:

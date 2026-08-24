@@ -41,7 +41,8 @@ python scripts/validate_nested_agents.py
 
 ## Incarnation-home projection and visible binding
 
-The focused home suite covers the v2 manifest/schema binding, the
+The focused home suite covers the current v3 and readable legacy v2
+manifest/schema binding, the
 owner-authored capability-class registry and its explicit unknown path, default
 projection of session continuity and actor tooling, deny-by-default ambient
 operator-control and unknown entries, exact subject-bound operator grants,
@@ -65,16 +66,19 @@ when the current typed projection demotes it to denied. Unknown or foreign
 symlinks and undeclared top-level state fail closed. New realization homes
 require the exact typed holder/task/run context, with mismatched binding, stale
 manifest, persistent sequential reuse, and overlapping claim attempts rejected.
-Same-filesystem hard links to ambient denied state, multiply linked regular
-files, device/inode aliases, and replacement during no-follow validation fail
-closed before manifest admission or launch; the adversarial fixture also
-verifies that ambient bytes remain unchanged. Distinct contexts receive
-separate manifest, config, cache, log, tmp, and descendant-binary coordinates,
-while a first-preparation validation failure removes only unpublished owner
-roots and preserves the pre-existing closeout route. Older v2 manifests
-without `actor_local_state_names` remain readable only after the loader derives
-that set from the recomputed typed projection; they cannot satisfy canonical
-launch without a typed holder binding. These are source and fixture claims; they
+Same-filesystem hard links to ambient denied state, severed ambient aliases,
+multiply linked regular files, device/inode aliases, and replacement during
+no-follow validation fail closed before manifest admission or launch; the
+adversarial fixtures also verify that ambient bytes and config mode remain
+unchanged. Distinct contexts receive separate manifest, config, cache, log,
+tmp, and descendant-binary coordinates. Synchronized first preparation is
+serializable and idempotent, while a failed or stale tokened preparer is
+recoverable without deleting another attempt's root. Legacy v2 manifests are
+schema-valid on their explicit compatibility route; holder-bound v2 manifests
+are rejected by canonical loading until preparation migrates them to v3.
+Incomplete holder receipts missing `runtime_state_root` or `closeout_route`
+are rejected by both the receipt schema and runtime binding validator. These
+are source and fixture claims; they
 do not establish host artifact admission, activation, live canary success,
 transport delivery, or owner acceptance.
 

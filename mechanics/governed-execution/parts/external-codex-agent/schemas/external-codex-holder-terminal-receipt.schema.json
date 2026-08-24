@@ -202,6 +202,8 @@
         "actor_ref",
         "incarnation_ref",
         "session_ref",
+        "runtime_state_root",
+        "closeout_route",
         "holder_ref",
         "task_ref",
         "run_ref"

@@ -25,7 +25,13 @@ manifest loading. The realization-scoped home also gave sequential holders the
 same mutable top-level namespace, so one duty could poison the next one. A
 regular-file hard link could additionally expose an ambient inode through the
 actor-local name, and a caller could reuse a namespace string without proving
-the typed responsibility context that owned it.
+the typed responsibility context that owned it. The first repair also left four
+lifecycle edges at the generic owner boundary: the ambient inode walk was only
+a current-path observation, config replacement could reach metadata mutation
+before final alias admission, concurrent first preparation used existence
+snapshots as rollback ownership, and the manifest and holder-receipt schemas
+did not express their runtime compatibility and complete binding requirements
+at the same version boundary.
 
 ## Options considered
 
@@ -48,13 +54,28 @@ entries continue to require an exact symlink to the ambient source. A prior
 shared symlink may be removed only when the current typed projection demotes
 that entry to denied; a regular local shadow is preserved.
 
+Current typed homes emit v3 denied-state provenance: one bounded record for
+each current denied name binds the ambient entry identity, when present, to the
+admitted local-tree digest. A changed ambient identity is accepted only when
+the local tree is unchanged, so unlink/replace cannot turn a previously
+ambient-derived alias into accepted holder-local state. The record is bounded
+by the current projection and is not a filename/history denylist. Every file
+write or mode update validates and safely opens the target before its first
+effect, and revalidates the target before replacement.
+
 New homes require the exact bytes of a typed holder/task/run responsibility
 context. The digest of that context selects a holder-local directory below the
 realization coordinate and is carried into the manifest and holder receipt. A
 persistent non-replacing claim reserves the home for one responsibility
 lifecycle, so a mismatched, reassigned, overlapping, or sequential launch is
 rejected. A missing typed binding remains valid only for an existing legacy v2
-ownership marker and cannot satisfy canonical launch.
+ownership marker and cannot satisfy canonical launch. Preparation attempts are
+serialized by one runtime-root lock; an unpublished root is owned by an exact
+token before materialization, and only a tokened unmarked root can be rolled
+back or recovered as stale. Legacy v2 remains schema-valid on its explicit
+read/migration route, while holder-bound v2 cannot pass canonical launch until
+preparation rewrites it to v3. Holder receipts require the complete runtime
+binding, including `runtime_state_root` and `closeout_route`.
 
 ## Rationale
 
@@ -74,6 +95,10 @@ putting actor, task, Goal, version, or path identity into policy.
 - Tradeoff: callers creating a new home must supply the owner-defined typed
   responsibility context and retain its claim until lifecycle closeout; old
   marked v2 homes remain a compatibility case until retired by their owner.
+- Tradeoff: the runtime retains one persistent preparation lock per runtime
+  root and one temporary owner token per unpublished first-preparation home;
+  stale recovery is fail-closed if that tokened tree contains an ambient alias
+  or an unsafe special entry.
 - Residual: source behavior and installed-artifact parity remain separate from
   host trust admission, live canary evidence, transport delivery, and owner
   acceptance.

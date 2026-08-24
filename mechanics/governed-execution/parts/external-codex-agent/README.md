@@ -105,7 +105,7 @@ and replay only through their matching legacy wake reservation. A retry after a 
   This identity is
   distinct from any nested proof actor. This operator surface is not A2A transport and
   does not replace the governed JSONL runtime;
-- records the v2 incarnation-home manifest as a model-neutral capability
+- records the current v3 incarnation-home manifest as a model-neutral capability
   projection. The owner-authored `capability-classes.v1.json` registry supplies
   session-continuity, actor-tooling, and known operator-control meanings. Its
   loader and schema pin those canonical policies; future vocabulary entries
@@ -131,10 +131,11 @@ and replay only through their matching legacy wake reservation. A retry after a 
   state. A denied ambient entry may have a regular-file or real-directory
   shadow created by Codex in the projected home; that shadow is never a shared
   capability link. Top-level symlinks, special files, foreign link targets, and
-  names absent from the current typed projection remain fail-closed. The
-  manifest records the derived `actor_local_state_names` set for new homes and
-  recomputes it for older v2 manifests, so this is a registry-derived
-  invariant rather than a filename exception;
+  names absent from the current typed projection remain fail-closed. The v3
+  manifest records the derived `actor_local_state_names` set plus one bounded
+  current-entry inode/tree provenance record per denied name. An ambient
+  unlink/replace is admitted only when the local tree is unchanged; no
+  unbounded pathname/history denylist is retained;
 - binds each newly created home below the realization root to the exact bytes
   of a typed holder/task/run responsibility context. The context carries the
   existing goal/actor/incarnation/session runtime coordinates plus owner-bound
@@ -143,7 +144,10 @@ and replay only through their matching legacy wake reservation. A retry after a 
   claim reserves that home for one responsibility lifecycle, so mismatched,
   reassigned, overlapping, and sequential reuse fail closed. The
   realization-scoped legacy path remains a compatibility read/preparation
-  route only for a marked older v2 home and cannot satisfy canonical launch;
+  route only for a marked older v2 home. A legacy v2 holder-bound manifest is
+  readable for migration but cannot satisfy canonical launch until preparation
+  rewrites it as v3. Every first preparation is serialized by the runtime-owned
+  preparation lock and claims an unpublished root with an exact owner token;
 - exposes the installed `aoa-external-codex-return` leaf for the final external
   return contour. The leaf receives an explicit return-owner binding and exact
   handoff/holder paths, uses a connectable local Codex app-server as a

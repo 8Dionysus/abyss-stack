@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import importlib.util
 import json
+import multiprocessing as mp
 import os
 import shutil
 import socket
@@ -115,6 +116,34 @@ def _prepare_home_for_test(**kwargs: object) -> dict[str, object]:
 
 
 MODULE.prepare_home = _prepare_home_for_test
+
+
+def _synchronized_prepare_worker(
+    ambient: str,
+    realization: str,
+    runtime_root: str,
+    context: dict[str, str],
+    result_path: str,
+    barrier: object,
+) -> None:
+    result: dict[str, object]
+    try:
+        barrier.wait()  # type: ignore[attr-defined]
+        manifest = MODULE.prepare_home(
+            ambient_home=Path(ambient),
+            realization_path=Path(realization),
+            runtime_root=Path(runtime_root),
+            binding_context=context,
+        )
+        manifest_path = Path(manifest["codex_home"]).parent / "incarnation-home.json"
+        result = {
+            "ok": True,
+            "codex_home": manifest["codex_home"],
+            "manifest_digest": MODULE.sha256_bytes(manifest_path.read_bytes()),
+        }
+    except BaseException as exc:  # pragma: no cover - reported to the parent
+        result = {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
+    Path(result_path).write_text(json.dumps(result), encoding="utf-8")
 
 
 def _shared_fixture_name() -> str:
@@ -364,6 +393,79 @@ def test_denied_ambient_entry_can_be_actor_local_regular_state_and_reprepared(
     assert shared_name in refreshed["shared_state_names"]
 
 
+def test_severed_ambient_alias_is_rejected_by_persisted_denied_provenance(
+    tmp_path: Path,
+) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    denied_name = _unknown_fixture_name(tmp_path)
+    secret = b"ambient-confidential-bytes"
+    (ambient / denied_name).write_bytes(secret)
+    realization = _realization(tmp_path / "realization.json")
+    manifest = _ORIGINAL_PREPARE_HOME(
+        ambient_home=ambient,
+        realization_path=realization,
+        runtime_root=runtime_root,
+        binding_context=_holder_binding_context(runtime_root, "severed-alias"),
+    )
+    actor_home = Path(manifest["codex_home"])
+    manifest_path = actor_home.parent / "incarnation-home.json"
+
+    os.link(ambient / denied_name, actor_home / denied_name)
+    (ambient / denied_name).unlink()
+    replacement = b"ambient-replacement-not-the-secret"
+    (ambient / denied_name).write_bytes(replacement)
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="denied-state provenance changed across ambient replacement",
+    ):
+        MODULE._load_manifest(manifest_path)
+
+    assert (actor_home / denied_name).read_bytes() == secret
+    assert (ambient / denied_name).read_bytes() == replacement
+
+
+def test_config_alias_rejection_preserves_ambient_bytes_and_mode(
+    tmp_path: Path,
+) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    ambient_config = ambient / "config.toml"
+    ambient_config.write_text('model = "sol"\n', encoding="utf-8")
+    ambient_config.chmod(0o640)
+    realization = _realization(tmp_path / "realization.json")
+    manifest = _ORIGINAL_PREPARE_HOME(
+        ambient_home=ambient,
+        realization_path=realization,
+        runtime_root=runtime_root,
+        binding_context=_holder_binding_context(runtime_root, "config-alias"),
+    )
+    actor_config = Path(manifest["codex_home"]) / "config.toml"
+    actor_config.unlink()
+    os.link(ambient_config, actor_config)
+    before_bytes = ambient_config.read_bytes()
+    before_mode = stat.S_IMODE(ambient_config.stat().st_mode)
+
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="aliases ambient state|multiply linked",
+    ):
+        _ORIGINAL_PREPARE_HOME(
+            ambient_home=ambient,
+            realization_path=realization,
+            runtime_root=runtime_root,
+            binding_context=_holder_binding_context(runtime_root, "config-alias"),
+        )
+
+    assert ambient_config.read_bytes() == before_bytes
+    assert stat.S_IMODE(ambient_config.stat().st_mode) == before_mode
+
+
 def test_new_home_requires_typed_holder_binding(tmp_path: Path) -> None:
     ambient = tmp_path / "ambient"
     runtime_root = tmp_path / "runtime"
@@ -426,6 +528,136 @@ def test_legacy_v2_manifest_derives_denied_local_state_set(tmp_path: Path) -> No
     loaded, _raw, _digest = MODULE._load_manifest_snapshot(manifest_path)
     assert denied_name not in loaded.get("shared_state_names", [])
     assert (actor_home / denied_name).read_bytes() == b"legacy-local-state"
+
+
+def test_legacy_v2_manifest_shape_is_schema_valid_without_typed_binding(
+    tmp_path: Path,
+) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    realization = _realization(tmp_path / "realization.json")
+    realization_payload = json.loads(realization.read_text(encoding="utf-8"))
+    coordinate = MODULE._incarnation_coordinate(
+        realization_payload["model_realization_id"],
+        realization_payload["configuration_fingerprint"],
+    )
+    incarnation_root = runtime_root / ("sha256-" + coordinate.removeprefix("sha256:"))
+    incarnation_root.mkdir()
+    codex_home = incarnation_root / "codex-home"
+    (incarnation_root / "incarnation-home.json").write_text(
+        json.dumps(
+            {
+                "ambient_codex_home": str(ambient),
+                "ambient_home_identity": MODULE._ambient_home_identity(ambient),
+                "model_realization_id": realization_payload["model_realization_id"],
+                "codex_home": str(codex_home),
+            }
+        ),
+        encoding="utf-8",
+    )
+    manifest = _ORIGINAL_PREPARE_HOME(
+        ambient_home=ambient,
+        realization_path=realization,
+        runtime_root=runtime_root,
+    )
+    manifest_path = incarnation_root / "incarnation-home.json"
+    legacy_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert manifest["schema_version"] == MODULE.LEGACY_SCHEMA_VERSION
+    assert "holder_binding" not in legacy_manifest
+    assert "denied_state_provenance" not in legacy_manifest
+    schema = json.loads(
+        (PART / "schemas" / "external-codex-incarnation-home.schema.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    Draft202012Validator(schema).validate(legacy_manifest)
+
+
+def test_holder_bound_legacy_v2_manifest_requires_migration_before_launch(
+    tmp_path: Path,
+) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    realization = _realization(tmp_path / "realization.json")
+    context = _holder_binding_context(runtime_root, "legacy-typed-migration")
+    manifest = _ORIGINAL_PREPARE_HOME(
+        ambient_home=ambient,
+        realization_path=realization,
+        runtime_root=runtime_root,
+        binding_context=context,
+    )
+    manifest_path = Path(manifest["codex_home"]).parent / "incarnation-home.json"
+    legacy_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    legacy_manifest["schema_version"] = MODULE.LEGACY_SCHEMA_VERSION
+    legacy_manifest.pop("denied_state_provenance")
+    manifest_path.write_text(json.dumps(legacy_manifest), encoding="utf-8")
+
+    schema = json.loads(
+        (PART / "schemas" / "external-codex-incarnation-home.schema.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    Draft202012Validator(schema).validate(legacy_manifest)
+    context_digest = MODULE.sha256_bytes(MODULE.canonical_bytes(context))
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="legacy typed v2 incarnation-home manifest requires migration",
+    ):
+        MODULE._load_manifest_snapshot(
+            manifest_path,
+            binding_context=context,
+            binding_context_digest=context_digest,
+            require_holder_binding=True,
+        )
+
+
+def test_two_synchronized_first_prepares_are_serializable_and_idempotent(
+    tmp_path: Path,
+) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    realization = _realization(tmp_path / "realization.json")
+    context = _holder_binding_context(runtime_root, "synchronized-first-prepare")
+    result_paths = [tmp_path / "prepare-a.json", tmp_path / "prepare-b.json"]
+    barrier = mp.get_context("fork").Barrier(2)
+    context_mp = mp.get_context("fork")
+    workers = [
+        context_mp.Process(
+            target=_synchronized_prepare_worker,
+            args=(
+                str(ambient),
+                str(realization),
+                str(runtime_root),
+                context,
+                str(result_path),
+                barrier,
+            ),
+        )
+        for result_path in result_paths
+    ]
+    for worker in workers:
+        worker.start()
+    for worker in workers:
+        worker.join()
+        assert worker.exitcode == 0
+
+    results = [json.loads(path.read_text(encoding="utf-8")) for path in result_paths]
+    assert all(result["ok"] is True for result in results), results
+    assert len({result["codex_home"] for result in results}) == 1
+    assert len({result["manifest_digest"] for result in results}) == 1
+    manifest_path = (
+        Path(str(results[0]["codex_home"])).parent / "incarnation-home.json"
+    )
+    assert manifest_path.is_file()
 
 
 def test_holder_local_namespaces_keep_sequential_duties_isolated(tmp_path: Path) -> None:
@@ -768,7 +1000,48 @@ def test_stale_holder_manifest_and_failed_first_prepare_roll_back(
             binding_context=failing_context,
         )
     monkeypatch.setattr(MODULE, "_validate_actor_local_entries", original_validate)
-    assert {entry.name for entry in failing_runtime.iterdir()} == {"closeout.route"}
+    assert {entry.name for entry in failing_runtime.iterdir()} == {
+        "closeout.route",
+        MODULE.PREPARATION_LOCK_FILE_NAME,
+    }
+
+
+def test_stale_tokened_preparer_is_recovered_before_retry(tmp_path: Path) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    realization = _realization(tmp_path / "realization.json")
+    context = _holder_binding_context(runtime_root, "stale-preparer")
+    owner = MODULE._prepare_home_attempt_owner(
+        ambient_home=ambient,
+        realization_path=realization,
+        runtime_root=runtime_root,
+        binding_context=context,
+    )
+    assert owner is not None
+    realization_root = Path(owner["realization_root"])
+    incarnation_root = Path(owner["incarnation_root"])
+    realization_root.mkdir(mode=0o700)
+    incarnation_root.mkdir(mode=0o700)
+    stale = dict(owner)
+    stale["pid"] = 999999
+    stale["start_ticks"] = 1
+    MODULE._write_new_json(
+        incarnation_root / MODULE.PREPARATION_OWNER_FILE_NAME,
+        stale,
+        "fixture stale preparation owner token",
+    )
+
+    manifest = _ORIGINAL_PREPARE_HOME(
+        ambient_home=ambient,
+        realization_path=realization,
+        runtime_root=runtime_root,
+        binding_context=context,
+    )
+    assert Path(manifest["codex_home"]).is_dir()
+    assert not (Path(manifest["codex_home"]).parent / MODULE.PREPARATION_OWNER_FILE_NAME).exists()
 
 
 def test_capability_projection_denies_ambient_operator_control_by_default(
@@ -1236,6 +1509,52 @@ def test_holder_schema_and_loader_reject_rebind_post_exec_identity_without_prove
         match="requires replacement_reentry provenance",
     ):
         MODULE._load_holder_receipt_snapshot(receipt_path)
+
+    complete_binding = {
+        "schema_version": MODULE.HOLDER_BINDING_CONTEXT_SCHEMA_VERSION,
+        "binding_digest": "sha256:" + "1" * 64,
+        "coordinate": "sha256:" + "2" * 64,
+        "goal_ref": "goal:test/receipt",
+        "actor_ref": "actor:test/receipt",
+        "incarnation_ref": "incarnation:test/receipt",
+        "session_ref": "session:test/receipt",
+        "runtime_state_root": "/tmp/runtime-state",
+        "closeout_route": "/tmp/closeout.route",
+        "holder_ref": "holder:test/receipt",
+        "task_ref": "task:test/receipt",
+        "run_ref": "run:test/receipt",
+    }
+    for missing in ("runtime_state_root", "closeout_route"):
+        incomplete = dict(complete_binding)
+        incomplete.pop(missing)
+        with pytest.raises(ValidationError):
+            Draft202012Validator(schema).validate(
+                {
+                    **receipt,
+                    "replacement_reentry": {
+                        "receipt_ref": "/tmp/reentry.json",
+                        "receipt_sha256": "sha256:" + "4" * 64,
+                        "duty_ref": "/tmp/duty.json",
+                        "duty_sha256": "sha256:" + "5" * 64,
+                        "failure_event_ref": "/tmp/failure.json",
+                        "failure_event_sha256": "sha256:" + "6" * 64,
+                        "goal_id": "goal:test/receipt",
+                        "actor_id": "actor:test/receipt",
+                        "session_id": "session:test/receipt",
+                        "holder_pid": 101,
+                        "holder_start_ticks": 1001,
+                    },
+                    "runtime": {
+                        **receipt["runtime"],
+                        "holder_binding": incomplete,
+                    },
+                }
+            )
+        with pytest.raises(
+            MODULE.IncarnationHomeError,
+            match="holder binding fields are not exact",
+        ):
+            MODULE._validate_holder_binding_manifest_record(incomplete)
 
 
 def test_holder_loss_reentry_is_exactly_bound_to_source_evidence(
