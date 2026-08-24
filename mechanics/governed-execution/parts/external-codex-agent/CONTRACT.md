@@ -378,7 +378,10 @@ materializes those sealed bytes into the matching package-relative tree in a
 private `/var/tmp` tmpfs, applies the admitted modes, and remounts that tree
 read-only before both version probing and final exec. This prevents the
 same-UID holder from replacing or chmodding the exact launcher or dependency
-coordinate. The mirror keeps the launcher's `$0`/module-relative coordinate,
+coordinate. Each package-file execute-access probe is bracketed by retained-
+descriptor source-version checks; actual byte, mode, ACL, or other metadata
+drift fails closed, while unlink-only link-count drift is safe for the retained
+inode. The mirror keeps the launcher's `$0`/module-relative coordinate,
 including parent-relative paths from nested launchers. Only source ancestors
 outside the detected package boundary are linked; the package subtree is
 copied without writing to a root-owned installed package. The host snapshot

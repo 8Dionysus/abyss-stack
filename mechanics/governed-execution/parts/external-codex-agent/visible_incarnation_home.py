@@ -10774,6 +10774,35 @@ def _effective_execute_access(descriptor: int) -> bool:
     )
 
 
+def _package_source_version_changed(
+    before: os.stat_result,
+    after: os.stat_result,
+) -> bool:
+    """Detect source changes that can alter copied bytes or effective access."""
+
+    if (
+        before.st_dev,
+        before.st_ino,
+        before.st_mode,
+        before.st_size,
+        before.st_mtime_ns,
+    ) != (
+        after.st_dev,
+        after.st_ino,
+        after.st_mode,
+        after.st_size,
+        after.st_mtime_ns,
+    ):
+        return True
+    # Unlinking the ambient name legitimately changes link count and ctime on
+    # the retained inode.  A ctime-only change with a stable link count still
+    # identifies an ACL, ownership, or other metadata mutation.
+    return (
+        before.st_ctime_ns != after.st_ctime_ns
+        and before.st_nlink == after.st_nlink
+    )
+
+
 def _copy_package_file(
     source: Path,
     target: Path,
@@ -10799,26 +10828,22 @@ def _copy_package_file(
                 break
             chunks.append(chunk)
         after = os.fstat(source_fd)
-        if (
-            before.st_dev,
-            before.st_ino,
-            before.st_size,
-            before.st_mtime_ns,
-            before.st_ctime_ns,
-            stat.S_IMODE(before.st_mode),
-        ) != (
-            after.st_dev,
-            after.st_ino,
-            after.st_size,
-            after.st_mtime_ns,
-            after.st_ctime_ns,
-            stat.S_IMODE(after.st_mode),
-        ):
+        if _package_source_version_changed(before, after):
             raise IncarnationHomeError(
                 f"package snapshot source changed while reading: {source}"
             )
         content = b"".join(chunks)
+        access_before = os.fstat(source_fd)
+        if _package_source_version_changed(after, access_before):
+            raise IncarnationHomeError(
+                f"package snapshot source changed before access check: {source}"
+            )
         target_mode = 0o500 if _effective_execute_access(source_fd) else 0o400
+        access_after = os.fstat(source_fd)
+        if _package_source_version_changed(access_before, access_after):
+            raise IncarnationHomeError(
+                f"package snapshot source changed during access check: {source}"
+            )
         target_flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
         if hasattr(os, "O_NOFOLLOW"):
             target_flags |= os.O_NOFOLLOW

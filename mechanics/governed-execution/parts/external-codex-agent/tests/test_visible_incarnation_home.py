@@ -6679,6 +6679,46 @@ def test_package_snapshot_mode_uses_acl_aware_retained_descriptor(
     assert descriptor_kwargs == {"effective_ids": True}
 
 
+def test_package_snapshot_rejects_mode_race_after_access_probe(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = tmp_path / "source"
+    source.write_bytes(b"unchanged-content")
+    source.chmod(0o700)
+    target = tmp_path / "target" / "codex"
+    target.parent.mkdir()
+    original_access = MODULE.os.access
+    probe_raced = False
+
+    def mutate_after_access_probe(
+        path: str | bytes | os.PathLike[str] | os.PathLike[bytes],
+        mode: int,
+        *args: object,
+        **kwargs: object,
+    ) -> bool:
+        nonlocal probe_raced
+        result = original_access(path, mode, *args, **kwargs)
+        if str(path).startswith("/proc/self/fd/") and mode == MODULE.os.X_OK:
+            source.chmod(0o644)
+            probe_raced = True
+        return result
+
+    monkeypatch.setattr(MODULE.os, "access", mutate_after_access_probe)
+    records: dict[Path, tuple[int, int, str, int]] = {}
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="changed during access check",
+    ):
+        MODULE._copy_package_file(source, target, records=records)
+
+    assert probe_raced
+    assert source.read_bytes() == b"unchanged-content"
+    assert stat.S_IMODE(source.stat().st_mode) == 0o644
+    assert not target.exists()
+    assert records == {}
+
+
 def test_shebang_snapshot_preserves_effective_companion_execute_mode(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
