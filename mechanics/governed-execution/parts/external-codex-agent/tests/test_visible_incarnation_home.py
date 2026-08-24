@@ -710,6 +710,55 @@ def test_ambient_directory_vanish_before_safe_open_is_rejected(
     )
 
 
+def test_ambient_directory_replacement_before_safe_open_is_rejected(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ambient = tmp_path / "ambient"
+    ambient.mkdir()
+    denied_directory = ambient / "denied-directory"
+    denied_directory.mkdir()
+    (denied_directory / "secret.json").write_bytes(b"ambient-descendant-secret")
+    moved_directory = tmp_path / "moved-denied-directory"
+    replacement_directory = ambient / "denied-directory"
+    original_open = MODULE.os.open
+    root_fd: int | None = None
+    replaced = False
+
+    def racing_open(
+        path: object,
+        flags: int,
+        mode: int = 0o777,
+        *,
+        dir_fd: int | None = None,
+    ) -> int:
+        nonlocal root_fd, replaced
+        if path == ambient and dir_fd is None:
+            root_fd = original_open(path, flags, mode, dir_fd=dir_fd)
+            return root_fd
+        if (
+            path == replacement_directory.name
+            and dir_fd == root_fd
+            and not replaced
+        ):
+            denied_directory.rename(moved_directory)
+            replacement_directory.mkdir()
+            replaced = True
+        return original_open(path, flags, mode, dir_fd=dir_fd)
+
+    monkeypatch.setattr(MODULE.os, "open", racing_open)
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="ambient capability directory changed before safe open",
+    ):
+        MODULE._ambient_inode_identities(ambient)
+
+    assert replaced
+    assert (moved_directory / "secret.json").read_bytes() == (
+        b"ambient-descendant-secret"
+    )
+    assert replacement_directory.is_dir()
+
+
 def test_actor_local_child_replacement_after_walk_revalidation_is_rejected(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -879,7 +879,9 @@ def _ambient_inode_identities(ambient_home: Path) -> set[tuple[int, int]]:
                         or child_identity != observed_identity
                     ):
                         os.close(child_fd)
-                        continue
+                        raise IncarnationHomeError(
+                            "ambient capability directory changed before safe open"
+                        )
                     if child_identity in visited_directories:
                         os.close(child_fd)
                         continue

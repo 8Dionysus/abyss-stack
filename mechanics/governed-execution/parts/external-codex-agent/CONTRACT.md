@@ -880,7 +880,8 @@ absent or may be a top-level regular file or real directory created by the
 actor. It is not a shared link, and the runtime never deletes it during
 prepare. Validation opens each existing denied entry without following
 symlinks, retains directory descriptors through recursive enumeration, and
-revalidates each named entry after the final descriptor-based observation. It
+revalidates each named entry after the final descriptor-based observation and
+rejects a stat-to-open replacement of any denied directory before traversal. It
 rechecks its device/inode/mode across the observation, recursively checks real
 directories, rejects every multiply linked regular file, and rejects any inode
 also present below the ambient home. Thus same-filesystem hard links,

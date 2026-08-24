@@ -143,7 +143,8 @@ and replay only through their matching legacy wake reservation. A retry after a 
   a name is renamed away while it is being inspected; a directory identity or
   type race fails closed rather than traversing a replacement and losing its
   descendants, and every visited child name is revalidated after its complete
-  descriptor-relative walk;
+  descriptor-relative walk; a stat-to-open replacement of any denied directory
+  also fails closed before its descendants can be omitted from provenance;
 - binds each newly created home below the realization root to the exact bytes
   of a typed holder/task/run responsibility context. The context carries the
   existing goal/actor/incarnation/session runtime coordinates plus owner-bound

@@ -69,8 +69,9 @@ manifest, persistent sequential reuse, and overlapping claim attempts rejected.
 Same-filesystem hard links to ambient denied state, severed ambient aliases,
 denied inodes moved during materialization, multiply linked regular files,
 device/inode aliases, a directory-entry rename/stat race that could lose
-descendants, replacement during no-follow validation, and a child swap after
-its complete descriptor-relative walk fail closed before manifest admission or
+descendants, replacement during no-follow validation, a stat-to-open directory
+replacement, and a child swap after its complete descriptor-relative walk fail
+closed before manifest admission or
 launch;
 the adversarial fixtures also verify that ambient bytes and config mode remain
 unchanged. Existing-file updates stage the new bytes through an unnameable
