@@ -73,8 +73,9 @@ descendants, replacement during no-follow validation, a stat-to-open directory
 replacement, and a child swap after its complete descriptor-relative walk fail
 closed before manifest admission or
 launch;
-the adversarial fixtures also verify that ambient bytes and config mode remain
-unchanged. Existing-file updates stage the new bytes through an unnameable
+the complete top-level name set is also rejected before an existing home is
+claimed or mutated, and the adversarial fixtures verify that ambient bytes and
+config mode remain unchanged. Existing-file updates stage the new bytes through an unnameable
 descriptor and atomically exchange them only after verifying the displaced
 target inode, so a concurrent target replacement cannot delete a victim and a
 deterministic truncate/write failure preserves the prior bytes, mode, and inode.

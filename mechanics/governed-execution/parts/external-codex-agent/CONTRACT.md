@@ -902,7 +902,9 @@ cannot become acceptable merely because its ambient pathname was replaced. The
 snapshot is collected from retained descriptor-relative directory entries, so
 a rename during entry stat retains the original device/inode identity; a
 directory identity or type race fails closed instead of traversing a replacement
-and losing its descendants. The snapshot
+and losing its descendants. Before the preparation owner claims or mutates an
+existing home, the complete top-level name set is enumerated through a stable
+descriptor and rejected if it contains an undeclared entry. The snapshot
 is bounded to that preparation and is not a filename/history denylist.
 Every file writer pins and revalidates the target parent descriptor before
 creating, replacing, or mode-updating a file, so a parent rename or symlink

@@ -145,6 +145,9 @@ and replay only through their matching legacy wake reservation. A retry after a 
   descendants, and every visited child name is revalidated after its complete
   descriptor-relative walk; a stat-to-open replacement of any denied directory
   also fails closed before its descendants can be omitted from provenance;
+- validates the complete top-level name set of an existing home before claiming
+  or mutating it, so undeclared state cannot leave partial config, mode, or
+  projection effects behind;
 - binds each newly created home below the realization root to the exact bytes
   of a typed holder/task/run responsibility context. The context carries the
   existing goal/actor/incarnation/session runtime coordinates plus owner-bound

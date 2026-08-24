@@ -1650,6 +1650,119 @@ def test_claimed_home_rejects_repreparation_before_any_projection_effect(
     assert claim_digest == MODULE.sha256_bytes(claim_path.read_bytes())
 
 
+def test_unclaimed_home_rejects_undeclared_entry_before_any_effect(
+    tmp_path: Path,
+) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    ambient_config = ambient / "config.toml"
+    ambient_config.write_text('model = "sol"\n', encoding="utf-8")
+    ambient_config.chmod(0o640)
+    (ambient / "app-server-control").mkdir()
+    realization = _realization(tmp_path / "realization.json")
+    grant = _capability_grant(
+        tmp_path / "grant.json",
+        ambient=ambient,
+        realization=realization,
+        ambient_entry="app-server-control",
+    )
+    manifest = MODULE.prepare_home(
+        ambient_home=ambient,
+        realization_path=realization,
+        runtime_root=runtime_root,
+        capability_grants=[grant],
+    )
+    actor_home = Path(manifest["codex_home"])
+    manifest_path = actor_home.parent / "incarnation-home.json"
+    projection = actor_home / "app-server-control"
+    unexpected = actor_home / "undeclared-top-level"
+    unexpected.write_bytes(b"foreign-state")
+
+    before_manifest = manifest_path.read_bytes()
+    before_home_mode = stat.S_IMODE(actor_home.stat().st_mode)
+    before_root_mode = stat.S_IMODE(actor_home.parent.stat().st_mode)
+    before_config = actor_home / "config.toml"
+    before_config_bytes = before_config.read_bytes()
+    before_config_stat = os.lstat(before_config)
+    before_projection_stat = os.lstat(projection)
+    before_projection_target = projection.readlink()
+    before_unexpected_stat = os.lstat(unexpected)
+    before_names = sorted(entry.name for entry in actor_home.iterdir())
+    local_names = ("cache", "log", "tmp", MODULE.DESCENDANT_BIN_NAME)
+    before_local_modes = {
+        name: stat.S_IMODE((actor_home / name).stat().st_mode)
+        for name in local_names
+    }
+    before_ambient_bytes = ambient_config.read_bytes()
+    before_ambient_stat = os.lstat(ambient_config)
+
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="unexpected incarnation-home entry: undeclared-top-level",
+    ):
+        MODULE.prepare_home(
+            ambient_home=ambient,
+            realization_path=realization,
+            runtime_root=runtime_root,
+            capability_grants=[grant],
+        )
+
+    assert manifest_path.read_bytes() == before_manifest
+    assert stat.S_IMODE(actor_home.stat().st_mode) == before_home_mode
+    assert stat.S_IMODE(actor_home.parent.stat().st_mode) == before_root_mode
+    assert before_config.read_bytes() == before_config_bytes
+    after_config_stat = os.lstat(before_config)
+    assert (
+        after_config_stat.st_dev,
+        after_config_stat.st_ino,
+        after_config_stat.st_mode,
+    ) == (
+        before_config_stat.st_dev,
+        before_config_stat.st_ino,
+        before_config_stat.st_mode,
+    )
+    after_projection_stat = os.lstat(projection)
+    assert projection.readlink() == before_projection_target
+    assert (
+        after_projection_stat.st_dev,
+        after_projection_stat.st_ino,
+        after_projection_stat.st_mode,
+    ) == (
+        before_projection_stat.st_dev,
+        before_projection_stat.st_ino,
+        before_projection_stat.st_mode,
+    )
+    after_unexpected_stat = os.lstat(unexpected)
+    assert unexpected.read_bytes() == b"foreign-state"
+    assert (
+        after_unexpected_stat.st_dev,
+        after_unexpected_stat.st_ino,
+        after_unexpected_stat.st_mode,
+    ) == (
+        before_unexpected_stat.st_dev,
+        before_unexpected_stat.st_ino,
+        before_unexpected_stat.st_mode,
+    )
+    assert sorted(entry.name for entry in actor_home.iterdir()) == before_names
+    assert {
+        name: stat.S_IMODE((actor_home / name).stat().st_mode)
+        for name in local_names
+    } == before_local_modes
+    assert ambient_config.read_bytes() == before_ambient_bytes
+    after_ambient_stat = os.lstat(ambient_config)
+    assert (
+        after_ambient_stat.st_dev,
+        after_ambient_stat.st_ino,
+        after_ambient_stat.st_mode,
+    ) == (
+        before_ambient_stat.st_dev,
+        before_ambient_stat.st_ino,
+        before_ambient_stat.st_mode,
+    )
+
+
 def test_launch_claim_rejects_manifest_replacement_after_snapshot_before_lock(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

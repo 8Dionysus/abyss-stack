@@ -133,6 +133,19 @@ SAFE_PROJECTION_FORBIDDEN_KEYS = frozenset(
 LOCAL_NAMES = frozenset(
     {"config.toml", "cache", "log", "tmp", DESCENDANT_BIN_NAME}
 )
+
+
+def _is_declared_staging_recovery_name(name: str) -> bool:
+    stage = STAGED_FILE_NAME_PATTERN.fullmatch(name)
+    if stage is not None:
+        return stage.group("target") in LOCAL_NAMES
+    quarantine = STAGED_QUARANTINE_NAME_PATTERN.fullmatch(name)
+    if quarantine is None:
+        return False
+    stage = STAGED_FILE_NAME_PATTERN.fullmatch(quarantine.group("stage"))
+    return stage is not None and stage.group("target") in LOCAL_NAMES
+
+
 ROOT_KEY_LINE = re.compile(
     r"^\s*(?P<key>model|model_reasoning_effort|\"model\"|\"model_reasoning_effort\")\s*="
 )
@@ -1192,6 +1205,45 @@ def _open_stable_actor_local_entry(target: Path, name: str) -> os.stat_result:
     )
     try:
         return opened
+    finally:
+        os.close(descriptor)
+
+
+def _validate_actor_local_top_level_names(
+    codex_home: Path, expected_names: set[str]
+) -> None:
+    """Reject undeclared top-level state before any home mutation."""
+
+    if not codex_home.exists() and not codex_home.is_symlink():
+        return
+    descriptor, _initial, opened = _open_stable_actor_local_path_descriptor(
+        codex_home, "codex-home"
+    )
+    try:
+        if not stat.S_ISDIR(opened.st_mode):
+            raise IncarnationHomeError("incarnation Codex home is not a directory")
+        try:
+            with os.scandir(descriptor) as entries:
+                observed_names = {entry.name for entry in entries}
+            after_listing = os.fstat(descriptor)
+        except OSError as exc:
+            raise IncarnationHomeError(
+                "incarnation Codex home cannot be enumerated safely"
+            ) from exc
+        if _actor_local_identity_mode(after_listing) != _actor_local_identity_mode(opened):
+            raise IncarnationHomeError(
+                "incarnation Codex home changed during top-level validation"
+            )
+        unexpected = sorted(
+            name
+            for name in observed_names
+            if name not in expected_names
+            and not _is_declared_staging_recovery_name(name)
+        )
+        if unexpected:
+            raise IncarnationHomeError(
+                f"unexpected incarnation-home entry: {unexpected[0]}"
+            )
     finally:
         os.close(descriptor)
 
@@ -7908,6 +7960,15 @@ def _prepare_home_impl(
             ):
                 previous_shared_names.add(entry["name"])
 
+    expected_names = (
+        set(shared_names)
+        | set(actor_local_state_names)
+        | LOCAL_NAMES
+        | previous_shared_names
+    )
+    if incarnation_root.exists() and not unpublished_root:
+        _validate_actor_local_top_level_names(codex_home, expected_names)
+
     if incarnation_root.exists() and not unpublished_root:
         if incarnation_root.is_symlink() or not incarnation_root.is_dir():
             raise IncarnationHomeError("incarnation root is not a real directory")
@@ -8043,7 +8104,6 @@ def _prepare_home_impl(
                 f"obsolete capability projection link drift: {target}"
             )
 
-    expected_names = set(shared_names) | set(actor_local_state_names) | LOCAL_NAMES
     for entry in codex_home.iterdir():
         if entry.name not in expected_names:
             raise IncarnationHomeError(
