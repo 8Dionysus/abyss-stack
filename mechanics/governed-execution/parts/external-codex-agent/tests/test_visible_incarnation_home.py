@@ -6640,6 +6640,21 @@ def test_package_snapshot_mode_comes_from_retained_source_descriptor(
     assert records[target][3] == 0o500
 
 
+def test_package_snapshot_mode_does_not_promote_inapplicable_execute_bit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    info = SimpleNamespace(
+        st_mode=stat.S_IFREG | 0o401,
+        st_uid=41001,
+        st_gid=42001,
+    )
+    monkeypatch.setattr(MODULE.os, "geteuid", lambda: info.st_uid)
+    monkeypatch.setattr(MODULE.os, "getegid", lambda: 43001)
+    monkeypatch.setattr(MODULE.os, "getgroups", lambda: [])
+
+    assert not MODULE._effective_execute_access(info)
+
+
 def test_shebang_snapshot_preserves_effective_companion_execute_mode(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -6653,6 +6668,7 @@ def test_shebang_snapshot_preserves_effective_companion_execute_mode(
     companion = executable.parent / MODULE.CODE_MODE_HOST_NAME
     companion.write_bytes(b"group-executable-companion")
     companion.chmod(0o450)
+    companion_info = companion.stat()
     original_access = MODULE.os.access
 
     def allow_companion_execute(
@@ -6666,6 +6682,9 @@ def test_shebang_snapshot_preserves_effective_companion_execute_mode(
         return original_access(path, mode, *args, **kwargs)
 
     monkeypatch.setattr(MODULE.os, "access", allow_companion_execute)
+    monkeypatch.setattr(MODULE.os, "geteuid", lambda: companion_info.st_uid + 1)
+    monkeypatch.setattr(MODULE.os, "getegid", lambda: companion_info.st_gid)
+    monkeypatch.setattr(MODULE.os, "getgroups", lambda: [])
     (
         snapshot_fd,
         _snapshot_exec_path,
