@@ -382,7 +382,7 @@ coordinate. The mirror keeps the launcher's `$0`/module-relative coordinate,
 including parent-relative paths from nested launchers. Only source ancestors
 outside the detected package boundary are linked; the package subtree is
 copied without writing to a root-owned installed package. The host snapshot
-lives under the manifest's admitted `codex_home/tmp` local directory, and its
+lives under the manifest's admitted runtime-root scratch directory, and its
 `noexec` filesystem is rejected before materialization; it is lifecycle cleanup
 evidence, not the final execution coordinate. The named form remains reopenable
 for Node-backed `#!/usr/bin/env node` launchers. A lifecycle child removes the

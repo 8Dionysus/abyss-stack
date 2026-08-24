@@ -99,8 +99,8 @@ and replay only through their matching legacy wake reservation. A retry after a 
   coordinate, including parent-relative paths such as `bin/` launchers
   resolving `../vendor`. Source-ancestor links are retained only outside the
   detected package boundary; the package subtree is copied without writing to
-  a root-owned installed package. The host snapshot lives under the admitted
-  `codex_home/tmp` local directory, and its filesystem is rejected when marked
+  a root-owned installed package. The host snapshot uses the admitted
+  runtime-root scratch directory, and its filesystem is rejected when marked
   `noexec`; it remains lifecycle cleanup evidence rather than the mutable
   final execution coordinate. A lifecycle child removes the exact snapshot and
   mirror after the holder's PID/start-tick identity exits. Both routes execute

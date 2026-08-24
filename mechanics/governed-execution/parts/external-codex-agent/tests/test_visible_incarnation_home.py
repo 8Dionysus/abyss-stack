@@ -4380,6 +4380,9 @@ def test_direct_launch_records_the_actual_responsibility_holder_before_exec(
     )
     manifest_path = Path(manifest["codex_home"]).parent / "incarnation-home.json"
     manifest_snapshot = manifest_path.read_bytes()
+    codex_tmp = Path(manifest["codex_home"]) / "tmp"
+    codex_tmp.chmod(0o500)
+    assert MODULE._launch_snapshot_root(manifest) == runtime_root
     executable = tmp_path / "codex"
     executable.write_text(
         "#!/bin/sh\n"
@@ -4546,8 +4549,7 @@ def test_direct_launch_records_the_actual_responsibility_holder_before_exec(
     assert "--tmpfs" in captured["argv"]
     assert "--remount-ro" in captured["argv"]
     snapshot_dir = next(
-        path
-        for path in (Path(manifest["codex_home"]) / "tmp").iterdir()
+        path for path in runtime_root.iterdir()
         if path.name.startswith("abyss-stack-codex-package-")
     )
     snapshot_path = next(snapshot_dir.rglob("codex"))
@@ -6602,6 +6604,40 @@ def test_package_snapshot_does_not_mirror_ancestor_siblings(
             snapshot_exec,
             snapshot_dir=snapshot_dir,
         )
+
+
+def test_package_snapshot_mode_comes_from_retained_source_descriptor(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = tmp_path / "source"
+    source.write_bytes(b"original")
+    source.chmod(0o700)
+    target = tmp_path / "target" / "codex"
+    target.parent.mkdir()
+    original_fstat = MODULE.os.fstat
+    calls = 0
+    raced = False
+
+    def replace_after_source_read(fd: int) -> os.stat_result:
+        nonlocal calls, raced
+        observed = original_fstat(fd)
+        calls += 1
+        if calls == 2:
+            source.unlink()
+            source.write_bytes(b"replacement")
+            source.chmod(0o644)
+            raced = True
+        return observed
+
+    monkeypatch.setattr(MODULE.os, "fstat", replace_after_source_read)
+    records: dict[Path, tuple[int, int, str, int]] = {}
+    MODULE._copy_package_file(source, target, records=records)
+
+    assert raced
+    assert target.read_bytes() == b"original"
+    assert stat.S_IMODE(target.stat().st_mode) == 0o500
+    assert records[target][3] == 0o500
 
 
 def test_shebang_snapshot_preserves_effective_companion_execute_mode(

@@ -10593,6 +10593,15 @@ def _execution_snapshot_root(preferred: Path | None) -> Path:
     return root
 
 
+def _launch_snapshot_root(manifest: dict[str, Any]) -> Path:
+    """Use runtime-owned scratch space, not holder-local state, for mirrors."""
+
+    runtime_root = manifest.get("runtime_root")
+    if not isinstance(runtime_root, str):
+        raise IncarnationHomeError("manifest runtime root is missing")
+    return _execution_snapshot_root(Path(runtime_root))
+
+
 def _package_root(executable: Path) -> Path:
     """Find the nearest package boundary without following a marker link."""
 
@@ -10799,7 +10808,9 @@ def _copy_package_file(
                 f"package snapshot source changed while reading: {source}"
             )
         content = b"".join(chunks)
-        target_mode = 0o500 if os.access(source, os.X_OK) else 0o400
+        target_mode = (
+            0o500 if stat.S_IMODE(before.st_mode) & 0o111 else 0o400
+        )
         target_flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
         if hasattr(os, "O_NOFOLLOW"):
             target_flags |= os.O_NOFOLLOW
@@ -11938,7 +11949,7 @@ def command_launch(args: argparse.Namespace) -> int:
                 executable_snapshot_mount,
             ) = _open_verified_executable(
                 executable,
-                snapshot_root=Path(str(manifest["codex_home"])) / "tmp",
+                snapshot_root=_launch_snapshot_root(manifest),
             )
         except BaseException:
             _release_holder_claim(
@@ -12229,7 +12240,7 @@ def command_launch(args: argparse.Namespace) -> int:
             executable_snapshot_mount,
         ) = _open_verified_executable(
             executable,
-            snapshot_root=Path(str(manifest["codex_home"])) / "tmp",
+            snapshot_root=_launch_snapshot_root(manifest),
         )
     except BaseException:
         _release_holder_claim(
