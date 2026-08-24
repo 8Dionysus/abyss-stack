@@ -787,8 +787,22 @@ def _identity_from_record(value: object, label: str) -> tuple[int, int] | None:
     return device, inode
 
 
-def _open_stable_actor_local_entry(target: Path, name: str) -> os.stat_result:
-    """Open one entry without following a replacement symlink and recheck it."""
+def _actor_local_open_flags(observed: os.stat_result) -> int:
+    if stat.S_ISDIR(observed.st_mode):
+        flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+    else:
+        flags = getattr(os, "O_PATH", os.O_RDONLY)
+    return flags | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
+
+
+def _actor_local_identity_mode(observed: os.stat_result) -> tuple[int, int, int]:
+    return observed.st_dev, observed.st_ino, observed.st_mode
+
+
+def _open_stable_actor_local_path_descriptor(
+    target: Path, name: str
+) -> tuple[int, os.stat_result, os.stat_result]:
+    """Open one path without following a replacement symlink and retain it."""
 
     try:
         initial = os.lstat(target)
@@ -800,10 +814,8 @@ def _open_stable_actor_local_entry(target: Path, name: str) -> os.stat_result:
         raise IncarnationHomeError(
             f"actor-local capability entry may not be a symlink: {target}"
         )
-    flags = getattr(os, "O_PATH", os.O_RDONLY)
-    flags |= getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
     try:
-        descriptor = os.open(target, flags)
+        descriptor = os.open(target, _actor_local_open_flags(initial))
     except OSError as exc:
         raise IncarnationHomeError(
             f"actor-local capability entry cannot be opened safely: {target}"
@@ -812,35 +824,205 @@ def _open_stable_actor_local_entry(target: Path, name: str) -> os.stat_result:
         opened = os.fstat(descriptor)
         observed = os.lstat(target)
         if (
-            (
-                opened.st_dev,
-                opened.st_ino,
-                opened.st_mode,
-            )
-            != (
-                initial.st_dev,
-                initial.st_ino,
-                initial.st_mode,
-            )
-            or (
-                opened.st_dev,
-                opened.st_ino,
-                opened.st_mode,
-            )
-            != (
-                observed.st_dev,
-                observed.st_ino,
-                observed.st_mode,
-            )
+            _actor_local_identity_mode(opened) != _actor_local_identity_mode(initial)
+            or _actor_local_identity_mode(opened) != _actor_local_identity_mode(observed)
         ):
             raise IncarnationHomeError(
                 f"actor-local capability entry changed during validation: {name}"
             )
-        return opened
+        return descriptor, initial, opened
+    except IncarnationHomeError:
+        os.close(descriptor)
+        raise
     except OSError as exc:
+        os.close(descriptor)
         raise IncarnationHomeError(
             f"actor-local capability entry cannot be inspected: {target}"
         ) from exc
+
+
+def _open_stable_actor_local_child_descriptor(
+    parent_fd: int, child_name: str, label: str
+) -> tuple[int, os.stat_result, os.stat_result]:
+    """Open one directory child relative to a retained parent descriptor."""
+
+    try:
+        initial = os.stat(child_name, dir_fd=parent_fd, follow_symlinks=False)
+    except OSError as exc:
+        raise IncarnationHomeError(
+            f"actor-local capability entry cannot be inspected: {label}"
+        ) from exc
+    if stat.S_ISLNK(initial.st_mode):
+        raise IncarnationHomeError(
+            f"actor-local capability entry may not be a symlink: {label}"
+        )
+    try:
+        descriptor = os.open(
+            child_name,
+            _actor_local_open_flags(initial),
+            dir_fd=parent_fd,
+        )
+    except OSError as exc:
+        raise IncarnationHomeError(
+            f"actor-local capability entry cannot be opened safely: {label}"
+        ) from exc
+    try:
+        opened = os.fstat(descriptor)
+        observed = os.stat(child_name, dir_fd=parent_fd, follow_symlinks=False)
+        if (
+            _actor_local_identity_mode(opened) != _actor_local_identity_mode(initial)
+            or _actor_local_identity_mode(opened) != _actor_local_identity_mode(observed)
+        ):
+            raise IncarnationHomeError(
+                f"actor-local capability entry changed during validation: {label}"
+            )
+        return descriptor, initial, opened
+    except IncarnationHomeError:
+        os.close(descriptor)
+        raise
+    except OSError as exc:
+        os.close(descriptor)
+        raise IncarnationHomeError(
+            f"actor-local capability entry cannot be inspected: {label}"
+        ) from exc
+
+
+def _revalidate_actor_local_path(
+    target: Path,
+    descriptor: int,
+    initial: os.stat_result,
+    label: str,
+) -> None:
+    try:
+        observed = os.lstat(target)
+        opened = os.fstat(descriptor)
+    except OSError as exc:
+        raise IncarnationHomeError(
+            f"actor-local capability entry changed during validation: {label}"
+        ) from exc
+    if (
+        _actor_local_identity_mode(opened) != _actor_local_identity_mode(initial)
+        or _actor_local_identity_mode(opened) != _actor_local_identity_mode(observed)
+    ):
+        raise IncarnationHomeError(
+            f"actor-local capability entry changed during validation: {label}"
+        )
+
+
+def _revalidate_actor_local_child(
+    parent_fd: int,
+    child_name: str,
+    descriptor: int,
+    initial: os.stat_result,
+    label: str,
+) -> None:
+    try:
+        observed = os.stat(child_name, dir_fd=parent_fd, follow_symlinks=False)
+        opened = os.fstat(descriptor)
+    except OSError as exc:
+        raise IncarnationHomeError(
+            f"actor-local capability entry changed during validation: {label}"
+        ) from exc
+    if (
+        _actor_local_identity_mode(opened) != _actor_local_identity_mode(initial)
+        or _actor_local_identity_mode(opened) != _actor_local_identity_mode(observed)
+    ):
+        raise IncarnationHomeError(
+            f"actor-local capability entry changed during validation: {label}"
+        )
+
+
+def _walk_stable_actor_local_tree(
+    target: Path, name: str
+) -> list[tuple[str, os.stat_result]]:
+    """Walk actor-local state through retained descriptors, not mutable paths."""
+
+    root_fd, root_initial, root_opened = _open_stable_actor_local_path_descriptor(
+        target, name
+    )
+    records: list[tuple[str, os.stat_result]] = []
+    visited_directories: set[tuple[int, int]] = set()
+
+    def visit(
+        descriptor: int,
+        initial: os.stat_result,
+        opened: os.stat_result,
+        relative: str,
+        *,
+        parent_fd: int | None,
+        child_name: str | None,
+    ) -> None:
+        try:
+            current = os.fstat(descriptor)
+            if _actor_local_identity_mode(current) != _actor_local_identity_mode(opened):
+                raise IncarnationHomeError(
+                    f"actor-local capability entry changed during validation: {relative}"
+                )
+            records.append((relative, current))
+            if stat.S_ISDIR(current.st_mode):
+                identity = (current.st_dev, current.st_ino)
+                if identity in visited_directories:
+                    raise IncarnationHomeError(
+                        f"actor-local capability directory is aliased: {relative}"
+                    )
+                visited_directories.add(identity)
+                try:
+                    children = sorted(os.listdir(descriptor))
+                    after_listing = os.fstat(descriptor)
+                except OSError as exc:
+                    raise IncarnationHomeError(
+                        f"actor-local capability directory cannot be enumerated: {relative}"
+                    ) from exc
+                if _actor_local_identity_mode(after_listing) != _actor_local_identity_mode(current):
+                    raise IncarnationHomeError(
+                        f"actor-local capability directory changed during validation: {relative}"
+                    )
+                for child_name_value in children:
+                    child_label = f"{relative}/{child_name_value}"
+                    child_fd, child_initial, child_opened = (
+                        _open_stable_actor_local_child_descriptor(
+                            descriptor, child_name_value, child_label
+                        )
+                    )
+                    visit(
+                        child_fd,
+                        child_initial,
+                        child_opened,
+                        child_label,
+                        parent_fd=descriptor,
+                        child_name=child_name_value,
+                    )
+            if parent_fd is None:
+                _revalidate_actor_local_path(
+                    target, descriptor, initial, relative
+                )
+            else:
+                assert child_name is not None
+                _revalidate_actor_local_child(
+                    parent_fd, child_name, descriptor, initial, relative
+                )
+        finally:
+            os.close(descriptor)
+
+    visit(
+        root_fd,
+        root_initial,
+        root_opened,
+        name,
+        parent_fd=None,
+        child_name=None,
+    )
+    return records
+
+
+def _open_stable_actor_local_entry(target: Path, name: str) -> os.stat_result:
+    """Open one entry without following a replacement symlink and recheck it."""
+
+    descriptor, _initial, opened = _open_stable_actor_local_path_descriptor(
+        target, name
+    )
+    try:
+        return opened
     finally:
         os.close(descriptor)
 
@@ -854,41 +1036,22 @@ def _validate_actor_local_entry(
     """Permit only unaliased Codex-owned regular files/directories."""
 
     ambient_identities = ambient_identities or set()
-    visited_directories: set[tuple[int, int]] = set()
-
-    def visit(path: Path, label: str) -> None:
-        observed = _open_stable_actor_local_entry(path, label)
+    for label, observed in _walk_stable_actor_local_tree(target, name):
         identity = (observed.st_dev, observed.st_ino)
         mode = observed.st_mode
         if identity in ambient_identities:
             raise IncarnationHomeError(
-                f"actor-local capability entry aliases ambient state: {path}"
+                f"actor-local capability entry aliases ambient state: {label}"
             )
         if stat.S_ISREG(mode):
             if observed.st_nlink != 1:
                 raise IncarnationHomeError(
-                    f"actor-local capability entry is multiply linked: {path}"
+                    f"actor-local capability entry is multiply linked: {label}"
                 )
-            return
-        if not stat.S_ISDIR(mode):
+        elif not stat.S_ISDIR(mode):
             raise IncarnationHomeError(
-                f"actor-local capability entry is not a regular file or directory: {name}"
+                f"actor-local capability entry is not a regular file or directory: {label}"
             )
-        if identity in visited_directories:
-            raise IncarnationHomeError(
-                f"actor-local capability directory is aliased: {path}"
-            )
-        visited_directories.add(identity)
-        try:
-            children = list(path.iterdir())
-        except OSError as exc:
-            raise IncarnationHomeError(
-                f"actor-local capability directory cannot be enumerated: {path}"
-            ) from exc
-        for child in children:
-            visit(child, f"{name}/{child.name}")
-
-    visit(target, name)
 
 
 def _validate_actor_local_entries(
@@ -911,10 +1074,7 @@ def _local_tree_digest(target: Path, name: str) -> str | None:
     if not target.exists() and not target.is_symlink():
         return None
     rows: list[dict[str, object]] = []
-    visited_directories: set[tuple[int, int]] = set()
-
-    def visit(path: Path, relative: str) -> None:
-        observed = _open_stable_actor_local_entry(path, relative)
+    for relative, observed in _walk_stable_actor_local_tree(target, name):
         identity = (observed.st_dev, observed.st_ino)
         rows.append(
             {
@@ -926,23 +1086,6 @@ def _local_tree_digest(target: Path, name: str) -> str | None:
                 "links": observed.st_nlink,
             }
         )
-        if not stat.S_ISDIR(observed.st_mode):
-            return
-        if identity in visited_directories:
-            raise IncarnationHomeError(
-                f"actor-local capability directory is aliased: {path}"
-            )
-        visited_directories.add(identity)
-        try:
-            children = sorted(path.iterdir(), key=lambda child: child.name)
-        except OSError as exc:
-            raise IncarnationHomeError(
-                f"actor-local capability directory cannot be enumerated: {path}"
-            ) from exc
-        for child in children:
-            visit(child, f"{relative}/{child.name}")
-
-    visit(target, name)
     return sha256_bytes(canonical_bytes(rows))
 
 
@@ -2854,6 +2997,49 @@ def _validate_holder_claim(
         raise IncarnationHomeError("holder claim binding context digest disagrees")
 
 
+def _reserve_or_validate_holder_claim(
+    *,
+    manifest_path: Path,
+    manifest: dict[str, Any],
+    manifest_digest: str,
+    binding_context_digest: str,
+    holder_receipt_path: Path,
+) -> tuple[Path, str]:
+    """Reserve a claim, or accept the exact same claim for an idempotent rebind."""
+
+    claim_path = _holder_claim_path(manifest_path)
+    try:
+        observed = os.lstat(claim_path)
+    except FileNotFoundError:
+        return _reserve_holder_claim(
+            manifest_path=manifest_path,
+            manifest=manifest,
+            manifest_digest=manifest_digest,
+            binding_context_digest=binding_context_digest,
+            holder_receipt_path=holder_receipt_path,
+        )
+    except OSError as exc:
+        raise IncarnationHomeError(
+            f"holder claim cannot be inspected: {claim_path}"
+        ) from exc
+    if stat.S_ISLNK(observed.st_mode) or not stat.S_ISREG(observed.st_mode):
+        raise IncarnationHomeError(
+            "incarnation home already has an active or completed holder claim"
+        )
+    claim, raw = _load_json_snapshot(claim_path, "holder claim")
+    claim_digest = sha256_bytes(raw)
+    _validate_holder_claim(
+        claim_path=claim_path,
+        claim_digest=claim_digest,
+        manifest_path=manifest_path,
+        manifest=manifest,
+        manifest_digest=manifest_digest,
+        binding_context_digest=binding_context_digest,
+        holder_receipt_path=holder_receipt_path,
+    )
+    return claim_path, claim_digest
+
+
 def _release_holder_claim(
     *, claim_path: Path, claim_digest: str, label: str = "holder claim"
 ) -> None:
@@ -3442,6 +3628,15 @@ def _rebind_replacement_holder_receipt(
         },
     }
     _assert_safe_projection(receipt)
+    _reserve_holder_claim_for_launch(
+        manifest_path=manifest_path,
+        manifest=manifest,
+        manifest_digest=manifest_digest,
+        binding_context_digest=context_digest,
+        binding_context=context,
+        holder_receipt_path=receipt_path,
+        allow_existing_claim=True,
+    )
     _write_new_json(receipt_path, receipt, "replacement holder terminal receipt")
     return receipt
 
@@ -3505,6 +3700,10 @@ def _decode_holder_manifest_snapshot(runtime: dict[str, Any]) -> bytes | None:
     elif runtime_holder_binding is not None:
         raise IncarnationHomeError(
             "holder incarnation manifest snapshot has an unexpected holder binding"
+        )
+    else:
+        raise IncarnationHomeError(
+            "holder incarnation manifest snapshot holder binding is missing"
         )
     return snapshot
 
@@ -5631,6 +5830,7 @@ def _reserve_holder_claim_for_launch(
     binding_context_digest: str,
     binding_context: dict[str, str],
     holder_receipt_path: Path,
+    allow_existing_claim: bool = False,
 ) -> tuple[Path, str]:
     """Publish a launch claim under the same lock that freezes preparation."""
 
@@ -5658,7 +5858,12 @@ def _reserve_holder_claim_for_launch(
             raise IncarnationHomeError(
                 "incarnation-home manifest changed before holder claim"
             )
-        return _reserve_holder_claim(
+        reserve = (
+            _reserve_or_validate_holder_claim
+            if allow_existing_claim
+            else _reserve_holder_claim
+        )
+        return reserve(
             manifest_path=manifest_path,
             manifest=manifest,
             manifest_digest=manifest_digest,
@@ -5750,6 +5955,205 @@ def _validate_preparation_owner_record(
     return dict(value)
 
 
+def _open_recovery_directory_at(
+    parent_fd: int, name: str, label: str
+) -> tuple[int, os.stat_result, os.stat_result]:
+    """Open one recovery directory relative to a retained parent descriptor."""
+
+    try:
+        initial = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+    except OSError as exc:
+        raise IncarnationHomeError(
+            f"{label} cannot be inspected safely"
+        ) from exc
+    if stat.S_ISLNK(initial.st_mode) or not stat.S_ISDIR(initial.st_mode):
+        raise IncarnationHomeError(f"{label} is not a real directory")
+    flags = (
+        os.O_RDONLY
+        | getattr(os, "O_DIRECTORY", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_CLOEXEC", 0)
+    )
+    try:
+        descriptor = os.open(name, flags, dir_fd=parent_fd)
+    except OSError as exc:
+        raise IncarnationHomeError(f"{label} cannot be opened safely") from exc
+    try:
+        opened = os.fstat(descriptor)
+        if (
+            _actor_local_identity_mode(opened)
+            != _actor_local_identity_mode(initial)
+        ):
+            raise IncarnationHomeError(f"{label} changed during safe open")
+        return descriptor, initial, opened
+    except IncarnationHomeError:
+        os.close(descriptor)
+        raise
+    except OSError as exc:
+        os.close(descriptor)
+        raise IncarnationHomeError(f"{label} cannot be inspected after safe open") from exc
+
+
+def _revalidate_recovery_entry(
+    parent_fd: int,
+    name: str,
+    descriptor: int,
+    initial: os.stat_result,
+    label: str,
+) -> os.stat_result:
+    try:
+        observed = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+        opened = os.fstat(descriptor)
+    except OSError as exc:
+        raise IncarnationHomeError(f"{label} changed during recovery") from exc
+    if (
+        _actor_local_identity_mode(observed)
+        != _actor_local_identity_mode(initial)
+        or _actor_local_identity_mode(opened)
+        != _actor_local_identity_mode(initial)
+    ):
+        raise IncarnationHomeError(f"{label} changed during recovery")
+    return observed
+
+
+def _validate_recoverable_entry_at(
+    parent_fd: int,
+    name: str,
+    *,
+    ambient_identities: set[tuple[int, int]],
+    label: str,
+) -> None:
+    try:
+        observed = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+    except OSError as exc:
+        raise IncarnationHomeError(
+            f"stale incarnation preparation entry cannot be inspected: {label}"
+        ) from exc
+    if stat.S_ISLNK(observed.st_mode):
+        return
+    identity = (observed.st_dev, observed.st_ino)
+    if identity in ambient_identities:
+        raise IncarnationHomeError(
+            f"stale incarnation preparation aliases ambient state: {label}"
+        )
+    if stat.S_ISREG(observed.st_mode):
+        if observed.st_nlink != 1:
+            raise IncarnationHomeError(
+                f"stale incarnation preparation entry is multiply linked: {label}"
+            )
+        return
+    if not stat.S_ISDIR(observed.st_mode):
+        raise IncarnationHomeError(
+            f"stale incarnation preparation contains a special file: {label}"
+        )
+    descriptor, initial, opened = _open_recovery_directory_at(
+        parent_fd, name, label
+    )
+    try:
+        try:
+            children = sorted(os.listdir(descriptor))
+            after_listing = os.fstat(descriptor)
+        except OSError as exc:
+            raise IncarnationHomeError(
+                f"stale incarnation preparation directory cannot be enumerated: {label}"
+            ) from exc
+        if _actor_local_identity_mode(after_listing) != _actor_local_identity_mode(opened):
+            raise IncarnationHomeError(
+                f"stale incarnation preparation directory changed during validation: {label}"
+            )
+        for child_name in children:
+            _validate_recoverable_entry_at(
+                descriptor,
+                child_name,
+                ambient_identities=ambient_identities,
+                label=f"{label}/{child_name}",
+            )
+        _revalidate_recovery_entry(parent_fd, name, descriptor, initial, label)
+    finally:
+        os.close(descriptor)
+
+
+def _remove_recoverable_entry_at(
+    parent_fd: int,
+    name: str,
+    *,
+    ambient_identities: set[tuple[int, int]],
+    label: str,
+) -> None:
+    try:
+        observed = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+    except OSError as exc:
+        raise IncarnationHomeError(
+            f"stale incarnation preparation entry changed during recovery: {label}"
+        ) from exc
+    if stat.S_ISLNK(observed.st_mode):
+        try:
+            current = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+            if _actor_local_identity_mode(current) != _actor_local_identity_mode(observed):
+                raise IncarnationHomeError(f"{label} changed during recovery")
+            os.unlink(name, dir_fd=parent_fd)
+        except IncarnationHomeError:
+            raise
+        except OSError as exc:
+            raise IncarnationHomeError(f"{label} could not be removed safely") from exc
+        return
+    identity = (observed.st_dev, observed.st_ino)
+    if identity in ambient_identities:
+        raise IncarnationHomeError(
+            f"stale incarnation preparation aliases ambient state: {label}"
+        )
+    if stat.S_ISREG(observed.st_mode):
+        if observed.st_nlink != 1:
+            raise IncarnationHomeError(
+                f"stale incarnation preparation entry is multiply linked: {label}"
+            )
+        try:
+            current = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+            if (
+                _actor_local_identity_mode(current)
+                != _actor_local_identity_mode(observed)
+                or current.st_nlink != 1
+            ):
+                raise IncarnationHomeError(f"{label} changed during recovery")
+            os.unlink(name, dir_fd=parent_fd)
+        except IncarnationHomeError:
+            raise
+        except OSError as exc:
+            raise IncarnationHomeError(f"{label} could not be removed safely") from exc
+        return
+    if not stat.S_ISDIR(observed.st_mode):
+        raise IncarnationHomeError(
+            f"stale incarnation preparation contains a special file: {label}"
+        )
+    descriptor, initial, opened = _open_recovery_directory_at(
+        parent_fd, name, label
+    )
+    try:
+        try:
+            children = sorted(os.listdir(descriptor))
+            after_listing = os.fstat(descriptor)
+        except OSError as exc:
+            raise IncarnationHomeError(
+                f"stale incarnation preparation directory cannot be enumerated: {label}"
+            ) from exc
+        if _actor_local_identity_mode(after_listing) != _actor_local_identity_mode(opened):
+            raise IncarnationHomeError(f"{label} changed during recovery")
+        for child_name in children:
+            _remove_recoverable_entry_at(
+                descriptor,
+                child_name,
+                ambient_identities=ambient_identities,
+                label=f"{label}/{child_name}",
+            )
+        _revalidate_recovery_entry(parent_fd, name, descriptor, initial, label)
+        try:
+            os.rmdir(name, dir_fd=parent_fd)
+        except OSError as exc:
+            raise IncarnationHomeError(f"{label} could not be removed safely") from exc
+    finally:
+        os.close(descriptor)
+
+
 def _recover_stale_preparation_root(
     *,
     incarnation_root: Path,
@@ -5760,68 +6164,148 @@ def _recover_stale_preparation_root(
     holder_coordinate: str | None,
     ambient_identities: set[tuple[int, int]],
 ) -> None:
-    """Remove only a runtime-tokened, unpublished root after the lock is held."""
+    """Remove one tokened root through a retained inode-bound directory handle."""
 
-    marker = incarnation_root / "incarnation-home.json"
-    if marker.exists() or marker.is_symlink():
-        raise IncarnationHomeError(
-            "published incarnation home cannot be treated as stale preparation"
-        )
-    owner_path = incarnation_root / PREPARATION_OWNER_FILE_NAME
-    owner = _load_json(owner_path, "incarnation preparation owner token")
-    _validate_preparation_owner_record(
-        owner,
-        ambient_home=ambient_home,
-        runtime_root=runtime_root,
-        realization_root=realization_root,
-        incarnation_root=incarnation_root,
-        coordinate=coordinate,
-        holder_coordinate=holder_coordinate,
+    parent_fd = _open_pinned_parent_directory(
+        incarnation_root, "stale incarnation preparation root"
     )
-
-    def validate_recoverable(path: Path, label: str) -> None:
-        try:
-            observed = os.lstat(path)
-        except OSError as exc:
-            raise IncarnationHomeError(
-                f"stale incarnation preparation entry cannot be inspected: {path}"
-            ) from exc
-        if stat.S_ISLNK(observed.st_mode):
-            return
-        identity = (observed.st_dev, observed.st_ino)
-        if identity in ambient_identities:
-            raise IncarnationHomeError(
-                f"stale incarnation preparation aliases ambient state: {path}"
-            )
-        if stat.S_ISREG(observed.st_mode):
-            if observed.st_nlink != 1:
-                raise IncarnationHomeError(
-                    f"stale incarnation preparation entry is multiply linked: {path}"
-                )
-            return
-        if not stat.S_ISDIR(observed.st_mode):
-            raise IncarnationHomeError(
-                f"stale incarnation preparation contains a special file: {label}"
-            )
-        try:
-            children = sorted(path.iterdir(), key=lambda child: child.name)
-        except OSError as exc:
-            raise IncarnationHomeError(
-                f"stale incarnation preparation directory cannot be enumerated: {path}"
-            ) from exc
-        for child in children:
-            validate_recoverable(child, f"{label}/{child.name}")
-
-    for child in incarnation_root.iterdir():
-        if child == owner_path or child.is_symlink():
-            continue
-        validate_recoverable(child, child.name)
+    root_fd: int | None = None
     try:
-        shutil.rmtree(incarnation_root)
-    except OSError as exc:
-        raise IncarnationHomeError(
-            "stale incarnation preparation root could not be recovered"
-        ) from exc
+        root_fd, root_initial, root_opened = _open_recovery_directory_at(
+            parent_fd,
+            incarnation_root.name,
+            "stale incarnation preparation root",
+        )
+        try:
+            try:
+                marker = os.stat(
+                    "incarnation-home.json",
+                    dir_fd=root_fd,
+                    follow_symlinks=False,
+                )
+            except FileNotFoundError:
+                marker = None
+            except OSError as exc:
+                raise IncarnationHomeError(
+                    "published incarnation home marker cannot be inspected safely"
+                ) from exc
+            if marker is not None:
+                raise IncarnationHomeError(
+                    "published incarnation home cannot be treated as stale preparation"
+                )
+            owner_fd, _owner_opened = _open_stable_regular_file_at(
+                root_fd,
+                PREPARATION_OWNER_FILE_NAME,
+                label="incarnation preparation owner token",
+                ambient_identities=ambient_identities,
+            )
+            try:
+                owner = _decode_json_snapshot(
+                    _read_descriptor_bytes(
+                        owner_fd, "incarnation preparation owner token"
+                    ),
+                    "incarnation preparation owner token",
+                )
+            finally:
+                os.close(owner_fd)
+            _validate_preparation_owner_record(
+                owner,
+                ambient_home=ambient_home,
+                runtime_root=runtime_root,
+                realization_root=realization_root,
+                incarnation_root=incarnation_root,
+                coordinate=coordinate,
+                holder_coordinate=holder_coordinate,
+            )
+            try:
+                children = sorted(os.listdir(root_fd))
+                after_listing = os.fstat(root_fd)
+            except OSError as exc:
+                raise IncarnationHomeError(
+                    "stale incarnation preparation root cannot be enumerated safely"
+                ) from exc
+            if _actor_local_identity_mode(after_listing) != _actor_local_identity_mode(root_opened):
+                raise IncarnationHomeError(
+                    "stale incarnation preparation root changed during validation"
+                )
+            for child_name in children:
+                _validate_recoverable_entry_at(
+                    root_fd,
+                    child_name,
+                    ambient_identities=ambient_identities,
+                    label=child_name,
+                )
+            _revalidate_recovery_entry(
+                parent_fd,
+                incarnation_root.name,
+                root_fd,
+                root_initial,
+                "stale incarnation preparation root",
+            )
+            for child_name in sorted(os.listdir(root_fd)):
+                _remove_recoverable_entry_at(
+                    root_fd,
+                    child_name,
+                    ambient_identities=ambient_identities,
+                    label=child_name,
+                )
+            _revalidate_recovery_entry(
+                parent_fd,
+                incarnation_root.name,
+                root_fd,
+                root_initial,
+                "stale incarnation preparation root",
+            )
+            try:
+                os.rmdir(incarnation_root.name, dir_fd=parent_fd)
+            except OSError as exc:
+                raise IncarnationHomeError(
+                    "stale incarnation preparation root could not be recovered"
+                ) from exc
+        finally:
+            os.close(root_fd)
+            root_fd = None
+    finally:
+        os.close(parent_fd)
+
+
+def _remove_empty_directory_if_stable(path: Path, label: str) -> None:
+    """Remove an empty directory only through its pinned parent and identity."""
+
+    parent_fd = _open_pinned_parent_directory(path, label)
+    descriptor: int | None = None
+    try:
+        try:
+            initial = os.stat(path.name, dir_fd=parent_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            return
+        except OSError as exc:
+            raise IncarnationHomeError(f"{label} cannot be inspected safely") from exc
+        if stat.S_ISLNK(initial.st_mode) or not stat.S_ISDIR(initial.st_mode):
+            return
+        descriptor, _opened_initial, opened = _open_recovery_directory_at(
+            parent_fd, path.name, label
+        )
+        try:
+            try:
+                if os.listdir(descriptor):
+                    return
+            except OSError as exc:
+                raise IncarnationHomeError(f"{label} cannot be enumerated safely") from exc
+            _revalidate_recovery_entry(parent_fd, path.name, descriptor, initial, label)
+            try:
+                os.rmdir(path.name, dir_fd=parent_fd)
+            except FileNotFoundError:
+                return
+            except OSError as exc:
+                raise IncarnationHomeError(f"{label} could not be removed safely") from exc
+        finally:
+            os.close(descriptor)
+            descriptor = None
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+        os.close(parent_fd)
 
 
 def _claim_preparation_root(
@@ -6353,13 +6837,10 @@ def _rollback_unpublished_home(
         holder_coordinate=holder_coordinate,
         ambient_identities=ambient_identities,
     )
-    if realization_root.is_dir() and not any(realization_root.iterdir()):
-        try:
-            realization_root.rmdir()
-        except OSError as exc:
-            raise IncarnationHomeError(
-                "failed home preparation left an empty realization root"
-            ) from exc
+    _remove_empty_directory_if_stable(
+        realization_root,
+        "failed home preparation realization root",
+    )
 
 
 def prepare_home(

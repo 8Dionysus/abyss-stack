@@ -89,7 +89,14 @@ parent replacement before any ambient bytes or mode can change.
 Incomplete holder receipts missing `runtime_state_root` or `closeout_route`
 are rejected by both the receipt schema and runtime binding validator. A
 receipt carrying an immutable manifest snapshot must also carry the complete
-`holder_binding`; the schema and snapshot loader reject its omission.
+`holder_binding`; the schema and snapshot loader reject its omission for both
+v3 and legacy-v2 snapshots, while pre-snapshot receipts retain their bounded
+compatibility path. Rebind reserves that same holder claim under the
+preparation lock before publishing a replacement receipt, and an exact retry
+is idempotent. Directory enumeration retains its descriptor and rejects a
+deterministic pathname replacement after the descriptor is opened. Stale-root
+rollback validates and removes through a retained root descriptor, rejecting a
+replacement root before deleting the replacement tree.
 These are source and fixture claims; they
 do not establish host artifact admission, activation, live canary success,
 transport delivery, or owner acceptance.

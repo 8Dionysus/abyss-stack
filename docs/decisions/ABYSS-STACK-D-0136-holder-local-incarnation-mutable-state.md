@@ -88,8 +88,10 @@ schema-valid compatibility shape and is rejected by the loader on any route.
 Holder receipts require the complete runtime binding, including
 `runtime_state_root` and `closeout_route`. A receipt carrying an immutable
 manifest snapshot also requires `holder_binding` in the public schema, matching
-the runtime snapshot loader; pre-snapshot compatibility receipts remain
-readable without that conditional field.
+the runtime snapshot loader for both v3 and legacy-v2 snapshots; pre-snapshot
+compatibility receipts remain readable without that conditional field. Rebind
+reserves the same holder claim under the preparation lock before publishing a
+replacement receipt, with an exact-claim retry path.
 
 ## Rationale
 
@@ -113,7 +115,9 @@ putting actor, task, Goal, version, or path identity into policy.
 - Tradeoff: the runtime retains one persistent preparation lock per runtime
   root and one temporary owner token per unpublished first-preparation home;
   stale recovery is fail-closed if that tokened tree contains an ambient alias
-  or an unsafe special entry.
+  or an unsafe special entry, and retains a validated root descriptor through
+  descriptor-relative deletion so a pathname replacement cannot redirect
+  rollback into another home.
 - Residual: source behavior and installed-artifact parity remain separate from
   host trust admission, live canary evidence, transport delivery, and owner
   acceptance.

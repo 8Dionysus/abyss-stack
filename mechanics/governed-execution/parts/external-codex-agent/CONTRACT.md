@@ -234,7 +234,10 @@ digests. The receipt also carries the exact launch-time manifest bytes as a
 base64 snapshot bound to that digest. After launch, the recorded manifest
 pathname is provenance only: the closer validates the holder-bound snapshot so
 preparation/profile refreshes may rewrite the content-addressed pathname
-without changing the live holder identity. Legacy receipts without the
+without changing the live holder identity. Any receipt carrying a manifest
+snapshot, including a legacy-v2 snapshot, must carry the complete typed
+`holder_binding` in both the receipt runtime and the snapshot; the runtime
+loader and public schema reject its omission. Legacy receipts without the
 snapshot retain their prior fail-closed pathname check. The holder argv is the post-exec `/proc` shape, including the
 interpreter argv of a shebang-backed executable. For that shebang route, an
 internal `payload-launch` helper runs as bubblewrap's payload, revalidates the
@@ -266,7 +269,11 @@ and observer-event digests, current holder/Kitty identities, direct holder
 lineage, scoped incarnation manifest, and executable digest, and publishes a
 new canonical holder receipt carrying the packet provenance. The rebind receipt
 proves only holder identity; it does not prove wake delivery, Goal activation,
-semantic acceptance, or closure.
+semantic acceptance, or closure. Before publishing that receipt, rebind reserves
+the same non-replacing holder claim under the runtime preparation lock; an exact
+retry may validate its existing claim, while a different receipt or holder is
+rejected. A rebind therefore cannot leave the live home writable after receipt
+publication.
 
 The payload holder publishes its lifecycle receipt only after the exact Kitty
 ancestor and dedicated-window handshake is ready. The runtime retries that
@@ -850,11 +857,13 @@ entry whose typed projection is `denied`. An entry in that derived set may be
 absent or may be a top-level regular file or real directory created by the
 actor. It is not a shared link, and the runtime never deletes it during
 prepare. Validation opens each existing denied entry without following
-symlinks, rechecks its device/inode/mode across the observation, recursively
-checks real directories, rejects every multiply linked regular file, and
-rejects any inode also present below the ambient home. Thus same-filesystem
-hard links, device/inode aliases, symlink replacement, special files, foreign
-targets, and arbitrary undeclared top-level entries fail closed before
+symlinks, retains directory descriptors through recursive enumeration, and
+revalidates each named entry after the final descriptor-based observation. It
+rechecks its device/inode/mode across the observation, recursively checks real
+directories, rejects every multiply linked regular file, and rejects any inode
+also present below the ambient home. Thus same-filesystem hard links,
+device/inode aliases, symlink replacement during enumeration, special files,
+foreign targets, and arbitrary undeclared top-level entries fail closed before
 manifest admission or launch. When a previous shared link becomes denied under
 the current typed policy, the exact old ambient link may be removed; a regular
 local shadow is retained and validated. A shared projection still requires its
@@ -878,8 +887,12 @@ All preparation attempts in one runtime state root hold the persistent
 regular file; its identity, type, and link count are checked before any mode
 normalization or lock effect. A first unpublished holder home is marked with
 the exact `.prepare-owner.json` token before materialization. Rollback removes only
-that tokened, unmarked root; a later attempt may recover the same stale tokened
-root under the lock, while a published home is never treated as stale.
+that tokened, unmarked root. Stale recovery retains the validated root
+directory descriptor, validates the whole tree through descriptor-relative
+enumeration, and removes entries only through that descriptor after rechecking
+the root inode; a pathname replacement cannot redirect rollback into a
+published sibling. A later attempt may recover the same stale tokened root
+under the lock, while a published home is never treated as stale.
 
 An `--capability-grant` input is an exact
 `schemas/external-codex-capability-grant.schema.json` owner artifact for one

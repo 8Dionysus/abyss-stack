@@ -1042,6 +1042,41 @@ def test_denied_actor_local_replacement_before_open_fails_closed(
         MODULE._validate_actor_local_entry(target, "actor-local.json")
 
 
+def test_denied_actor_local_directory_replacement_after_pin_fails_closed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = tmp_path / "actor-local"
+    target.mkdir()
+    (target / "state.json").write_text("private", encoding="utf-8")
+    foreign = tmp_path / "foreign"
+    foreign.mkdir()
+    foreign_entry = foreign / "state.json"
+    foreign_entry.write_text("ambient-secret", encoding="utf-8")
+    moved = tmp_path / "moved-actor-local"
+    target_identity = (target.stat().st_dev, target.stat().st_ino)
+    real_listdir = MODULE.os.listdir
+    replaced = False
+
+    def racing_listdir(value: int | str | os.PathLike[str]) -> list[str]:
+        nonlocal replaced
+        if (
+            isinstance(value, int)
+            and not replaced
+            and (os.fstat(value).st_dev, os.fstat(value).st_ino) == target_identity
+        ):
+            replaced = True
+            target.rename(moved)
+            target.symlink_to(foreign)
+        return real_listdir(value)
+
+    monkeypatch.setattr(MODULE.os, "listdir", racing_listdir)
+    with pytest.raises(MODULE.IncarnationHomeError, match="changed during validation"):
+        MODULE._validate_actor_local_entry(target, "actor-local")
+    assert target.is_symlink()
+    assert foreign_entry.read_text(encoding="utf-8") == "ambient-secret"
+    assert (moved / "state.json").read_text(encoding="utf-8") == "private"
+
+
 def test_typed_holder_binding_separates_sequential_homes_and_rejects_reassignment(
     tmp_path: Path,
 ) -> None:
@@ -1245,6 +1280,73 @@ def test_stale_tokened_preparer_is_recovered_before_retry(tmp_path: Path) -> Non
     )
     assert Path(manifest["codex_home"]).is_dir()
     assert not (Path(manifest["codex_home"]).parent / MODULE.PREPARATION_OWNER_FILE_NAME).exists()
+
+
+def test_stale_recovery_rejects_root_replacement_before_delete(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    realization = _realization(tmp_path / "realization.json")
+    context = _holder_binding_context(runtime_root, "stale-root-race")
+    owner = MODULE._prepare_home_attempt_owner(
+        ambient_home=ambient,
+        realization_path=realization,
+        runtime_root=runtime_root,
+        binding_context=context,
+    )
+    assert owner is not None
+    realization_root = Path(owner["realization_root"])
+    incarnation_root = Path(owner["incarnation_root"])
+    realization_root.mkdir(mode=0o700)
+    incarnation_root.mkdir(mode=0o700)
+    MODULE._write_new_json(
+        incarnation_root / MODULE.PREPARATION_OWNER_FILE_NAME,
+        owner,
+        "fixture stale preparation owner token",
+    )
+    (incarnation_root / "in-progress.json").write_text(
+        "in-progress", encoding="utf-8"
+    )
+    replacement = tmp_path / "replacement-root"
+    replacement.mkdir()
+    (replacement / "published-sibling").write_text("keep", encoding="utf-8")
+    moved = incarnation_root.with_name(incarnation_root.name + "-moved")
+    root_identity = (incarnation_root.stat().st_dev, incarnation_root.stat().st_ino)
+    real_listdir = MODULE.os.listdir
+    replaced = False
+
+    def racing_listdir(value: int | str | os.PathLike[str]) -> list[str]:
+        nonlocal replaced
+        if (
+            isinstance(value, int)
+            and not replaced
+            and (os.fstat(value).st_dev, os.fstat(value).st_ino) == root_identity
+        ):
+            replaced = True
+            incarnation_root.rename(moved)
+            replacement.rename(incarnation_root)
+        return real_listdir(value)
+
+    monkeypatch.setattr(MODULE.os, "listdir", racing_listdir)
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="stale incarnation preparation root changed during recovery",
+    ):
+        MODULE._recover_stale_preparation_root(
+            incarnation_root=incarnation_root,
+            ambient_home=ambient,
+            realization_root=realization_root,
+            runtime_root=runtime_root,
+            coordinate=str(owner["coordinate"]),
+            holder_coordinate=owner["holder_coordinate"],
+            ambient_identities=MODULE._ambient_inode_identities(ambient),
+        )
+    assert (incarnation_root / "published-sibling").read_text(encoding="utf-8") == "keep"
+    assert (moved / "in-progress.json").read_text(encoding="utf-8") == "in-progress"
 
 
 def test_capability_projection_denies_ambient_operator_control_by_default(
@@ -1772,6 +1874,38 @@ def test_holder_schema_and_loader_reject_rebind_post_exec_identity_without_prove
         match="holder incarnation manifest snapshot holder binding is missing",
     ):
         MODULE._load_holder_receipt_snapshot(snapshot_path)
+
+    legacy_snapshot = MODULE.canonical_bytes(
+        {
+            "schema_version": MODULE.LEGACY_SCHEMA_VERSION,
+            "model_slug": receipt["runtime"]["model"],
+            "reasoning_effort": receipt["runtime"]["reasoning_effort"],
+            "ambient_codex_home": receipt["runtime"]["ambient_codex_home"],
+            "codex_home": receipt["runtime"]["incarnation_codex_home"],
+        }
+    )
+    legacy_snapshot_receipt = {
+        **snapshot_receipt,
+        "receipt_ref": str((tmp_path / "legacy-snapshot-holder.json").resolve()),
+        "runtime": {
+            **snapshot_receipt["runtime"],
+            "incarnation_manifest_snapshot_b64": base64.b64encode(
+                legacy_snapshot
+            ).decode("ascii"),
+            "incarnation_manifest_digest": MODULE.sha256_bytes(legacy_snapshot),
+        },
+    }
+    with pytest.raises(ValidationError):
+        Draft202012Validator(schema).validate(legacy_snapshot_receipt)
+    legacy_snapshot_path = tmp_path / "legacy-snapshot-holder.json"
+    legacy_snapshot_path.write_bytes(
+        MODULE.canonical_bytes(legacy_snapshot_receipt) + b"\n"
+    )
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="holder incarnation manifest snapshot holder binding is missing",
+    ):
+        MODULE._load_holder_receipt_snapshot(legacy_snapshot_path)
 
     for missing in ("runtime_state_root", "closeout_route"):
         incomplete = dict(complete_binding)
@@ -2312,6 +2446,19 @@ def test_rebind_receipt_binds_holder_environment_and_manifest_snapshot(
         receipt["runtime"]["incarnation_manifest_snapshot_b64"]
     ) == manifest_path.read_bytes()
     assert json.loads(output_path.read_text(encoding="utf-8")) == receipt
+    claim_path = manifest_path.parent / MODULE.HOLDER_CLAIM_FILE_NAME
+    claim = json.loads(claim_path.read_text(encoding="utf-8"))
+    assert claim["holder_receipt"] == str(output_path.resolve())
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="holder-claimed incarnation home is frozen against re-preparation",
+    ):
+        _ORIGINAL_PREPARE_HOME(
+            ambient_home=ambient,
+            realization_path=Path(manifest["model_realization_ref"]),
+            runtime_root=runtime_root,
+            binding_context=context,
+        )
 
 
 def test_load_manifest_revalidates_realization_identifier(tmp_path: Path) -> None:
@@ -3366,12 +3513,26 @@ def test_holder_identity_uses_bound_manifest_snapshot_after_path_refresh(
     companion.write_bytes(b"codex-code-mode-host\n")
     companion.chmod(0o700)
     manifest_path = tmp_path / "incarnation-home.json"
+    snapshot_runtime = tmp_path / "snapshot-runtime"
+    snapshot_runtime.mkdir()
+    snapshot_context = _holder_binding_context(snapshot_runtime, "snapshot-refresh")
+    snapshot_context_digest = MODULE.sha256_bytes(
+        MODULE.canonical_bytes(snapshot_context)
+    )
+    snapshot_binding = MODULE._holder_binding_manifest_record(
+        snapshot_context,
+        snapshot_context_digest,
+        MODULE._holder_binding_context_coordinate(
+            snapshot_context, snapshot_context_digest
+        ),
+    )
     launch_manifest = {
         "schema_version": MODULE.SCHEMA_VERSION,
         "model_slug": "gpt-5.6-luna",
         "reasoning_effort": "max",
         "ambient_codex_home": str(tmp_path / "ambient"),
         "codex_home": str(tmp_path / "incarnation"),
+        "holder_binding": snapshot_binding,
     }
     snapshot = json.dumps(launch_manifest, sort_keys=True).encode("utf-8")
     manifest_path.write_bytes(b"profile-refresh-replaced-this-path\n")
@@ -3414,6 +3575,7 @@ def test_holder_identity_uses_bound_manifest_snapshot_after_path_refresh(
             "reasoning_effort": "max",
             "ambient_codex_home": str(tmp_path / "ambient"),
             "incarnation_codex_home": str(tmp_path / "incarnation"),
+            "holder_binding": snapshot_binding,
         },
         "terminal": {
             "pid": kitty_pid,
@@ -3546,6 +3708,19 @@ def test_live_close_uses_holder_bound_companion_after_host_removal(
     handoff = tmp_path / "handoff.json"
     wake = tmp_path / "wake.json"
     closure = tmp_path / "closure.json"
+    snapshot_runtime = tmp_path / "snapshot-runtime"
+    snapshot_runtime.mkdir()
+    snapshot_context = _holder_binding_context(snapshot_runtime, "snapshot-close")
+    snapshot_context_digest = MODULE.sha256_bytes(
+        MODULE.canonical_bytes(snapshot_context)
+    )
+    snapshot_binding = MODULE._holder_binding_manifest_record(
+        snapshot_context,
+        snapshot_context_digest,
+        MODULE._holder_binding_context_coordinate(
+            snapshot_context, snapshot_context_digest
+        ),
+    )
     manifest_snapshot = MODULE.canonical_bytes(
         {
             "schema_version": MODULE.SCHEMA_VERSION,
@@ -3553,6 +3728,7 @@ def test_live_close_uses_holder_bound_companion_after_host_removal(
             "reasoning_effort": "max",
             "ambient_codex_home": str(tmp_path / "ambient"),
             "codex_home": str(tmp_path / "incarnation"),
+            "holder_binding": snapshot_binding,
         }
     )
     holder_pid, parent_pid, kitty_pid = 101, 102, 103
@@ -3599,6 +3775,7 @@ def test_live_close_uses_holder_bound_companion_after_host_removal(
             "reasoning_effort": "max",
             "ambient_codex_home": str(tmp_path / "ambient"),
             "incarnation_codex_home": str(tmp_path / "incarnation"),
+            "holder_binding": snapshot_binding,
         },
         "terminal": {
             "binding": "kitty_ancestor_at_exec",
