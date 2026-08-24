@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 30322205,
+  "allowed_tracked_bytes": 38523231,
+  "approved_by": "repository-owner",
+  "base_ref": "efa14a2c0cbd4ab2d3b4044f851742f323f27c96",
+  "changed_generated_bytes": 30322205,
+  "changed_generated_files": 332,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "8dd3368abe2f62299ff37ab10604ddf522e478bf4cbfaa919bbe865f4e14c576",
+  "reason": "This narrow PR refreshes the owner family for atomic target exchange and victim-preserving staged replacement; the receipt admits the measured generated delta and tracked corpus under the standing owner budget.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 38523231,
+  "tracked_bytes_max": 24117248
+}
