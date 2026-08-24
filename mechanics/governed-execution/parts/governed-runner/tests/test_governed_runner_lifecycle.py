@@ -83,6 +83,7 @@ class GovernedRunnerLifecycleTests(GovernedRunnerTestCase):
 
         self.assertEqual(result["status"], "fail")
         self.assertEqual(result["failure_class"], "policy_denied")
+        run_id = result["run_id"]
         run_dir = self.logs_root / result["run_id"]
         state = json.loads((run_dir / "run.state.json").read_text(encoding="utf-8"))
         self.assertTrue(
@@ -91,8 +92,48 @@ class GovernedRunnerLifecycleTests(GovernedRunnerTestCase):
                 for reason in state["failure_reasons"]
             )
         )
-        self.assertTrue((run_dir / "result.summary.json").is_file())
-        self.assertTrue((run_dir / "report.md").is_file())
+        expected_artifacts = {
+            "request.json",
+            "policy.snapshot.json",
+            "preflight.summary.json",
+            "approval.status.json",
+            "run.state.json",
+            "result.summary.json",
+            "report.md",
+        }
+        self.assertTrue(
+            all((run_dir / artifact).is_file() for artifact in expected_artifacts)
+        )
+        request = json.loads((run_dir / "request.json").read_text(encoding="utf-8"))
+        policy_snapshot = json.loads(
+            (run_dir / "policy.snapshot.json").read_text(encoding="utf-8")
+        )
+        preflight = json.loads(
+            (run_dir / "preflight.summary.json").read_text(encoding="utf-8")
+        )
+        approval = json.loads(
+            (run_dir / "approval.status.json").read_text(encoding="utf-8")
+        )
+        source_identity = request["source_identity"]
+        self.assertEqual(source_identity["head"], state["base_head"])
+        self.assertEqual(source_identity, state["source_identity"])
+        self.assertEqual(source_identity, policy_snapshot["source_identity"])
+        self.assertEqual(source_identity, preflight["source_identity"])
+        self.assertEqual(source_identity["head"], policy_snapshot["base_head"])
+        self.assertEqual(source_identity["head"], preflight["base_head"])
+        self.assertEqual(source_identity["head"], approval["base_head"])
+        self.assertTrue(preflight["gate_result"]["allowed"])
+
+        replayed = self.module.prepare_run(
+            self.request_path,
+            policy_path=self.policy_path,
+            log_root=self.logs_root,
+            run_id=run_id,
+            gate_provider=drifting_gate,
+            advisory_provider=self.advisory_provider,
+            proposal_provider=self.proposal_provider,
+        )
+        self.assertEqual(replayed, result)
 
     def test_dirty_repo_blocks_execution(self) -> None:
         (self.repo_root / "docs" / "dirty.md").write_text("dirty\n", encoding="utf-8")

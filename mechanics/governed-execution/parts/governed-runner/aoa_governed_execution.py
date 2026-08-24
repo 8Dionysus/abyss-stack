@@ -4236,41 +4236,7 @@ def prepare_run(
             next_action="Restore aoa-status --autonomy --json to pass or use an allowed break-glass reason.",
         )
 
-    try:
-        source_binding = _bind_repo_root(
-            repo_root,
-            expected_identity=source_identity,
-        )
-        repo_root = source_binding.root
-        base_head = _source_bound_call(
-            source_binding,
-            lambda: TRIALS.git_head(repo_root),
-        )
-    except (RuntimeError, SOURCE_IDENTITY.SourceIdentityError) as exc:
-        state = {
-            "run_id": run_id,
-            "target_id": target_id,
-            "repo_root": str(repo_root),
-            "playbook_id": advisory["playbook_id"],
-            "task_class": task_class,
-            "trust_state_snapshot": trust_state_snapshot,
-            "canary_id": request.get("canary_id"),
-            "request_path": request_path_text,
-            "phase": "preflight",
-            "status": "fail",
-            "break_glass_used": bool(gate_result["break_glass_used"]),
-        }
-        return failure_result(
-            run_dir,
-            state=state,
-            phase="preflight",
-            failure_class="policy_denied",
-            reasons=[
-                "source identity changed after autonomy gate: "
-                f"{type(exc).__name__}: {exc}"
-            ],
-            next_action="Restore the exact source identity and retry the governed run.",
-        )
+    base_head = source_identity["head"]
     state = {
         "artifact_kind": "aoa.governed-run.state",
         "schema_version": "v1",
@@ -4310,6 +4276,8 @@ def prepare_run(
             "playbook_policy": playbook_policy,
             "task_class": task_class,
             "trust_state_snapshot": trust_state_snapshot,
+            "base_head": base_head,
+            "source_identity": source_binding.identity,
         },
     )
     write_json(
@@ -4321,6 +4289,7 @@ def prepare_run(
             "target_id": target_id,
             "repo_root": str(repo_root),
             "base_head": base_head,
+            "source_identity": source_binding.identity,
             "playbook_id": advisory["playbook_id"],
             "task_class": task_class,
             "trust_state_snapshot": trust_state_snapshot,
@@ -4335,6 +4304,32 @@ def prepare_run(
     initialize_approval(run_dir, run_id=run_id, base_head=base_head)
     save_state(run_dir, state)
 
+    try:
+        source_binding = _bind_repo_root(
+            repo_root,
+            expected_identity=source_identity,
+        )
+        repo_root = source_binding.root
+        post_gate_base_head = _source_bound_call(
+            source_binding,
+            lambda: TRIALS.git_head(repo_root),
+        )
+        if post_gate_base_head != base_head:
+            raise SOURCE_IDENTITY.SourceIdentityError(
+                "source base head changed after autonomy gate"
+            )
+    except (RuntimeError, SOURCE_IDENTITY.SourceIdentityError) as exc:
+        return failure_result(
+            run_dir,
+            state=state,
+            phase="preflight",
+            failure_class="policy_denied",
+            reasons=[
+                "source identity changed after autonomy gate: "
+                f"{type(exc).__name__}: {exc}"
+            ],
+            next_action="Restore the exact source identity and retry the governed run.",
+        )
     try:
         proposal_payload = (proposal_provider or default_proposal_provider)(
             {

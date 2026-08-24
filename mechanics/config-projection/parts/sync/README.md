@@ -36,7 +36,10 @@ new unit arguments and the deployed installer implementation cannot drift.
 Selecting `mechanics` also projects the shared
 `scripts/abyss_stack_source_identity.py` helper, because the diagnostic,
 autonomy-status, and governed-runner mechanics consume that source-local
-identity contract.
+identity contract. The helper projection uses checksum comparison so a stale
+equal-size, same-mtime target cannot survive a normal, preview, or delete-mode
+sync; delete-mode remains limited to the selected `mechanics` tree and does not
+delete unrelated files under `Configs/scripts/`.
 
 Unknown items and `Secrets` are rejected. Preview requires an existing target.
 Source-control and interpreter/test cache material (`.git`, `__pycache__`,
