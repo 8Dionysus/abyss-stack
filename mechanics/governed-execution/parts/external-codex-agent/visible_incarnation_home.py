@@ -1884,7 +1884,12 @@ def _stage_unnameable_file_at(
 
 
 def _remove_staged_file_at(
-    parent_fd: int, name: str, descriptor: int, label: str
+    parent_fd: int,
+    name: str,
+    descriptor: int,
+    label: str,
+    *,
+    require_unlinked: bool = False,
 ) -> None:
     """Remove only the exact private staging link retained by descriptor.
 
@@ -1897,6 +1902,10 @@ def _remove_staged_file_at(
     try:
         observed = os.lstat(name, dir_fd=parent_fd)
     except FileNotFoundError:
+        if require_unlinked:
+            raise IncarnationHomeError(
+                f"{label} staging entry disappeared before cleanup"
+            )
         return
     except OSError as exc:
         raise IncarnationHomeError(f"{label} staging entry cannot be inspected") from exc
@@ -1962,6 +1971,10 @@ def _remove_staged_file_at(
                     dst_dir_fd=quarantine_fd,
                 )
             except FileNotFoundError:
+                if require_unlinked:
+                    raise IncarnationHomeError(
+                        f"{label} staging entry disappeared before quarantine"
+                    )
                 return
             except OSError as exc:
                 raise IncarnationHomeError(
@@ -1988,6 +2001,17 @@ def _remove_staged_file_at(
                 )
             os.unlink(name, dir_fd=quarantine_fd)
             quarantine_entry_moved = False
+            if require_unlinked:
+                try:
+                    remaining = os.fstat(descriptor)
+                except OSError as exc:
+                    raise IncarnationHomeError(
+                        f"{label} staging inode cannot be checked after cleanup"
+                    ) from exc
+                if remaining.st_nlink != 0:
+                    raise IncarnationHomeError(
+                        f"{label} staging inode remained linked after cleanup"
+                    )
         except FileNotFoundError:
             if not quarantine_entry_moved:
                 return
@@ -2480,7 +2504,42 @@ def _copy_legacy_actor_local_state(
         initially_ambient_identities=ambient_identities,
     )
     allowed_target_names = set(target_actor_local_names) | LOCAL_NAMES
+    source_content_digests = {
+        name: _local_tree_content_digest(
+            source_home / name,
+            name,
+            ambient_identities=ambient_identities,
+        )
+        for name in source_names
+        if name != "config.toml"
+    }
     visited_directories: set[tuple[int, int]] = set()
+
+    def stable_directory_children(
+        descriptor: int,
+        expected: os.stat_result,
+        label: str,
+    ) -> list[str]:
+        try:
+            first = sorted(os.listdir(descriptor))
+            first_stat = os.fstat(descriptor)
+            second = sorted(os.listdir(descriptor))
+            second_stat = os.fstat(descriptor)
+        except OSError as exc:
+            raise IncarnationHomeError(
+                f"legacy actor-local state directory cannot be enumerated: {label}"
+            ) from exc
+        if (
+            first != second
+            or _actor_local_identity_mode(first_stat)
+            != _actor_local_identity_mode(second_stat)
+            or _actor_local_identity_mode(first_stat)
+            != _actor_local_identity_mode(expected)
+        ):
+            raise IncarnationHomeError(
+                f"legacy actor-local state directory changed during migration: {label}"
+            )
+        return first
 
     def ensure_target_directory(target: Path, mode: int, label: str) -> None:
         try:
@@ -2613,17 +2672,7 @@ def _copy_legacy_actor_local_state(
             )
         visited_directories.add(identity)
         ensure_target_directory(target, stat.S_IMODE(current.st_mode), label)
-        try:
-            children = sorted(os.listdir(descriptor))
-            after_listing = os.fstat(descriptor)
-        except OSError as exc:
-            raise IncarnationHomeError(
-                f"legacy actor-local state directory cannot be enumerated: {label}"
-            ) from exc
-        if _actor_local_identity_mode(after_listing) != _actor_local_identity_mode(current):
-            raise IncarnationHomeError(
-                f"legacy actor-local state directory changed during migration: {label}"
-            )
+        children = stable_directory_children(descriptor, current, label)
         for child in children:
             child_label = f"{label}/{child}"
             child_descriptor, child_initial, child_opened = (
@@ -2644,6 +2693,10 @@ def _copy_legacy_actor_local_state(
                 )
             finally:
                 os.close(child_descriptor)
+        if stable_directory_children(descriptor, current, label) != children:
+            raise IncarnationHomeError(
+                f"legacy actor-local state directory changed during migration: {label}"
+            )
         revalidate_source(source, descriptor, initial, parent_fd, child_name, label)
 
     for name in source_names:
@@ -2678,6 +2731,19 @@ def _copy_legacy_actor_local_state(
             )
         finally:
             os.close(descriptor)
+    final_source_content_digests = {
+        name: _local_tree_content_digest(
+            source_home / name,
+            name,
+            ambient_identities=ambient_identities,
+        )
+        for name in source_names
+        if name != "config.toml"
+    }
+    if final_source_content_digests != source_content_digests:
+        raise IncarnationHomeError(
+            "legacy actor-local state changed during migration"
+        )
 
 
 def _utc_now() -> str:
@@ -8141,6 +8207,7 @@ def _finish_preparation_owner(owner: dict[str, Any] | None) -> None:
             owner_path.name,
             descriptor,
             "incarnation preparation owner token retirement",
+            require_unlinked=True,
         )
     finally:
         if descriptor is not None:

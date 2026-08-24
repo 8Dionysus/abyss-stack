@@ -1693,6 +1693,62 @@ def test_explicit_legacy_migration_carries_local_state_into_typed_v3(
     assert (migrated_home / denied_name).read_bytes() == b"current-v3-state"
 
 
+def test_legacy_migration_rejects_child_inserted_after_directory_listing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ambient = tmp_path / "ambient"
+    source_home = tmp_path / "legacy-home"
+    target_home = tmp_path / "typed-home"
+    ambient.mkdir()
+    source_home.mkdir(mode=0o700)
+    target_home.mkdir(mode=0o700)
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    (source_home / "config.toml").write_text(
+        'model = "sol"\n', encoding="utf-8"
+    )
+    for name in MODULE.LOCAL_NAMES - {"config.toml"}:
+        (source_home / name).mkdir(mode=0o700)
+
+    cache_identity = (source_home / "cache").stat()
+    real_listdir = MODULE.os.listdir
+    cache_listings = 0
+    inserted = False
+
+    def racing_listdir(value: int | str | os.PathLike[str]) -> list[str]:
+        nonlocal cache_listings, inserted
+        result = real_listdir(value)
+        if isinstance(value, int):
+            opened = os.fstat(value)
+            if (
+                (opened.st_dev, opened.st_ino)
+                == (cache_identity.st_dev, cache_identity.st_ino)
+            ):
+                cache_listings += 1
+                if cache_listings == 3 and not inserted:
+                    (source_home / "cache" / "late-child").write_bytes(b"late")
+                    inserted = True
+        return result
+
+    monkeypatch.setattr(MODULE.os, "listdir", racing_listdir)
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="legacy actor-local state directory changed during migration",
+    ):
+        MODULE._copy_legacy_actor_local_state(
+            source_home=source_home,
+            target_home=target_home,
+            source_expected_names=set(MODULE.LOCAL_NAMES),
+            source_actor_local_names=(),
+            target_actor_local_names=set(),
+            ambient_home=ambient,
+            ambient_identities=MODULE._ambient_inode_identities(ambient),
+        )
+
+    assert inserted
+    assert (source_home / "cache" / "late-child").read_bytes() == b"late"
+    assert not (target_home / "cache" / "late-child").exists()
+
+
 def test_legacy_migration_rejects_preexisting_typed_home_before_copy(
     tmp_path: Path,
 ) -> None:
@@ -2568,6 +2624,72 @@ def test_owner_cleanup_preserves_replacement_after_final_revalidation(
     assert replaced
     assert moved_owner_path.read_bytes() == MODULE.canonical_bytes(owner) + b"\n"
     assert owner_path.read_bytes() == b"published-marker"
+
+
+def test_owner_cleanup_rejects_token_disappearance_after_final_revalidation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    realization_root = tmp_path / "realization-root"
+    incarnation_root = tmp_path / "incarnation-root"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    realization_root.mkdir()
+    incarnation_root.mkdir()
+    owner = MODULE._preparation_owner_record(
+        ambient_home=ambient,
+        runtime_root=runtime_root,
+        realization_root=realization_root,
+        incarnation_root=incarnation_root,
+        coordinate="sha256:" + "3" * 64,
+        holder_coordinate=None,
+    )
+    owner_path = incarnation_root / MODULE.PREPARATION_OWNER_FILE_NAME
+    MODULE._write_new_json(
+        owner_path,
+        owner,
+        "fixture preparation owner token",
+    )
+    published_path = incarnation_root / "published-marker.json"
+    published_path.write_bytes(b"published-marker")
+    original_revalidate = MODULE._revalidate_regular_file_at
+    disappeared = False
+
+    def disappear_after_revalidation(
+        parent_fd: int,
+        name: str,
+        descriptor: int,
+        initial: os.stat_result,
+        *,
+        label: str,
+        ambient_identities: set[tuple[int, int]],
+    ) -> None:
+        nonlocal disappeared
+        original_revalidate(
+            parent_fd,
+            name,
+            descriptor,
+            initial,
+            label=label,
+            ambient_identities=ambient_identities,
+        )
+        if label == "incarnation preparation owner token" and not disappeared:
+            owner_path.unlink()
+            disappeared = True
+
+    monkeypatch.setattr(
+        MODULE, "_revalidate_regular_file_at", disappear_after_revalidation
+    )
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="staging entry disappeared before cleanup",
+    ):
+        MODULE._finish_preparation_owner(owner)
+
+    assert disappeared
+    assert not owner_path.exists()
+    assert published_path.read_bytes() == b"published-marker"
 
 
 def test_stale_recovery_rejects_root_replacement_before_delete(
