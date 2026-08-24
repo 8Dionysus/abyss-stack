@@ -68,15 +68,17 @@ require the exact typed holder/task/run context, with mismatched binding, stale
 manifest, persistent sequential reuse, and overlapping claim attempts rejected.
 Same-filesystem hard links to ambient denied state, severed ambient aliases,
 denied inodes moved during materialization, multiply linked regular files,
-device/inode aliases, a directory-entry rename/stat race, and replacement
-during no-follow validation fail closed before manifest admission or launch;
+device/inode aliases, a directory-entry rename/stat race that could lose
+descendants, and replacement during no-follow validation fail closed before
+manifest admission or launch;
 the adversarial fixtures also verify that ambient bytes and config mode remain
 unchanged. Existing-file updates stage the new bytes through an unnameable
 descriptor and atomically exchange them only after verifying the displaced
 target inode, so a concurrent target replacement cannot delete a victim and a
 deterministic truncate/write failure preserves the prior bytes, mode, and inode.
-An interrupted staging
-link is recovered only after inode validation through a private quarantine;
+Only stages for owner-local file targets are recovered; legitimate denied names
+that resemble stages remain intact. Interrupted staging quarantine directories
+are also recovered only after descriptor and child identity validation, while
 an aliased stage remains intact and preserves the external inode.
 Distinct contexts receive separate manifest, config, cache, log,
 tmp, and descendant-binary coordinates. Synchronized first preparation is

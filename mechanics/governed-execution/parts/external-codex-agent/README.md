@@ -35,8 +35,8 @@ The controller:
   private launcher; the bubblewrap monitor remains only the snapshot-cleanup
   supervisor. The receipt includes the exact launch-time incarnation manifest
   bytes as a digest-bound base64 snapshot; after launch, its pathname is
-  provenance only, so profile preparation may refresh that pathname without
-  changing holder identity. The installed launcher closes that exact holder
+  provenance for receipt binding, while the claimed home is frozen and profile
+  preparation may not refresh it. The installed launcher closes that exact holder
   terminal only after typed closure authorization. Authorization may be
   `wake_delivered` (a separate wake receipt proves delivery) or
   `join_completed` (a non-waking join proves a returned responsibility); both
@@ -140,8 +140,9 @@ and replay only through their matching legacy wake reservation. A retry after a 
   inode moved into the holder home cannot be accepted after its ambient pathname
   is replaced. The snapshot is collected from retained descriptor-relative
   directory entries, preserving the original device/inode identity even when
-  a name is renamed away while it is being inspected; a replaced directory is
-  never traversed as ambient provenance;
+  a name is renamed away while it is being inspected; a directory identity or
+  type race fails closed rather than traversing a replacement and losing its
+  descendants;
 - binds each newly created home below the realization root to the exact bytes
   of a typed holder/task/run responsibility context. The context carries the
   existing goal/actor/incarnation/session runtime coordinates plus owner-bound
@@ -173,8 +174,10 @@ until preparation rewrites it as v3. Every first preparation is serialized by
   cannot delete an unvalidated victim or change ambient bytes or mode; a staged
   write failure leaves the prior target intact. If a process is interrupted after
   creating a private staging link, the next unclaimed preparation removes only
-  an inode-validated stage through a private quarantine directory; a multiply
-  linked or replaced stage fails closed and is not deleted.
+  an inode-validated stage for an owner-local file target, and recovers any
+  matching interrupted quarantine directory. A legitimate denied entry that
+  merely resembles a stage, or a multiply linked/replaced artifact, is not
+  deleted and fails closed.
 - exposes the installed `aoa-external-codex-return` leaf for the final external
   return contour. The leaf receives an explicit return-owner binding and exact
   handoff/holder paths, uses a connectable local Codex app-server as a

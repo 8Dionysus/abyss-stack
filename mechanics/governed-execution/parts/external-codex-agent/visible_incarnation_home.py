@@ -58,6 +58,9 @@ CAPABILITY_ENTRY_NAME_PATTERN = re.compile(r"^(?!\.\.?$)[^/]+$")
 STAGED_FILE_NAME_PATTERN = re.compile(
     r"^\.(?P<target>[^/]+)\.stage-(?P<token>[0-9a-f]{32})$"
 )
+STAGED_QUARANTINE_NAME_PATTERN = re.compile(
+    r"^\.(?P<stage>\.[^/]+\.stage-[0-9a-f]{32})\.quarantine-[0-9a-f]{32}$"
+)
 HOLDER_RECEIPT_SCHEMA_VERSION = "abyss_stack_visible_incarnation_holder_terminal_v1"
 HOLDER_BINDING_CONTEXT_SCHEMA_VERSION = (
     "abyss_stack_visible_incarnation_holder_binding_context_v1"
@@ -796,6 +799,9 @@ def _ambient_inode_identities(ambient_home: Path) -> set[tuple[int, int]]:
                 for entry in entries_snapshot:
                     try:
                         directory_entry_inode = entry.inode()
+                        directory_entry_is_directory = entry.is_dir(
+                            follow_symlinks=False
+                        )
                     except OSError as exc:
                         raise IncarnationHomeError(
                             f"ambient capability entry cannot be inspected: {entry.name}"
@@ -808,6 +814,10 @@ def _ambient_inode_identities(ambient_home: Path) -> set[tuple[int, int]]:
                         # The directory entry identity above is the retained
                         # provenance when the name was renamed away before
                         # stat could inspect it.
+                        if directory_entry_is_directory:
+                            raise IncarnationHomeError(
+                                "ambient capability directory changed during enumeration"
+                            )
                         if not isinstance(directory_entry_inode, int) or directory_entry_inode < 1:
                             raise IncarnationHomeError(
                                 f"ambient capability entry cannot be inspected: {entry.name}"
@@ -819,6 +829,20 @@ def _ambient_inode_identities(ambient_home: Path) -> set[tuple[int, int]]:
                         ) from exc
                     observed_identity = (observed.st_dev, observed.st_ino)
                     identities.add(observed_identity)
+                    if directory_entry_is_directory != stat.S_ISDIR(observed.st_mode):
+                        raise IncarnationHomeError(
+                            "ambient capability entry changed during enumeration"
+                        )
+                    if (
+                        directory_entry_is_directory
+                        and isinstance(directory_entry_inode, int)
+                        and directory_entry_inode > 0
+                        and (parent_device, directory_entry_inode)
+                        != observed_identity
+                    ):
+                        raise IncarnationHomeError(
+                            "ambient capability directory changed during enumeration"
+                        )
                     if not stat.S_ISDIR(observed.st_mode):
                         continue
                     child_flags = (
@@ -1763,36 +1787,52 @@ def _recover_abandoned_staged_files(
             ) from exc
         for name in names:
             match = STAGED_FILE_NAME_PATTERN.fullmatch(name)
-            if match is None or not match.group("target"):
-                continue
-            try:
-                observed = os.lstat(name, dir_fd=parent_fd)
-            except FileNotFoundError:
-                continue
-            except OSError as exc:
-                raise IncarnationHomeError(
-                    f"abandoned staging entry cannot be inspected: {name}"
-                ) from exc
-            if stat.S_ISLNK(observed.st_mode) or not stat.S_ISREG(observed.st_mode):
-                raise IncarnationHomeError(
-                    f"abandoned staging entry is not an isolated regular file: {name}"
-                )
-            descriptor, _opened = _open_stable_regular_file_at(
-                parent_fd,
-                name,
-                label=f"abandoned staging entry {name}",
-                ambient_identities=ambient_identities,
-            )
-            try:
-                _remove_staged_file_at(
+            if match is not None:
+                if match.group("target") not in LOCAL_NAMES:
+                    continue
+                try:
+                    observed = os.lstat(name, dir_fd=parent_fd)
+                except FileNotFoundError:
+                    continue
+                except OSError as exc:
+                    raise IncarnationHomeError(
+                        f"abandoned staging entry cannot be inspected: {name}"
+                    ) from exc
+                if stat.S_ISLNK(observed.st_mode) or not stat.S_ISREG(observed.st_mode):
+                    raise IncarnationHomeError(
+                        f"abandoned staging entry is not an isolated regular file: {name}"
+                    )
+                descriptor, _opened = _open_stable_regular_file_at(
                     parent_fd,
                     name,
-                    descriptor,
-                    f"abandoned staging entry {name}",
+                    label=f"abandoned staging entry {name}",
+                    ambient_identities=ambient_identities,
                 )
-                changed = True
-            finally:
-                os.close(descriptor)
+                try:
+                    _remove_staged_file_at(
+                        parent_fd,
+                        name,
+                        descriptor,
+                        f"abandoned staging entry {name}",
+                    )
+                    changed = True
+                finally:
+                    os.close(descriptor)
+                continue
+            quarantine = STAGED_QUARANTINE_NAME_PATTERN.fullmatch(name)
+            if quarantine is None:
+                continue
+            stage_name = quarantine.group("stage")
+            stage_match = STAGED_FILE_NAME_PATTERN.fullmatch(stage_name)
+            if stage_match is None or stage_match.group("target") not in LOCAL_NAMES:
+                continue
+            _recover_staging_quarantine_directory_at(
+                parent_fd,
+                name,
+                stage_name=stage_name,
+                ambient_identities=ambient_identities,
+            )
+            changed = True
         if changed:
             os.fsync(parent_fd)
     finally:
@@ -1830,6 +1870,65 @@ def _rename_exchange_at(
         error_number = ctypes.get_errno()
         detail = os.strerror(error_number) if error_number else "unknown error"
         raise IncarnationHomeError(f"{label} atomic exchange failed: {detail}")
+
+
+def _recover_staging_quarantine_directory_at(
+    parent_fd: int,
+    name: str,
+    *,
+    stage_name: str,
+    ambient_identities: set[tuple[int, int]],
+) -> None:
+    """Recover one owner-created quarantine directory without path trust."""
+
+    descriptor, initial, opened = _open_recovery_directory_at(
+        parent_fd,
+        name,
+        f"staging quarantine {name}",
+    )
+    try:
+        try:
+            children = sorted(os.listdir(descriptor))
+        except OSError as exc:
+            raise IncarnationHomeError(
+                f"staging quarantine cannot be enumerated: {name}"
+            ) from exc
+        if any(child != stage_name for child in children):
+            raise IncarnationHomeError(
+                f"staging quarantine contains an unexpected entry: {name}"
+            )
+        if children:
+            child = children[0]
+            child_descriptor, _child_opened = _open_stable_regular_file_at(
+                descriptor,
+                child,
+                label=f"staging quarantine entry {name}/{child}",
+                ambient_identities=ambient_identities,
+            )
+            try:
+                _remove_staged_file_at(
+                    descriptor,
+                    child,
+                    child_descriptor,
+                    f"staging quarantine entry {name}/{child}",
+                )
+            finally:
+                os.close(child_descriptor)
+        _revalidate_recovery_entry(
+            parent_fd,
+            name,
+            descriptor,
+            initial,
+            f"staging quarantine {name}",
+        )
+        try:
+            os.rmdir(name, dir_fd=parent_fd)
+        except OSError as exc:
+            raise IncarnationHomeError(
+                f"staging quarantine could not be removed: {name}"
+            ) from exc
+    finally:
+        os.close(descriptor)
 
 
 def _replace_with_staged_file_at(

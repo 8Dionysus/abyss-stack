@@ -232,9 +232,10 @@ process-parent PID/start ticks, the first Kitty ancestor PID/start ticks/argv,
 the detached Kitty window identity/dedication proof, and executable/manifest
 digests. The receipt also carries the exact launch-time manifest bytes as a
 base64 snapshot bound to that digest. After launch, the recorded manifest
-pathname is provenance only: the closer validates the holder-bound snapshot so
-preparation/profile refreshes may rewrite the content-addressed pathname
-without changing the live holder identity. Any receipt carrying a manifest
+pathname remains provenance for receipt binding: the closer validates the
+holder-bound snapshot, while the claimed home is frozen and
+preparation/profile refreshes may not rewrite its content-addressed pathname.
+Any receipt carrying a manifest
 snapshot, including a legacy-v2 snapshot, must carry the complete typed
 `holder_binding` in both the receipt runtime and the snapshot; the runtime
 loader and public schema reject its omission. Legacy receipts without the
@@ -890,7 +891,8 @@ through the final local-tree walk, so a denied inode moved into the holder home
 cannot become acceptable merely because its ambient pathname was replaced. The
 snapshot is collected from retained descriptor-relative directory entries, so
 a rename during entry stat retains the original device/inode identity; a
-replacement directory is never traversed as ambient provenance. The snapshot
+directory identity or type race fails closed instead of traversing a replacement
+and losing its descendants. The snapshot
 is bounded to that preparation and is not a filename/history denylist.
 Every file writer pins and revalidates the target parent descriptor before
 creating, replacing, or mode-updating a file, so a parent rename or symlink
@@ -902,9 +904,10 @@ unnameable descriptor, and atomically exchanged only after both descriptors are
 revalidated; the displaced name is checked against the retained target inode,
 and a mismatch is exchanged back without deleting the victim. A staging write or fsync failure therefore leaves the prior bytes,
 mode, and inode intact. If a process is interrupted after linking a private
-stage, the next unclaimed preparation removes only an inode-validated stage
-through a private quarantine directory; a multiply linked or replaced stage
-fails closed without deleting the foreign inode. The preparation lock serializes through the pinned runtime directory
+stage for an owner-local file target, and recovers matching interrupted
+quarantine directories through the same descriptor validation. A legitimate
+denied entry that merely resembles a stage, or a multiply linked or replaced
+artifact, fails closed without deletion. The preparation lock serializes through the pinned runtime directory
 and revalidates its named single-link file after acquisition, so a lock-name
 replacement cannot split critical sections or chmod an external inode.
 Legacy v2 manifests remain schema-valid without this field on the explicit

@@ -63,8 +63,9 @@ by the current projection and is not a filename/history denylist. During one
 materialization, the initial ambient inode snapshot is retained through the
 final local-tree walk as a runtime-owned freshness boundary; its directory-entry
 identities are retained from descriptor-relative enumeration, so a rename during
-stat cannot erase the original inode from the snapshot. A replaced directory is
-never traversed as ambient provenance. The snapshot is discarded after that
+stat cannot erase the original inode from the snapshot. A directory identity or
+type race fails closed instead of traversing a replacement and losing its
+descendants. The snapshot is discarded after that
 attempt and is not a filename/history denylist. Every file writer
 pins and revalidates the target parent descriptor before creating, replacing,
 or mode-updating a file, safely admits the existing target before its first
@@ -72,9 +73,12 @@ effect, and stages replacement bytes through a separate unnameable descriptor
 before atomic exchange. The displaced name must match the retained target
 inode; a mismatch is exchanged back without deleting the victim. A parent rename, symlink replacement, or staged
 write failure is rejected without changing ambient bytes or mode or destroying
-the prior target. An interrupted named staging link is recovered only after
-moving it into a private quarantine and revalidating its retained inode; an
-aliased or replaced stage fails closed without deleting the foreign inode.
+the prior target. An interrupted named staging link for an owner-local file
+target is recovered only after moving it into a private quarantine and
+revalidating its retained inode; interrupted quarantine directories are also
+recovered through descriptor validation. A legitimate denied entry that merely
+resembles a stage, or an aliased/replaced stage, fails closed without deleting
+the foreign inode.
 
 New homes require the exact bytes of a typed holder/task/run responsibility
 context. The digest of that context selects a holder-local directory below the

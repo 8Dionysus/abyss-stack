@@ -517,6 +517,9 @@ def test_initial_dirent_inode_is_retained_if_ambient_stat_races(
         def inode(self) -> int:
             return int(self._entry.inode())  # type: ignore[attr-defined]
 
+        def is_dir(self, *args: object, **kwargs: object) -> bool:
+            return bool(self._entry.is_dir(*args, **kwargs))  # type: ignore[attr-defined]
+
         def stat(self, *args: object, **kwargs: object) -> os.stat_result:
             nonlocal moved, moved_target
             if self._trigger and self.name == denied_name and not moved:
@@ -586,6 +589,77 @@ def test_initial_dirent_inode_is_retained_if_ambient_stat_races(
     assert moved_target is not None
     assert not moved_target.exists()
     assert not list(runtime_root.glob("sha256-*/holder-sha256-*/incarnation-home.json"))
+
+
+def test_ambient_directory_rename_race_is_rejected_before_descendant_loss(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ambient = tmp_path / "ambient"
+    ambient.mkdir()
+    denied_directory = ambient / "denied-directory"
+    denied_directory.mkdir()
+    (denied_directory / "secret.json").write_bytes(b"ambient-descendant-secret")
+    replacement = ambient / "replacement-directory"
+    ambient_identity = (ambient.stat().st_dev, ambient.stat().st_ino)
+    original_scandir = MODULE.os.scandir
+    moved = False
+
+    class EntryProxy:
+        def __init__(self, entry: object) -> None:
+            self._entry = entry
+
+        @property
+        def name(self) -> str:
+            return str(self._entry.name)  # type: ignore[attr-defined]
+
+        def inode(self) -> int:
+            return int(self._entry.inode())  # type: ignore[attr-defined]
+
+        def is_dir(self, *args: object, **kwargs: object) -> bool:
+            return bool(self._entry.is_dir(*args, **kwargs))  # type: ignore[attr-defined]
+
+        def stat(self, *args: object, **kwargs: object) -> os.stat_result:
+            nonlocal moved
+            if self.name == denied_directory.name and not moved:
+                moved = True
+                denied_directory.rename(tmp_path / "moved-denied-directory")
+                replacement.mkdir()
+            return self._entry.stat(*args, **kwargs)  # type: ignore[attr-defined]
+
+    class ScannerProxy:
+        def __init__(self, iterator: object) -> None:
+            self._iterator = iterator
+
+        def __enter__(self) -> "ScannerProxy":
+            self._iterator.__enter__()  # type: ignore[attr-defined]
+            return self
+
+        def __exit__(self, *args: object) -> object:
+            return self._iterator.__exit__(*args)  # type: ignore[attr-defined]
+
+        def __iter__(self) -> object:
+            for entry in self._iterator:  # type: ignore[operator]
+                yield EntryProxy(entry)
+
+    def racing_scandir(path: object) -> object:
+        if isinstance(path, int):
+            opened = os.fstat(path)
+            if (opened.st_dev, opened.st_ino) == ambient_identity:
+                return ScannerProxy(original_scandir(path))
+        return original_scandir(path)
+
+    monkeypatch.setattr(MODULE.os, "scandir", racing_scandir)
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="ambient capability directory changed during enumeration",
+    ):
+        MODULE._ambient_inode_identities(ambient)
+
+    assert moved
+    assert (tmp_path / "moved-denied-directory" / "secret.json").read_bytes() == (
+        b"ambient-descendant-secret"
+    )
+    assert replacement.is_dir()
 
 
 def test_config_alias_rejection_preserves_ambient_bytes_and_mode(
@@ -792,6 +866,80 @@ def test_interrupted_staging_link_is_recovered_before_reprepare(tmp_path: Path) 
     assert not stage.exists()
     assert (actor_home / "config.toml").read_bytes() == before_config
     assert not list(actor_home.glob("*.quarantine-*"))
+
+
+def test_stage_like_denied_state_is_not_recovered_as_internal_staging(
+    tmp_path: Path,
+) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    stage_like_name = ".notes.stage-" + "c" * 32
+    (ambient / stage_like_name).write_bytes(b"ambient-denied-source")
+    realization = _realization(tmp_path / "realization.json")
+    context = _holder_binding_context(runtime_root, "stage-like-denied")
+    manifest = _ORIGINAL_PREPARE_HOME(
+        ambient_home=ambient,
+        realization_path=realization,
+        runtime_root=runtime_root,
+        binding_context=context,
+    )
+    local = Path(manifest["codex_home"]) / stage_like_name
+    local.write_bytes(b"legitimate-actor-local-state")
+
+    refreshed = _ORIGINAL_PREPARE_HOME(
+        ambient_home=ambient,
+        realization_path=realization,
+        runtime_root=runtime_root,
+        binding_context=context,
+    )
+
+    assert refreshed["codex_home"] == str(local.parent)
+    assert local.read_bytes() == b"legitimate-actor-local-state"
+
+
+def test_interrupted_staging_quarantine_is_recovered_before_reprepare(
+    tmp_path: Path,
+) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    realization = _realization(tmp_path / "realization.json")
+    context = _holder_binding_context(runtime_root, "quarantine-recovery")
+    manifest = _ORIGINAL_PREPARE_HOME(
+        ambient_home=ambient,
+        realization_path=realization,
+        runtime_root=runtime_root,
+        binding_context=context,
+    )
+    actor_home = Path(manifest["codex_home"])
+    stage_name = ".config.toml.stage-" + "d" * 32
+    populated_quarantine = actor_home / (
+        "." + stage_name + ".quarantine-" + "e" * 32
+    )
+    populated_quarantine.mkdir(mode=0o700)
+    (populated_quarantine / stage_name).write_bytes(b"abandoned-stage")
+    empty_quarantine = actor_home / (
+        "." + stage_name + ".quarantine-" + "f" * 32
+    )
+    empty_quarantine.mkdir(mode=0o700)
+    before_config = (actor_home / "config.toml").read_bytes()
+
+    refreshed = _ORIGINAL_PREPARE_HOME(
+        ambient_home=ambient,
+        realization_path=realization,
+        runtime_root=runtime_root,
+        binding_context=context,
+    )
+
+    assert refreshed["codex_home"] == str(actor_home)
+    assert not populated_quarantine.exists()
+    assert not empty_quarantine.exists()
+    assert (actor_home / "config.toml").read_bytes() == before_config
 
 
 def test_abandoned_staging_alias_is_rejected_without_external_mutation(
