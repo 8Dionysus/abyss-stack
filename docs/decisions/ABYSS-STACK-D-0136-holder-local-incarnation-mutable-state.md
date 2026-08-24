@@ -72,10 +72,14 @@ persistent non-replacing claim reserves the home for one responsibility
 lifecycle, so a mismatched, reassigned, overlapping, or sequential launch is
 rejected. Once published, the claim freezes the home against every later
 preparation: ambient changes and newly supplied grants cannot rewrite or widen
-the live holder. Claim publication and preparation share one runtime-root lock;
-that lock is itself required to be a runtime-owned single-link regular file
-before any mode normalization or lock effect, so an aliased lock cannot mutate
-an external inode. An unpublished root is owned by an exact token before materialization, and only
+the live holder. Claim publication and preparation share a serialization
+boundary formed by the pinned runtime directory plus its runtime-owned
+single-link regular lock file. The named lock is revalidated after acquisition
+and is never mode-normalized through an alias, so a lock-name replacement cannot
+split critical sections or mutate an external inode. New files are published
+from unnameable temporary descriptors, and existing writable targets are
+reopened and revalidated before their first truncate or mode effect. An
+unpublished root is owned by an exact token before materialization, and only
 a tokened unmarked root can be rolled back or recovered as stale. Canonical
 launch reloads and digest-checks the manifest while that lock is held, so a
 concurrent manifest replacement fails closed before claim publication rather
@@ -91,7 +95,9 @@ manifest snapshot also requires `holder_binding` in the public schema, matching
 the runtime snapshot loader for both v3 and legacy-v2 snapshots; pre-snapshot
 compatibility receipts remain readable without that conditional field. Rebind
 reserves the same holder claim under the preparation lock before publishing a
-replacement receipt, with an exact-claim retry path.
+replacement receipt; if canonical launch already claimed the home, rebind
+transfers the receipt binding from the superseded receipt under that lock, and
+an exact-claim retry remains idempotent.
 
 ## Rationale
 

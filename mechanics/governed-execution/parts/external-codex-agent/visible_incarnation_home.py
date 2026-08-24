@@ -1269,6 +1269,7 @@ def _open_stable_regular_file_at(
     *,
     label: str,
     ambient_identities: set[tuple[int, int]],
+    writable: bool = False,
 ) -> tuple[int, os.stat_result]:
     """Open one regular child through a pinned parent and recheck its identity."""
 
@@ -1278,7 +1279,9 @@ def _open_stable_regular_file_at(
         raise IncarnationHomeError(f"{label} cannot be inspected") from exc
     if stat.S_ISLNK(initial.st_mode) or not stat.S_ISREG(initial.st_mode):
         raise IncarnationHomeError(f"{label} is not a regular file")
-    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
+    flags = (os.O_RDWR if writable else os.O_RDONLY) | getattr(
+        os, "O_NOFOLLOW", 0
+    ) | getattr(os, "O_CLOEXEC", 0)
     try:
         descriptor = os.open(name, flags, dir_fd=parent_fd)
     except OSError as exc:
@@ -1317,21 +1320,101 @@ def _read_descriptor_bytes(descriptor: int, label: str) -> bytes:
         raise IncarnationHomeError(f"{label} cannot be read safely") from exc
 
 
-def _create_temporary_file_at(parent_fd: int, prefix: str) -> tuple[int, str]:
-    """Create one private temporary file through a pinned parent descriptor."""
+def _create_unnameable_temporary_file_at(parent_fd: int, label: str) -> int:
+    """Create a temporary inode that has no replaceable source pathname."""
 
-    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_CLOEXEC", 0)
-    for _ in range(128):
-        name = f"{prefix}{secrets.token_hex(16)}"
-        try:
-            return os.open(name, flags, 0o600, dir_fd=parent_fd), name
-        except FileExistsError:
-            continue
-        except OSError as exc:
+    tmpfile = getattr(os, "O_TMPFILE", 0)
+    if not tmpfile:
+        raise IncarnationHomeError(
+            f"{label} requires an unnameable temporary file boundary"
+        )
+    flags = tmpfile | os.O_RDWR | getattr(os, "O_CLOEXEC", 0)
+    try:
+        descriptor = os.open(".", flags, 0o600, dir_fd=parent_fd)
+    except OSError as exc:
+        raise IncarnationHomeError(
+            f"{label} cannot create an unnameable temporary file"
+        ) from exc
+    try:
+        opened = os.fstat(descriptor)
+        if not stat.S_ISREG(opened.st_mode) or opened.st_nlink != 0:
             raise IncarnationHomeError(
-                "cannot create a private temporary file in the pinned parent"
-            ) from exc
-    raise IncarnationHomeError("cannot allocate a private temporary file name")
+                f"{label} temporary inode is not unnameable"
+            )
+        return descriptor
+    except IncarnationHomeError:
+        os.close(descriptor)
+        raise
+    except OSError as exc:
+        os.close(descriptor)
+        raise IncarnationHomeError(
+            f"{label} temporary inode cannot be validated"
+        ) from exc
+
+
+def _write_descriptor_exact(
+    descriptor: int, content: bytes, mode: int, label: str
+) -> None:
+    """Write one already-admitted descriptor without reopening its pathname."""
+
+    try:
+        os.fchmod(descriptor, mode)
+        os.ftruncate(descriptor, 0)
+        os.lseek(descriptor, 0, os.SEEK_SET)
+        view = memoryview(content)
+        while view:
+            view = view[os.write(descriptor, view) :]
+        os.fsync(descriptor)
+    except OSError as exc:
+        raise IncarnationHomeError(f"cannot write admitted file: {label}") from exc
+
+
+def _revalidate_writable_regular_file_at(
+    parent_fd: int,
+    name: str,
+    descriptor: int,
+    initial: os.stat_result,
+    *,
+    label: str,
+    ambient_identities: set[tuple[int, int]],
+) -> None:
+    """Recheck a writable descriptor immediately before its first effect."""
+
+    try:
+        opened = os.fstat(descriptor)
+        observed = os.lstat(name, dir_fd=parent_fd)
+    except OSError as exc:
+        raise IncarnationHomeError(f"{label} changed before mutation") from exc
+    if (
+        (opened.st_dev, opened.st_ino, opened.st_mode)
+        != (initial.st_dev, initial.st_ino, initial.st_mode)
+        or (opened.st_dev, opened.st_ino, opened.st_mode)
+        != (observed.st_dev, observed.st_ino, observed.st_mode)
+        or not stat.S_ISREG(opened.st_mode)
+        or opened.st_nlink != 1
+        or (opened.st_dev, opened.st_ino) in ambient_identities
+    ):
+        raise IncarnationHomeError(f"{label} changed before mutation")
+
+
+def _publish_unnameable_file_at(
+    parent_fd: int, descriptor: int, name: str, label: str
+) -> None:
+    """Create the destination link from the admitted descriptor, never its name."""
+
+    try:
+        os.link(
+            f"/proc/self/fd/{descriptor}",
+            name,
+            dst_dir_fd=parent_fd,
+            follow_symlinks=True,
+        )
+    except FileExistsError as exc:
+        raise IncarnationHomeError(f"{label} already exists") from exc
+    except OSError as exc:
+        raise IncarnationHomeError(
+            f"cannot publish unnameable {label}"
+        ) from exc
 
 
 def _write_exact(
@@ -1346,7 +1429,6 @@ def _write_exact(
     ambient_identities = ambient_identities or set()
     parent_fd = _open_pinned_parent_directory(path, "exact file")
     descriptor: int | None = None
-    temporary_name: str | None = None
     try:
         try:
             existing = os.lstat(path.name, dir_fd=parent_fd)
@@ -1362,43 +1444,31 @@ def _write_exact(
                 path.name,
                 label=f"existing file {path}",
                 ambient_identities=ambient_identities,
+                writable=True,
             )
             try:
                 same_content = _read_descriptor_bytes(descriptor, str(path)) == content
+                _revalidate_writable_regular_file_at(
+                    parent_fd,
+                    path.name,
+                    descriptor,
+                    opened,
+                    label=f"existing file {path}",
+                    ambient_identities=ambient_identities,
+                )
                 if same_content:
                     if stat.S_IMODE(opened.st_mode) != mode:
                         os.fchmod(descriptor, mode)
                     return
+                _write_descriptor_exact(descriptor, content, mode, str(path))
+                os.fsync(parent_fd)
+                return
             finally:
                 os.close(descriptor)
                 descriptor = None
-        descriptor, temporary_name = _create_temporary_file_at(
-            parent_fd, path.name + ".tmp-"
-        )
-        os.fchmod(descriptor, mode)
-        view = memoryview(content)
-        while view:
-            view = view[os.write(descriptor, view) :]
-        os.fsync(descriptor)
-        try:
-            target = os.lstat(path.name, dir_fd=parent_fd)
-        except FileNotFoundError:
-            target = None
-        if target is not None:
-            target_fd, _target_stat = _open_stable_regular_file_at(
-                parent_fd,
-                path.name,
-                label=f"replacement target {path}",
-                ambient_identities=ambient_identities,
-            )
-            os.close(target_fd)
-        os.replace(
-            temporary_name,
-            path.name,
-            src_dir_fd=parent_fd,
-            dst_dir_fd=parent_fd,
-        )
-        temporary_name = None
+        descriptor = _create_unnameable_temporary_file_at(parent_fd, str(path))
+        _write_descriptor_exact(descriptor, content, mode, str(path))
+        _publish_unnameable_file_at(parent_fd, descriptor, path.name, str(path))
         os.fsync(parent_fd)
     except IncarnationHomeError:
         raise
@@ -1407,11 +1477,6 @@ def _write_exact(
     finally:
         if descriptor is not None:
             os.close(descriptor)
-        if temporary_name is not None:
-            try:
-                os.unlink(temporary_name, dir_fd=parent_fd)
-            except FileNotFoundError:
-                pass
         os.close(parent_fd)
 
 
@@ -2830,39 +2895,38 @@ def _write_atomic_json(
     payload = canonical_bytes(value) + b"\n"
     parent_fd = _open_pinned_parent_directory(path, label)
     fd: int | None = None
-    temporary_name: str | None = None
     try:
-        fd, temporary_name = _create_temporary_file_at(
-            parent_fd, path.name + ".tmp."
-        )
-        os.fchmod(fd, 0o600)
-        view = memoryview(payload)
-        while view:
-            view = view[os.write(fd, view) :]
-        os.fsync(fd)
-        if replace:
+        try:
+            target = os.lstat(path.name, dir_fd=parent_fd)
+        except FileNotFoundError:
+            target = None
+        if target is not None:
+            if not replace:
+                raise IncarnationHomeError(f"{label} already exists: {path}")
+            fd, opened = _open_stable_regular_file_at(
+                parent_fd,
+                path.name,
+                label=label,
+                ambient_identities=set(),
+                writable=True,
+            )
             try:
-                target = os.lstat(path.name, dir_fd=parent_fd)
-            except FileNotFoundError:
-                target = None
-            if target is not None and stat.S_ISLNK(target.st_mode):
-                raise IncarnationHomeError(
-                    f"{label} became a symlink before publication: {path}"
+                _revalidate_writable_regular_file_at(
+                    parent_fd,
+                    path.name,
+                    fd,
+                    opened,
+                    label=label,
+                    ambient_identities=set(),
                 )
-            os.replace(
-                temporary_name,
-                path.name,
-                src_dir_fd=parent_fd,
-                dst_dir_fd=parent_fd,
-            )
-            temporary_name = None
+                _write_descriptor_exact(fd, payload, 0o600, str(path))
+            finally:
+                os.close(fd)
+                fd = None
         else:
-            os.link(
-                temporary_name,
-                path.name,
-                src_dir_fd=parent_fd,
-                dst_dir_fd=parent_fd,
-            )
+            fd = _create_unnameable_temporary_file_at(parent_fd, label)
+            _write_descriptor_exact(fd, payload, 0o600, str(path))
+            _publish_unnameable_file_at(parent_fd, fd, path.name, label)
         os.fsync(parent_fd)
     except FileExistsError as exc:
         raise IncarnationHomeError(f"{label} already exists: {path}") from exc
@@ -2871,11 +2935,6 @@ def _write_atomic_json(
     finally:
         if fd is not None:
             os.close(fd)
-        if temporary_name is not None:
-            try:
-                os.unlink(temporary_name, dir_fd=parent_fd)
-            except FileNotFoundError:
-                pass
         os.close(parent_fd)
 
 
@@ -2997,7 +3056,7 @@ def _validate_holder_claim(
         raise IncarnationHomeError("holder claim binding context digest disagrees")
 
 
-def _reserve_or_validate_holder_claim(
+def _reserve_or_transfer_holder_claim(
     *,
     manifest_path: Path,
     manifest: dict[str, Any],
@@ -3005,7 +3064,7 @@ def _reserve_or_validate_holder_claim(
     binding_context_digest: str,
     holder_receipt_path: Path,
 ) -> tuple[Path, str]:
-    """Reserve a claim, or accept the exact same claim for an idempotent rebind."""
+    """Reserve a claim, or transfer the exact claim to a replacement receipt."""
 
     claim_path = _holder_claim_path(manifest_path)
     try:
@@ -3028,6 +3087,24 @@ def _reserve_or_validate_holder_claim(
         )
     claim, raw = _load_json_snapshot(claim_path, "holder claim")
     claim_digest = sha256_bytes(raw)
+    requested_receipt = _safe_source_receipt_path(holder_receipt_path)
+    current_receipt = claim.get("holder_receipt")
+    if not isinstance(current_receipt, str):
+        raise IncarnationHomeError("holder claim holder_receipt is invalid")
+    if current_receipt == requested_receipt:
+        _validate_holder_claim(
+            claim_path=claim_path,
+            claim_digest=claim_digest,
+            manifest_path=manifest_path,
+            manifest=manifest,
+            manifest_digest=manifest_digest,
+            binding_context_digest=binding_context_digest,
+            holder_receipt_path=holder_receipt_path,
+        )
+        return claim_path, claim_digest
+    previous_receipt_path = Path(current_receipt)
+    if _safe_source_receipt_path(previous_receipt_path) != current_receipt:
+        raise IncarnationHomeError("holder claim holder_receipt is invalid")
     _validate_holder_claim(
         claim_path=claim_path,
         claim_digest=claim_digest,
@@ -3035,9 +3112,16 @@ def _reserve_or_validate_holder_claim(
         manifest=manifest,
         manifest_digest=manifest_digest,
         binding_context_digest=binding_context_digest,
-        holder_receipt_path=holder_receipt_path,
+        holder_receipt_path=previous_receipt_path,
     )
-    return claim_path, claim_digest
+    transferred = dict(claim)
+    transferred["holder_receipt"] = requested_receipt
+    _write_atomic_json(claim_path, transferred, "holder claim transfer", replace=True)
+    try:
+        transferred_raw = _regular_file(claim_path, "holder claim").read_bytes()
+    except OSError as exc:
+        raise IncarnationHomeError("holder claim transfer could not be hashed") from exc
+    return claim_path, sha256_bytes(transferred_raw)
 
 
 def _release_holder_claim(
@@ -5780,21 +5864,70 @@ def command_close(args: argparse.Namespace) -> int:
 def _incarnation_preparation_lock(
     runtime_root: Path, ambient_identities: set[tuple[int, int]]
 ) -> Any:
-    """Serialize every preparation in one runtime state root."""
+    """Serialize every preparation through the pinned runtime directory."""
 
     lock_path = runtime_root / PREPARATION_LOCK_FILE_NAME
-    if lock_path.is_symlink():
-        raise IncarnationHomeError(
-            f"incarnation preparation lock may not be a symlink: {lock_path}"
-        )
-    flags = os.O_CREAT | os.O_RDWR | getattr(os, "O_CLOEXEC", 0)
-    flags |= getattr(os, "O_NOFOLLOW", 0)
+    parent_fd = _open_pinned_parent_directory(
+        lock_path, "incarnation preparation lock"
+    )
+    directory_locked = False
     lock_fd: int | None = None
+    lock_file_locked = False
     try:
-        lock_fd = os.open(lock_path, flags, 0o600)
+        try:
+            initial = os.lstat(
+                PREPARATION_LOCK_FILE_NAME, dir_fd=parent_fd
+            )
+        except FileNotFoundError:
+            initial = None
+        except OSError as exc:
+            raise IncarnationHomeError(
+                f"incarnation preparation lock cannot be inspected: {lock_path}"
+            ) from exc
+        if initial is not None and (
+            stat.S_ISLNK(initial.st_mode) or not stat.S_ISREG(initial.st_mode)
+        ):
+            raise IncarnationHomeError(
+                f"incarnation preparation lock is not an isolated regular file: {lock_path}"
+            )
+        fcntl.flock(parent_fd, fcntl.LOCK_EX)
+        directory_locked = True
+        try:
+            locked_initial = os.lstat(
+                PREPARATION_LOCK_FILE_NAME, dir_fd=parent_fd
+            )
+        except FileNotFoundError:
+            locked_initial = None
+        except OSError as exc:
+            raise IncarnationHomeError(
+                f"incarnation preparation lock cannot be inspected after directory lock: {lock_path}"
+            ) from exc
+        if initial is not None and (
+            locked_initial is None
+            or (locked_initial.st_dev, locked_initial.st_ino, locked_initial.st_mode)
+            != (initial.st_dev, initial.st_ino, initial.st_mode)
+        ):
+            raise IncarnationHomeError(
+                f"incarnation preparation lock changed before acquisition: {lock_path}"
+            )
+        initial = locked_initial
+        flags = os.O_RDWR | getattr(os, "O_CLOEXEC", 0)
+        flags |= getattr(os, "O_NOFOLLOW", 0)
+        if initial is None:
+            flags |= os.O_CREAT | os.O_EXCL
+        lock_fd = os.open(
+            PREPARATION_LOCK_FILE_NAME,
+            flags,
+            0o600,
+            dir_fd=parent_fd,
+        )
         opened = os.fstat(lock_fd)
-        observed = os.lstat(lock_path)
+        observed = os.lstat(PREPARATION_LOCK_FILE_NAME, dir_fd=parent_fd)
         if (
+            initial is not None
+            and (opened.st_dev, opened.st_ino, opened.st_mode)
+            != (initial.st_dev, initial.st_ino, initial.st_mode)
+        ) or (
             (opened.st_dev, opened.st_ino, opened.st_mode)
             != (observed.st_dev, observed.st_ino, observed.st_mode)
             or not stat.S_ISREG(opened.st_mode)
@@ -5804,9 +5937,23 @@ def _incarnation_preparation_lock(
             raise IncarnationHomeError(
                 f"incarnation preparation lock is not an isolated regular file: {lock_path}"
             )
-        if stat.S_IMODE(opened.st_mode) != 0o600:
-            os.fchmod(lock_fd, 0o600)
         fcntl.flock(lock_fd, fcntl.LOCK_EX)
+        lock_file_locked = True
+        reopened = os.fstat(lock_fd)
+        renamed = os.lstat(PREPARATION_LOCK_FILE_NAME, dir_fd=parent_fd)
+        if (
+            (reopened.st_dev, reopened.st_ino)
+            != (opened.st_dev, opened.st_ino)
+            or (renamed.st_dev, renamed.st_ino)
+            != (opened.st_dev, opened.st_ino)
+            or not stat.S_ISREG(reopened.st_mode)
+            or reopened.st_nlink != 1
+            or (reopened.st_dev, reopened.st_ino) in ambient_identities
+            or stat.S_IMODE(reopened.st_mode) != 0o600
+        ):
+            raise IncarnationHomeError(
+                f"incarnation preparation lock changed after acquisition: {lock_path}"
+            )
         yield
     except IncarnationHomeError:
         raise
@@ -5815,11 +5962,20 @@ def _incarnation_preparation_lock(
             f"incarnation preparation lock cannot be acquired: {lock_path}"
         ) from exc
     finally:
-        if lock_fd is not None:
+        if lock_fd is not None and lock_file_locked:
             try:
                 fcntl.flock(lock_fd, fcntl.LOCK_UN)
             finally:
                 os.close(lock_fd)
+        elif lock_fd is not None:
+            os.close(lock_fd)
+        if directory_locked:
+            try:
+                fcntl.flock(parent_fd, fcntl.LOCK_UN)
+            finally:
+                os.close(parent_fd)
+        else:
+            os.close(parent_fd)
 
 
 def _reserve_holder_claim_for_launch(
@@ -5832,7 +5988,7 @@ def _reserve_holder_claim_for_launch(
     holder_receipt_path: Path,
     allow_existing_claim: bool = False,
 ) -> tuple[Path, str]:
-    """Publish a launch claim under the same lock that freezes preparation."""
+    """Publish or rebind a holder claim under the preparation serialization boundary."""
 
     runtime_root_value = manifest.get("runtime_root")
     ambient_home_value = manifest.get("ambient_codex_home")
@@ -5859,13 +6015,13 @@ def _reserve_holder_claim_for_launch(
                 "incarnation-home manifest changed before holder claim"
             )
         reserve = (
-            _reserve_or_validate_holder_claim
+            _reserve_or_transfer_holder_claim
             if allow_existing_claim
             else _reserve_holder_claim
         )
         return reserve(
             manifest_path=manifest_path,
-            manifest=manifest,
+            manifest=_locked_manifest,
             manifest_digest=manifest_digest,
             binding_context_digest=binding_context_digest,
             holder_receipt_path=holder_receipt_path,

@@ -270,8 +270,10 @@ lineage, scoped incarnation manifest, and executable digest, and publishes a
 new canonical holder receipt carrying the packet provenance. The rebind receipt
 proves only holder identity; it does not prove wake delivery, Goal activation,
 semantic acceptance, or closure. Before publishing that receipt, rebind reserves
-the same non-replacing holder claim under the runtime preparation lock; an exact
-retry may validate its existing claim, while a different receipt or holder is
+the same holder claim under the runtime preparation lock. An exact retry
+validates its existing claim; recovery of an already claimed live holder
+transfers that claim's receipt binding from the superseded receipt to the
+replacement receipt under the lock, while a different holder or manifest is
 rejected. A rebind therefore cannot leave the live home writable after receipt
 publication.
 
@@ -875,7 +877,13 @@ tree. After an ambient unlink/replace, the loader permits the existing local
 tree only when its digest is unchanged; a new or altered local tree is denied.
 Every file writer pins and revalidates the target parent descriptor before
 creating, replacing, or mode-updating a file, so a parent rename or symlink
-replacement cannot redirect an effect into ambient state.
+replacement cannot redirect an effect into ambient state. New files are
+published directly from an unnameable `O_TMPFILE` descriptor rather than a
+replaceable temporary pathname; existing admitted regular files are reopened
+read/write and revalidated immediately before their first truncate or mode
+effect. The preparation lock serializes through the pinned runtime directory
+and revalidates its named single-link file after acquisition, so a lock-name
+replacement cannot split critical sections or chmod an external inode.
 Legacy v2 manifests remain schema-valid without this field on the explicit
 compatibility branch, but no v2 manifest can pass canonical launch until
 migration produces v3. The loader

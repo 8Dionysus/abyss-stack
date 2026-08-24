@@ -502,6 +502,36 @@ def test_exact_writer_rejects_parent_replacement_before_ambient_mutation(
     assert actor_config.read_bytes() == b'actor = "old"\n'
 
 
+def test_exact_writer_publishes_from_unnameable_descriptor(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    actor = tmp_path / "actor"
+    ambient = tmp_path / "ambient"
+    actor.mkdir()
+    ambient.mkdir()
+    ambient_config = ambient / "config.toml"
+    ambient_config.write_bytes(b'ambient = "protected"\n')
+    ambient_config.chmod(0o640)
+    target = actor / "incarnation-home.json"
+    before_ambient_bytes = ambient_config.read_bytes()
+    before_ambient_mode = stat.S_IMODE(ambient_config.stat().st_mode)
+
+    def forbidden_named_replace(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("publication must not reopen a replaceable temp name")
+
+    monkeypatch.setattr(MODULE.os, "replace", forbidden_named_replace)
+    MODULE._write_exact(
+        target,
+        b'{"safe":true}\n',
+        0o600,
+        ambient_identities=MODULE._ambient_inode_identities(ambient),
+    )
+
+    assert target.read_bytes() == b'{"safe":true}\n'
+    assert ambient_config.read_bytes() == before_ambient_bytes
+    assert stat.S_IMODE(ambient_config.stat().st_mode) == before_ambient_mode
+
+
 def test_preparation_lock_alias_rejection_preserves_external_mode_and_bytes(
     tmp_path: Path,
 ) -> None:
@@ -530,6 +560,44 @@ def test_preparation_lock_alias_rejection_preserves_external_mode_and_bytes(
 
     assert external_lock.read_bytes() == before_bytes
     assert stat.S_IMODE(external_lock.stat().st_mode) == before_mode
+
+
+def test_preparation_lock_replacement_after_acquisition_fails_closed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    original_flock = MODULE.fcntl.flock
+    exclusive_calls = 0
+    lock_path = runtime_root / MODULE.PREPARATION_LOCK_FILE_NAME
+
+    def replace_after_lock(fd: int, operation: int) -> None:
+        nonlocal exclusive_calls
+        original_flock(fd, operation)
+        if operation == MODULE.fcntl.LOCK_EX:
+            exclusive_calls += 1
+            if exclusive_calls == 2:
+                lock_path.unlink()
+                lock_path.write_bytes(b"replacement-lock")
+                lock_path.chmod(0o600)
+
+    monkeypatch.setattr(MODULE.fcntl, "flock", replace_after_lock)
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="preparation lock changed after acquisition",
+    ):
+        _ORIGINAL_PREPARE_HOME(
+            ambient_home=ambient,
+            realization_path=_realization(tmp_path / "realization.json"),
+            runtime_root=runtime_root,
+            binding_context=_holder_binding_context(runtime_root, "lock-replace"),
+        )
+
+    assert lock_path.read_bytes() == b"replacement-lock"
+    assert exclusive_calls == 2
 
 
 def test_new_home_requires_typed_holder_binding(tmp_path: Path) -> None:
@@ -2395,6 +2463,16 @@ def test_rebind_receipt_binds_holder_environment_and_manifest_snapshot(
         binding_context=context,
     )
     manifest_path = Path(manifest["codex_home"]).parent / "incarnation-home.json"
+    original_receipt_path = tmp_path / "original-holder.json"
+    context_digest = MODULE.sha256_bytes(context_path.read_bytes())
+    MODULE._reserve_holder_claim_for_launch(
+        manifest_path=manifest_path,
+        manifest=manifest,
+        manifest_digest=MODULE.sha256_bytes(manifest_path.read_bytes()),
+        binding_context_digest=context_digest,
+        binding_context=context,
+        holder_receipt_path=original_receipt_path,
+    )
     executable = Path("/proc/self/exe").resolve()
     executable_digest = MODULE.sha256_bytes(executable.read_bytes())
     holder_argv = [str(executable), "exec"]

@@ -80,20 +80,25 @@ schema-valid on their explicit compatibility route; every v2 manifest,
 including typed and provenance-bearing variants, is rejected by canonical
 loading until preparation migrates it to v3, and provenance-bearing v2 is
 rejected even on the non-canonical loader route because the public v2 branch
-forbids that field. A multiply linked preparation lock is rejected before
-`fchmod`, with the external inode's bytes and mode preserved. Canonical launch
-also reloads and digest-checks the manifest while holding the preparation lock,
-rejecting a deterministic replacement race before claim publication.
-The exact writer pins the target parent descriptor and rejects a deterministic
-parent replacement before any ambient bytes or mode can change.
+forbids that field. A multiply linked preparation lock is rejected before any
+mode effect, with the external inode's bytes and mode preserved; a deterministic
+lock-name replacement after acquisition is also rejected. The lock serializes
+through the pinned runtime directory, so concurrent first preparation remains
+serializable. Canonical launch also reloads and digest-checks the manifest
+while holding the preparation lock, rejecting a deterministic replacement race
+before claim publication. The exact writer pins the target parent descriptor,
+publishes new files from an unnameable descriptor, and rewrites only an
+immediately revalidated admitted descriptor; deterministic parent and
+temporary-name replacement cannot change ambient bytes or mode.
 Incomplete holder receipts missing `runtime_state_root` or `closeout_route`
 are rejected by both the receipt schema and runtime binding validator. A
 receipt carrying an immutable manifest snapshot must also carry the complete
 `holder_binding`; the schema and snapshot loader reject its omission for both
 v3 and legacy-v2 snapshots, while pre-snapshot receipts retain their bounded
 compatibility path. Rebind reserves that same holder claim under the
-preparation lock before publishing a replacement receipt, and an exact retry
-is idempotent. Directory enumeration retains its descriptor and rejects a
+preparation lock before publishing a replacement receipt, transferring an
+existing claim from the superseded receipt under that lock; an exact retry is
+idempotent. Directory enumeration retains its descriptor and rejects a
 deterministic pathname replacement after the descriptor is opened. Stale-root
 rollback validates and removes through a retained root descriptor, rejecting a
 replacement root before deleting the replacement tree.
