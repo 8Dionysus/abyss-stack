@@ -1690,7 +1690,7 @@ def test_explicit_legacy_migration_carries_local_state_into_typed_v3(
     (legacy_home / denied_name).write_bytes(b"legacy-denied-state")
     (legacy_home / "cache" / "legacy-cache").write_bytes(b"legacy-cache")
     source_modes = {
-        "cache": 0o750,
+        "cache": 0o500,
         "log": 0o711,
         "tmp": 0o755,
         MODULE.DESCENDANT_BIN_NAME: 0o751,

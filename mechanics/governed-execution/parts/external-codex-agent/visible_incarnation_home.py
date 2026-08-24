@@ -2663,7 +2663,15 @@ def _copy_legacy_actor_local_state_impl(
             )
         return first
 
-    def ensure_target_directory(target: Path, mode: int, label: str) -> None:
+    def ensure_target_directory(
+        target: Path,
+        mode: int,
+        label: str,
+        *,
+        final: bool = False,
+    ) -> None:
+        source_mode = stat.S_IMODE(mode)
+        target_mode = source_mode if final else source_mode | 0o700
         target_parent_fd: int | None = None
         target_descriptor: int | None = None
         try:
@@ -2682,7 +2690,7 @@ def _copy_legacy_actor_local_state_impl(
                 try:
                     os.mkdir(
                         target.name,
-                        stat.S_IMODE(mode),
+                        target_mode,
                         dir_fd=target_parent_fd,
                     )
                 except FileExistsError as exc:
@@ -2710,12 +2718,12 @@ def _copy_legacy_actor_local_state_impl(
                 raise IncarnationHomeError(
                     f"migration target directory changed during safe open: {label}"
                 )
-            os.fchmod(target_descriptor, stat.S_IMODE(mode))
+            os.fchmod(target_descriptor, target_mode)
             after = os.fstat(target_descriptor)
             if (
                 not stat.S_ISDIR(after.st_mode)
                 or (after.st_dev, after.st_ino) != expected_identity
-                or stat.S_IMODE(after.st_mode) != stat.S_IMODE(mode)
+                or stat.S_IMODE(after.st_mode) != target_mode
             ):
                 raise IncarnationHomeError(
                     f"migration target directory mode could not be verified: {label}"
@@ -2855,7 +2863,8 @@ def _copy_legacy_actor_local_state_impl(
                 f"legacy actor-local state directory is aliased: {label}"
             )
         visited_directories.add(identity)
-        ensure_target_directory(target, stat.S_IMODE(current.st_mode), label)
+        directory_mode = stat.S_IMODE(current.st_mode)
+        ensure_target_directory(target, directory_mode, label)
         children = stable_directory_children(descriptor, current, label)
         for child in children:
             child_label = f"{label}/{child}"
@@ -2881,6 +2890,7 @@ def _copy_legacy_actor_local_state_impl(
             raise IncarnationHomeError(
                 f"legacy actor-local state directory changed during migration: {label}"
             )
+        ensure_target_directory(target, directory_mode, label, final=True)
         revalidate_source(source, descriptor, initial, parent_fd, child_name, label)
 
     for name in source_names:
