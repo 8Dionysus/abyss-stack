@@ -12,6 +12,8 @@ Tracking starts with the community-docs baseline for this repository.
 - Bind the canonical `aoa-kag` MCP adapter to an authored absolute
   `AOA_KAG_ARTIFACT_ROOT` seam for v4 cold-CAS reads, preserving fail-closed
   loader behavior and separate artifact-admission verdicts.
+- Pin the repo-local KAG validation action to the exact merged `aoa-kag`
+  provider commit used by this consumer change.
 - Keep the read-contour validator compatible with the pinned MCP 2.x
   snake-case model fields and their wire-format aliases.
 - Bound the Codex agent-routing adapter's wait for an event-keyed relay
