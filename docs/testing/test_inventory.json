@@ -121,6 +121,7 @@
         "mechanics/runtime-lifecycle/parts/logs-status/tests/test_service_selection_status.py",
         "mechanics/runtime-lifecycle/parts/start-stop/tests/test_aoa_warmup.py",
         "mechanics/runtime-lifecycle/parts/status-readouts/tests/test_runtime_hygiene.py",
+        "mechanics/runtime-lifecycle/parts/deployment-route/tests/test_deployment_route.py",
         "mechanics/runtime-repair/parts/a2a-return-dry-run/tests/test_a2a_return_closeout_dry_run.py",
         "mechanics/runtime-repair/parts/degradation-receipts/tests/test_degradation_receipts.py",
         "mechanics/runtime-repair/parts/memo-contradiction-sidecar/tests/test_memo_contradiction_integrity_runner.py",

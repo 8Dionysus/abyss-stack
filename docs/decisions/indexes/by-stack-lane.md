@@ -68,6 +68,7 @@
 - [ABYSS-STACK-D-0062 Agent Skill Projection Validator Module](../ABYSS-STACK-D-0062-agent-skill-projection-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0062-agent-skill-projection-validator-module.md`)
 - [ABYSS-STACK-D-0063 Root Validator Wrapper Tail Removal](../ABYSS-STACK-D-0063-root-validator-wrapper-tail-removal.md) (`docs/decisions/ABYSS-STACK-D-0063-root-validator-wrapper-tail-removal.md`)
 - [ABYSS-STACK-D-0064 Federation Effective Runtime Inputs](../ABYSS-STACK-D-0064-federation-effective-runtime-inputs.md) (`docs/decisions/ABYSS-STACK-D-0064-federation-effective-runtime-inputs.md`)
+- [ABYSS-STACK-D-0076 Owner-source Atomic Deployment Route](../ABYSS-STACK-D-0076-owner-source-atomic-deployment-route.md) (`docs/decisions/ABYSS-STACK-D-0076-owner-source-atomic-deployment-route.md`)
 
 ## config projection
 
@@ -80,6 +81,7 @@
 
 - [ABYSS-STACK-D-0005 Operator Wrappers With Part-Local Backends](../ABYSS-STACK-D-0005-operator-wrappers-with-part-local-backends.md) (`docs/decisions/ABYSS-STACK-D-0005-operator-wrappers-with-part-local-backends.md`)
 - [ABYSS-STACK-D-0027 Managed Systemd Unit Sources](../ABYSS-STACK-D-0027-managed-systemd-unit-sources.md) (`docs/decisions/ABYSS-STACK-D-0027-managed-systemd-unit-sources.md`)
+- [ABYSS-STACK-D-0076 Owner-source Atomic Deployment Route](../ABYSS-STACK-D-0076-owner-source-atomic-deployment-route.md) (`docs/decisions/ABYSS-STACK-D-0076-owner-source-atomic-deployment-route.md`)
 
 ## machine fit
 
@@ -193,6 +195,10 @@
 
 - [ABYSS-STACK-D-0065 Observability LogQL Loki Alloy](../ABYSS-STACK-D-0065-observability-logql-loki-alloy.md) (`docs/decisions/ABYSS-STACK-D-0065-observability-logql-loki-alloy.md`)
 - [ABYSS-STACK-D-0070 Observability OTLP Tempo Trace Plane](../ABYSS-STACK-D-0070-observability-otlp-tempo-trace-plane.md) (`docs/decisions/ABYSS-STACK-D-0070-observability-otlp-tempo-trace-plane.md`)
+
+## operator deployment
+
+- [ABYSS-STACK-D-0076 Owner-source Atomic Deployment Route](../ABYSS-STACK-D-0076-owner-source-atomic-deployment-route.md) (`docs/decisions/ABYSS-STACK-D-0076-owner-source-atomic-deployment-route.md`)
 
 ## release/tooling
 

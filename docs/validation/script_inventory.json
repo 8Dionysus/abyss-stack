@@ -48,6 +48,7 @@
         "scripts/aoa-bootstrap-wsl.ps1",
         "scripts/aoa-bounded-autonomy-pilot",
         "scripts/aoa-check-layout",
+        "scripts/aoa-deploy-owner-package",
         "scripts/aoa-diagnose",
         "scripts/aoa-doctor",
         "scripts/aoa-doctor-win.ps1",

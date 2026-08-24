@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://abyss-stack.invalid/schemas/owner-source-rollback-receipt-v1",
+  "title": "Abyss Stack owner-source rollback receipt v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "status",
+    "operation_id",
+    "owner_repo",
+    "activation_receipt",
+    "destination",
+    "release_root",
+    "restored_predecessor",
+    "claim_ceiling",
+    "receipt_digest"
+  ],
+  "properties": {
+    "schema_version": {"const": "abyss_stack_owner_source_rollback_receipt_v1"},
+    "status": {"const": "rolled_back"},
+    "receipt_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

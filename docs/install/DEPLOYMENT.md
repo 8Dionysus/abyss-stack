@@ -163,6 +163,28 @@ Use `aoa-status --autonomy --json` for the operator-readable control-loop verdic
 When the `federation` profile is active, the same verdict also requires route-api health, closure, and federation layer checks to agree.
 When the `federation` profile is not active and federated advisory consumption is disabled, route-api checks should appear as `not_enabled` rather than as hard failures.
 
+### Owner-source package deployment route
+
+For a later operator-controlled move of an owner-reviewed source checkout, use
+the runtime-lifecycle [owner-source deployment route](../../mechanics/runtime-lifecycle/parts/deployment-route/README.md).
+It is a different route from Configs sync:
+
+- source sync is a non-destructive mirror operation and does not provide an
+  atomic package switch;
+- the owner-source route requires an external typed admission, an exact clean
+  commit/tree, and a same-filesystem preflight;
+- it stages a self-contained Git release under a versioned identity, then
+  atomically replaces one destination symlink while retaining the predecessor;
+- activation and rollback are explicit commands and emit receipts; the route
+  does not install dependencies, relink Configs, start services, or prove live
+  health.
+
+The route rejects dirty source/destination state, stale or mismatched
+admission, incomplete staging, cross-device paths, concurrent deployment, and
+predecessor identity drift. Artifact signature/SBOM/provenance admission stays
+with `abyss-machine`; this repository must not invent an artifact class for a
+source-only owner route.
+
 The shortest honest verify path for the current promoted runtime is:
 
 ```bash

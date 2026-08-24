@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://abyss-stack.invalid/schemas/owner-source-activate-receipt-v1",
+  "title": "Abyss Stack owner-source activate receipt v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "status",
+    "operation_id",
+    "owner_repo",
+    "prepare_receipt",
+    "source",
+    "destination",
+    "release_root",
+    "activated_release",
+    "predecessor",
+    "atomicity",
+    "dependency_posture",
+    "claim_ceiling",
+    "receipt_digest"
+  ],
+  "properties": {
+    "schema_version": {"const": "abyss_stack_owner_source_activate_receipt_v1"},
+    "status": {"const": "activated"},
+    "dependency_posture": {"const": "source_only_no_install"},
+    "receipt_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

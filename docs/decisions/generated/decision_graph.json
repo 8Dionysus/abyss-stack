@@ -1,19 +1,19 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
-  "decision_count": 75,
-  "edge_count": 1629,
+  "decision_count": 76,
+  "edge_count": 1655,
   "edge_type_counts": {
-    "CITES_SOURCE_SURFACE": 651,
-    "DATED": 75,
-    "GUARDED_BY": 193,
-    "HAS_STATUS": 75,
-    "HAS_SURFACE_CLASS": 182,
-    "IN_STACK_LANE": 148,
-    "NEXT_DECISION": 74,
-    "OWNED_BY_SURFACE": 79,
-    "OWNS_DECISION": 75,
+    "CITES_SOURCE_SURFACE": 661,
+    "DATED": 76,
+    "GUARDED_BY": 197,
+    "HAS_STATUS": 76,
+    "HAS_SURFACE_CLASS": 185,
+    "IN_STACK_LANE": 151,
+    "NEXT_DECISION": 75,
+    "OWNED_BY_SURFACE": 80,
+    "OWNS_DECISION": 76,
     "SUPERSEDED_BY": 1,
-    "UNDER_MECHANIC_PARENT": 76
+    "UNDER_MECHANIC_PARENT": 77
   },
   "edges": [
     {
@@ -7778,12 +7778,137 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0075",
+      "target": "decision:ABYSS-STACK-D-0076",
+      "type": "NEXT_DECISION"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0075",
       "target": "owner_surface:mcp/services/aoa-kag-mcp/",
       "type": "OWNED_BY_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0075",
       "target": "mechanic_parent:federation-seams",
+      "type": "UNDER_MECHANIC_PARENT"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
+      "target": "source_surface:docs/install/DEPLOYMENT.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
+      "target": "source_surface:docs/validation/validation_lanes.json",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
+      "target": "source_surface:mechanics/runtime-lifecycle/AGENTS.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
+      "target": "source_surface:mechanics/runtime-lifecycle/PARTS.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
+      "target": "source_surface:mechanics/runtime-lifecycle/parts/deployment-route/README.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
+      "target": "source_surface:mechanics/runtime-lifecycle/parts/deployment-route/aoa_deploy_owner_package.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
+      "target": "source_surface:mechanics/runtime-lifecycle/parts/deployment-route/schemas/",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
+      "target": "source_surface:mechanics/runtime-lifecycle/parts/deployment-route/tests/test_deployment_route.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
+      "target": "source_surface:scripts/aoa-sync-configs",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
+      "target": "source_surface:scripts/validators/script_surface.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
+      "target": "date:2026-08-24",
+      "type": "DATED"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
+      "target": "guard_family:atomic%20switch",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
+      "target": "guard_family:clean%20source%20identity",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
+      "target": "guard_family:deployment%20lock",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
+      "target": "guard_family:predecessor%20rollback",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
+      "target": "status:accepted",
+      "type": "HAS_STATUS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
+      "target": "surface_class:deployment%20route",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
+      "target": "surface_class:runtime%20topology",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
+      "target": "surface_class:source/runtime%20boundary",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
+      "target": "stack_lane:operator%20deployment",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
+      "target": "stack_lane:runtime%20lifecycle",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
+      "target": "stack_lane:source%20checkout",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
+      "target": "owner_surface:mechanics/runtime-lifecycle/parts/deployment-route/",
+      "type": "OWNED_BY_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
+      "target": "mechanic_parent:runtime-lifecycle",
       "type": "UNDER_MECHANIC_PARENT"
     },
     {
@@ -8160,21 +8285,26 @@
       "source": "repo:abyss-stack",
       "target": "decision:ABYSS-STACK-D-0075",
       "type": "OWNS_DECISION"
+    },
+    {
+      "source": "repo:abyss-stack",
+      "target": "decision:ABYSS-STACK-D-0076",
+      "type": "OWNS_DECISION"
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 685,
+  "node_count": 700,
   "node_type_counts": {
-    "date": 18,
-    "decision": 75,
-    "guard_family": 73,
+    "date": 19,
+    "decision": 76,
+    "guard_family": 77,
     "mechanic_parent": 10,
-    "owner_surface": 37,
+    "owner_surface": 38,
     "repo": 1,
-    "source_surface": 390,
-    "stack_lane": 24,
+    "source_surface": 396,
+    "stack_lane": 25,
     "status": 2,
-    "surface_class": 55
+    "surface_class": 56
   },
   "nodes": [
     {
@@ -8265,6 +8395,11 @@
     {
       "id": "date:2026-06-28",
       "label": "2026-06-28",
+      "type": "date"
+    },
+    {
+      "id": "date:2026-08-24",
+      "label": "2026-08-24",
       "type": "date"
     },
     {
@@ -9018,6 +9153,16 @@
       "type": "decision"
     },
     {
+      "date": "2026-08-24",
+      "id": "decision:ABYSS-STACK-D-0076",
+      "label": "ABYSS-STACK-D-0076",
+      "path": "docs/decisions/ABYSS-STACK-D-0076-owner-source-atomic-deployment-route.md",
+      "posture": "accepted owner-source deployment rationale",
+      "status": "accepted",
+      "title": "ABYSS-STACK-D-0076 Owner-source Atomic Deployment Route",
+      "type": "decision"
+    },
+    {
       "id": "guard_family:MCP%20port%20confinement",
       "label": "MCP port confinement",
       "type": "guard_family"
@@ -9038,8 +9183,18 @@
       "type": "guard_family"
     },
     {
+      "id": "guard_family:atomic%20switch",
+      "label": "atomic switch",
+      "type": "guard_family"
+    },
+    {
       "id": "guard_family:branch%20policy",
       "label": "branch policy",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:clean%20source%20identity",
+      "label": "clean source identity",
       "type": "guard_family"
     },
     {
@@ -9075,6 +9230,11 @@
     {
       "id": "guard_family:decision%20surface",
       "label": "decision surface",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:deployment%20lock",
+      "label": "deployment lock",
       "type": "guard_family"
     },
     {
@@ -9180,6 +9340,11 @@
     {
       "id": "guard_family:pilot%20route%20posture",
       "label": "pilot route posture",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:predecessor%20rollback",
+      "label": "predecessor rollback",
       "type": "guard_family"
     },
     {
@@ -9490,6 +9655,11 @@
     {
       "id": "owner_surface:mechanics/federation-seams/",
       "label": "mechanics/federation-seams/",
+      "type": "owner_surface"
+    },
+    {
+      "id": "owner_surface:mechanics/runtime-lifecycle/parts/deployment-route/",
+      "label": "mechanics/runtime-lifecycle/parts/deployment-route/",
       "type": "owner_surface"
     },
     {
@@ -11044,8 +11214,38 @@
       "type": "source_surface"
     },
     {
+      "id": "source_surface:mechanics/runtime-lifecycle/AGENTS.md",
+      "label": "mechanics/runtime-lifecycle/AGENTS.md",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/runtime-lifecycle/PARTS.md",
+      "label": "mechanics/runtime-lifecycle/PARTS.md",
+      "type": "source_surface"
+    },
+    {
       "id": "source_surface:mechanics/runtime-lifecycle/parts/config-sync-boundary/docs/SOURCE_RUNTIME_PARITY_PACKET.md",
       "label": "mechanics/runtime-lifecycle/parts/config-sync-boundary/docs/SOURCE_RUNTIME_PARITY_PACKET.md",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/runtime-lifecycle/parts/deployment-route/README.md",
+      "label": "mechanics/runtime-lifecycle/parts/deployment-route/README.md",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/runtime-lifecycle/parts/deployment-route/aoa_deploy_owner_package.py",
+      "label": "mechanics/runtime-lifecycle/parts/deployment-route/aoa_deploy_owner_package.py",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/runtime-lifecycle/parts/deployment-route/schemas/",
+      "label": "mechanics/runtime-lifecycle/parts/deployment-route/schemas/",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/runtime-lifecycle/parts/deployment-route/tests/test_deployment_route.py",
+      "label": "mechanics/runtime-lifecycle/parts/deployment-route/tests/test_deployment_route.py",
       "type": "source_surface"
     },
     {
@@ -11629,6 +11829,11 @@
       "type": "stack_lane"
     },
     {
+      "id": "stack_lane:operator%20deployment",
+      "label": "operator deployment",
+      "type": "stack_lane"
+    },
+    {
       "id": "stack_lane:profiles%20and%20presets",
       "label": "profiles and presets",
       "type": "stack_lane"
@@ -11756,6 +11961,11 @@
     {
       "id": "surface_class:decision%20route",
       "label": "decision route",
+      "type": "surface_class"
+    },
+    {
+      "id": "surface_class:deployment%20route",
+      "label": "deployment route",
       "type": "surface_class"
     },
     {

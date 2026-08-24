@@ -87,6 +87,7 @@ MECHANIC_PACKAGE_PARTS = {
         "wait-smoke",
         "logs-status",
         "status-readouts",
+        "deployment-route",
         "user-unit",
     ),
     "runtime-repair": (

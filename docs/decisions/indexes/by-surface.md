@@ -34,6 +34,7 @@
 
 - [ABYSS-STACK-D-0001 Runtime Root Under AbyssOS](../ABYSS-STACK-D-0001-runtime-root-under-abyssos.md) (`docs/decisions/ABYSS-STACK-D-0001-runtime-root-under-abyssos.md`)
 - [ABYSS-STACK-D-0043 Service Selection Validator Module](../ABYSS-STACK-D-0043-service-selection-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0043-service-selection-validator-module.md`)
+- [ABYSS-STACK-D-0076 Owner-source Atomic Deployment Route](../ABYSS-STACK-D-0076-owner-source-atomic-deployment-route.md) (`docs/decisions/ABYSS-STACK-D-0076-owner-source-atomic-deployment-route.md`)
 
 ## runtime profile
 
@@ -69,6 +70,7 @@
 - [ABYSS-STACK-D-0071 AoA Evals Local Port Write-Side MCP](../ABYSS-STACK-D-0071-aoa-evals-local-port-write-side-mcp.md) (`docs/decisions/ABYSS-STACK-D-0071-aoa-evals-local-port-write-side-mcp.md`)
 - [ABYSS-STACK-D-0072 AoA 4PDA Connector MCP Access Plane](../ABYSS-STACK-D-0072-aoa-4pda-connector-mcp-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0072-aoa-4pda-connector-mcp-access-plane.md`)
 - [ABYSS-STACK-D-0074 Telegram and Discord Connector MCP Access Planes](../ABYSS-STACK-D-0074-telegram-discord-connector-mcp-access-planes.md) (`docs/decisions/ABYSS-STACK-D-0074-telegram-discord-connector-mcp-access-planes.md`)
+- [ABYSS-STACK-D-0076 Owner-source Atomic Deployment Route](../ABYSS-STACK-D-0076-owner-source-atomic-deployment-route.md) (`docs/decisions/ABYSS-STACK-D-0076-owner-source-atomic-deployment-route.md`)
 
 ## mechanic package
 
@@ -219,6 +221,10 @@
 ## decision route
 
 - [ABYSS-STACK-D-0056 Decision Surface Validator Module](../ABYSS-STACK-D-0056-decision-surface-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0056-decision-surface-validator-module.md`)
+
+## deployment route
+
+- [ABYSS-STACK-D-0076 Owner-source Atomic Deployment Route](../ABYSS-STACK-D-0076-owner-source-atomic-deployment-route.md) (`docs/decisions/ABYSS-STACK-D-0076-owner-source-atomic-deployment-route.md`)
 
 ## diagnostic surface
 

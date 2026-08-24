@@ -183,9 +183,17 @@
 
 - [ABYSS-STACK-D-0057 Mechanics Topology Validator Module](../ABYSS-STACK-D-0057-mechanics-topology-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0057-mechanics-topology-validator-module.md`)
 
+## atomic switch
+
+- [ABYSS-STACK-D-0076 Owner-source Atomic Deployment Route](../ABYSS-STACK-D-0076-owner-source-atomic-deployment-route.md) (`docs/decisions/ABYSS-STACK-D-0076-owner-source-atomic-deployment-route.md`)
+
 ## branch policy
 
 - [ABYSS-STACK-D-0054 Branch Policy Validator Module](../ABYSS-STACK-D-0054-branch-policy-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0054-branch-policy-validator-module.md`)
+
+## clean source identity
+
+- [ABYSS-STACK-D-0076 Owner-source Atomic Deployment Route](../ABYSS-STACK-D-0076-owner-source-atomic-deployment-route.md) (`docs/decisions/ABYSS-STACK-D-0076-owner-source-atomic-deployment-route.md`)
 
 ## compatibility bridge
 
@@ -212,6 +220,10 @@
 ## decision surface
 
 - [ABYSS-STACK-D-0056 Decision Surface Validator Module](../ABYSS-STACK-D-0056-decision-surface-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0056-decision-surface-validator-module.md`)
+
+## deployment lock
+
+- [ABYSS-STACK-D-0076 Owner-source Atomic Deployment Route](../ABYSS-STACK-D-0076-owner-source-atomic-deployment-route.md) (`docs/decisions/ABYSS-STACK-D-0076-owner-source-atomic-deployment-route.md`)
 
 ## design surface
 
@@ -284,6 +296,10 @@
 ## pilot route posture
 
 - [ABYSS-STACK-D-0060 Inference Pilot Compatibility Validator Module](../ABYSS-STACK-D-0060-inference-pilot-compatibility-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0060-inference-pilot-compatibility-validator-module.md`)
+
+## predecessor rollback
+
+- [ABYSS-STACK-D-0076 Owner-source Atomic Deployment Route](../ABYSS-STACK-D-0076-owner-source-atomic-deployment-route.md) (`docs/decisions/ABYSS-STACK-D-0076-owner-source-atomic-deployment-route.md`)
 
 ## profile topology
 

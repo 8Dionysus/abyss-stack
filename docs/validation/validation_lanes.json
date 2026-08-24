@@ -233,6 +233,7 @@
           "scripts/aoa-sync-configs",
           "scripts/aoa-bootstrap-configs",
           "scripts/aoa-check-layout",
+          "scripts/aoa-deploy-owner-package",
           "scripts/aoa-install-systemd",
           "scripts/aoa-first-run",
           "scripts/aoa-warmup",
