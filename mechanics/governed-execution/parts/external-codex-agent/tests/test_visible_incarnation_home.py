@@ -6716,6 +6716,51 @@ def test_named_snapshot_cleanup_refuses_replacement_directory(
         os.close(snapshot_fd)
 
 
+def test_named_snapshot_cleanup_keeps_replacement_after_validation_race(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    original_dir = tmp_path / "abyss-stack-codex-package-original"
+    original_dir.mkdir()
+    original_path = original_dir / "codex"
+    original_path.write_bytes(b"original")
+    original_path.chmod(0o500)
+    snapshot_fd = os.open(
+        original_dir,
+        os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0),
+    )
+    moved_dir = tmp_path / "abyss-stack-codex-package-moved"
+    replacement_path = original_dir / "codex"
+    original_lstat = MODULE.os.lstat
+    raced = False
+
+    def replace_after_validation(path: object, *args: object, **kwargs: object):
+        nonlocal raced
+        observed = original_lstat(path, *args, **kwargs)
+        if not raced and path == original_dir and kwargs.get("dir_fd") is None:
+            original_dir.rename(moved_dir)
+            original_dir.mkdir()
+            replacement_path.write_bytes(b"replacement")
+            replacement_path.chmod(0o640)
+            raced = True
+        return observed
+
+    monkeypatch.setattr(MODULE.os, "lstat", replace_after_validation)
+    try:
+        MODULE._remove_named_snapshot(
+            original_path,
+            snapshot_dir=original_dir,
+            snapshot_dir_fd=snapshot_fd,
+        )
+        assert raced
+        assert original_dir.is_dir()
+        assert replacement_path.read_bytes() == b"replacement"
+        assert replacement_path.stat().st_mode & 0o777 == 0o640
+        assert not moved_dir.exists()
+    finally:
+        os.close(snapshot_fd)
+
+
 def test_kitty_dedication_rejects_sibling_terminal_child(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

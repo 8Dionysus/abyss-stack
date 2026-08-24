@@ -386,9 +386,14 @@ lives under the manifest's admitted `codex_home/tmp` local directory, and its
 `noexec` filesystem is rejected before materialization; it is lifecycle cleanup
 evidence, not the final execution coordinate. The named form remains reopenable
 for Node-backed `#!/usr/bin/env node` launchers. A lifecycle child removes the
-exact snapshot and mirror after the holder's PID/start-tick identity exits. The
-launch executes the verified private namespace bytes rather than mutable
-source-inode bytes or a replaceable source pathname. It then
+exact snapshot and mirror after the holder's PID/start-tick identity exits.
+Snapshot cleanup performs no mode, traversal, or deletion effect through a
+mutable cleanup pathname: the retained root and every descendant directory
+are mode-adjusted and traversed through validated descriptors, then quarantined
+and revalidated by inode before removal; a rename/replacement race preserves
+the replacement and fails closed. The launch
+executes the verified private namespace bytes rather than mutable source-inode
+bytes or a replaceable source pathname. It then
 sends `TERM` to the exact holder process
 through a pidfd opened after the final identity check; the receipt records that signal target
 separately from the terminal it observes. The non-replacing closure receipt

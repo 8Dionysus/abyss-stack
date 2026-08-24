@@ -10141,6 +10141,321 @@ def _resolved_executable(codex_executable: Path) -> Path:
     return executable
 
 
+def _snapshot_directory_flags() -> int:
+    return (
+        os.O_RDONLY
+        | getattr(os, "O_DIRECTORY", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_CLOEXEC", 0)
+    )
+
+
+def _remove_snapshot_tree_contents(directory_fd: int, label: str) -> None:
+    """Remove a snapshot tree through retained directory descriptors only."""
+
+    try:
+        names = sorted(os.listdir(directory_fd))
+    except OSError as exc:
+        raise IncarnationHomeError(
+            f"{label} cannot be enumerated through its retained descriptor"
+        ) from exc
+    for name in names:
+        try:
+            initial = os.lstat(name, dir_fd=directory_fd)
+        except FileNotFoundError:
+            continue
+        except OSError as exc:
+            raise IncarnationHomeError(
+                f"{label} entry cannot be inspected: {name}"
+            ) from exc
+        if stat.S_ISLNK(initial.st_mode) or not (
+            stat.S_ISDIR(initial.st_mode) or stat.S_ISREG(initial.st_mode)
+        ):
+            raise IncarnationHomeError(
+                f"{label} contains an unsupported entry: {name}"
+            )
+        flags = (
+            _snapshot_directory_flags()
+            if stat.S_ISDIR(initial.st_mode)
+            else os.O_RDONLY
+            | getattr(os, "O_NOFOLLOW", 0)
+            | getattr(os, "O_CLOEXEC", 0)
+        )
+        try:
+            child_fd = os.open(name, flags, dir_fd=directory_fd)
+        except FileNotFoundError:
+            continue
+        except OSError as exc:
+            raise IncarnationHomeError(
+                f"{label} entry cannot be opened safely: {name}"
+            ) from exc
+        try:
+            opened = os.fstat(child_fd)
+            observed = os.lstat(name, dir_fd=directory_fd)
+            if (
+                _actor_local_identity_mode(opened)
+                != _actor_local_identity_mode(initial)
+                or _actor_local_identity_mode(observed)
+                != _actor_local_identity_mode(initial)
+            ):
+                raise IncarnationHomeError(
+                    f"{label} entry changed during safe cleanup: {name}"
+                )
+            child_label = f"{label}/{name}"
+            if stat.S_ISDIR(initial.st_mode):
+                _remove_snapshot_directory_at(
+                    directory_fd,
+                    name,
+                    child_fd,
+                    initial,
+                    child_label,
+                )
+            else:
+                _remove_staged_file_at(
+                    directory_fd,
+                    name,
+                    child_fd,
+                    child_label,
+                )
+        finally:
+            os.close(child_fd)
+
+
+def _remove_snapshot_directory_at(
+    parent_fd: int,
+    name: str,
+    directory_fd: int,
+    initial: os.stat_result,
+    label: str,
+) -> None:
+    """Quarantine and remove one retained snapshot directory inode."""
+
+    quarantine_name: str | None = None
+    quarantine_fd: int | None = None
+    quarantine_opened: os.stat_result | None = None
+    quarantine_entry_moved = False
+    try:
+        retained_before = os.fstat(directory_fd)
+        if (
+            _actor_local_identity_mode(retained_before)
+            != _actor_local_identity_mode(initial)
+            or not stat.S_ISDIR(retained_before.st_mode)
+        ):
+            raise IncarnationHomeError(f"{label} changed before cleanup")
+        # Frozen snapshot directories are intentionally not writable.  Change
+        # only the retained inode before quarantine; never use its mutable
+        # pathname as a mode or cleanup authority.
+        os.fchmod(directory_fd, 0o700)
+        prepared = os.fstat(directory_fd)
+        if (
+            prepared.st_dev,
+            prepared.st_ino,
+            stat.S_IMODE(prepared.st_mode),
+        ) != (
+            initial.st_dev,
+            initial.st_ino,
+            0o700,
+        ):
+            raise IncarnationHomeError(f"{label} changed while becoming writable")
+        for _attempt in range(8):
+            candidate = f".{name}.quarantine-{secrets.token_hex(16)}"
+            try:
+                os.mkdir(candidate, 0o700, dir_fd=parent_fd)
+            except FileExistsError:
+                continue
+            quarantine_name = candidate
+            break
+        if quarantine_name is None:
+            raise IncarnationHomeError(
+                f"{label} could not allocate a private cleanup directory"
+            )
+        try:
+            quarantine_fd = os.open(
+                quarantine_name,
+                _snapshot_directory_flags(),
+                dir_fd=parent_fd,
+            )
+            quarantine_opened = os.fstat(quarantine_fd)
+            quarantine_observed = os.lstat(
+                quarantine_name,
+                dir_fd=parent_fd,
+            )
+            if (
+                _actor_local_identity_mode(quarantine_opened)
+                != _actor_local_identity_mode(quarantine_observed)
+                or not stat.S_ISDIR(quarantine_opened.st_mode)
+            ):
+                raise IncarnationHomeError(
+                    f"{label} cleanup directory changed during safe open"
+                )
+            try:
+                os.rename(
+                    name,
+                    name,
+                    src_dir_fd=parent_fd,
+                    dst_dir_fd=quarantine_fd,
+                )
+            except FileNotFoundError:
+                return
+            except OSError as exc:
+                raise IncarnationHomeError(
+                    f"{label} could not be quarantined"
+                ) from exc
+            quarantine_entry_moved = True
+            quarantined = os.lstat(name, dir_fd=quarantine_fd)
+            retained = os.fstat(directory_fd)
+            if (
+                _actor_local_identity_mode(quarantined)
+                != _actor_local_identity_mode(prepared)
+                or _actor_local_identity_mode(retained)
+                != _actor_local_identity_mode(prepared)
+                or not stat.S_ISDIR(retained.st_mode)
+            ):
+                quarantine_entry_moved = _restore_quarantined_entry_at(
+                    parent_fd=parent_fd,
+                    quarantine_fd=quarantine_fd,
+                    quarantine_name=name,
+                    target_name=name,
+                    label=f"{label} raced directory",
+                )
+                raise IncarnationHomeError(
+                    f"{label} changed during quarantine"
+                )
+            _remove_snapshot_tree_contents(directory_fd, label)
+            remaining = os.fstat(directory_fd)
+            if os.listdir(directory_fd):
+                raise IncarnationHomeError(
+                    f"{label} was repopulated during cleanup"
+                )
+            _revalidate_recovery_entry_before_removal(
+                quarantine_fd,
+                name,
+                directory_fd,
+                remaining,
+                f"{label} retained directory",
+            )
+            os.rmdir(name, dir_fd=quarantine_fd)
+            quarantine_entry_moved = False
+        except FileNotFoundError:
+            if not quarantine_entry_moved:
+                return
+            raise
+    finally:
+        if (
+            quarantine_name is not None
+            and not quarantine_entry_moved
+            and quarantine_fd is not None
+            and quarantine_opened is not None
+        ):
+            _revalidate_recovery_entry_before_removal(
+                parent_fd,
+                quarantine_name,
+                quarantine_fd,
+                quarantine_opened,
+                f"{label} cleanup directory",
+            )
+            try:
+                os.rmdir(quarantine_name, dir_fd=parent_fd)
+            except FileNotFoundError:
+                pass
+        if quarantine_fd is not None:
+            os.close(quarantine_fd)
+
+
+def _remove_snapshot_tree_from_descriptor(
+    snapshot_path: Path,
+    snapshot_dir: Path,
+    snapshot_dir_fd: int,
+) -> None:
+    """Clean and remove a named snapshot using its retained root descriptor."""
+
+    try:
+        root_initial = os.fstat(snapshot_dir_fd)
+        if not stat.S_ISDIR(root_initial.st_mode):
+            return
+        try:
+            snapshot_path.relative_to(snapshot_dir)
+        except ValueError:
+            return
+        # This effect is descriptor-relative; the pathname can be replaced or
+        # renamed without changing the inode whose mode is being repaired.
+        os.fchmod(snapshot_dir_fd, 0o700)
+        _remove_snapshot_tree_contents(snapshot_dir_fd, "named snapshot")
+        try:
+            bound = Path(os.readlink(f"/proc/self/fd/{snapshot_dir_fd}"))
+        except OSError:
+            return
+        if not bound.is_absolute() or str(bound).endswith(" (deleted)"):
+            return
+        parent_fd = _open_pinned_parent_directory(bound, "named snapshot cleanup")
+        try:
+            observed = os.lstat(bound.name, dir_fd=parent_fd)
+            retained = os.fstat(snapshot_dir_fd)
+            if (
+                _actor_local_identity_mode(observed)
+                != _actor_local_identity_mode(retained)
+                or not stat.S_ISDIR(observed.st_mode)
+            ):
+                return
+            _remove_snapshot_directory_at(
+                parent_fd,
+                bound.name,
+                snapshot_dir_fd,
+                observed,
+                "named snapshot",
+            )
+            os.fsync(parent_fd)
+        finally:
+            os.close(parent_fd)
+    except (IncarnationHomeError, OSError):
+        return
+
+
+def _open_snapshot_root_for_cleanup(
+    snapshot_path: Path,
+    snapshot_dir: Path,
+) -> None:
+    """Open a snapshot root safely before descriptor-relative cleanup."""
+
+    try:
+        parent_fd = _open_pinned_parent_directory(
+            snapshot_dir,
+            "named snapshot cleanup",
+        )
+    except (IncarnationHomeError, OSError):
+        return
+    root_fd: int | None = None
+    try:
+        try:
+            initial = os.lstat(snapshot_dir.name, dir_fd=parent_fd)
+            root_fd = os.open(
+                snapshot_dir.name,
+                _snapshot_directory_flags(),
+                dir_fd=parent_fd,
+            )
+            opened = os.fstat(root_fd)
+            observed = os.lstat(snapshot_dir.name, dir_fd=parent_fd)
+        except OSError:
+            return
+        if (
+            _actor_local_identity_mode(initial)
+            != _actor_local_identity_mode(opened)
+            or _actor_local_identity_mode(observed)
+            != _actor_local_identity_mode(opened)
+            or not stat.S_ISDIR(opened.st_mode)
+        ):
+            return
+        _remove_snapshot_tree_from_descriptor(
+            snapshot_path,
+            snapshot_dir,
+            root_fd,
+        )
+    finally:
+        if root_fd is not None:
+            os.close(root_fd)
+        os.close(parent_fd)
+
+
 def _remove_named_snapshot(
     snapshot_path: Path,
     *,
@@ -10149,47 +10464,31 @@ def _remove_named_snapshot(
 ) -> None:
     cleanup_dir = snapshot_dir
     if cleanup_dir is not None:
-        try:
-            if snapshot_dir_fd is not None:
+        if (
+            not cleanup_dir.name.startswith("abyss-stack-codex-package-")
+            or not snapshot_path.is_relative_to(cleanup_dir)
+        ):
+            return
+        if snapshot_dir_fd is not None:
+            try:
                 expected = os.fstat(snapshot_dir_fd)
                 observed = os.lstat(cleanup_dir)
-                if (
-                    not stat.S_ISDIR(expected.st_mode)
-                    or not stat.S_ISDIR(observed.st_mode)
-                    or (expected.st_dev, expected.st_ino)
-                    != (observed.st_dev, observed.st_ino)
-                ):
-                    return
+            except OSError:
+                return
             if (
-                cleanup_dir.is_symlink()
-                or not cleanup_dir.is_dir()
-                or not cleanup_dir.name.startswith("abyss-stack-codex-package-")
+                not stat.S_ISDIR(expected.st_mode)
+                or _actor_local_identity_mode(expected)
+                != _actor_local_identity_mode(observed)
             ):
                 return
-            snapshot_path.relative_to(cleanup_dir)
-            os.chmod(cleanup_dir, 0o700)
-        except (OSError, ValueError):
+            _remove_snapshot_tree_from_descriptor(
+                snapshot_path,
+                cleanup_dir,
+                snapshot_dir_fd,
+            )
             return
-    if cleanup_dir is not None:
-        try:
-            def remove_tree(root: Path) -> None:
-                os.chmod(root, 0o700)
-                with os.scandir(root) as entries:
-                    for entry in entries:
-                        child = Path(entry.path)
-                        if entry.is_symlink():
-                            child.unlink(missing_ok=True)
-                        elif entry.is_dir(follow_symlinks=False):
-                            remove_tree(child)
-                        else:
-                            child.unlink(missing_ok=True)
-                os.chmod(root, 0o700)
-                root.rmdir()
-
-            remove_tree(cleanup_dir)
-        except OSError:
-            return
-        sync_path = cleanup_dir.parent
+        _open_snapshot_root_for_cleanup(snapshot_path, cleanup_dir)
+        return
     else:
         try:
             snapshot_path.unlink(missing_ok=True)
