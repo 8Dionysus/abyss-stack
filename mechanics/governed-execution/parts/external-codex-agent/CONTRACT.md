@@ -864,6 +864,9 @@ records only the current denied projection: each name has the ambient entry's
 current device/inode identity, when present, and a digest of the admitted local
 tree. After an ambient unlink/replace, the loader permits the existing local
 tree only when its digest is unchanged; a new or altered local tree is denied.
+Every file writer pins and revalidates the target parent descriptor before
+creating, replacing, or mode-updating a file, so a parent rename or symlink
+replacement cannot redirect an effect into ambient state.
 Legacy v2 manifests remain schema-valid without this field on the explicit
 compatibility branch, but no v2 manifest can pass canonical launch until
 migration produces v3. The loader

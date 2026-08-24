@@ -84,6 +84,8 @@ forbids that field. A multiply linked preparation lock is rejected before
 `fchmod`, with the external inode's bytes and mode preserved. Canonical launch
 also reloads and digest-checks the manifest while holding the preparation lock,
 rejecting a deterministic replacement race before claim publication.
+The exact writer pins the target parent descriptor and rejects a deterministic
+parent replacement before any ambient bytes or mode can change.
 Incomplete holder receipts missing `runtime_state_root` or `closeout_route`
 are rejected by both the receipt schema and runtime binding validator. A
 receipt carrying an immutable manifest snapshot must also carry the complete

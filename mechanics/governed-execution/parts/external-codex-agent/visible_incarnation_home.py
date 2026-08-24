@@ -1076,6 +1076,121 @@ def _bound_config(ambient_config: bytes, model_slug: str, effort: str) -> bytes:
     return bound.encode("utf-8")
 
 
+def _open_pinned_parent_directory(path: Path, label: str) -> int:
+    """Open and pin one target parent before any file mutation."""
+
+    if not path.is_absolute() or not path.name:
+        raise IncarnationHomeError(f"{label} must be an absolute file path: {path}")
+    parent = path.parent
+    try:
+        observed = os.lstat(parent)
+    except OSError as exc:
+        raise IncarnationHomeError(
+            f"{label} parent cannot be inspected: {parent}"
+        ) from exc
+    if stat.S_ISLNK(observed.st_mode) or not stat.S_ISDIR(observed.st_mode):
+        raise IncarnationHomeError(f"{label} parent must be a real directory: {parent}")
+    flags = os.O_RDONLY
+    flags |= getattr(os, "O_DIRECTORY", 0)
+    flags |= getattr(os, "O_NOFOLLOW", 0)
+    flags |= getattr(os, "O_CLOEXEC", 0)
+    try:
+        parent_fd = os.open(parent, flags)
+    except OSError as exc:
+        raise IncarnationHomeError(
+            f"{label} parent cannot be opened safely: {parent}"
+        ) from exc
+    try:
+        opened = os.fstat(parent_fd)
+        if (
+            (opened.st_dev, opened.st_ino, opened.st_mode)
+            != (observed.st_dev, observed.st_ino, observed.st_mode)
+        ):
+            raise IncarnationHomeError(
+                f"{label} parent changed during safe open: {parent}"
+            )
+        return parent_fd
+    except IncarnationHomeError:
+        os.close(parent_fd)
+        raise
+    except OSError as exc:
+        os.close(parent_fd)
+        raise IncarnationHomeError(
+            f"{label} parent cannot be inspected after safe open: {parent}"
+        ) from exc
+
+
+def _open_stable_regular_file_at(
+    parent_fd: int,
+    name: str,
+    *,
+    label: str,
+    ambient_identities: set[tuple[int, int]],
+) -> tuple[int, os.stat_result]:
+    """Open one regular child through a pinned parent and recheck its identity."""
+
+    try:
+        initial = os.lstat(name, dir_fd=parent_fd)
+    except OSError as exc:
+        raise IncarnationHomeError(f"{label} cannot be inspected") from exc
+    if stat.S_ISLNK(initial.st_mode) or not stat.S_ISREG(initial.st_mode):
+        raise IncarnationHomeError(f"{label} is not a regular file")
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
+    try:
+        descriptor = os.open(name, flags, dir_fd=parent_fd)
+    except OSError as exc:
+        raise IncarnationHomeError(f"{label} cannot be opened safely") from exc
+    try:
+        opened = os.fstat(descriptor)
+        observed = os.lstat(name, dir_fd=parent_fd)
+        if (
+            (opened.st_dev, opened.st_ino, opened.st_mode)
+            != (initial.st_dev, initial.st_ino, initial.st_mode)
+            or (opened.st_dev, opened.st_ino, opened.st_mode)
+            != (observed.st_dev, observed.st_ino, observed.st_mode)
+            or (opened.st_dev, opened.st_ino) in ambient_identities
+            or opened.st_nlink != 1
+        ):
+            raise IncarnationHomeError(f"{label} changed during safe validation")
+        return descriptor, opened
+    except IncarnationHomeError:
+        os.close(descriptor)
+        raise
+    except OSError as exc:
+        os.close(descriptor)
+        raise IncarnationHomeError(f"{label} cannot be revalidated safely") from exc
+
+
+def _read_descriptor_bytes(descriptor: int, label: str) -> bytes:
+    try:
+        os.lseek(descriptor, 0, os.SEEK_SET)
+        chunks: list[bytes] = []
+        while True:
+            chunk = os.read(descriptor, 1024 * 1024)
+            if not chunk:
+                return b"".join(chunks)
+            chunks.append(chunk)
+    except OSError as exc:
+        raise IncarnationHomeError(f"{label} cannot be read safely") from exc
+
+
+def _create_temporary_file_at(parent_fd: int, prefix: str) -> tuple[int, str]:
+    """Create one private temporary file through a pinned parent descriptor."""
+
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_CLOEXEC", 0)
+    for _ in range(128):
+        name = f"{prefix}{secrets.token_hex(16)}"
+        try:
+            return os.open(name, flags, 0o600, dir_fd=parent_fd), name
+        except FileExistsError:
+            continue
+        except OSError as exc:
+            raise IncarnationHomeError(
+                "cannot create a private temporary file in the pinned parent"
+            ) from exc
+    raise IncarnationHomeError("cannot allocate a private temporary file name")
+
+
 def _write_exact(
     path: Path,
     content: bytes,
@@ -1086,80 +1201,62 @@ def _write_exact(
     """Publish bytes only after the current target has passed alias admission."""
 
     ambient_identities = ambient_identities or set()
-    parent = path.parent
-    if (
-        not path.is_absolute()
-        or parent.is_symlink()
-        or not parent.is_dir()
-        or path.is_symlink()
-    ):
-        raise IncarnationHomeError(f"refusing to replace unsafe file path: {path}")
-    existing = path.exists()
-    if existing and not path.is_file():
-        raise IncarnationHomeError(f"refusing to replace non-file: {path}")
-    if existing:
-        _validate_actor_local_entry(
-            path,
-            path.name,
-            ambient_identities=ambient_identities,
-        )
+    parent_fd = _open_pinned_parent_directory(path, "exact file")
+    descriptor: int | None = None
+    temporary_name: str | None = None
+    try:
         try:
-            same_content = path.read_bytes() == content
+            existing = os.lstat(path.name, dir_fd=parent_fd)
+        except FileNotFoundError:
+            existing = None
         except OSError as exc:
-            raise IncarnationHomeError(f"cannot inspect existing file: {path}") from exc
-        if same_content:
-            flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0)
-            flags |= getattr(os, "O_NOFOLLOW", 0)
+            raise IncarnationHomeError(
+                f"refusing to inspect unsafe file path: {path}"
+            ) from exc
+        if existing is not None:
+            descriptor, opened = _open_stable_regular_file_at(
+                parent_fd,
+                path.name,
+                label=f"existing file {path}",
+                ambient_identities=ambient_identities,
+            )
             try:
-                descriptor = os.open(path, flags)
-            except OSError as exc:
-                raise IncarnationHomeError(
-                    f"cannot open existing file for safe metadata update: {path}"
-                ) from exc
-            try:
-                opened = os.fstat(descriptor)
-                observed = os.lstat(path)
-                if (
-                    (opened.st_dev, opened.st_ino, opened.st_mode)
-                    != (observed.st_dev, observed.st_ino, observed.st_mode)
-                    or (opened.st_dev, opened.st_ino) in ambient_identities
-                    or not stat.S_ISREG(opened.st_mode)
-                    or opened.st_nlink != 1
-                ):
-                    raise IncarnationHomeError(
-                        f"existing file changed before safe metadata update: {path}"
-                    )
-                if stat.S_IMODE(opened.st_mode) != mode:
-                    os.fchmod(descriptor, mode)
-            except OSError as exc:
-                if isinstance(exc, IncarnationHomeError):
-                    raise
-                raise IncarnationHomeError(
-                    f"cannot safely update existing file metadata: {path}"
-                ) from exc
+                same_content = _read_descriptor_bytes(descriptor, str(path)) == content
+                if same_content:
+                    if stat.S_IMODE(opened.st_mode) != mode:
+                        os.fchmod(descriptor, mode)
+                    return
             finally:
                 os.close(descriptor)
-            return
-    descriptor: int | None = None
-    temporary: Path | None = None
-    try:
-        descriptor, temporary_name = tempfile.mkstemp(
-            prefix=path.name + ".tmp-", dir=str(parent)
+                descriptor = None
+        descriptor, temporary_name = _create_temporary_file_at(
+            parent_fd, path.name + ".tmp-"
         )
-        temporary = Path(temporary_name)
         os.fchmod(descriptor, mode)
         view = memoryview(content)
         while view:
             view = view[os.write(descriptor, view) :]
         os.fsync(descriptor)
-        if path.exists() or path.is_symlink():
-            _validate_actor_local_entry(
-                path,
+        try:
+            target = os.lstat(path.name, dir_fd=parent_fd)
+        except FileNotFoundError:
+            target = None
+        if target is not None:
+            target_fd, _target_stat = _open_stable_regular_file_at(
+                parent_fd,
                 path.name,
+                label=f"replacement target {path}",
                 ambient_identities=ambient_identities,
             )
-        os.replace(temporary, path)
-        temporary = None
+            os.close(target_fd)
+        os.replace(
+            temporary_name,
+            path.name,
+            src_dir_fd=parent_fd,
+            dst_dir_fd=parent_fd,
+        )
+        temporary_name = None
+        os.fsync(parent_fd)
     except IncarnationHomeError:
         raise
     except OSError as exc:
@@ -1167,8 +1264,12 @@ def _write_exact(
     finally:
         if descriptor is not None:
             os.close(descriptor)
-        if temporary is not None:
-            temporary.unlink(missing_ok=True)
+        if temporary_name is not None:
+            try:
+                os.unlink(temporary_name, dir_fd=parent_fd)
+            except FileNotFoundError:
+                pass
+        os.close(parent_fd)
 
 
 def _utc_now() -> str:
@@ -2583,40 +2684,43 @@ def _write_atomic_json(
     *,
     replace: bool,
 ) -> None:
-    if not path.is_absolute() or path.is_symlink():
-        raise IncarnationHomeError(f"{label} must be an absolute non-symlink path: {path}")
-    parent = path.parent
-    if parent.is_symlink() or not parent.is_dir():
-        raise IncarnationHomeError(f"{label} parent must be a real directory: {parent}")
     payload = canonical_bytes(value) + b"\n"
+    parent_fd = _open_pinned_parent_directory(path, label)
     fd: int | None = None
-    temporary_path: Path | None = None
+    temporary_name: str | None = None
     try:
-        fd, temporary_name = tempfile.mkstemp(prefix=path.name + ".tmp.", dir=str(parent))
-        temporary_path = Path(temporary_name)
+        fd, temporary_name = _create_temporary_file_at(
+            parent_fd, path.name + ".tmp."
+        )
         os.fchmod(fd, 0o600)
         view = memoryview(payload)
         while view:
             view = view[os.write(fd, view) :]
         os.fsync(fd)
         if replace:
-            if path.is_symlink():
+            try:
+                target = os.lstat(path.name, dir_fd=parent_fd)
+            except FileNotFoundError:
+                target = None
+            if target is not None and stat.S_ISLNK(target.st_mode):
                 raise IncarnationHomeError(
                     f"{label} became a symlink before publication: {path}"
                 )
-            os.replace(temporary_path, path)
+            os.replace(
+                temporary_name,
+                path.name,
+                src_dir_fd=parent_fd,
+                dst_dir_fd=parent_fd,
+            )
+            temporary_name = None
         else:
-            os.link(temporary_path, path)
-        directory_flags = os.O_RDONLY
-        if hasattr(os, "O_DIRECTORY"):
-            directory_flags |= os.O_DIRECTORY
-        if hasattr(os, "O_NOFOLLOW"):
-            directory_flags |= os.O_NOFOLLOW
-        directory_fd = os.open(parent, directory_flags)
-        try:
-            os.fsync(directory_fd)
-        finally:
-            os.close(directory_fd)
+            os.link(
+                temporary_name,
+                path.name,
+                src_dir_fd=parent_fd,
+                dst_dir_fd=parent_fd,
+            )
+        os.fsync(parent_fd)
     except FileExistsError as exc:
         raise IncarnationHomeError(f"{label} already exists: {path}") from exc
     except OSError as exc:
@@ -2624,8 +2728,12 @@ def _write_atomic_json(
     finally:
         if fd is not None:
             os.close(fd)
-        if temporary_path is not None:
-            temporary_path.unlink(missing_ok=True)
+        if temporary_name is not None:
+            try:
+                os.unlink(temporary_name, dir_fd=parent_fd)
+            except FileNotFoundError:
+                pass
+        os.close(parent_fd)
 
 
 def _write_new_json(path: Path, value: dict[str, Any], label: str) -> None:

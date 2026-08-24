@@ -60,8 +60,10 @@ admitted local-tree digest. A changed ambient identity is accepted only when
 the local tree is unchanged, so unlink/replace cannot turn a previously
 ambient-derived alias into accepted holder-local state. The record is bounded
 by the current projection and is not a filename/history denylist. Every file
-write or mode update validates and safely opens the target before its first
-effect, and revalidates the target before replacement.
+writer pins and revalidates the target parent descriptor before creating,
+replacing, or mode-updating a file, and safely opens the target before its first
+effect; a parent rename or symlink replacement is rejected before ambient
+bytes or mode can change.
 
 New homes require the exact bytes of a typed holder/task/run responsibility
 context. The digest of that context selects a holder-local directory below the

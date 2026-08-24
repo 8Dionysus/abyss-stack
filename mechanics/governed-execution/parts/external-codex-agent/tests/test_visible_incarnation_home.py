@@ -467,6 +467,41 @@ def test_config_alias_rejection_preserves_ambient_bytes_and_mode(
     assert stat.S_IMODE(ambient_config.stat().st_mode) == before_mode
 
 
+def test_exact_writer_rejects_parent_replacement_before_ambient_mutation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    actor = tmp_path / "actor"
+    ambient = tmp_path / "ambient"
+    actor.mkdir()
+    ambient.mkdir()
+    actor_config = actor / "config.toml"
+    ambient_config = ambient / "config.toml"
+    actor_config.write_bytes(b'actor = "old"\n')
+    ambient_config.write_bytes(b'ambient = "protected"\n')
+    ambient_config.chmod(0o640)
+    before_ambient_bytes = ambient_config.read_bytes()
+    before_ambient_mode = stat.S_IMODE(ambient_config.stat().st_mode)
+    original_open = MODULE.os.open
+
+    def redirect_replaced_parent(
+        path: object, flags: int, *args: object, **kwargs: object
+    ) -> int:
+        if kwargs.get("dir_fd") is None and os.fspath(path) == str(actor):
+            return original_open(ambient, flags, *args, **kwargs)
+        return original_open(path, flags, *args, **kwargs)
+
+    monkeypatch.setattr(MODULE.os, "open", redirect_replaced_parent)
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="exact file parent changed during safe open",
+    ):
+        MODULE._write_exact(actor_config, b'actor = "new"\n', 0o600)
+
+    assert ambient_config.read_bytes() == before_ambient_bytes
+    assert stat.S_IMODE(ambient_config.stat().st_mode) == before_ambient_mode
+    assert actor_config.read_bytes() == b'actor = "old"\n'
+
+
 def test_preparation_lock_alias_rejection_preserves_external_mode_and_bytes(
     tmp_path: Path,
 ) -> None:
