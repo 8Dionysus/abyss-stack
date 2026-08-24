@@ -96,6 +96,9 @@ including typed and provenance-bearing variants, is rejected by canonical
 loading. The explicit `migrate` route validates the v2 home under the
 preparation lock, carries isolated actor-local trees into a distinct typed v3
 home, regenerates the bound config, and leaves the v2 source untouched.
+The migrated manifest binds the exact legacy-manifest digest; retries accept
+only an exact byte/mode/projection/source-state match, and a pre-existing typed
+target with divergent state is rejected before copy or mutation.
 Provenance-bearing v2 is rejected even on the non-canonical loader route because
 the public v2 branch forbids that field. A multiply linked preparation lock is
 rejected before any

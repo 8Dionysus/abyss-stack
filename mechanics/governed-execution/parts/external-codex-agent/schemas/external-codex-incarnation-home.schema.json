@@ -42,6 +42,7 @@
     "runtime_root": {"$ref": "#/$defs/absolutePath"},
     "codex_home": {"$ref": "#/$defs/absolutePath"},
     "holder_binding": {"$ref": "#/$defs/holderBinding"},
+    "migration_source_manifest_digest": {"$ref": "#/$defs/digest"},
     "config_digest": {"$ref": "#/$defs/digest"},
     "shared_state_names": {
       "type": "array",

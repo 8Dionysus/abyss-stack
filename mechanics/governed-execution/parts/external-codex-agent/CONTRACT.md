@@ -871,7 +871,10 @@ canonical launch rejects every v2 manifest, whether or not it carries typed
 holder data or denied-state provenance. The explicit `migrate` route validates
 the v2 home under the preparation lock, carries its isolated actor-local trees
 into a distinct typed v3 home, regenerates the bound config, and leaves the v2
-source untouched. A provenance-bearing v2 marker is not a schema-valid
+source untouched. The typed result records the legacy manifest digest; a retry
+returns an existing target only after exact byte, mode, projection, config, and
+source-state validation. Any other pre-existing typed target is rejected before
+copy or mutation. A provenance-bearing v2 marker is not a schema-valid
 compatibility shape and is rejected by the loader on the non-canonical route as
 well. Current
 typed holder requirements are therefore not weakened by the compatibility
@@ -934,6 +937,11 @@ compatibility branch, but no v2 manifest can pass canonical launch until
 migration produces v3. The loader
 recomputes the exact denied set for older untyped v2 reads when that optional
 field is absent.
+
+A migrated v3 manifest may additionally carry
+`migration_source_manifest_digest`, which binds the source snapshot used for
+the migration and is not accepted as a substitute for the complete typed
+holder binding.
 
 All preparation attempts in one runtime state root hold the persistent
 `.incarnation-home.lock`. The lock must itself be a runtime-owned, single-link

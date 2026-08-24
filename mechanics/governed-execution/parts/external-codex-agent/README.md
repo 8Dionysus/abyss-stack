@@ -170,7 +170,11 @@ typed holder data or denied-state provenance—is rejected by canonical launch.
 The explicit `migrate --legacy-manifest ... --binding-context ...` route is the
 only upgrade path: under the preparation lock it validates the v2 home, carries
 its isolated actor-local trees into a distinct typed v3 home, regenerates the
-bound config, and leaves the v2 source untouched. Every first preparation is
+bound config, and leaves the v2 source untouched. The resulting v3 manifest
+records the exact legacy manifest digest; a retry may return that target only
+after revalidating its bytes, modes, projection, and source state as an exact
+idempotent match. A pre-existing typed target with any other state is rejected
+before copy or mutation. Every first preparation is
 serialized by
   the runtime-owned preparation lock and claims an unpublished root with an
   exact owner token; owner-token retirement retains and revalidates that

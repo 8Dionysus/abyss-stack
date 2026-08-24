@@ -1652,6 +1652,9 @@ def test_explicit_legacy_migration_carries_local_state_into_typed_v3(
 
     assert migrated["schema_version"] == MODULE.SCHEMA_VERSION
     assert migrated_home != legacy_home
+    assert migrated["migration_source_manifest_digest"] == MODULE.sha256_bytes(
+        legacy_manifest_path.read_bytes()
+    )
     assert (migrated_home / denied_name).read_bytes() == b"legacy-denied-state"
     assert (migrated_home / "cache" / "legacy-cache").read_bytes() == (
         b"legacy-cache"
@@ -1677,6 +1680,83 @@ def test_explicit_legacy_migration_carries_local_state_into_typed_v3(
         MODULE.LEGACY_SCHEMA_VERSION
     )
     assert (legacy_home / denied_name).read_bytes() == b"legacy-denied-state"
+
+    (migrated_home / denied_name).write_bytes(b"current-v3-state")
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="legacy migration target is not an exact idempotent match",
+    ):
+        MODULE.migrate_legacy_home(
+            legacy_manifest_path=legacy_manifest_path,
+            binding_context=context,
+        )
+    assert (migrated_home / denied_name).read_bytes() == b"current-v3-state"
+
+
+def test_legacy_migration_rejects_preexisting_typed_home_before_copy(
+    tmp_path: Path,
+) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    denied_name = _unknown_fixture_name(tmp_path)
+    (ambient / denied_name).write_bytes(b"ambient-denied-state")
+    realization = _realization(tmp_path / "realization.json")
+    realization_payload = json.loads(realization.read_text(encoding="utf-8"))
+    coordinate = MODULE._incarnation_coordinate(
+        realization_payload["model_realization_id"],
+        realization_payload["configuration_fingerprint"],
+    )
+    legacy_root = runtime_root / ("sha256-" + coordinate.removeprefix("sha256:"))
+    legacy_root.mkdir()
+    legacy_home = legacy_root / "codex-home"
+    (legacy_root / "incarnation-home.json").write_text(
+        json.dumps(
+            {
+                "ambient_codex_home": str(ambient),
+                "ambient_home_identity": MODULE._ambient_home_identity(ambient),
+                "model_realization_id": realization_payload["model_realization_id"],
+                "codex_home": str(legacy_home),
+            }
+        ),
+        encoding="utf-8",
+    )
+    legacy_manifest = _ORIGINAL_PREPARE_HOME(
+        ambient_home=ambient,
+        realization_path=realization,
+        runtime_root=runtime_root,
+    )
+    legacy_home = Path(legacy_manifest["codex_home"])
+    (legacy_home / denied_name).write_bytes(b"legacy-denied-state")
+    legacy_manifest_path = legacy_home.parent / "incarnation-home.json"
+    context = _holder_binding_context(runtime_root, "legacy-existing-target")
+
+    existing = _ORIGINAL_PREPARE_HOME(
+        ambient_home=ambient,
+        realization_path=realization,
+        runtime_root=runtime_root,
+        binding_context=context,
+    )
+    existing_home = Path(existing["codex_home"])
+    existing_state = existing_home / denied_name
+    existing_state.write_bytes(b"current-v3-state")
+    before_manifest = (existing_home.parent / "incarnation-home.json").read_bytes()
+
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="legacy migration refuses to overwrite a pre-existing typed home",
+    ):
+        MODULE.migrate_legacy_home(
+            legacy_manifest_path=legacy_manifest_path,
+            binding_context=context,
+        )
+
+    assert existing_state.read_bytes() == b"current-v3-state"
+    assert (existing_home.parent / "incarnation-home.json").read_bytes() == (
+        before_manifest
+    )
 
 
 def test_claimed_home_rejects_repreparation_before_any_projection_effect(

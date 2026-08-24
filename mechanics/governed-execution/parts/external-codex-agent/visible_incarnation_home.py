@@ -1319,6 +1319,183 @@ def _local_tree_digest(target: Path, name: str) -> str | None:
     return sha256_bytes(canonical_bytes(rows))
 
 
+def _local_tree_content_digest(
+    target: Path,
+    name: str,
+    *,
+    ambient_identities: set[tuple[int, int]] | None = None,
+) -> str | None:
+    """Digest one local tree's bytes and modes through retained descriptors."""
+
+    if not target.exists() and not target.is_symlink():
+        return None
+    ambient_identities = ambient_identities or set()
+    root_fd, root_initial, root_opened = _open_stable_actor_local_path_descriptor(
+        target, name
+    )
+    rows: list[dict[str, object]] = []
+    visited_directories: set[tuple[int, int]] = set()
+
+    def read_regular(
+        descriptor: int,
+        current: os.stat_result,
+        *,
+        parent_fd: int | None,
+        child_name: str | None,
+        label: str,
+    ) -> bytes:
+        if current.st_nlink != 1:
+            raise IncarnationHomeError(
+                f"actor-local capability entry is multiply linked: {label}"
+            )
+        read_parent_fd: int | None = None
+        read_descriptor: int | None = None
+        try:
+            if parent_fd is None:
+                read_parent_fd = _open_pinned_parent_directory(target, label)
+                read_descriptor, read_opened = _open_stable_regular_file_at(
+                    read_parent_fd,
+                    target.name,
+                    label=label,
+                    ambient_identities=ambient_identities,
+                )
+            else:
+                assert child_name is not None
+                read_descriptor, read_opened = _open_stable_regular_file_at(
+                    parent_fd,
+                    child_name,
+                    label=label,
+                    ambient_identities=ambient_identities,
+                )
+            if _actor_local_identity_mode(read_opened) != _actor_local_identity_mode(
+                current
+            ):
+                raise IncarnationHomeError(f"actor-local capability entry changed: {label}")
+            content = _read_descriptor_bytes(read_descriptor, label)
+            repeated_content = _read_descriptor_bytes(read_descriptor, label)
+            if repeated_content != content:
+                raise IncarnationHomeError(
+                    f"actor-local capability entry changed while reading: {label}"
+                )
+            after_read = os.fstat(read_descriptor)
+            if _actor_local_identity_mode(after_read) != _actor_local_identity_mode(
+                current
+            ):
+                raise IncarnationHomeError(
+                    f"actor-local capability entry changed while reading: {label}"
+                )
+            return repeated_content
+        finally:
+            if read_descriptor is not None:
+                os.close(read_descriptor)
+            if read_parent_fd is not None:
+                os.close(read_parent_fd)
+
+    def visit(
+        descriptor: int,
+        initial: os.stat_result,
+        opened: os.stat_result,
+        relative: str,
+        *,
+        parent_fd: int | None,
+        child_name: str | None,
+    ) -> None:
+        current = os.fstat(descriptor)
+        if _actor_local_identity_mode(current) != _actor_local_identity_mode(opened):
+            raise IncarnationHomeError(
+                f"actor-local capability entry changed during content validation: {relative}"
+            )
+        identity = (current.st_dev, current.st_ino)
+        if identity in ambient_identities:
+            raise IncarnationHomeError(
+                f"actor-local capability entry aliases ambient state: {relative}"
+            )
+        if stat.S_ISREG(current.st_mode):
+            content = read_regular(
+                descriptor,
+                current,
+                parent_fd=parent_fd,
+                child_name=child_name,
+                label=relative,
+            )
+            rows.append(
+                {
+                    "path": relative,
+                    "kind": "file",
+                    "mode": stat.S_IMODE(current.st_mode),
+                    "content_digest": sha256_bytes(content),
+                }
+            )
+        elif stat.S_ISDIR(current.st_mode):
+            if identity in visited_directories:
+                raise IncarnationHomeError(
+                    f"actor-local capability directory is aliased: {relative}"
+                )
+            visited_directories.add(identity)
+            rows.append(
+                {
+                    "path": relative,
+                    "kind": "directory",
+                    "mode": stat.S_IMODE(current.st_mode),
+                }
+            )
+            try:
+                children = sorted(os.listdir(descriptor))
+                after_listing = os.fstat(descriptor)
+            except OSError as exc:
+                raise IncarnationHomeError(
+                    f"actor-local capability directory cannot be enumerated: {relative}"
+                ) from exc
+            if _actor_local_identity_mode(after_listing) != _actor_local_identity_mode(
+                current
+            ):
+                raise IncarnationHomeError(
+                    f"actor-local capability directory changed during content validation: {relative}"
+                )
+            for child_name_value in children:
+                child_label = f"{relative}/{child_name_value}"
+                child_fd, child_initial, child_opened = (
+                    _open_stable_actor_local_child_descriptor(
+                        descriptor, child_name_value, child_label
+                    )
+                )
+                try:
+                    visit(
+                        child_fd,
+                        child_initial,
+                        child_opened,
+                        child_label,
+                        parent_fd=descriptor,
+                        child_name=child_name_value,
+                    )
+                finally:
+                    os.close(child_fd)
+        else:
+            raise IncarnationHomeError(
+                f"actor-local capability entry is not a regular file or directory: {relative}"
+            )
+        if parent_fd is None:
+            _revalidate_actor_local_path(target, descriptor, initial, relative)
+        else:
+            assert child_name is not None
+            _revalidate_actor_local_child(
+                parent_fd, child_name, descriptor, initial, relative
+            )
+
+    try:
+        visit(
+            root_fd,
+            root_initial,
+            root_opened,
+            name,
+            parent_fd=None,
+            child_name=None,
+        )
+    finally:
+        os.close(root_fd)
+    return sha256_bytes(canonical_bytes(rows))
+
+
 def _denied_state_provenance(
     *,
     codex_home: Path,
@@ -2405,6 +2582,12 @@ def _copy_legacy_actor_local_state(
                         f"legacy actor-local state changed during migration: {label}"
                     )
                 content = _read_descriptor_bytes(read_descriptor, label)
+                repeated_content = _read_descriptor_bytes(read_descriptor, label)
+                if repeated_content != content:
+                    raise IncarnationHomeError(
+                        f"legacy actor-local state changed while reading: {label}"
+                    )
+                content = repeated_content
             finally:
                 if read_descriptor is not None:
                     os.close(read_descriptor)
@@ -8024,6 +8207,7 @@ def _prepare_home_impl(
     _migration_source_home: Path | None = None,
     _migration_source_expected_names: set[str] | None = None,
     _migration_source_actor_local_names: Sequence[str] = (),
+    _migration_source_manifest_digest: str | None = None,
 ) -> dict[str, Any]:
     if holder_namespace is not None:
         raise IncarnationHomeError(
@@ -8382,6 +8566,14 @@ def _prepare_home_impl(
             holder_context_digest,
             holder_coordinate or "",
         )
+        if _migration_source_manifest_digest is not None:
+            if SHA256_DIGEST_PATTERN.fullmatch(_migration_source_manifest_digest) is None:
+                raise IncarnationHomeError(
+                    "legacy migration source manifest digest is invalid"
+                )
+            manifest["migration_source_manifest_digest"] = (
+                _migration_source_manifest_digest
+            )
     _write_exact(
         incarnation_root / "incarnation-home.json",
         json.dumps(manifest, ensure_ascii=False, sort_keys=True, indent=2).encode("utf-8")
@@ -8812,6 +9004,114 @@ def _legacy_migration_actor_local_names(manifest: dict[str, Any]) -> list[str]:
     return sorted(names)
 
 
+def _validate_idempotent_legacy_migration_target(
+    *,
+    target_manifest: dict[str, Any],
+    target_home: Path,
+    legacy_manifest_digest: str,
+    source_home: Path,
+    source_actor_local_names: Sequence[str],
+    ambient_home: Path,
+    ambient_identities: set[tuple[int, int]],
+    expected_config: bytes,
+    expected_capability_projection: dict[str, Any],
+) -> None:
+    """Accept only a target that is the exact result of this migration."""
+
+    if target_manifest.get("migration_source_manifest_digest") != legacy_manifest_digest:
+        raise IncarnationHomeError(
+            "legacy migration refuses to overwrite a pre-existing typed home"
+        )
+    expected_shared_names = sorted(
+        name
+        for name, entry in expected_capability_projection["entries"].items()
+        if entry["projection"] == "shared_link"
+    )
+    expected_actor_local_names = sorted(
+        name
+        for name, entry in expected_capability_projection["entries"].items()
+        if entry["projection"] == "denied"
+    )
+    if target_manifest.get("config_digest") != sha256_bytes(expected_config):
+        raise IncarnationHomeError(
+            "legacy migration target is not an exact idempotent match"
+        )
+    if target_manifest.get("capability_projection") != expected_capability_projection:
+        raise IncarnationHomeError(
+            "legacy migration target is not an exact idempotent match"
+        )
+    if target_manifest.get("shared_state_names") != expected_shared_names:
+        raise IncarnationHomeError(
+            "legacy migration target is not an exact idempotent match"
+        )
+    if target_manifest.get("actor_local_state_names") != expected_actor_local_names:
+        raise IncarnationHomeError(
+            "legacy migration target is not an exact idempotent match"
+        )
+    expected_names = (
+        set(expected_shared_names) | set(expected_actor_local_names) | LOCAL_NAMES
+    )
+    _validate_actor_local_top_level_names(target_home, expected_names)
+    _validate_actor_local_entries(
+        target_home,
+        sorted(set(expected_actor_local_names) | set(LOCAL_NAMES)),
+        ambient_home,
+        initially_ambient_identities=ambient_identities,
+    )
+    target_config_digest = _local_tree_content_digest(
+        target_home / "config.toml",
+        "config.toml",
+        ambient_identities=ambient_identities,
+    )
+    expected_config_record = sha256_bytes(
+        canonical_bytes(
+            [
+                {
+                    "path": "config.toml",
+                    "kind": "file",
+                    "mode": 0o600,
+                    "content_digest": sha256_bytes(expected_config),
+                }
+            ]
+        )
+    )
+    if target_config_digest != expected_config_record:
+        raise IncarnationHomeError(
+            "legacy migration target is not an exact idempotent match"
+        )
+    if set(source_actor_local_names) - set(expected_actor_local_names):
+        raise IncarnationHomeError(
+            "legacy migration source state is not admitted by the target projection"
+        )
+    for name in sorted(set(source_actor_local_names) | (LOCAL_NAMES - {"config.toml"})):
+        source_digest = _local_tree_content_digest(
+            source_home / name,
+            name,
+            ambient_identities=ambient_identities,
+        )
+        target_digest = _local_tree_content_digest(
+            target_home / name,
+            name,
+            ambient_identities=ambient_identities,
+        )
+        if source_digest != target_digest:
+            raise IncarnationHomeError(
+                "legacy migration target is not an exact idempotent match"
+            )
+    for name in expected_shared_names:
+        source = ambient_home / name
+        target = target_home / name
+        if (
+            source.is_symlink()
+            or not source.exists()
+            or not target.is_symlink()
+            or target.readlink() != source
+        ):
+            raise IncarnationHomeError(
+                "legacy migration target is not an exact idempotent match"
+            )
+
+
 def migrate_legacy_home(
     *,
     legacy_manifest_path: Path,
@@ -8828,7 +9128,7 @@ def migrate_legacy_home(
         raise IncarnationHomeError(
             "legacy migration requires an incarnation-home v2 manifest"
         )
-    context, _context_bytes, _context_digest = _holder_binding_context_input(
+    context, _context_bytes, context_digest = _holder_binding_context_input(
         binding_context
     )
     runtime_root = _absolute_directory(
@@ -8894,6 +9194,62 @@ def migrate_legacy_home(
                 ambient_home,
                 initially_ambient_identities=ambient_identities,
             )
+            realization, model_slug, effort, _runtime_version, fingerprint = _realization(
+                realization_path
+            )
+            expected_config = _bound_config(
+                _regular_file(
+                    ambient_home / "config.toml", "ambient Codex config"
+                ).read_bytes(),
+                model_slug,
+                effort,
+            )
+            expected_coordinate = _incarnation_coordinate(
+                str(realization.get("model_realization_id")), fingerprint
+            )
+            expected_capability_projection = _build_capability_projection(
+                ambient_home=ambient_home,
+                ambient_home_identity=_ambient_home_identity(ambient_home),
+                model_realization_id=str(realization.get("model_realization_id")),
+                incarnation_coordinate=expected_coordinate,
+                capability_grants=capability_grants,
+            )
+            target_marker = Path(str(owner_token["incarnation_root"])) / (
+                "incarnation-home.json"
+            )
+            try:
+                target_marker_stat = os.lstat(target_marker)
+            except FileNotFoundError:
+                target_marker_stat = None
+            except OSError as exc:
+                raise IncarnationHomeError(
+                    "legacy migration target marker cannot be inspected"
+                ) from exc
+            if target_marker_stat is not None:
+                if stat.S_ISLNK(target_marker_stat.st_mode) or not stat.S_ISREG(
+                    target_marker_stat.st_mode
+                ):
+                    raise IncarnationHomeError(
+                        "legacy migration target marker is not a regular file"
+                    )
+                target_manifest, _target_bytes, _target_digest = _load_manifest_snapshot(
+                    target_marker,
+                    binding_context=context,
+                    binding_context_digest=context_digest,
+                    require_holder_binding=True,
+                )
+                _validate_idempotent_legacy_migration_target(
+                    target_manifest=target_manifest,
+                    target_home=target_home,
+                    legacy_manifest_digest=legacy_digest,
+                    source_home=source_home,
+                    source_actor_local_names=source_actor_local_names,
+                    ambient_home=ambient_home,
+                    ambient_identities=ambient_identities,
+                    expected_config=expected_config,
+                    expected_capability_projection=expected_capability_projection,
+                )
+                return target_manifest
             return _prepare_home_impl(
                 ambient_home=ambient_home,
                 realization_path=realization_path,
@@ -8904,6 +9260,7 @@ def migrate_legacy_home(
                 _migration_source_home=source_home,
                 _migration_source_expected_names=source_expected_names,
                 _migration_source_actor_local_names=source_actor_local_names,
+                _migration_source_manifest_digest=legacy_digest,
             )
     except BaseException:
         _rollback_unpublished_home(owner_token=owner_token)
