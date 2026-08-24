@@ -137,7 +137,10 @@ The current allowlist covers the local working surface:
   `aoa-mcp-http.service` bundle; these run
   deployed workspace wrappers with explicit authenticated loopback Streamable
   HTTP, preserve each package's tool authority, and reject unauthenticated
-  callers before dispatch
+  callers before dispatch. The managed read, bootstrap, and fallback templates
+  also bind `AOA_KAG_ARTIFACT_ROOT` to the deployed stack-owned
+  `Knowledge/kag/repo-self/cas` root so canonical v4 reads do not depend on a
+  shell or installer environment; owner artifact admission remains separate.
 - the separate `abyss-stack-mcp-read.service`,
   manual-only `abyss-stack-mcp-read-bootstrap.service`,
   `abyss-stack-mcp-candidate.service`, and

@@ -12,6 +12,12 @@ Tracking starts with the community-docs baseline for this repository.
 - Bind the canonical `aoa-kag` MCP adapter to an authored absolute
   `AOA_KAG_ARTIFACT_ROOT` seam for v4 cold-CAS reads, preserving fail-closed
   loader behavior and separate artifact-admission verdicts.
+- Preserve the legacy positional `aoa-kag` portable-family loader interface
+  when no cold-CAS root is configured, while retaining the explicit v4
+  binding path for complete owner delivery.
+- Carry public event `evidence_refs` through exact lookup results and make
+  text matching a miss-only fallback after indexed ID/path/label checks;
+  managed read units now carry the deployed cold-CAS binding directly.
 - Pin the repo-local KAG validation action to the exact merged `aoa-kag`
   provider commit used by this consumer change.
 - Keep the read-contour validator compatible with the pinned MCP 2.x

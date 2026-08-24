@@ -895,7 +895,18 @@ class KagRuntimeProjectionTests(unittest.TestCase):
         exact.materialize(evidence_bundle, destination)
         connection = sqlite3.connect(destination)
         connection.row_factory = sqlite3.Row
+        statements: list[str] = []
+        connection.set_trace_callback(statements.append)
         try:
+            event_id_hits, _ = exact.search_records_exact(
+                connection,
+                event["id"],
+                node_class="event",
+                detail="full",
+                limit=5,
+            )
+            indexed_trace = tuple(statements)
+            statements.clear()
             event_hits, _ = exact.search_records_exact(
                 connection,
                 immutable_ref,
@@ -912,6 +923,14 @@ class KagRuntimeProjectionTests(unittest.TestCase):
         finally:
             connection.close()
 
+        self.assertEqual(1, len(event_id_hits))
+        self.assertEqual(
+            [{"kind": "git_commit", "ref": immutable_ref}],
+            event_id_hits[0]["evidence_refs"],
+        )
+        self.assertFalse(
+            any("instr(lower" in statement.lower() for statement in indexed_trace)
+        )
         self.assertEqual(1, len(event_hits))
         self.assertEqual(
             [{"kind": "git_commit", "ref": immutable_ref}],

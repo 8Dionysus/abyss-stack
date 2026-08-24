@@ -940,32 +940,51 @@ def _exact_union_rows(
     limit: int,
     offset: int,
 ) -> list[sqlite3.Row]:
-    branches: list[str] = []
-    values: list[Any] = []
-    for priority, field in enumerate(query_fields):
-        if field in {"search_text", "text"} and query:
-            branch_clauses = [
-                f"instr(lower(COALESCE({field},'')), lower(?)) > 0"
-            ]
-        else:
-            branch_clauses = [f"{field}=?"]
-        branch_values: list[Any] = [query]
-        for previous in query_fields[:priority]:
-            branch_clauses.append(f"{previous}!=?")
-            branch_values.append(query)
-        branch_clauses.extend(clauses)
-        branch_values.extend(clause_values)
-        branches.append(
-            f"SELECT source.*,{priority} AS match_priority FROM {table} source "
-            f"WHERE {' AND '.join(branch_clauses)}"
-        )
-        values.extend(branch_values)
-    values.extend((limit, offset))
-    return connection.execute(
-        "SELECT * FROM (" + " UNION ALL ".join(branches) + ") "
-        f"ORDER BY match_priority,{order_by} LIMIT ? OFFSET ?",
-        tuple(values),
-    ).fetchall()
+    indexed_fields = tuple(
+        field for field in query_fields if field not in {"search_text", "text"}
+    )
+    text_fields = tuple(
+        field for field in query_fields if field in {"search_text", "text"}
+    )
+
+    def run(fields: Sequence[str], *, substring: bool) -> list[sqlite3.Row]:
+        if not fields:
+            return []
+        branches: list[str] = []
+        values: list[Any] = []
+        for priority, field in enumerate(fields):
+            if substring and query:
+                branch_clauses = [
+                    f"instr(lower(COALESCE({field},'')), lower(?)) > 0"
+                ]
+            else:
+                branch_clauses = [f"{field}=?"]
+            branch_values: list[Any] = [query]
+            for previous in fields[:priority]:
+                branch_clauses.append(f"{previous}!=?")
+                branch_values.append(query)
+            branch_clauses.extend(clauses)
+            branch_values.extend(clause_values)
+            branches.append(
+                f"SELECT source.*,{priority} AS match_priority FROM {table} source "
+                f"WHERE {' AND '.join(branch_clauses)}"
+            )
+            values.extend(branch_values)
+        values.extend((limit, offset))
+        return connection.execute(
+            "SELECT * FROM (" + " UNION ALL ".join(branches) + ") "
+            f"ORDER BY match_priority,{order_by} LIMIT ? OFFSET ?",
+            tuple(values),
+        ).fetchall()
+
+    # IDs, paths, labels, and other equality-addressable fields must decide
+    # exact hits before SQLite is asked to scan the large text columns.
+    indexed_rows = run(indexed_fields, substring=False)
+    if indexed_rows or not text_fields or not query:
+        return indexed_rows
+    # Text is an intentional bounded fallback for evidence refs and readiness
+    # phrases, reached only after all indexed exact fields miss.
+    return run(text_fields, substring=True)
 
 
 def _scoped_fts_expression(

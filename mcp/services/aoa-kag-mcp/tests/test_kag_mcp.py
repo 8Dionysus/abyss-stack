@@ -311,6 +311,34 @@ def test_canonical_query_loads_portable_family_without_v2_monolith(
     }
 
 
+def test_canonical_query_preserves_legacy_portable_loader_interface(
+    tmp_path: Path,
+) -> None:
+    state = _state(tmp_path)
+    _use_portable_family(state)
+    query_path = state.aoa_kag_root / "scripts" / "query_repo_local_kag.py"
+    query_path.parent.mkdir(parents=True, exist_ok=True)
+    query_path.write_text(
+        "SEEN = {}\n"
+        "class RepoKagQuery:\n"
+        "    def __init__(self, source_index, family):\n"
+        "        self.source_index = source_index\n"
+        "        SEEN['family'] = family\n"
+        "    def discover(self):\n"
+        "        return {'storage': self.source_index['storage']}\n"
+        "def load_family(repo_root):\n"
+        "    SEEN['loader_repo_root'] = repo_root\n"
+        "    return {'storage': 'portable-v3'}, {}, None, None\n",
+        encoding="utf-8",
+    )
+
+    canonical = CanonicalRepoKag(state)
+    assert canonical.discover_owner("repo-a") == {"storage": "portable-v3"}
+    module = canonical._query_module()
+    assert module.SEEN["loader_repo_root"] == state.provider_root("repo-a")
+    assert module.SEEN["family"] == {}
+
+
 def test_canonical_query_passes_cold_cas_binding_to_owner_loader(
     tmp_path: Path,
 ) -> None:
