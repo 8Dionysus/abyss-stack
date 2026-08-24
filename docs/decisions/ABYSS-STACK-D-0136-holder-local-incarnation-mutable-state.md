@@ -59,11 +59,16 @@ each current denied name binds the ambient entry identity, when present, to the
 admitted local-tree digest. A changed ambient identity is accepted only when
 the local tree is unchanged, so unlink/replace cannot turn a previously
 ambient-derived alias into accepted holder-local state. The record is bounded
-by the current projection and is not a filename/history denylist. Every file
-writer pins and revalidates the target parent descriptor before creating,
-replacing, or mode-updating a file, and safely opens the target before its first
-effect; a parent rename or symlink replacement is rejected before ambient
-bytes or mode can change.
+by the current projection and is not a filename/history denylist. During one
+materialization, the initial ambient inode snapshot is retained through the
+final local-tree walk as a runtime-owned freshness boundary; it is discarded
+after that attempt and is not a filename/history denylist. Every file writer
+pins and revalidates the target parent descriptor before creating, replacing,
+or mode-updating a file, safely admits the existing target before its first
+effect, and stages replacement bytes through a separate unnameable descriptor
+before atomic publication. A parent rename, symlink replacement, or staged
+write failure is rejected without changing ambient bytes or mode or destroying
+the prior target.
 
 New homes require the exact bytes of a typed holder/task/run responsibility
 context. The digest of that context selects a holder-local directory below the
@@ -77,8 +82,9 @@ boundary formed by the pinned runtime directory plus its runtime-owned
 single-link regular lock file. The named lock is revalidated after acquisition
 and is never mode-normalized through an alias, so a lock-name replacement cannot
 split critical sections or mutate an external inode. New files are published
-from unnameable temporary descriptors, and existing writable targets are
-reopened and revalidated before their first truncate or mode effect. An
+from unnameable temporary descriptors, and existing targets are admitted
+read-only, written to a fully fsynced unnameable staging descriptor, and
+revalidated before atomic replacement. An
 unpublished root is owned by an exact token before materialization, and only
 a tokened unmarked root can be rolled back or recovered as stale. Canonical
 launch reloads and digest-checks the manifest while that lock is held, so a

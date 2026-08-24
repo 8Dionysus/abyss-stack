@@ -429,6 +429,63 @@ def test_severed_ambient_alias_is_rejected_by_persisted_denied_provenance(
     assert (ambient / denied_name).read_bytes() == replacement
 
 
+def test_initial_denied_inode_is_rejected_if_moved_during_materialization(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    denied_name = _unknown_fixture_name(tmp_path)
+    ambient_entry = ambient / denied_name
+    secret = b"ambient-secret-moved-after-classification"
+    ambient_entry.write_bytes(secret)
+    realization = _realization(tmp_path / "realization.json")
+    original_write_exact = MODULE._write_exact
+    moved_target: Path | None = None
+    moved = False
+
+    def move_denied_inode_after_config(
+        path: Path,
+        content: bytes,
+        mode: int,
+        *,
+        ambient_identities: set[tuple[int, int]] | None = None,
+    ) -> None:
+        nonlocal moved, moved_target
+        original_write_exact(
+            path,
+            content,
+            mode,
+            ambient_identities=ambient_identities,
+        )
+        if path.name == "config.toml" and not moved:
+            moved = True
+            moved_target = path.parent / denied_name
+            os.rename(ambient_entry, moved_target)
+            ambient_entry.write_bytes(b"ambient-path-replacement")
+
+    monkeypatch.setattr(MODULE, "_write_exact", move_denied_inode_after_config)
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="actor-local capability entry aliases ambient state",
+    ):
+        _ORIGINAL_PREPARE_HOME(
+            ambient_home=ambient,
+            realization_path=realization,
+            runtime_root=runtime_root,
+            binding_context=_holder_binding_context(runtime_root, "materialization-alias"),
+        )
+
+    assert moved
+    assert (runtime_root / "closeout.route").is_file()
+    assert ambient_entry.read_bytes() == b"ambient-path-replacement"
+    assert moved_target is not None
+    assert not moved_target.exists()
+    assert not list(runtime_root.glob("sha256-*/holder-sha256-*/incarnation-home.json"))
+
+
 def test_config_alias_rejection_preserves_ambient_bytes_and_mode(
     tmp_path: Path,
 ) -> None:
@@ -530,6 +587,38 @@ def test_exact_writer_publishes_from_unnameable_descriptor(
     assert target.read_bytes() == b'{"safe":true}\n'
     assert ambient_config.read_bytes() == before_ambient_bytes
     assert stat.S_IMODE(ambient_config.stat().st_mode) == before_ambient_mode
+
+
+def test_atomic_existing_file_failure_preserves_bytes_mode_and_inode(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = tmp_path / "receipt.json"
+    path.write_bytes(b'{"old":true}\n')
+    path.chmod(0o640)
+    before_bytes = path.read_bytes()
+    before_mode = stat.S_IMODE(path.stat().st_mode)
+    before_inode = path.stat().st_ino
+    original_ftruncate = MODULE.os.ftruncate
+
+    def fail_after_truncate(descriptor: int, length: int) -> None:
+        original_ftruncate(descriptor, length)
+        raise OSError("synthetic staged-write failure")
+
+    monkeypatch.setattr(MODULE.os, "ftruncate", fail_after_truncate)
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="cannot write admitted file",
+    ):
+        MODULE._write_atomic_json(
+            path,
+            {"new": True},
+            "atomic receipt update",
+            replace=True,
+        )
+
+    assert path.read_bytes() == before_bytes
+    assert stat.S_IMODE(path.stat().st_mode) == before_mode
+    assert path.stat().st_ino == before_inode
 
 
 def test_preparation_lock_alias_rejection_preserves_external_mode_and_bytes(

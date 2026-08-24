@@ -1055,9 +1055,19 @@ def _validate_actor_local_entry(
 
 
 def _validate_actor_local_entries(
-    codex_home: Path, names: Sequence[str], ambient_home: Path
+    codex_home: Path,
+    names: Sequence[str],
+    ambient_home: Path,
+    *,
+    initially_ambient_identities: set[tuple[int, int]] | None = None,
 ) -> None:
     ambient_identities = _ambient_inode_identities(ambient_home)
+    if initially_ambient_identities is not None:
+        # Keep the first ambient classification in force for the complete
+        # materialization.  A denied inode can otherwise be moved into the
+        # holder home and replaced at its ambient pathname before this final
+        # walk, making a severed alias look newly actor-local.
+        ambient_identities.update(initially_ambient_identities)
     for name in names:
         target = codex_home / name
         if target.exists() or target.is_symlink():
@@ -1075,7 +1085,6 @@ def _local_tree_digest(target: Path, name: str) -> str | None:
         return None
     rows: list[dict[str, object]] = []
     for relative, observed in _walk_stable_actor_local_tree(target, name):
-        identity = (observed.st_dev, observed.st_ino)
         rows.append(
             {
                 "path": relative,
@@ -1090,19 +1099,33 @@ def _local_tree_digest(target: Path, name: str) -> str | None:
 
 
 def _denied_state_provenance(
-    *, codex_home: Path, ambient_home: Path, names: Sequence[str]
+    *,
+    codex_home: Path,
+    ambient_home: Path,
+    names: Sequence[str],
+    initially_ambient_identities: set[tuple[int, int]] | None = None,
 ) -> dict[str, dict[str, object]]:
-    """Record one current ambient identity and one local-tree digest per denied name."""
+    """Record one current identity and one admitted local-tree digest per name."""
 
-    return {
-        name: {
+    ambient_identities = _ambient_inode_identities(ambient_home)
+    if initially_ambient_identities is not None:
+        ambient_identities.update(initially_ambient_identities)
+    provenance: dict[str, dict[str, object]] = {}
+    for name in names:
+        target = codex_home / name
+        if target.exists() or target.is_symlink():
+            _validate_actor_local_entry(
+                target,
+                name,
+                ambient_identities=ambient_identities,
+            )
+        provenance[name] = {
             "ambient_entry": _identity_record(
                 _entry_identity(ambient_home / name, f"ambient denied entry {name}")
             ),
-            "local_tree_digest": _local_tree_digest(codex_home / name, name),
+            "local_tree_digest": _local_tree_digest(target, name),
         }
-        for name in names
-    }
+    return provenance
 
 
 def _validate_denied_state_provenance(
@@ -1438,6 +1461,124 @@ def _publish_unnameable_file_at(
         ) from exc
 
 
+def _stage_unnameable_file_at(
+    parent_fd: int, target_name: str, descriptor: int, label: str
+) -> str:
+    """Give a fully written anonymous inode one private staging name."""
+
+    for _attempt in range(8):
+        staged_name = f".{target_name}.stage-{secrets.token_hex(16)}"
+        try:
+            os.link(
+                f"/proc/self/fd/{descriptor}",
+                staged_name,
+                dst_dir_fd=parent_fd,
+                follow_symlinks=True,
+            )
+            return staged_name
+        except FileExistsError:
+            continue
+        except OSError as exc:
+            raise IncarnationHomeError(
+                f"cannot stage unnameable {label}"
+            ) from exc
+    raise IncarnationHomeError(f"cannot allocate a private staging name for {label}")
+
+
+def _remove_staged_file_at(
+    parent_fd: int, name: str, descriptor: int, label: str
+) -> None:
+    """Remove only the exact private staging link retained by descriptor."""
+
+    try:
+        observed = os.lstat(name, dir_fd=parent_fd)
+    except FileNotFoundError:
+        return
+    except OSError as exc:
+        raise IncarnationHomeError(f"{label} staging entry cannot be inspected") from exc
+    try:
+        opened = os.fstat(descriptor)
+    except OSError as exc:
+        raise IncarnationHomeError(f"{label} staging inode cannot be inspected") from exc
+    if (
+        (observed.st_dev, observed.st_ino, observed.st_mode)
+        != (opened.st_dev, opened.st_ino, opened.st_mode)
+        or not stat.S_ISREG(opened.st_mode)
+        or opened.st_nlink != 1
+    ):
+        raise IncarnationHomeError(f"{label} staging entry changed before cleanup")
+    try:
+        os.unlink(name, dir_fd=parent_fd)
+    except FileNotFoundError:
+        return
+    except OSError as exc:
+        raise IncarnationHomeError(f"{label} staging entry could not be removed") from exc
+
+
+def _replace_with_staged_file_at(
+    *,
+    parent_fd: int,
+    target_name: str,
+    target_descriptor: int,
+    target_initial: os.stat_result,
+    staged_descriptor: int,
+    label: str,
+    ambient_identities: set[tuple[int, int]],
+) -> None:
+    """Atomically publish a fully written replacement after identity rechecks."""
+
+    staged_name: str | None = None
+    try:
+        staged_name = _stage_unnameable_file_at(
+            parent_fd, target_name, staged_descriptor, label
+        )
+        staged_initial = os.fstat(staged_descriptor)
+        _revalidate_regular_file_at(
+            parent_fd,
+            staged_name,
+            staged_descriptor,
+            staged_initial,
+            label=f"{label} staged file",
+            ambient_identities=ambient_identities,
+        )
+        _revalidate_regular_file_at(
+            parent_fd,
+            target_name,
+            target_descriptor,
+            target_initial,
+            label=label,
+            ambient_identities=ambient_identities,
+        )
+        try:
+            os.replace(
+                staged_name,
+                target_name,
+                src_dir_fd=parent_fd,
+                dst_dir_fd=parent_fd,
+            )
+        except OSError as exc:
+            raise IncarnationHomeError(f"cannot atomically publish {label}") from exc
+        staged_name = None
+        try:
+            published = os.lstat(target_name, dir_fd=parent_fd)
+            staged = os.fstat(staged_descriptor)
+        except OSError as exc:
+            raise IncarnationHomeError(f"{label} changed after publication") from exc
+        if (
+            (published.st_dev, published.st_ino, published.st_mode)
+            != (staged.st_dev, staged.st_ino, staged.st_mode)
+            or not stat.S_ISREG(staged.st_mode)
+            or staged.st_nlink != 1
+            or (staged.st_dev, staged.st_ino) in ambient_identities
+        ):
+            raise IncarnationHomeError(f"{label} changed after publication")
+    finally:
+        if staged_name is not None:
+            _remove_staged_file_at(
+                parent_fd, staged_name, staged_descriptor, f"{label} staged file"
+            )
+
+
 def _write_exact(
     path: Path,
     content: bytes,
@@ -1449,7 +1590,8 @@ def _write_exact(
 
     ambient_identities = ambient_identities or set()
     parent_fd = _open_pinned_parent_directory(path, "exact file")
-    descriptor: int | None = None
+    existing_descriptor: int | None = None
+    staged_descriptor: int | None = None
     try:
         try:
             existing = os.lstat(path.name, dir_fd=parent_fd)
@@ -1460,44 +1602,62 @@ def _write_exact(
                 f"refusing to inspect unsafe file path: {path}"
             ) from exc
         if existing is not None:
-            descriptor, opened = _open_stable_regular_file_at(
+            existing_descriptor, opened = _open_stable_regular_file_at(
                 parent_fd,
                 path.name,
                 label=f"existing file {path}",
                 ambient_identities=ambient_identities,
-                writable=True,
             )
             try:
-                same_content = _read_descriptor_bytes(descriptor, str(path)) == content
-                _revalidate_writable_regular_file_at(
+                same_content = _read_descriptor_bytes(existing_descriptor, str(path)) == content
+                _revalidate_regular_file_at(
                     parent_fd,
                     path.name,
-                    descriptor,
+                    existing_descriptor,
                     opened,
                     label=f"existing file {path}",
                     ambient_identities=ambient_identities,
                 )
-                if same_content:
-                    if stat.S_IMODE(opened.st_mode) != mode:
-                        os.fchmod(descriptor, mode)
+                if same_content and stat.S_IMODE(opened.st_mode) == mode:
                     return
-                _write_descriptor_exact(descriptor, content, mode, str(path))
+                staged_descriptor = _create_unnameable_temporary_file_at(
+                    parent_fd, str(path)
+                )
+                _write_descriptor_exact(staged_descriptor, content, mode, str(path))
+                _replace_with_staged_file_at(
+                    parent_fd=parent_fd,
+                    target_name=path.name,
+                    target_descriptor=existing_descriptor,
+                    target_initial=opened,
+                    staged_descriptor=staged_descriptor,
+                    label=f"existing file {path}",
+                    ambient_identities=ambient_identities,
+                )
                 os.fsync(parent_fd)
+                os.close(staged_descriptor)
+                staged_descriptor = None
                 return
             finally:
-                os.close(descriptor)
-                descriptor = None
-        descriptor = _create_unnameable_temporary_file_at(parent_fd, str(path))
-        _write_descriptor_exact(descriptor, content, mode, str(path))
-        _publish_unnameable_file_at(parent_fd, descriptor, path.name, str(path))
+                os.close(existing_descriptor)
+                existing_descriptor = None
+        else:
+            staged_descriptor = _create_unnameable_temporary_file_at(
+                parent_fd, str(path)
+            )
+            _write_descriptor_exact(staged_descriptor, content, mode, str(path))
+            _publish_unnameable_file_at(
+                parent_fd, staged_descriptor, path.name, str(path)
+            )
         os.fsync(parent_fd)
     except IncarnationHomeError:
         raise
     except OSError as exc:
         raise IncarnationHomeError(f"cannot safely publish file: {path}") from exc
     finally:
-        if descriptor is not None:
-            os.close(descriptor)
+        if existing_descriptor is not None:
+            os.close(existing_descriptor)
+        if staged_descriptor is not None:
+            os.close(staged_descriptor)
         os.close(parent_fd)
 
 
@@ -2917,7 +3077,8 @@ def _write_atomic_json(
     payload = canonical_bytes(value) + b"\n"
     ambient_identities = ambient_identities or set()
     parent_fd = _open_pinned_parent_directory(path, label)
-    fd: int | None = None
+    existing_fd: int | None = None
+    staged_fd: int | None = None
     try:
         try:
             target = os.lstat(path.name, dir_fd=parent_fd)
@@ -2926,38 +3087,52 @@ def _write_atomic_json(
         if target is not None:
             if not replace:
                 raise IncarnationHomeError(f"{label} already exists: {path}")
-            fd, opened = _open_stable_regular_file_at(
+            existing_fd, opened = _open_stable_regular_file_at(
                 parent_fd,
                 path.name,
                 label=label,
                 ambient_identities=ambient_identities,
-                writable=True,
             )
             try:
-                _revalidate_writable_regular_file_at(
+                _revalidate_regular_file_at(
                     parent_fd,
                     path.name,
-                    fd,
+                    existing_fd,
                     opened,
                     label=label,
                     ambient_identities=ambient_identities,
                 )
-                _write_descriptor_exact(fd, payload, 0o600, str(path))
+                staged_fd = _create_unnameable_temporary_file_at(parent_fd, label)
+                _write_descriptor_exact(staged_fd, payload, 0o600, str(path))
+                _replace_with_staged_file_at(
+                    parent_fd=parent_fd,
+                    target_name=path.name,
+                    target_descriptor=existing_fd,
+                    target_initial=opened,
+                    staged_descriptor=staged_fd,
+                    label=label,
+                    ambient_identities=ambient_identities,
+                )
+                os.fsync(parent_fd)
+                os.close(staged_fd)
+                staged_fd = None
             finally:
-                os.close(fd)
-                fd = None
+                os.close(existing_fd)
+                existing_fd = None
         else:
-            fd = _create_unnameable_temporary_file_at(parent_fd, label)
-            _write_descriptor_exact(fd, payload, 0o600, str(path))
-            _publish_unnameable_file_at(parent_fd, fd, path.name, label)
-        os.fsync(parent_fd)
+            staged_fd = _create_unnameable_temporary_file_at(parent_fd, label)
+            _write_descriptor_exact(staged_fd, payload, 0o600, str(path))
+            _publish_unnameable_file_at(parent_fd, staged_fd, path.name, label)
+            os.fsync(parent_fd)
     except FileExistsError as exc:
         raise IncarnationHomeError(f"{label} already exists: {path}") from exc
     except OSError as exc:
         raise IncarnationHomeError(f"cannot write {label}: {path}") from exc
     finally:
-        if fd is not None:
-            os.close(fd)
+        if existing_fd is not None:
+            os.close(existing_fd)
+        if staged_fd is not None:
+            os.close(staged_fd)
         os.close(parent_fd)
 
 
@@ -3227,6 +3402,7 @@ def _restore_holder_claim_snapshot(
         raise IncarnationHomeError("holder claim rollback digest is invalid")
     parent_fd = _open_pinned_parent_directory(claim_path, "holder claim rollback")
     descriptor: int | None = None
+    staged_descriptor: int | None = None
     try:
         try:
             observed = os.lstat(claim_path.name, dir_fd=parent_fd)
@@ -3243,7 +3419,6 @@ def _restore_holder_claim_snapshot(
             claim_path.name,
             label="holder claim rollback",
             ambient_identities=ambient_identities,
-            writable=before_raw is not None,
         )
         current_raw = _read_descriptor_bytes(descriptor, str(claim_path))
         if sha256_bytes(current_raw) != after_digest:
@@ -3264,14 +3439,30 @@ def _restore_holder_claim_snapshot(
                     "holder claim could not be rolled back"
                 ) from exc
         else:
+            staged_descriptor = _create_unnameable_temporary_file_at(
+                parent_fd, "holder claim rollback"
+            )
             _write_descriptor_exact(
-                descriptor,
+                staged_descriptor,
                 before_raw,
                 0o600,
                 "holder claim rollback",
             )
+            _replace_with_staged_file_at(
+                parent_fd=parent_fd,
+                target_name=claim_path.name,
+                target_descriptor=descriptor,
+                target_initial=opened,
+                staged_descriptor=staged_descriptor,
+                label="holder claim rollback",
+                ambient_identities=ambient_identities,
+            )
+            os.close(staged_descriptor)
+            staged_descriptor = None
         os.fsync(parent_fd)
     finally:
+        if staged_descriptor is not None:
+            os.close(staged_descriptor)
         if descriptor is not None:
             os.close(descriptor)
         os.close(parent_fd)
@@ -7010,6 +7201,10 @@ def _prepare_home_impl(
         ambient_home / "config.toml", "ambient Codex config"
     ).read_bytes()
     config = _bound_config(ambient_config, model_slug, effort)
+    # This snapshot is the bounded provenance boundary for the complete
+    # materialization.  It must be captured before projection and retained
+    # even if ambient pathnames are later unlinked and replaced.
+    ambient_identities = _ambient_inode_identities(ambient_home)
     capability_projection = _build_capability_projection(
         ambient_home=ambient_home,
         ambient_home_identity=ambient_identity,
@@ -7028,8 +7223,6 @@ def _prepare_home_impl(
         for name, entry in capability_projection["entries"].items()
         if entry["projection"] == "denied"
     )
-    ambient_identities = _ambient_inode_identities(ambient_home)
-
     previous_shared_names: set[str] = set()
     if isinstance(existing.get("shared_state_names"), list):
         previous_shared_names = {
@@ -7075,6 +7268,7 @@ def _prepare_home_impl(
                 codex_home,
                 prevalidated_names,
                 ambient_home,
+                initially_ambient_identities=ambient_identities,
             )
         _validate_denied_state_provenance(
             manifest=existing,
@@ -7195,11 +7389,13 @@ def _prepare_home_impl(
         codex_home,
         sorted(set(actor_local_state_names) | set(LOCAL_NAMES)),
         ambient_home,
+        initially_ambient_identities=ambient_identities,
     )
     denied_provenance = _denied_state_provenance(
         codex_home=codex_home,
         ambient_home=ambient_home,
         names=actor_local_state_names,
+        initially_ambient_identities=ambient_identities,
     )
 
     manifest = {

@@ -135,7 +135,10 @@ and replay only through their matching legacy wake reservation. A retry after a 
   manifest records the derived `actor_local_state_names` set plus one bounded
   current-entry inode/tree provenance record per denied name. An ambient
   unlink/replace is admitted only when the local tree is unchanged; no
-  unbounded pathname/history denylist is retained;
+  unbounded pathname/history denylist is retained. The initial ambient inode
+  snapshot is retained only through the current materialization, so a denied
+  inode moved into the holder home cannot be accepted after its ambient pathname
+  is replaced;
 - binds each newly created home below the realization root to the exact bytes
   of a typed holder/task/run responsibility context. The context carries the
   existing goal/actor/incarnation/session runtime coordinates plus owner-bound
@@ -159,7 +162,12 @@ until preparation rewrites it as v3. Every first preparation is serialized by
   the runtime-owned preparation lock and claims an unpublished root with an
   exact owner token; owner-token retirement retains and revalidates that
   descriptor before unlinking, and rebind restores a superseded claim if
-  replacement-receipt publication fails.
+  replacement-receipt publication fails. The exact writer pins the target
+  parent descriptor, publishes new files from an unnameable descriptor, and
+  stages every existing-file replacement through a separate fully written
+  unnameable descriptor before atomic rename. Deterministic parent, target, and
+  temporary-name replacement cannot change ambient bytes or mode; a staged write
+  failure leaves the prior target intact.
 - exposes the installed `aoa-external-codex-return` leaf for the final external
   return contour. The leaf receives an explicit return-owner binding and exact
   handoff/holder paths, uses a connectable local Codex app-server as a

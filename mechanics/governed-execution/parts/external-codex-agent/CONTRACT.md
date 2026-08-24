@@ -885,13 +885,19 @@ records only the current denied projection: each name has the ambient entry's
 current device/inode identity, when present, and a digest of the admitted local
 tree. After an ambient unlink/replace, the loader permits the existing local
 tree only when its digest is unchanged; a new or altered local tree is denied.
+During one materialization, the initial ambient inode snapshot is also retained
+through the final local-tree walk, so a denied inode moved into the holder home
+cannot become acceptable merely because its ambient pathname was replaced. The
+snapshot is bounded to that preparation and is not a filename/history denylist.
 Every file writer pins and revalidates the target parent descriptor before
 creating, replacing, or mode-updating a file, so a parent rename or symlink
 replacement cannot redirect an effect into ambient state. New files are
 published directly from an unnameable `O_TMPFILE` descriptor rather than a
-replaceable temporary pathname; existing admitted regular files are reopened
-read/write and revalidated immediately before their first truncate or mode
-effect. The preparation lock serializes through the pinned runtime directory
+replaceable temporary pathname; existing admitted regular files are opened
+read-only for identity admission, written completely through a separate
+unnameable descriptor, and atomically replaced only after both descriptors are
+revalidated. A staging write or fsync failure therefore leaves the prior bytes,
+mode, and inode intact. The preparation lock serializes through the pinned runtime directory
 and revalidates its named single-link file after acquisition, so a lock-name
 replacement cannot split critical sections or chmod an external inode.
 Legacy v2 manifests remain schema-valid without this field on the explicit

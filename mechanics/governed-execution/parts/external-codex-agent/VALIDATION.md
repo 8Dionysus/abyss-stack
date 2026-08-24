@@ -67,10 +67,13 @@ symlinks and undeclared top-level state fail closed. New realization homes
 require the exact typed holder/task/run context, with mismatched binding, stale
 manifest, persistent sequential reuse, and overlapping claim attempts rejected.
 Same-filesystem hard links to ambient denied state, severed ambient aliases,
-multiply linked regular files, device/inode aliases, and replacement during
-no-follow validation fail closed before manifest admission or launch; the
-adversarial fixtures also verify that ambient bytes and config mode remain
-unchanged. Distinct contexts receive separate manifest, config, cache, log,
+denied inodes moved during materialization, multiply linked regular files,
+device/inode aliases, and replacement during no-follow validation fail closed
+before manifest admission or launch; the adversarial fixtures also verify that
+ambient bytes and config mode remain unchanged. Existing-file updates stage the
+new bytes through an unnameable descriptor and publish them atomically, so a
+deterministic truncate/write failure preserves the prior bytes, mode, and inode.
+Distinct contexts receive separate manifest, config, cache, log,
 tmp, and descendant-binary coordinates. Synchronized first preparation is
 serializable and idempotent, while a failed or stale tokened preparer is
 recoverable without deleting another attempt's root. A published holder claim
@@ -87,9 +90,10 @@ through the pinned runtime directory, so concurrent first preparation remains
 serializable. Canonical launch also reloads and digest-checks the manifest
 while holding the preparation lock, rejecting a deterministic replacement race
 before claim publication. The exact writer pins the target parent descriptor,
-publishes new files from an unnameable descriptor, and rewrites only an
-immediately revalidated admitted descriptor; deterministic parent and
-temporary-name replacement cannot change ambient bytes or mode.
+publishes new files from an unnameable descriptor, and stages existing-file
+updates through a fully written unnameable descriptor before atomic publication;
+deterministic parent and temporary-name replacement cannot change ambient bytes
+or mode.
 Incomplete holder receipts missing `runtime_state_root` or `closeout_route`
 are rejected by both the receipt schema and runtime binding validator. A
 receipt carrying an immutable manifest snapshot must also carry the complete
