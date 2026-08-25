@@ -10593,6 +10593,76 @@ def _execution_snapshot_root(preferred: Path | None) -> Path:
     return root
 
 
+def _snapshot_root_matches(root: Path, root_fd: int) -> bool:
+    """Check that the retained root still names the opened directory inode."""
+
+    try:
+        observed = os.lstat(root)
+        retained = os.fstat(root_fd)
+    except OSError:
+        return False
+    return (
+        stat.S_ISDIR(retained.st_mode)
+        and _actor_local_identity_mode(observed)
+        == _actor_local_identity_mode(retained)
+    )
+
+
+def _open_execution_snapshot_root(preferred: Path | None) -> tuple[Path, int]:
+    """Open and retain the exact admitted runtime scratch directory."""
+
+    root = _execution_snapshot_root(preferred)
+    parent_fd = _open_pinned_parent_directory(root, "shebang snapshot root")
+    root_fd: int | None = None
+    try:
+        initial = os.lstat(root.name, dir_fd=parent_fd)
+        if stat.S_ISLNK(initial.st_mode) or not stat.S_ISDIR(initial.st_mode):
+            raise IncarnationHomeError(
+                f"shebang snapshot root changed before safe open: {root}"
+            )
+        root_fd = os.open(
+            root.name,
+            _snapshot_directory_flags(),
+            dir_fd=parent_fd,
+        )
+        opened = os.fstat(root_fd)
+        observed = os.lstat(root.name, dir_fd=parent_fd)
+        if (
+            not stat.S_ISDIR(opened.st_mode)
+            or _actor_local_identity_mode(opened)
+            != _actor_local_identity_mode(initial)
+            or _actor_local_identity_mode(observed)
+            != _actor_local_identity_mode(opened)
+        ):
+            raise IncarnationHomeError(
+                f"shebang snapshot root changed during safe open: {root}"
+            )
+        try:
+            flags = os.fstatvfs(root_fd).f_flag
+        except OSError as exc:
+            raise IncarnationHomeError(
+                f"shebang snapshot filesystem could not be inspected: {root}"
+            ) from exc
+        noexec = getattr(os, "ST_NOEXEC", 0)
+        if isinstance(noexec, int) and noexec and flags & noexec:
+            raise IncarnationHomeError(
+                f"shebang snapshot filesystem is mounted noexec: {root}"
+            )
+        return root, root_fd
+    except IncarnationHomeError:
+        if root_fd is not None:
+            os.close(root_fd)
+        raise
+    except OSError as exc:
+        if root_fd is not None:
+            os.close(root_fd)
+        raise IncarnationHomeError(
+            f"shebang snapshot root could not be opened safely: {root}"
+        ) from exc
+    finally:
+        os.close(parent_fd)
+
+
 def _launch_snapshot_root(manifest: dict[str, Any]) -> Path:
     """Use runtime-owned scratch space, not holder-local state, for mirrors."""
 
@@ -10929,8 +10999,8 @@ def _copy_package_tree(
 
 
 def _mirror_package_layout(
-    *, executable: Path, snapshot_root: Path
-) -> tuple[Path, Path, dict[Path, tuple[int, int, str, int]], Path]:
+    *, executable: Path, snapshot_root: Path | None
+) -> tuple[Path, Path, dict[Path, tuple[int, int, str, int]], Path, int]:
     """Build a private package snapshot with stable ancestor coordinates.
 
     Only the directory coordinates needed to reach the admitted package are
@@ -10939,13 +11009,52 @@ def _mirror_package_layout(
     depend on unrelated packages and prior snapshots.
     """
 
-    snapshot_dir = Path(
-        tempfile.mkdtemp(prefix="abyss-stack-codex-package-", dir=snapshot_root)
-    )
+    snapshot_root, snapshot_root_fd = _open_execution_snapshot_root(snapshot_root)
+    snapshot_dir: Path | None = None
+    bound_snapshot_dir: Path | None = None
+    snapshot_dir_name: str | None = None
+    snapshot_dir_fd: int | None = None
     try:
-        os.chmod(snapshot_dir, 0o700)
+        for _attempt in range(8):
+            candidate = f"abyss-stack-codex-package-{secrets.token_hex(16)}"
+            try:
+                os.mkdir(candidate, 0o700, dir_fd=snapshot_root_fd)
+            except FileExistsError:
+                continue
+            snapshot_dir_name = candidate
+            break
+        if snapshot_dir_name is None:
+            raise IncarnationHomeError(
+                "shebang snapshot root could not allocate a private directory"
+            )
+        if not _snapshot_root_matches(snapshot_root, snapshot_root_fd):
+            raise IncarnationHomeError(
+                f"shebang snapshot root changed during private directory creation: {snapshot_root}"
+            )
+        snapshot_dir_fd = os.open(
+            snapshot_dir_name,
+            _snapshot_directory_flags(),
+            dir_fd=snapshot_root_fd,
+        )
+        opened_snapshot_dir = os.fstat(snapshot_dir_fd)
+        observed_snapshot_dir = os.lstat(
+            snapshot_dir_name,
+            dir_fd=snapshot_root_fd,
+        )
+        if (
+            not stat.S_ISDIR(opened_snapshot_dir.st_mode)
+            or _actor_local_identity_mode(opened_snapshot_dir)
+            != _actor_local_identity_mode(observed_snapshot_dir)
+        ):
+            raise IncarnationHomeError(
+                "shebang snapshot directory changed during safe open"
+            )
+        bound_snapshot_dir = (
+            Path(f"/proc/self/fd/{snapshot_root_fd}") / snapshot_dir_name
+        )
+        snapshot_dir = snapshot_root / snapshot_dir_name
         source_dir = Path("/")
-        target_dir = snapshot_dir
+        target_dir = bound_snapshot_dir
         records: dict[Path, tuple[int, int, str, int]] = {}
         package_root = _package_root(executable)
         source_parts = package_root.parts
@@ -10959,23 +11068,137 @@ def _mirror_package_layout(
             source_dir,
             target_dir,
             excluded=executable,
+            # Source enumeration uses the ambient package coordinates, while
+            # target writes are descriptor-bound through /proc/self/fd.  The
+            # snapshot must therefore be excluded by its ambient coordinate;
+            # comparing it with the bound target spelling would recurse into
+            # the newly created mirror whenever both live below /tmp.
             ignored_source=snapshot_dir,
             records=records,
         )
+        if not _snapshot_root_matches(snapshot_root, snapshot_root_fd):
+            raise IncarnationHomeError(
+                f"shebang snapshot root changed while building private mirror: {snapshot_root}"
+            )
+        assert snapshot_dir is not None
+        assert bound_snapshot_dir is not None
+        records = {
+            snapshot_dir / path.relative_to(bound_snapshot_dir): value
+            for path, value in records.items()
+        }
+        stable_target_dir = snapshot_dir / target_dir.relative_to(bound_snapshot_dir)
+        retained_snapshot_dir_fd = snapshot_dir_fd
+        snapshot_dir_fd = None
         return (
-            target_dir / executable.relative_to(package_root),
+            stable_target_dir / executable.relative_to(package_root),
             snapshot_dir,
             records,
-            target_dir,
+            stable_target_dir,
+            retained_snapshot_dir_fd,
         )
     except BaseException:
-        _remove_named_snapshot(
-            snapshot_dir / executable.name, snapshot_dir=snapshot_dir
-        )
+        if snapshot_dir_fd is not None:
+            try:
+                _remove_snapshot_tree_contents(
+                    snapshot_dir_fd,
+                    "failed shebang package snapshot",
+                )
+                if snapshot_dir_name is not None:
+                    os.rmdir(snapshot_dir_name, dir_fd=snapshot_root_fd)
+            except (IncarnationHomeError, OSError):
+                pass
+        elif snapshot_dir_name is not None:
+            try:
+                os.rmdir(snapshot_dir_name, dir_fd=snapshot_root_fd)
+            except OSError:
+                pass
         raise
+    finally:
+        if snapshot_dir_fd is not None:
+            os.close(snapshot_dir_fd)
+        os.close(snapshot_root_fd)
 
 
-def _freeze_snapshot_tree(snapshot_dir: Path) -> None:
+def _freeze_snapshot_tree(
+    snapshot_dir: Path,
+    *,
+    snapshot_dir_fd: int | None = None,
+) -> None:
+    if snapshot_dir_fd is not None:
+        def freeze_descriptor(directory_fd: int, label: str) -> None:
+            try:
+                names = sorted(os.listdir(directory_fd))
+            except OSError as exc:
+                raise IncarnationHomeError(
+                    f"{label} cannot be enumerated through its retained descriptor"
+                ) from exc
+            for name in names:
+                try:
+                    initial = os.lstat(name, dir_fd=directory_fd)
+                except OSError as exc:
+                    raise IncarnationHomeError(
+                        f"{label} entry cannot be inspected: {name}"
+                    ) from exc
+                if stat.S_ISLNK(initial.st_mode) or not (
+                    stat.S_ISDIR(initial.st_mode) or stat.S_ISREG(initial.st_mode)
+                ):
+                    raise IncarnationHomeError(
+                        f"{label} contains an unsupported entry: {name}"
+                    )
+                flags = (
+                    _snapshot_directory_flags()
+                    if stat.S_ISDIR(initial.st_mode)
+                    else os.O_RDONLY
+                    | getattr(os, "O_NOFOLLOW", 0)
+                    | getattr(os, "O_CLOEXEC", 0)
+                )
+                child_fd: int | None = None
+                try:
+                    child_fd = os.open(name, flags, dir_fd=directory_fd)
+                    opened = os.fstat(child_fd)
+                    observed = os.lstat(name, dir_fd=directory_fd)
+                    if (
+                        _actor_local_identity_mode(opened)
+                        != _actor_local_identity_mode(initial)
+                        or _actor_local_identity_mode(observed)
+                        != _actor_local_identity_mode(initial)
+                    ):
+                        raise IncarnationHomeError(
+                            f"{label} entry changed during safe freeze: {name}"
+                        )
+                    if stat.S_ISDIR(initial.st_mode):
+                        os.fchmod(child_fd, 0o500)
+                        frozen = os.fstat(child_fd)
+                        if (
+                            frozen.st_dev,
+                            frozen.st_ino,
+                            stat.S_IMODE(frozen.st_mode),
+                        ) != (
+                            initial.st_dev,
+                            initial.st_ino,
+                            0o500,
+                        ):
+                            raise IncarnationHomeError(
+                                f"{label} directory changed while freezing: {name}"
+                            )
+                        freeze_descriptor(child_fd, f"{label}/{name}")
+                        retained = os.fstat(child_fd)
+                        if (
+                            _actor_local_identity_mode(retained)
+                            != _actor_local_identity_mode(frozen)
+                            or stat.S_IMODE(retained.st_mode) != 0o500
+                        ):
+                            raise IncarnationHomeError(
+                                f"{label} directory changed after freezing: {name}"
+                            )
+                finally:
+                    if child_fd is not None:
+                        os.close(child_fd)
+
+        os.fchmod(snapshot_dir_fd, 0o500)
+        freeze_descriptor(snapshot_dir_fd, "named snapshot")
+        return
+
     directory_flags = os.O_RDONLY
     if hasattr(os, "O_DIRECTORY"):
         directory_flags |= os.O_DIRECTORY
@@ -11274,14 +11497,30 @@ def _open_verified_executable(
                     snapshot_dir,
                     snapshot_records,
                     snapshot_package_root,
+                    snapshot_root_fd,
                 ) = _mirror_package_layout(
                     executable=executable,
-                    snapshot_root=_execution_snapshot_root(snapshot_root),
+                    snapshot_root=snapshot_root,
                 )
+                assert snapshot_dir is not None
+                assert snapshot_path is not None
+                assert snapshot_package_root is not None
+                assert snapshot_root_fd is not None
+                bound_snapshot_dir = Path(f"/proc/self/fd/{snapshot_root_fd}")
+                bound_snapshot_path = bound_snapshot_dir / snapshot_path.relative_to(
+                    snapshot_dir
+                )
+                bound_snapshot_package_root = bound_snapshot_dir / (
+                    snapshot_package_root.relative_to(snapshot_dir)
+                )
+                bound_snapshot_records = {
+                    bound_snapshot_dir / path.relative_to(snapshot_dir): value
+                    for path, value in snapshot_records.items()
+                }
                 snapshot_flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
                 if hasattr(os, "O_NOFOLLOW"):
                     snapshot_flags |= os.O_NOFOLLOW
-                snapshot_fd = os.open(snapshot_path, snapshot_flags, 0o500)
+                snapshot_fd = os.open(bound_snapshot_path, snapshot_flags, 0o500)
                 view = memoryview(content)
                 while view:
                     view = view[os.write(snapshot_fd, view) :]
@@ -11289,25 +11528,28 @@ def _open_verified_executable(
                 os.fchmod(snapshot_fd, 0o500)
                 os.fsync(snapshot_fd)
                 snapshot_info = os.fstat(snapshot_fd)
-                snapshot_records[snapshot_path] = (
+                bound_snapshot_records[bound_snapshot_path] = (
                     snapshot_info.st_dev,
                     snapshot_info.st_ino,
                     sha256_bytes(content),
                     0o500,
                 )
-                _freeze_snapshot_tree(snapshot_dir)
+                _freeze_snapshot_tree(
+                    bound_snapshot_dir,
+                    snapshot_dir_fd=snapshot_root_fd,
+                )
                 # A shebang interpreter must reopen a named path. Every
                 # actual directory from the private mirror root through the
                 # launcher's parent is frozen before that reopen, so a normal
                 # same-user rename cannot replace the verified final entry.
                 os.close(snapshot_fd)
                 snapshot_fd = None
-                snapshot_fd = os.open(snapshot_path, os.O_RDONLY)
+                snapshot_fd = os.open(bound_snapshot_path, os.O_RDONLY)
                 if hasattr(os, "O_NOFOLLOW"):
                     os.close(snapshot_fd)
                     snapshot_fd = None
                     snapshot_fd = os.open(
-                        snapshot_path, os.O_RDONLY | os.O_NOFOLLOW
+                        bound_snapshot_path, os.O_RDONLY | os.O_NOFOLLOW
                     )
                 info = os.fstat(snapshot_fd)
                 if not stat.S_ISREG(info.st_mode):
@@ -11326,20 +11568,14 @@ def _open_verified_executable(
                         "named executable snapshot bytes changed before exec"
                     )
                 snapshot_mount = _open_snapshot_mount(
-                    snapshot_path=snapshot_path,
-                    snapshot_dir=snapshot_dir,
-                    package_root=snapshot_package_root,
-                    records=snapshot_records,
+                    snapshot_path=bound_snapshot_path,
+                    snapshot_dir=bound_snapshot_dir,
+                    package_root=bound_snapshot_package_root,
+                    records=bound_snapshot_records,
                     companion_binding=(
                         companion_data[2] if companion_data is not None else None
                     ),
                 )
-                directory_flags = os.O_RDONLY
-                if hasattr(os, "O_DIRECTORY"):
-                    directory_flags |= os.O_DIRECTORY
-                if hasattr(os, "O_NOFOLLOW"):
-                    directory_flags |= os.O_NOFOLLOW
-                snapshot_root_fd = os.open(snapshot_dir, directory_flags)
                 os.set_inheritable(snapshot_root_fd, True)
                 execution_path = snapshot_mount["executable_path"]
                 os.close(snapshot_fd)
@@ -11357,27 +11593,31 @@ def _open_verified_executable(
                 if snapshot_fd is not None:
                     os.close(snapshot_fd)
                     snapshot_fd = None
-                if snapshot_root_fd is not None:
-                    os.close(snapshot_root_fd)
-                    snapshot_root_fd = None
                 _close_snapshot_mount(snapshot_mount)
                 if snapshot_path is not None:
                     _remove_named_snapshot(
-                        snapshot_path, snapshot_dir=snapshot_dir
+                        snapshot_path,
+                        snapshot_dir=snapshot_dir,
+                        snapshot_dir_fd=snapshot_root_fd,
                     )
+                if snapshot_root_fd is not None:
+                    os.close(snapshot_root_fd)
+                    snapshot_root_fd = None
                 raise
             except OSError as exc:
                 if snapshot_fd is not None:
                     os.close(snapshot_fd)
                     snapshot_fd = None
-                if snapshot_root_fd is not None:
-                    os.close(snapshot_root_fd)
-                    snapshot_root_fd = None
                 _close_snapshot_mount(snapshot_mount)
                 if snapshot_path is not None:
                     _remove_named_snapshot(
-                        snapshot_path, snapshot_dir=snapshot_dir
+                        snapshot_path,
+                        snapshot_dir=snapshot_dir,
+                        snapshot_dir_fd=snapshot_root_fd,
                     )
+                if snapshot_root_fd is not None:
+                    os.close(snapshot_root_fd)
+                    snapshot_root_fd = None
                 raise IncarnationHomeError(
                     "Codex shebang executable could not be snapshotted in a private package mirror"
                 ) from exc

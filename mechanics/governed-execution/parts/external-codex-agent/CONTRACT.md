@@ -390,6 +390,9 @@ lives under the manifest's admitted runtime-root scratch directory, and its
 evidence, not the final execution coordinate. The named form remains reopenable
 for Node-backed `#!/usr/bin/env node` launchers. A lifecycle child removes the
 exact snapshot and mirror after the holder's PID/start-tick identity exits.
+The admitted scratch root is retained as a no-follow directory descriptor while
+the private mirror directory is created descriptor-relatively; the retained
+snapshot directory descriptor then anchors subsequent mirror writes and reads.
 Snapshot cleanup performs no mode, traversal, or deletion effect through a
 mutable cleanup pathname: the retained root and every descendant directory
 are mode-adjusted and traversed through validated descriptors, then quarantined

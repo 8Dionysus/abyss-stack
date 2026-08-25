@@ -6374,6 +6374,60 @@ def test_shebang_snapshot_root_rejects_noexec_filesystem(
         MODULE._execution_snapshot_root(tmp_path)
 
 
+def test_shebang_snapshot_root_is_pinned_before_private_directory_creation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    package = tmp_path / "package"
+    executable = package / "bin" / "codex"
+    executable.parent.mkdir(parents=True)
+    (package / "package.json").write_text("{}\n", encoding="utf-8")
+    executable.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    executable.chmod(0o700)
+    runtime_root = tmp_path / "runtime-root"
+    runtime_root.mkdir()
+    replacement_root = tmp_path / "replacement-root"
+    replacement_root.mkdir()
+    renamed_root = tmp_path / "runtime-root-renamed"
+    original_mkdir = MODULE.os.mkdir
+    replaced = False
+
+    def replace_root_after_descriptor_relative_create(
+        path: str | bytes | os.PathLike[str] | os.PathLike[bytes],
+        mode: int = 0o777,
+        *args: object,
+        **kwargs: object,
+    ) -> None:
+        nonlocal replaced
+        original_mkdir(path, mode, *args, **kwargs)
+        if (
+            not replaced
+            and kwargs.get("dir_fd") is not None
+            and str(path).startswith("abyss-stack-codex-package-")
+        ):
+            runtime_root.rename(renamed_root)
+            runtime_root.symlink_to(replacement_root, target_is_directory=True)
+            replaced = True
+
+    monkeypatch.setattr(
+        MODULE.os,
+        "mkdir",
+        replace_root_after_descriptor_relative_create,
+    )
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="root changed during private directory creation",
+    ):
+        MODULE._mirror_package_layout(
+            executable=executable,
+            snapshot_root=runtime_root,
+        )
+
+    assert replaced
+    assert not list(replacement_root.iterdir())
+    assert not list(renamed_root.iterdir())
+
+
 @pytest.mark.skipif(
     shutil.which("cc") is None or not Path("/usr/bin/bwrap").is_file(),
     reason="the ELF companion regression needs cc and bubblewrap",
@@ -6588,7 +6642,13 @@ def test_package_snapshot_does_not_mirror_ancestor_siblings(
     snapshot_root = tmp_path / "snapshot-root"
     snapshot_root.mkdir()
 
-    snapshot_exec, snapshot_dir, _records, _target_dir = MODULE._mirror_package_layout(
+    (
+        snapshot_exec,
+        snapshot_dir,
+        _records,
+        _target_dir,
+        snapshot_dir_fd,
+    ) = MODULE._mirror_package_layout(
         executable=executable,
         snapshot_root=snapshot_root,
     )
@@ -6603,7 +6663,9 @@ def test_package_snapshot_does_not_mirror_ancestor_siblings(
         MODULE._remove_named_snapshot(
             snapshot_exec,
             snapshot_dir=snapshot_dir,
+            snapshot_dir_fd=snapshot_dir_fd,
         )
+        os.close(snapshot_dir_fd)
 
 
 def test_package_snapshot_mode_comes_from_retained_source_descriptor(
