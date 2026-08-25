@@ -12,7 +12,7 @@ Decision records own rationale; this directory contains generated graph read mod
 
 - Decisions: 137
 - Nodes: 1331
-- Edges: 3074
+- Edges: 3075
 
 ## Node Types
 
@@ -38,7 +38,7 @@ Decision records own rationale; this directory contains generated graph read mod
 - `NEXT_DECISION`: 136
 - `OWNED_BY_SURFACE`: 143
 - `OWNS_DECISION`: 137
-- `SUPERSEDED_BY`: 2
+- `SUPERSEDED_BY`: 3
 - `UNDER_MECHANIC_PARENT`: 143
 
 ## Boundary

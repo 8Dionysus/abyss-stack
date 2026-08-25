@@ -1,7 +1,7 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
   "decision_count": 137,
-  "edge_count": 3074,
+  "edge_count": 3075,
   "edge_type_counts": {
     "CITES_SOURCE_SURFACE": 1114,
     "DATED": 137,
@@ -12,7 +12,7 @@
     "NEXT_DECISION": 136,
     "OWNED_BY_SURFACE": 143,
     "OWNS_DECISION": 137,
-    "SUPERSEDED_BY": 2,
+    "SUPERSEDED_BY": 3,
     "UNDER_MECHANIC_PARENT": 143
   },
   "edges": [
@@ -13768,7 +13768,7 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0128",
-      "target": "status:accepted",
+      "target": "status:superseded",
       "type": "HAS_STATUS"
     },
     {
@@ -13795,6 +13795,11 @@
       "source": "decision:ABYSS-STACK-D-0128",
       "target": "owner_surface:mechanics/governed-execution/parts/external-codex-agent",
       "type": "OWNED_BY_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0128",
+      "target": "decision:ABYSS-STACK-D-0137",
+      "type": "SUPERSEDED_BY"
     },
     {
       "source": "decision:ABYSS-STACK-D-0128",
@@ -16907,8 +16912,8 @@
       "id": "decision:ABYSS-STACK-D-0128",
       "label": "ABYSS-STACK-D-0128",
       "path": "docs/decisions/ABYSS-STACK-D-0128-exact-runtime-subject-admission.md",
-      "posture": "accepted runtime rationale",
-      "status": "accepted",
+      "posture": "superseded historical runtime rationale",
+      "status": "superseded",
       "title": "ABYSS-STACK-D-0128 Exact Content-Addressed Runtime Subject Admission",
       "type": "decision"
     },
