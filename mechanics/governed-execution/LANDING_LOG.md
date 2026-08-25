@@ -1,5 +1,23 @@
 # Governed Execution Landing Log
 
+## 2026-08-25 - Declarative governed landing-effect grant ABI
+
+Recorded the source-only landing of the provider-neutral governed landing-effect
+grant ABI. The schema and fail-closed admission path bind exact Goal, holder,
+repository revision, branch or pull-request target, immutable pull-request head
+revision, effect set, independent reviewer identity, artifact bytes, expiry, and
+review-required return posture. Repository coordinates reject traversal
+components, and special-file, duplicate-member, digest, ref, size, and boundary
+time cases remain typed denials.
+
+The focused landing-effect suite passed 35 tests; the canonical repository-local
+KAG gate passed incremental drift, full parity, family contract, and
+compatibility assembly; and hosted Repo Validation passed on the synchronized
+branch. This is source/CI evidence only: the current runtime profile retains
+`external_effects=false` and the complete ten-effect forbidden closure, so no
+runtime activation, landing-effect execution, deployment, semantic/Goal verdict,
+or owner acceptance is claimed.
+
 ## 2026-08-13 - Stable external owner-request result identity
 
 Separated the cross-owner identity of an admitted `aoa-agents` execution
