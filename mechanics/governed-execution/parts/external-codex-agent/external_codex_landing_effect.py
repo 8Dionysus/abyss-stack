@@ -33,6 +33,15 @@ CAPABILITY_ID = "governed_git_landing_v1"
 ZERO_DIGEST = "sha256:" + "0" * 64
 MAX_GRANT_BYTES = 256 * 1024
 GIT_EXECUTABLE = "/usr/bin/git"
+GIT_REF_VALIDATION_ENV = {
+    "GIT_CONFIG_GLOBAL": os.devnull,
+    "GIT_CONFIG_NOSYSTEM": "1",
+    "GIT_CONFIG_SYSTEM": os.devnull,
+    "GIT_TERMINAL_PROMPT": "0",
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/usr/bin:/bin",
+}
 LANDING_EFFECTS = frozenset({"commit", "push", "pull_request", "merge"})
 RUNTIME_WIDE_FORBIDDEN_EFFECTS = frozenset(
     {
@@ -239,6 +248,7 @@ def _is_valid_git_ref(value: object) -> bool:
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             timeout=2,
+            env=GIT_REF_VALIDATION_ENV,
         )
     except (OSError, subprocess.TimeoutExpired):
         return False

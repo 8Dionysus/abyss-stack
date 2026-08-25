@@ -460,6 +460,17 @@ def test_git_ref_validation_ignores_ambient_path(tmp_path: Path, monkeypatch: py
     assert exc.value.code == "landing_effect_grant_target_invalid"
 
 
+def test_git_ref_validation_ignores_ambient_trace_destination(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    trace_path = tmp_path / "git-trace.json"
+    monkeypatch.setenv("GIT_TRACE2_EVENT", str(trace_path))
+
+    validate_landing_effect_grant(_grant())
+
+    assert not trace_path.exists()
+
+
 def test_absent_grant_is_default_denied() -> None:
     grant = _grant()
     request = _request(grant)
