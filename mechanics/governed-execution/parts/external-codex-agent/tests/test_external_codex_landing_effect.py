@@ -30,6 +30,7 @@ from external_codex_landing_effect import (  # noqa: E402
 
 AT = datetime(2026, 8, 24, 12, tzinfo=UTC)
 ZERO_DIGEST = "sha256:" + "0" * 64
+REF_DIGEST = "sha256:" + "1" * 64
 
 
 def _ref(owner: str, artifact: str, schema: str) -> dict[str, str]:
@@ -37,7 +38,7 @@ def _ref(owner: str, artifact: str, schema: str) -> dict[str, str]:
         "owner_repo": owner,
         "artifact_ref": artifact,
         "source_ref": "source-ref:landing-fixture",
-        "artifact_digest": ZERO_DIGEST,
+        "artifact_digest": REF_DIGEST,
         "schema_ref": "schemas/fixture.json",
         "schema_version": schema,
     }
@@ -223,6 +224,29 @@ def test_exact_grant_can_bind_a_pull_request_target() -> None:
 def test_repository_id_rejects_traversal_components(repository_id: str) -> None:
     grant = _grant()
     grant["repository"]["repository_id"] = repository_id
+    _refresh_semantic_digest(grant)
+
+    with pytest.raises(LandingEffectGrantError) as exc:
+        validate_landing_effect_grant(grant)
+    assert exc.value.code == "landing_effect_grant_schema_invalid"
+
+
+@pytest.mark.parametrize(
+    "ref_path",
+    [
+        ("goal_ref",),
+        ("holder_ref",),
+        ("review", "reviewer_ref"),
+        ("review", "evidence_ref"),
+        ("return_posture", "owner_ref"),
+    ],
+)
+def test_owner_references_reject_zero_digest(ref_path: tuple[str, ...]) -> None:
+    grant = _grant()
+    reference: dict[str, Any] = grant
+    for key in ref_path:
+        reference = reference[key]
+    reference["artifact_digest"] = ZERO_DIGEST
     _refresh_semantic_digest(grant)
 
     with pytest.raises(LandingEffectGrantError) as exc:

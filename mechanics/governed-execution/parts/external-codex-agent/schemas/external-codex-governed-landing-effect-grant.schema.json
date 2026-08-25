@@ -149,7 +149,11 @@
         "owner_repo": {"type": "string", "minLength": 1},
         "artifact_ref": {"type": "string", "minLength": 1},
         "source_ref": {"type": "string", "minLength": 1},
-        "artifact_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "artifact_digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "not": {"const": "sha256:0000000000000000000000000000000000000000000000000000000000000000"}
+        },
         "schema_ref": {"type": "string", "minLength": 1},
         "schema_version": {"type": "string", "minLength": 1}
       }
@@ -170,7 +174,11 @@
         "owner_repo": {"type": "string", "minLength": 1},
         "artifact_ref": {"type": "string", "minLength": 1},
         "source_ref": {"type": "string", "minLength": 1},
-        "artifact_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "artifact_digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "not": {"const": "sha256:0000000000000000000000000000000000000000000000000000000000000000"}
+        },
         "schema_ref": {"type": "string", "minLength": 1},
         "schema_version": {"type": "string", "minLength": 1},
         "incarnation_id": {"type": "string", "minLength": 1}
