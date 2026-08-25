@@ -134,6 +134,7 @@ MECHANIC_PART_REQUIRED_FILES = {
         "schemas/external-codex-resume.schema.json",
         "schemas/external-codex-review-preparation.schema.json",
         "schemas/external-codex-review-seed-envelope.schema.json",
+        "schemas/external-codex-review-state-seal.schema.json",
         "schemas/external-codex-runtime-profile.schema.json",
         "schemas/external-codex-state.schema.json",
         "schemas/external-codex-study-preparation.schema.json",

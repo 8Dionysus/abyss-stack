@@ -144,6 +144,9 @@
     "actor_delta_ref": {
       "oneOf": [{"type": "null"}, {"$ref": "#/$defs/evidenceRef"}]
     },
+    "review_seal_ref": {
+      "oneOf": [{"type": "null"}, {"$ref": "#/$defs/evidenceRef"}]
+    },
     "source_manifest_before_ref": {
       "oneOf": [{"type": "null"}, {"$ref": "#/$defs/evidenceRef"}]
     },

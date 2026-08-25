@@ -31,6 +31,62 @@
     "git_head": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
     "git_status_porcelain_sha256": {"$ref": "#/$defs/digest"},
     "git_diff_binary_sha256": {"$ref": "#/$defs/digest"},
+    "git_shallow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["present", "sha256", "entries", "identity"],
+      "properties": {
+        "present": {"type": "boolean"},
+        "sha256": {"oneOf": [{"$ref": "#/$defs/digest"}, {"type": "null"}]},
+        "entries": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^[0-9a-f]{40}$"}
+        },
+        "identity": {
+          "oneOf": [
+            {"type": "null"},
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["st_dev", "st_ino", "mode"],
+              "properties": {
+                "st_dev": {"type": "integer", "minimum": 0},
+                "st_ino": {"type": "integer", "minimum": 0},
+                "mode": {"type": "integer", "minimum": 0}
+              }
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {"present": {"const": false}},
+            "required": ["present"]
+          },
+          "then": {
+            "properties": {
+              "sha256": {"const": null},
+              "entries": {"const": []},
+              "identity": {"const": null}
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {"present": {"const": true}},
+            "required": ["present"]
+          },
+          "then": {
+            "properties": {
+              "sha256": {"$ref": "#/$defs/digest"},
+              "identity": {"type": "object"}
+            }
+          }
+        }
+      ]
+    },
     "status_entries": {
       "type": "array",
       "items": {

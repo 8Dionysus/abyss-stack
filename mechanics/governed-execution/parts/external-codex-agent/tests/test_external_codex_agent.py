@@ -3852,6 +3852,10 @@ def test_preflight_exercises_masked_nested_codex_sandbox(
         and command[index + 1].startswith("permissions.aoa_external_actor=")
     )
     assert f'"{fixture["launch"]["codex_executable"]}"="read"' in permission_override
+    assert (
+        f'"{RUNTIME.RUNTIME_PACKAGE_EXECUTION_ROOT}"="read"'
+        in permission_override
+    )
     assert '":workspace_roots"="write"' in permission_override
     assert protected_mountpoints == (".agents", ".codex", ".git")
     assert actor_git_mask["masks"]
@@ -4186,6 +4190,10 @@ def test_preflight_and_separate_process_return_structured_result(
     )
     assert f'"{sanitized_config}"="read"' in permission_override
     assert f'"{fixture["launch"]["codex_executable"]}"="read"' in permission_override
+    assert (
+        f'"{RUNTIME.RUNTIME_PACKAGE_EXECUTION_ROOT}"="read"'
+        in permission_override
+    )
     assert '":workspace_roots"="read"' in permission_override
     assert str(execution_root) not in permission_override
     assert '":minimal"="read"' in permission_override
@@ -5640,6 +5648,7 @@ def test_reviewer_preparation_forwards_exact_writer_evidence_without_starting(
         "review-workspace-manifest",
         "writer-actor-final-manifest",
         "writer-actor-delta",
+        "writer-review-state-seal",
     }
     assert task["task_family"] == "landing_review"
     assert task["review_required"] is False
@@ -8433,7 +8442,10 @@ def test_nested_evidence_namespace_closes_exact_producer_graph(
             "writer-report",
             Path(str(result["report_ref"]["artifact_ref"])),
         ),
-        review_input("writer-delta", session / "actor-delta.json"),
+        review_input(
+            "writer-delta",
+            Path(str(result["actor_delta_ref"]["artifact_ref"])),
+        ),
         review_input(
             "writer-fixture-readme",
             Path(str(upstream_readme["path"])),
@@ -8547,15 +8559,12 @@ def test_nested_evidence_namespace_closes_exact_producer_graph(
 
     producer_readme = Path(str(result["actor_projection_path"])) / "README.md"
     producer_readme.write_text("drift after producer result\n", encoding="utf-8")
-    with pytest.raises(
-        RUNTIME.NestedEvidenceNamespaceError,
-        match="producer source bytes drifted",
-    ):
-        RUNTIME.build_nested_evidence_namespace(
-            review_task_id="task:nested-evidence-review",
-            review_task_digest=review_task_digest,
-            immutable_inputs=inputs,
-        )
+    replayed_namespace = RUNTIME.build_nested_evidence_namespace(
+        review_task_id="task:nested-evidence-review",
+        review_task_digest=review_task_digest,
+        immutable_inputs=inputs,
+    )
+    assert replayed_namespace == namespace
 
 
 @pytest.mark.parametrize(
@@ -8623,7 +8632,10 @@ def test_nested_evidence_namespace_preserves_all_runtime_manifest_anchors(
             "writer-report",
             Path(str(result["report_ref"]["artifact_ref"])),
         ),
-        review_input("writer-delta", session / "actor-delta.json"),
+        review_input(
+            "writer-delta",
+            Path(str(result["actor_delta_ref"]["artifact_ref"])),
+        ),
     ]
     if workspace_write:
         inputs.append(
@@ -8719,7 +8731,7 @@ def test_independent_review_materializes_nested_evidence_before_inference(
             ),
             forwarded(
                 "writer-delta",
-                writer_session / "actor-delta.json",
+                Path(str(writer_result["actor_delta_ref"]["artifact_ref"])),
                 "abyss_stack_external_codex_actor_delta_v1",
             ),
             forwarded(
@@ -13037,6 +13049,20 @@ def test_a2a_export_requires_exact_independent_review_result(
         ),
         schema_version="abyss_stack_external_codex_actor_delta_v1",
     )
+    writer_review_seal_path = Path(
+        str(writer_result["review_seal_ref"]["artifact_ref"])
+    )
+    writer_review_seal_ref = _provenance(
+        "abyss-stack",
+        "runtime-results/fixture-writer-review-state-seal.json",
+        digest=_digest_path(writer_review_seal_path),
+        source_ref=str(writer_result["thread_id"]),
+        schema_ref=(
+            "mechanics/governed-execution/parts/external-codex-agent/schemas/"
+            "external-codex-review-state-seal.schema.json"
+        ),
+        schema_version="abyss_stack_external_codex_review_state_seal_v1",
+    )
     reviewer_actor_inputs = (
         (
             "writer-actor-final-manifest",
@@ -13044,6 +13070,11 @@ def test_a2a_export_requires_exact_independent_review_result(
             writer_actor_final_ref,
         ),
         ("writer-actor-delta", writer_actor_delta_path, writer_actor_delta_ref),
+        (
+            "writer-review-state-seal",
+            writer_review_seal_path,
+            writer_review_seal_ref,
+        ),
     )
     reviewer = _fixture(
         tmp_path / "reviewer",

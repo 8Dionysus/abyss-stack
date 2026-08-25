@@ -196,6 +196,22 @@ source manifests, and final pathname identity form the current race boundary.
 A new immutable closeout run and independent review remain required before
 comparison or fit work resumes.
 
+The private-Git and review-seed boundary is now narrower: a legitimate shallow
+source carries only necessary source-authored commit boundaries into the
+isolated repository, and strict full fsck remains the authority check. Clean
+terminal actor state is sealed content-addressedly while the writer lock still
+binds the result and manifest; later seed issuance and reviewer materialization
+consume that seal, not a mutable writer projection. The storage tradeoff is an
+exact actor-tree snapshot limited to the runtime-owned projection, with shared
+content-addressed objects within each seal. `projection_bytes` reports all
+regular-file bytes while `storage_bytes` reports unique object bytes; seal JSON,
+directory, and symlink metadata remain bounded overhead. The owner still needs
+independent runtime-integrity review before landing or activation. Rollback is
+fail-closed
+seed rejection and holder re-entry; an owned incomplete seal may be recovered,
+while a published valid seal is retained as evidence and no release, pointer,
+service, or source checkout is mutated by this route.
+
 The first admitted real-work landing wake exposed a narrower A2A continuation
 gap: a same-thread instruction could name later evidence, but a read-only
 reviewer correctly refused to trust bytes absent from its immutable projection.
