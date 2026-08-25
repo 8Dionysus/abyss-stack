@@ -5,7 +5,7 @@ import json
 import os
 import sys
 from copy import deepcopy
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -250,6 +250,22 @@ def test_reviewer_identity_must_differ_from_holder() -> None:
     assert exc.value.code == "landing_effect_grant_review_invalid"
 
 
+def test_reviewer_stable_identity_cannot_be_versioned_away() -> None:
+    grant = _grant()
+    grant["review"]["reviewer_ref"] = _ref(
+        grant["holder_ref"]["owner_repo"],
+        grant["holder_ref"]["artifact_ref"],
+        "reviewer-v2",
+    )
+    grant["review"]["reviewer_ref"]["source_ref"] = "source-ref:reviewer-v2"
+    grant["review"]["reviewer_ref"]["artifact_digest"] = "sha256:" + "1" * 64
+    _refresh_semantic_digest(grant)
+
+    with pytest.raises(LandingEffectGrantError) as exc:
+        validate_landing_effect_grant(grant)
+    assert exc.value.code == "landing_effect_grant_review_invalid"
+
+
 def test_duplicate_artifact_members_are_rejected() -> None:
     grant = _grant()
     raw = _raw(grant).replace(
@@ -453,6 +469,22 @@ def test_boundary_timestamp_overflow_is_a_typed_time_denial() -> None:
 
     with pytest.raises(LandingEffectGrantError) as exc:
         validate_landing_effect_grant(grant)
+    assert exc.value.code == "landing_effect_grant_time_invalid"
+
+
+def test_admission_time_overflow_is_a_typed_time_denial() -> None:
+    grant = _grant()
+    raw = _raw(grant)
+    boundary = datetime(1, 1, 1, tzinfo=timezone(timedelta(hours=14)))
+
+    with pytest.raises(LandingEffectGrantError) as exc:
+        admit_landing_effect_grant(
+            grant,
+            _request(grant),
+            grant_raw=raw,
+            expected_artifact_digest=_raw_digest(raw),
+            at=boundary,
+        )
     assert exc.value.code == "landing_effect_grant_time_invalid"
 
 

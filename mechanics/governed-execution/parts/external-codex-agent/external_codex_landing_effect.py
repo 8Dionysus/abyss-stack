@@ -150,7 +150,13 @@ def _now(value: datetime | None) -> datetime:
         raise LandingEffectGrantError(
             "landing_effect_grant_time_invalid", "admission time has no timezone"
         )
-    return value.astimezone(UTC)
+    try:
+        return value.astimezone(UTC)
+    except OverflowError as exc:
+        raise LandingEffectGrantError(
+            "landing_effect_grant_time_invalid",
+            "admission time is outside the UTC datetime range",
+        ) from exc
 
 
 def _schema_errors(grant: Mapping[str, Any]) -> list[str]:
@@ -303,12 +309,15 @@ def validate_landing_effect_grant(grant: Mapping[str, Any]) -> dict[str, Any]:
         raise LandingEffectGrantError(
             "landing_effect_grant_review_invalid", "landing effects require independent review"
         )
-    holder_identity = {
-        key: value
-        for key, value in copied["holder_ref"].items()
-        if key != "incarnation_id"
-    }
-    if _same_json(holder_identity, copied["review"]["reviewer_ref"]):
+    holder_identity = (
+        copied["holder_ref"]["owner_repo"],
+        copied["holder_ref"]["artifact_ref"],
+    )
+    reviewer_identity = (
+        copied["review"]["reviewer_ref"]["owner_repo"],
+        copied["review"]["reviewer_ref"]["artifact_ref"],
+    )
+    if holder_identity == reviewer_identity:
         raise LandingEffectGrantError(
             "landing_effect_grant_review_invalid",
             "reviewer identity must differ from holder identity",
