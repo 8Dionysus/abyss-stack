@@ -13,6 +13,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import stat
+import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Mapping
@@ -28,6 +31,7 @@ SCHEMA_PATH = (
 SCHEMA_VERSION = "abyss_stack_external_codex_governed_landing_effect_grant_v1"
 CAPABILITY_ID = "governed_git_landing_v1"
 ZERO_DIGEST = "sha256:" + "0" * 64
+MAX_GRANT_BYTES = 256 * 1024
 LANDING_EFFECTS = frozenset({"commit", "push", "pull_request", "merge"})
 RUNTIME_WIDE_FORBIDDEN_EFFECTS = frozenset(
     {
@@ -66,6 +70,27 @@ def _canonical_bytes(value: object) -> bytes:
 
 def _digest_bytes(raw: bytes) -> str:
     return "sha256:" + hashlib.sha256(raw).hexdigest()
+
+
+def _reject_duplicate_json_keys(
+    pairs: list[tuple[str, Any]],
+) -> dict[str, Any]:
+    parsed: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in parsed:
+            raise LandingEffectGrantError(
+                "landing_effect_grant_duplicate_key",
+                f"grant artifact contains duplicate JSON member: {key}",
+            )
+        parsed[key] = value
+    return parsed
+
+
+def _parse_json_bytes(raw: bytes) -> object:
+    return json.loads(
+        raw.decode("utf-8"),
+        object_pairs_hook=_reject_duplicate_json_keys,
+    )
 
 
 def _copy_json(value: Mapping[str, Any]) -> dict[str, Any]:
@@ -136,6 +161,90 @@ def _schema_errors(grant: Mapping[str, Any]) -> list[str]:
     )
 
 
+def _is_valid_git_ref(value: object) -> bool:
+    if not isinstance(value, str):
+        return False
+    try:
+        result = subprocess.run(
+            ["git", "check-ref-format", value],
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=2,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return result.returncode == 0
+
+
+def _validate_target_refs(grant: Mapping[str, Any]) -> None:
+    target = grant["target"]
+    ref_fields = (
+        ("target.branch", "branch"),
+    ) if target["kind"] == "branch" else (
+        ("target.base_branch", "base_branch"),
+        ("target.head_branch", "head_branch"),
+    )
+    for label, field in ref_fields:
+        if not _is_valid_git_ref(target[field]):
+            raise LandingEffectGrantError(
+                "landing_effect_grant_target_invalid",
+                f"{label} is not a valid Git ref",
+            )
+
+
+def _read_grant_bytes(grant_path: Path) -> bytes:
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        descriptor = os.open(grant_path, flags)
+    except OSError as exc:
+        raise LandingEffectGrantError(
+            "landing_effect_grant_unavailable",
+            "grant path could not be opened as a regular file",
+        ) from exc
+    try:
+        try:
+            metadata = os.fstat(descriptor)
+        except OSError as exc:
+            raise LandingEffectGrantError(
+                "landing_effect_grant_unavailable",
+                "grant descriptor could not be inspected",
+            ) from exc
+        if not stat.S_ISREG(metadata.st_mode):
+            raise LandingEffectGrantError(
+                "landing_effect_grant_unavailable",
+                "grant descriptor is not a regular file",
+            )
+        if metadata.st_size > MAX_GRANT_BYTES:
+            raise LandingEffectGrantError(
+                "landing_effect_grant_too_large",
+                "grant artifact exceeds the bounded admission size",
+            )
+        chunks = bytearray()
+        while len(chunks) <= MAX_GRANT_BYTES:
+            try:
+                chunk = os.read(
+                    descriptor,
+                    min(64 * 1024, MAX_GRANT_BYTES + 1 - len(chunks)),
+                )
+            except OSError as exc:
+                raise LandingEffectGrantError(
+                    "landing_effect_grant_unavailable",
+                    "grant bytes could not be read from the opened descriptor",
+                ) from exc
+            if not chunk:
+                break
+            chunks.extend(chunk)
+            if len(chunks) > MAX_GRANT_BYTES:
+                raise LandingEffectGrantError(
+                    "landing_effect_grant_too_large",
+                    "grant artifact exceeds the bounded admission size",
+                )
+        return bytes(chunks)
+    finally:
+        os.close(descriptor)
+
+
 def validate_landing_effect_grant(grant: Mapping[str, Any]) -> dict[str, Any]:
     """Validate and copy a grant document without admitting its scope."""
 
@@ -173,6 +282,7 @@ def validate_landing_effect_grant(grant: Mapping[str, Any]) -> dict[str, Any]:
         raise LandingEffectGrantError(
             "landing_effect_grant_ref_invalid", "grant_ref schema coordinate is not exact"
         )
+    _validate_target_refs(copied)
     if grant_ref["artifact_digest"] != _semantic_grant_digest(copied):
         raise LandingEffectGrantError(
             "landing_effect_grant_ref_invalid",
@@ -200,18 +310,23 @@ def load_landing_effect_grant(
     *,
     expected_digest: str | None = None,
 ) -> tuple[dict[str, Any], bytes]:
-    """Load one exact regular-file grant and verify its artifact identity."""
+    """Load one exact descriptor-bound grant and verify its byte identity."""
 
     grant_path = Path(path)
-    if not grant_path.is_absolute() or grant_path.is_symlink() or not grant_path.is_file():
+    if not grant_path.is_absolute():
         raise LandingEffectGrantError(
             "landing_effect_grant_unavailable",
-            "grant path must be an absolute regular non-symlink file",
+            "grant path must be absolute",
+        )
+    if expected_digest is None:
+        raise LandingEffectGrantError(
+            "landing_effect_grant_artifact_unbound",
+            "loading a grant requires an independent expected artifact digest",
         )
     try:
-        raw = grant_path.read_bytes()
-        value = json.loads(raw.decode("utf-8"))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raw = _read_grant_bytes(grant_path)
+        value = _parse_json_bytes(raw)
+    except (UnicodeDecodeError, json.JSONDecodeError, RecursionError) as exc:
         raise LandingEffectGrantError(
             "landing_effect_grant_unavailable", "grant bytes are not readable JSON"
         ) from exc
@@ -221,10 +336,7 @@ def load_landing_effect_grant(
         )
     grant = validate_landing_effect_grant(value)
     actual_digest = _digest_bytes(raw)
-    if expected_digest is not None and expected_digest not in {
-        actual_digest,
-        grant["grant_ref"]["artifact_digest"],
-    }:
+    if expected_digest != actual_digest:
         raise LandingEffectGrantError(
             "landing_effect_grant_artifact_drift",
             "grant bytes differ from the expected artifact digest",
@@ -308,8 +420,8 @@ def admit_landing_effect_grant(
             "exact grant admission requires the owner artifact bytes",
         )
     try:
-        parsed = json.loads(grant_raw.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        parsed = _parse_json_bytes(grant_raw)
+    except (UnicodeDecodeError, json.JSONDecodeError, RecursionError) as exc:
         raise LandingEffectGrantError(
             "landing_effect_grant_artifact_invalid", "grant artifact is not UTF-8 JSON"
         ) from exc
@@ -320,10 +432,12 @@ def admit_landing_effect_grant(
         )
     actual_digest = _digest_bytes(grant_raw)
     semantic_digest = admitted["grant_ref"]["artifact_digest"]
-    if expected_artifact_digest is not None and expected_artifact_digest not in {
-        actual_digest,
-        semantic_digest,
-    }:
+    if expected_artifact_digest is None:
+        raise LandingEffectGrantError(
+            "landing_effect_grant_artifact_unbound",
+            "exact grant admission requires an independent expected artifact digest",
+        )
+    if expected_artifact_digest != actual_digest:
         raise LandingEffectGrantError(
             "landing_effect_grant_artifact_drift",
             "grant artifact differs from the expected digest",

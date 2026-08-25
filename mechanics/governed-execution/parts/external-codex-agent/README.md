@@ -171,10 +171,14 @@ and replay only through their matching legacy wake reservation. A retry after a 
   `schemas/external-codex-governed-landing-effect-grant.schema.json`. Exact
   admission binds Goal, holder/incarnation, repository revision, branch or
   pull-request target, an exact landing-effect set, independent review, and
-  reviewed return posture. Missing, stale, wider, contradictory, or
-  artifact-drifted grants fail closed. This is an owner-qualified admission
-  seam only: current profiles keep all external effects disabled and the
-  command observer's ten-effect forbidden closure unchanged;
+  reviewed return posture. Branch targets may bind only commit and push;
+  pull-request and merge effects require exact pull-request coordinates. The
+  owner must also supply the exact artifact-byte digest independently of the
+  grant's semantic self-digest. Missing, stale, wider, contradictory,
+  duplicate-member, invalid-ref, oversized, or artifact-drifted grants fail
+  closed. This is an owner-qualified admission seam only: current profiles
+  keep all external effects disabled and the command observer's ten-effect
+  forbidden closure unchanged;
 - keeps the SDK `summon-request-v4` as the typed active
   `AgentIncarnationBinding.task_request_ref`, while binding the richer
   runtime-owner task separately as an exact snapshot/continuation-pinned

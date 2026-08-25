@@ -726,17 +726,21 @@ these exact relations in one document:
 
 - `goal_ref` and `holder_ref`, including the holder's exact incarnation;
 - `repository.repository_id` and its exact `revision`;
-- either one exact branch target or one exact pull-request target;
-- an exact set drawn only from `commit`, `push`, `pull_request`, and `merge`;
+- either one exact branch target (which may bind only `commit` and `push`) or
+  one exact pull-request target (which may bind the full landing effect set);
+- an exact set drawn only from `commit`, `push`, `pull_request`, and `merge`,
+  with pull-request and merge effects requiring the pull-request target
+  coordinates;
 - an independent-review binding whose status is approved; and
 - a `return_posture` with the exact return owner, route, review-required status,
   and wake condition.
 
 `grant_ref.artifact_digest` is the canonical semantic grant digest computed
 with that one self-referential digest field set to the zero digest. Admission
-also requires the exact grant artifact bytes and may bind an external byte
-digest when a controller has one. This keeps the grant identity content-bound
-without inventing a hash fixed point.
+also requires the exact grant artifact bytes and an independently supplied
+digest of those exact bytes; the semantic digest alone cannot authorize an
+artifact. Loading uses one bounded `O_NOFOLLOW` descriptor, rejects duplicate
+JSON members, and validates the complete Git ref grammar before admission.
 
 `admit_landing_effect_grant` is fail-closed: absent, malformed, stale,
 future-dated, review-pending, artifact-drifted, contradictory, narrower, or

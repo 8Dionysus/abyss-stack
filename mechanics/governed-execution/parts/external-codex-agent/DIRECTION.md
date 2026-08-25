@@ -21,11 +21,14 @@ The provider-neutral governed landing-effect ABI now gives a future owner
 executor one exact, expiring grant shape for commit, push, pull-request, or
 merge duties. The grant repeats the exact Goal, holder/incarnation,
 repository/revision, branch or pull-request target, effect set, independent
-review, and reviewed return posture. Its admission rejects absent, stale,
-wider, contradictory, and drifted artifacts. It is intentionally declarative:
-the current runtime profile still has `external_effects=false`, and command
-classification still retains all ten forbidden effects, so this ABI does not
-perform or enable a landing effect.
+review, and reviewed return posture. Branch targets can bind only commit and
+push; pull-request and merge duties require exact pull-request coordinates
+and an independently supplied digest of the exact artifact bytes. Admission
+also rejects absent, stale, wider, contradictory, duplicate-member,
+invalid-ref, oversized, and drifted artifacts. It is intentionally
+declarative: the current runtime profile still has `external_effects=false`,
+and command classification still retains all ten forbidden effects, so this
+ABI does not perform or enable a landing effect.
 
 The initial write ABI now keeps separate model-neutral aliases for landing and
 structured owner-duty canaries. This preserves exact realization binding while

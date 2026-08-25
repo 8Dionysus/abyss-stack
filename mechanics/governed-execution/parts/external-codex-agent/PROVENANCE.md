@@ -119,9 +119,13 @@ The governed landing-effect grant is a separate runtime-owned ABI, not a
 replacement for the stronger Goal, holder, repository, review, or return
 owners. Its semantic self-digest binds the exact grant document, while
 admission compares every scope member structurally against an explicit
-request. The runtime keeps the grant path and bytes outside model-issued
-command authority; the current profile and command observer remain
-external-effect-free even after a grant is descriptively admitted.
+request and requires an independently supplied digest of the exact artifact
+bytes. Branch targets are limited to commit and push; pull-request and merge
+effects require exact pull-request coordinates. Descriptor-bound bounded
+loading rejects path races, duplicate JSON members, invalid Git refs, and
+oversized artifacts. The runtime keeps the grant path and bytes outside
+model-issued command authority; the current profile and command observer
+remain external-effect-free even after a grant is descriptively admitted.
 
 The live Codex bundled model catalog and executable digest are currentness
 checks, not replacements for `aoa-models`. Runtime receipts are execution

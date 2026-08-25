@@ -108,6 +108,26 @@
     "issued_at": {"type": "string", "format": "date-time"},
     "expires_at": {"type": "string", "format": "date-time"}
   },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "target": {
+            "properties": {"kind": {"const": "branch"}}
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "allowed_effects": {
+            "not": {
+              "contains": {"enum": ["pull_request", "merge"]}
+            }
+          }
+        }
+      }
+    }
+  ],
   "$defs": {
     "ownerRef": {
       "type": "object",
@@ -153,6 +173,7 @@
     },
     "branch": {
       "type": "string",
+      "maxLength": 1024,
       "pattern": "^refs/heads/(?!\\.\\.?$)[A-Za-z0-9._/-]+$"
     },
     "revision": {
