@@ -1312,8 +1312,53 @@ def test_load_manifest_rejects_unexpected_incarnation_home_link(
     (tmp_path / "replacement.json").write_text("{}", encoding="utf-8")
 
     with pytest.raises(
-        MODULE.IncarnationHomeError, match="unexpected incarnation-home link"
+        MODULE.IncarnationHomeError, match="actor-local runtime entry is a link"
     ):
+        MODULE._load_manifest(manifest_path)
+
+
+def test_prepare_home_rejects_actor_local_hard_link(tmp_path: Path) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    ambient_state = ambient / "goals_1.sqlite"
+    ambient_state.write_bytes(b"ambient")
+    realization = _realization(tmp_path / "realization.json")
+    manifest = MODULE.prepare_home(
+        ambient_home=ambient,
+        realization_path=realization,
+        runtime_root=runtime_root,
+    )
+    os.link(ambient_state, Path(manifest["codex_home"]) / "goals_1.sqlite")
+
+    with pytest.raises(MODULE.IncarnationHomeError, match="multiply linked"):
+        MODULE.prepare_home(
+            ambient_home=ambient,
+            realization_path=realization,
+            runtime_root=runtime_root,
+        )
+
+
+def test_load_manifest_rejects_nested_actor_local_link(tmp_path: Path) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    manifest = MODULE.prepare_home(
+        ambient_home=ambient,
+        realization_path=_realization(tmp_path / "realization.json"),
+        runtime_root=runtime_root,
+    )
+    actor_home = Path(manifest["codex_home"])
+    manifest_path = actor_home.parent / "incarnation-home.json"
+    plugin_state = actor_home / "plugins"
+    plugin_state.mkdir()
+    (plugin_state / "ambient-control").symlink_to(ambient / "config.toml")
+
+    with pytest.raises(MODULE.IncarnationHomeError, match="actor-local runtime entry is a link"):
         MODULE._load_manifest(manifest_path)
 
 
