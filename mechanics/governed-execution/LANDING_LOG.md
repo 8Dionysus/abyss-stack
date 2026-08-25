@@ -11,8 +11,8 @@ components, and special-file, duplicate-member, digest, ref, size, and boundary
 time cases remain typed denials.
 
 The focused landing-effect suite (`test_external_codex_landing_effect.py`)
-collected and passed 44 tests on source repair commit `eaca7e02741888b85eb1dc232cd3c5c168635b95`
-(33 test functions, three existing three-case parametrizations, and one
+collected and passed 46 tests on source repair commit `a4761058bb846a6016cb5286d387b7180e778566`
+(35 test functions, three existing three-case parametrizations, and one
 five-case owner-reference parametrization). The canonical repository-local KAG
 gate passed incremental drift, full parity, family contract, and compatibility
 assembly; and hosted Repo Validation passed on the synchronized branch. This is
