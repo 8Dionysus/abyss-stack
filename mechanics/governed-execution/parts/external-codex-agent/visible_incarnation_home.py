@@ -5158,6 +5158,7 @@ def _load_manifest_snapshot(
         local = codex_home / name
         if local.is_symlink() or not local.is_dir():
             raise IncarnationHomeError(f"actor-local {name} is not a real directory")
+        _validate_isolated_actor_local_entry(local, name)
     return manifest, raw, sha256_bytes(raw)
 
 

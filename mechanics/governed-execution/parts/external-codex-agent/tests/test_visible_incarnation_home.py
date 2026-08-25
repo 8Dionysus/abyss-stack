@@ -1362,6 +1362,25 @@ def test_load_manifest_rejects_nested_actor_local_link(tmp_path: Path) -> None:
         MODULE._load_manifest(manifest_path)
 
 
+def test_load_manifest_rejects_nested_builtin_local_link(tmp_path: Path) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    manifest = MODULE.prepare_home(
+        ambient_home=ambient,
+        realization_path=_realization(tmp_path / "realization.json"),
+        runtime_root=runtime_root,
+    )
+    actor_home = Path(manifest["codex_home"])
+    manifest_path = actor_home.parent / "incarnation-home.json"
+    (actor_home / "cache" / "ambient-control").symlink_to(ambient / "config.toml")
+
+    with pytest.raises(MODULE.IncarnationHomeError, match="actor-local runtime entry is a link"):
+        MODULE._load_manifest(manifest_path)
+
+
 def test_executable_version_must_match_realization_runtime(tmp_path: Path) -> None:
     executable = tmp_path / "codex"
     executable.write_text(
