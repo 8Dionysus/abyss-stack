@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 30166495,
+  "allowed_tracked_bytes": 38366929,
+  "approved_by": "repository-owner",
+  "base_ref": "efa14a2c0cbd4ab2d3b4044f851742f323f27c96",
+  "changed_generated_bytes": 30166495,
+  "changed_generated_files": 329,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "42be0659584197e903738b9786069a7906a3456e96332b8236cc43823cc1d97f",
+  "reason": "Refresh the portable family for the bounded visible-home receipt-schema binding repair; preserve standing generated-family budgets.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 38366929,
+  "tracked_bytes_max": 24117248
+}

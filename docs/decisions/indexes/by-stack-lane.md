@@ -311,6 +311,7 @@
 - [ABYSS-STACK-D-0133 Owner-Bound External Goal Pause](../ABYSS-STACK-D-0133-owner-bound-external-goal-pause.md) (`docs/decisions/ABYSS-STACK-D-0133-owner-bound-external-goal-pause.md`)
 - [ABYSS-STACK-D-0134 Generic Responsibility-Movement Observation](../ABYSS-STACK-D-0134-generic-responsibility-movement-observation.md) (`docs/decisions/ABYSS-STACK-D-0134-generic-responsibility-movement-observation.md`)
 - [ABYSS-STACK-D-0135 Typed Incarnation Capability Projection](../ABYSS-STACK-D-0135-typed-incarnation-capability-projection.md) (`docs/decisions/ABYSS-STACK-D-0135-typed-incarnation-capability-projection.md`)
+- [ABYSS-STACK-D-0137 Holder-Local Incarnation Mutable State](../ABYSS-STACK-D-0137-holder-local-incarnation-mutable-state.md) (`docs/decisions/ABYSS-STACK-D-0137-holder-local-incarnation-mutable-state.md`)
 
 ## human review
 
@@ -408,6 +409,7 @@
 - [ABYSS-STACK-D-0133 Owner-Bound External Goal Pause](../ABYSS-STACK-D-0133-owner-bound-external-goal-pause.md) (`docs/decisions/ABYSS-STACK-D-0133-owner-bound-external-goal-pause.md`)
 - [ABYSS-STACK-D-0134 Generic Responsibility-Movement Observation](../ABYSS-STACK-D-0134-generic-responsibility-movement-observation.md) (`docs/decisions/ABYSS-STACK-D-0134-generic-responsibility-movement-observation.md`)
 - [ABYSS-STACK-D-0135 Typed Incarnation Capability Projection](../ABYSS-STACK-D-0135-typed-incarnation-capability-projection.md) (`docs/decisions/ABYSS-STACK-D-0135-typed-incarnation-capability-projection.md`)
+- [ABYSS-STACK-D-0137 Holder-Local Incarnation Mutable State](../ABYSS-STACK-D-0137-holder-local-incarnation-mutable-state.md) (`docs/decisions/ABYSS-STACK-D-0137-holder-local-incarnation-mutable-state.md`)
 
 ## runtime access plane
 
@@ -483,6 +485,7 @@
 - [ABYSS-STACK-D-0133 Owner-Bound External Goal Pause](../ABYSS-STACK-D-0133-owner-bound-external-goal-pause.md) (`docs/decisions/ABYSS-STACK-D-0133-owner-bound-external-goal-pause.md`)
 - [ABYSS-STACK-D-0134 Generic Responsibility-Movement Observation](../ABYSS-STACK-D-0134-generic-responsibility-movement-observation.md) (`docs/decisions/ABYSS-STACK-D-0134-generic-responsibility-movement-observation.md`)
 - [ABYSS-STACK-D-0135 Typed Incarnation Capability Projection](../ABYSS-STACK-D-0135-typed-incarnation-capability-projection.md) (`docs/decisions/ABYSS-STACK-D-0135-typed-incarnation-capability-projection.md`)
+- [ABYSS-STACK-D-0137 Holder-Local Incarnation Mutable State](../ABYSS-STACK-D-0137-holder-local-incarnation-mutable-state.md) (`docs/decisions/ABYSS-STACK-D-0137-holder-local-incarnation-mutable-state.md`)
 
 ## validation lane
 

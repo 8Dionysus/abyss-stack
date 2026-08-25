@@ -25,7 +25,12 @@
   ],
   "properties": {
     "$schema": {"const": "schemas/external-codex-incarnation-home.schema.json"},
-    "schema_version": {"const": "abyss_stack_codex_incarnation_home_v2"},
+    "schema_version": {
+      "enum": [
+        "abyss_stack_codex_incarnation_home_v2",
+        "abyss_stack_codex_incarnation_home_v3"
+      ]
+    },
     "model_realization_id": {"type": "string", "minLength": 1},
     "model_realization_ref": {"$ref": "#/$defs/absolutePath"},
     "configuration_fingerprint": {"$ref": "#/$defs/digest"},
@@ -36,11 +41,23 @@
     "ambient_home_identity": {"$ref": "#/$defs/digest"},
     "runtime_root": {"$ref": "#/$defs/absolutePath"},
     "codex_home": {"$ref": "#/$defs/absolutePath"},
+    "holder_binding": {"$ref": "#/$defs/holderBinding"},
+    "migration_source_manifest_digest": {"$ref": "#/$defs/digest"},
     "config_digest": {"$ref": "#/$defs/digest"},
     "shared_state_names": {
       "type": "array",
       "uniqueItems": true,
       "items": {"$ref": "#/$defs/name"}
+    },
+    "actor_local_state_names": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/name"}
+    },
+    "denied_state_provenance": {
+      "type": "object",
+      "propertyNames": {"$ref": "#/$defs/name"},
+      "additionalProperties": {"$ref": "#/$defs/deniedStateProvenance"}
     },
     "capability_projection": {"$ref": "#/$defs/capabilityProjection"},
     "top_level_posture": {"const": "incarnation-home"},
@@ -53,6 +70,74 @@
       "type": "string",
       "pattern": "^(?!\\.\\.?$)[^/]+$",
       "minLength": 1
+    },
+    "holderBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "binding_digest",
+        "coordinate",
+        "goal_ref",
+        "actor_ref",
+        "incarnation_ref",
+        "session_ref",
+        "runtime_state_root",
+        "closeout_route",
+        "holder_ref",
+        "task_ref",
+        "run_ref"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "abyss_stack_visible_incarnation_holder_binding_context_v1"
+        },
+        "binding_digest": {"$ref": "#/$defs/digest"},
+        "coordinate": {"$ref": "#/$defs/digest"},
+        "goal_ref": {"type": "string", "minLength": 1},
+        "actor_ref": {"type": "string", "minLength": 1},
+        "incarnation_ref": {"type": "string", "minLength": 1},
+        "session_ref": {"type": "string", "minLength": 1},
+        "runtime_state_root": {"$ref": "#/$defs/absolutePath"},
+        "closeout_route": {"$ref": "#/$defs/absolutePath"},
+        "holder_ref": {"type": "string", "minLength": 1},
+        "task_ref": {"type": "string", "minLength": 1},
+        "run_ref": {"type": "string", "minLength": 1}
+      }
+    },
+    "deniedStateProvenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ambient_entry", "local_tree_digest"],
+      "properties": {
+        "ambient_entry": {
+          "anyOf": [
+            {"type": "null"},
+            {"$ref": "#/$defs/inodeIdentity"}
+          ]
+        },
+        "local_tree_digest": {
+          "anyOf": [
+            {"type": "null"},
+            {"$ref": "#/$defs/digest"}
+          ]
+        },
+        "local_tree_content_digest": {
+          "anyOf": [
+            {"type": "null"},
+            {"$ref": "#/$defs/digest"}
+          ]
+        }
+      }
+    },
+    "inodeIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["device", "inode"],
+      "properties": {
+        "device": {"type": "integer", "minimum": 0},
+        "inode": {"type": "integer", "minimum": 1}
+      }
     },
     "capabilityProjection": {
       "type": "object",
@@ -231,5 +316,30 @@
         "sha256": {"$ref": "#/$defs/digest"}
       }
     }
-  }
+  },
+  "oneOf": [
+    {
+      "title": "Current typed v3 incarnation home",
+      "properties": {
+        "schema_version": {
+          "const": "abyss_stack_codex_incarnation_home_v3"
+        }
+      },
+      "required": [
+        "holder_binding",
+        "actor_local_state_names",
+        "denied_state_provenance"
+      ]
+    },
+    {
+      "title": "Readable and migration-only legacy v2 incarnation home",
+      "description": "This shape is schema-valid for compatibility reads and preparation migration only; canonical launch admission rejects every v2 manifest.",
+      "properties": {
+        "schema_version": {
+          "const": "abyss_stack_codex_incarnation_home_v2"
+        }
+      },
+      "not": {"required": ["denied_state_provenance"]}
+    }
+  ]
 }

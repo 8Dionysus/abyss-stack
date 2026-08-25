@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 30142924,
+  "allowed_tracked_bytes": 38342414,
+  "approved_by": "repository-owner",
+  "base_ref": "efa14a2c0cbd4ab2d3b4044f851742f323f27c96",
+  "changed_generated_bytes": 30142924,
+  "changed_generated_files": 329,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "92d018ffea0b4179d18466496da7e5143d48cbf00facb5c4d95101cdc4760f85",
+  "reason": "Refresh the portable family for the bounded visible-incarnation home residual repair, including denied-state provenance, serialized preparation ownership, explicit v2 migration semantics, and complete holder receipt binding; preserve standing generated-family budgets.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 38342414,
+  "tracked_bytes_max": 24117248
+}

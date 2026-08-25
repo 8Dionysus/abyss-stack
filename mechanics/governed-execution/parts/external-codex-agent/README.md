@@ -35,8 +35,8 @@ The controller:
   private launcher; the bubblewrap monitor remains only the snapshot-cleanup
   supervisor. The receipt includes the exact launch-time incarnation manifest
   bytes as a digest-bound base64 snapshot; after launch, its pathname is
-  provenance only, so profile preparation may refresh that pathname without
-  changing holder identity. The installed launcher closes that exact holder
+  provenance for receipt binding, while the claimed home is frozen and profile
+  preparation may not refresh it. The installed launcher closes that exact holder
   terminal only after typed closure authorization. Authorization may be
   `wake_delivered` (a separate wake receipt proves delivery) or
   `join_completed` (a non-waking join proves a returned responsibility); both
@@ -55,7 +55,14 @@ The controller:
   allowlist. Its output excludes raw Kitty `ls` payloads, environment, command
   lines, tokens, and credentials; compositor visibility remains explicitly
   unknown. `send-text` is a separately invoked terminal transport, not A2A
-  responsibility transfer. The holder receipt also binds the kernel boot ID
+  responsibility transfer. It retains an inode-bound connection to the
+  admitted control socket and exposes Kitty only a fresh abstract relay
+  endpoint. Both the retained upstream socket and the abstract client are
+  authenticated with kernel peer credentials against their admitted PID and
+  start ticks, so the abstract address alone is not trusted; pathname
+  replacement before admission fails closed and replacement during delivery
+  cannot receive the payload. The holder receipt
+  also binds the kernel boot ID
   alongside each process start tick. The closer publishes a
   recoverable sidecar reservation before signaling. The sidecar records the
   signal attempt before TERM and recovery never repeats an existing attempt;
@@ -92,8 +99,8 @@ and replay only through their matching legacy wake reservation. A retry after a 
   coordinate, including parent-relative paths such as `bin/` launchers
   resolving `../vendor`. Source-ancestor links are retained only outside the
   detected package boundary; the package subtree is copied without writing to
-  a root-owned installed package. The host snapshot lives under the admitted
-  `codex_home/tmp` local directory, and its filesystem is rejected when marked
+  a root-owned installed package. The host snapshot uses the admitted
+  runtime-root scratch directory, and its filesystem is rejected when marked
   `noexec`; it remains lifecycle cleanup evidence rather than the mutable
   final execution coordinate. A lifecycle child removes the exact snapshot and
   mirror after the holder's PID/start-tick identity exits. Both routes execute
@@ -105,7 +112,7 @@ and replay only through their matching legacy wake reservation. A retry after a 
   This identity is
   distinct from any nested proof actor. This operator surface is not A2A transport and
   does not replace the governed JSONL runtime;
-- records the v2 incarnation-home manifest as a model-neutral capability
+- records the current v3 incarnation-home manifest as a model-neutral capability
   projection. The owner-authored `capability-classes.v1.json` registry supplies
   session-continuity, actor-tooling, and known operator-control meanings. Its
   loader and schema pin those canonical policies; future vocabulary entries
@@ -127,6 +134,81 @@ and replay only through their matching legacy wake reservation. A retry after a 
   must carry its complete `explicit_grant`
   object under that key. Denied entries carry `explicit_grant: null`, with no
   detached grant list or grant-ID-only relation;
+- treats the typed denied projection as the boundary for actor-local mutable
+  state. A denied ambient entry may have a regular-file or real-directory
+  shadow created by Codex in the projected home; that shadow is never a shared
+  capability link. Top-level symlinks, special files, foreign link targets, and
+  names absent from the current typed projection remain fail-closed. The v3
+  manifest records the derived `actor_local_state_names` set plus one bounded
+  current-entry inode/tree provenance record per denied name. An ambient
+  unlink/replace is admitted only when the local tree is unchanged; no
+  unbounded pathname/history denylist is retained. The initial ambient inode
+  snapshot is retained only through the current materialization, so a denied
+  inode moved into the holder home cannot be accepted after its ambient pathname
+  is replaced. The snapshot is collected from retained descriptor-relative
+  directory entries, preserving the original device/inode identity even when
+  a name is renamed away while it is being inspected; a directory identity or
+  type race fails closed rather than traversing a replacement and losing its
+  descendants, and every visited child name is revalidated after its complete
+  descriptor-relative walk; a stat-to-open replacement of any denied directory
+  also fails closed before its descendants can be omitted from provenance;
+- validates the complete top-level name set of an existing home before claiming
+  or mutating it, so undeclared state cannot leave partial config, mode, or
+  projection effects behind;
+- binds each newly created home below the realization root to the exact bytes
+  of a typed holder/task/run responsibility context. The context carries the
+  existing goal/actor/incarnation/session runtime coordinates plus owner-bound
+  holder, task, and run references; its digest and a derived holder coordinate
+  are recorded in the manifest and holder receipt. A non-replacing holder
+  claim reserves that home for one responsibility lifecycle, so mismatched,
+  reassigned, overlapping, and sequential reuse fail closed. The published
+  claim freezes the complete home against every later preparation, so ambient
+  changes or newly supplied grants cannot rewrite or widen a live holder;
+  canonical claim publication and preparation use the same runtime-owned lock,
+  and launch reloads and digest-checks the manifest under that lock before
+  publishing a claim, rejecting a changed snapshot instead of binding stale
+  launch evidence.
+  The preparation lock is itself a single-link runtime-owned regular file
+  validated before any mode effect, so an aliased lock cannot mutate an
+  external inode.
+  The realization-scoped legacy path remains a compatibility read/preparation
+route only for a marked older v2 home. Every v2 manifest—including one with
+typed holder data or denied-state provenance—is rejected by canonical launch.
+The explicit `migrate --legacy-manifest ... --binding-context ...` route is the
+only upgrade path: under the preparation lock it validates the v2 home, carries
+its isolated actor-local trees into a distinct typed v3 home, regenerates the
+bound config, and leaves the v2 source untouched. The resulting v3 manifest
+records the exact legacy manifest digest; a retry may return that target only
+after revalidating its bytes, modes, projection, and source state as an exact
+idempotent match. Each copied legacy file and directory is also bound to its
+retained inode's kernel-owned source version, including size, mtime, and ctime;
+version drift is rejected before publication, so an A-B-A write cannot pass
+the endpoint snapshot checks. A pre-existing typed target with any other state is rejected
+before copy or mutation. Every first preparation is
+serialized by
+  the runtime-owned preparation lock and claims an unpublished root with an
+  exact owner token; owner-token retirement retains and revalidates that
+  descriptor before unlinking, and rebind restores a superseded claim if
+  replacement-receipt publication fails. The private payload helper also
+  releases the exact validated claim on any pre-receipt admission, payload, or
+  receipt-path failure, including failures before claim validation after the
+  outer launcher has exec'd into bubblewrap; immediately
+  before rollback it rechecks whether the exact canonical receipt was already
+  published, and a published receipt keeps the claim frozen. The exact writer
+  pins the target
+  parent descriptor, publishes new files from an unnameable descriptor, and
+  stages every existing-file replacement through a separate fully written
+  unnameable descriptor before an atomic exchange that verifies the displaced
+  target inode. Deterministic parent, target, and temporary-name replacement
+  cannot delete an unvalidated victim or change ambient bytes or mode; a staged
+  write failure leaves the prior target intact. If a process is interrupted after
+  creating a private staging link, the next unclaimed preparation removes only
+  an inode-validated stage for an owner-local file target, and recovers any
+  matching interrupted quarantine directory. If a replacement wins the
+  quarantine race, the replacement is atomically restored before rejection;
+  an occupied destination is exchanged and retained in quarantine so neither
+  entry is deleted. A legitimate denied entry that merely resembles a stage,
+  or a multiply linked/replaced artifact, is not deleted and fails closed.
 - exposes the installed `aoa-external-codex-return` leaf for the final external
   return contour. The leaf receives an explicit return-owner binding and exact
   handoff/holder paths, uses a connectable local Codex app-server as a

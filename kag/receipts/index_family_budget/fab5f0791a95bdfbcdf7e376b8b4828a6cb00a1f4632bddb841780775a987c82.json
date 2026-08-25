@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 30162093,
+  "allowed_tracked_bytes": 38353949,
+  "approved_by": "repository-owner",
+  "base_ref": "efa14a2c0cbd4ab2d3b4044f851742f323f27c96",
+  "changed_generated_bytes": 30162093,
+  "changed_generated_files": 331,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "fab5f0791a95bdfbcdf7e376b8b4828a6cb00a1f4632bddb841780775a987c82",
+  "reason": "Refresh the portable family for the bounded visible-home claim-freeze and legacy-launch admission repair; preserve standing generated-family budgets.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 38353949,
+  "tracked_bytes_max": 24117248
+}

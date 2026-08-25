@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 30404902,
+  "allowed_tracked_bytes": 38614508,
+  "approved_by": "repository-owner",
+  "base_ref": "efa14a2c0cbd4ab2d3b4044f851742f323f27c96",
+  "changed_generated_bytes": 30404902,
+  "changed_generated_files": 332,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "dd6382163dde5e93d008f75a295f94f7ca3545f860ad885e52780e85bafeee1c",
+  "reason": "Refresh derived owner family for 88b44c0fd final holder admission race repair; standing budgets unchanged.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 38614508,
+  "tracked_bytes_max": 24117248
+}

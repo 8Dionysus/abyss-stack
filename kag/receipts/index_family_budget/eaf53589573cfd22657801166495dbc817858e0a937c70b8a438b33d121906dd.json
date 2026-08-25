@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 30930262,
+  "allowed_tracked_bytes": 38919168,
+  "approved_by": "repository-owner",
+  "base_ref": "d1603cafd10b88a3372ec974d78b2b0163cf287d",
+  "changed_generated_bytes": 30930262,
+  "changed_generated_files": 339,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "eaf53589573cfd22657801166495dbc817858e0a937c70b8a438b33d121906dd",
+  "reason": "PR #424 committed retained package access revalidation after ACL probe",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 38919168,
+  "tracked_bytes_max": 24117248
+}

@@ -41,7 +41,8 @@ python scripts/validate_nested_agents.py
 
 ## Incarnation-home projection and visible binding
 
-The focused home suite covers the v2 manifest/schema binding, the
+The focused home suite covers the current v3 and readable legacy v2
+manifest/schema binding, the
 owner-authored capability-class registry and its explicit unknown path, default
 projection of session continuity and actor tooling, deny-by-default ambient
 operator-control and unknown entries, exact subject-bound operator grants,
@@ -57,6 +58,86 @@ closed when the exact terminal binding is not ready. These tests prove source
 behavior only; they do not prove installed-release parity, host
 trust/admission, a live visible canary, app-server effect enforcement, wake
 delivery, holder closure, owner acceptance, or Goal acceptance.
+
+The home-repair cases additionally prove that a denied ambient entry can retain
+an actor-created regular-file shadow across repeated preparation, that an
+exact shared link remains exact, and that a prior shared link is removed only
+when the current typed projection demotes it to denied. Unknown or foreign
+symlinks and undeclared top-level state fail closed. New realization homes
+require the exact typed holder/task/run context, with mismatched binding, stale
+manifest, persistent sequential reuse, and overlapping claim attempts rejected.
+Same-filesystem hard links to ambient denied state, severed ambient aliases,
+denied inodes moved during materialization, multiply linked regular files,
+device/inode aliases, a directory-entry rename/stat race that could lose
+descendants, replacement during no-follow validation, a stat-to-open directory
+replacement, and a child swap after its complete descriptor-relative walk fail
+closed before manifest admission or
+launch;
+the complete top-level name set is also rejected before an existing home is
+claimed or mutated, and the adversarial fixtures verify that ambient bytes and
+config mode remain unchanged. Existing-file updates stage the new bytes through an unnameable
+descriptor and atomically exchange them only after verifying the displaced
+target inode, so a concurrent target replacement cannot delete a victim and a
+deterministic truncate/write failure preserves the prior bytes, mode, and inode.
+Only stages for owner-local file targets are recovered; legitimate denied names
+that resemble stages remain intact. Interrupted staging quarantine directories
+are also recovered only after descriptor and child identity validation. If a
+replacement wins the quarantine race, the replacement is restored before the
+rejection; an occupied destination is atomically exchanged and retained so an
+aliased stage remains intact and preserves the external inode.
+Distinct contexts receive separate manifest, config, cache, log,
+tmp, and descendant-binary coordinates. Synchronized first preparation is
+serializable and idempotent, while a failed or stale tokened preparer is
+recoverable without deleting another attempt's root. A published holder claim
+freezes the home against re-preparation before any config, projection,
+provenance, permission, or manifest effect. Legacy v2 manifests are
+schema-valid on their explicit compatibility route; every v2 manifest,
+including typed and provenance-bearing variants, is rejected by canonical
+loading. The explicit `migrate` route validates the v2 home under the
+preparation lock, carries isolated actor-local trees into a distinct typed v3
+home, regenerates the bound config, and leaves the v2 source untouched.
+The migrated manifest binds the exact legacy-manifest digest; retries accept
+only an exact byte/mode/projection/source-state match, and a pre-existing typed
+target with divergent state is rejected before copy or mutation.
+Migration also binds each copied source tree row to the retained inode's
+kernel-owned version (including size, mtime, and ctime) and rejects version
+drift before publication, including a deterministic A-B-A source write.
+Provenance-bearing v2 is rejected even on the non-canonical loader route because
+the public v2 branch forbids that field. A multiply linked preparation lock is
+rejected before any
+mode effect, with the external inode's bytes and mode preserved; a deterministic
+lock-name replacement after acquisition is also rejected. The lock serializes
+through the pinned runtime directory, so concurrent first preparation remains
+serializable. Canonical launch also reloads and digest-checks the manifest
+while holding the preparation lock, rejecting a deterministic replacement race
+before claim publication. The exact writer pins the target parent descriptor,
+publishes new files from an unnameable descriptor, and stages existing-file
+updates through a fully written unnameable descriptor before atomic publication;
+deterministic parent and temporary-name replacement cannot change ambient bytes
+or mode. A pre-validation manifest failure, payload-side private-payload drift,
+or occupied-receipt failure releases the exact unpublished claim even when the
+outer launcher has already exec'd into bubblewrap; a published receipt retains
+it.
+Incomplete holder receipts missing `runtime_state_root` or `closeout_route`
+are rejected by both the receipt schema and runtime binding validator. A
+receipt carrying an immutable manifest snapshot must also carry the complete
+`holder_binding`; the schema and snapshot loader reject its omission for both
+v3 and legacy-v2 snapshots, while pre-snapshot receipts retain their bounded
+compatibility path. Rebind reserves that same holder claim under the
+preparation lock before publishing a replacement receipt, transferring an
+existing claim from the superseded receipt under that lock; an exact retry is
+idempotent. A failed receipt publication restores the superseded claim
+byte-for-byte through its validated descriptor, and an existing output is
+accepted only when it is the same complete canonical receipt apart from
+creation time. Owner-token cleanup also retains and revalidates the token
+descriptor before unlinking, so a deterministic replacement cannot delete a
+newly published marker. Directory enumeration retains its descriptor and rejects a
+deterministic pathname replacement after the descriptor is opened. Stale-root
+rollback validates and removes through a retained root descriptor, rejecting a
+replacement root before deleting the replacement tree.
+These are source and fixture claims; they
+do not establish host artifact admission, activation, live canary success,
+transport delivery, or owner acceptance.
 
 The F4 residual regressions also prove that duplicate future class IDs cannot
 be represented in the registry schema because class IDs are object keys, and
@@ -411,7 +492,10 @@ process/start-tick, window, TTY, title, runtime-root, and closeout binding, and
 starts Kitty in socket-only mode. Focused observability tests prove safe
 allowlist projection from an environment-bearing Kitty payload, read-only
 status with unchanged socket permissions, PID/start-tick reuse protection,
-stale/missing state, and exact directed-input targeting; no status output
+stale/missing state, and exact directed-input targeting; adversarial directed-
+input tests replace the control-socket pathname before and during the external
+client invocation and prove that rejection is fail-closed and delivery remains
+on the retained original inode; no status output
 contains environment, command line, token, or credential fields. The installed
 `join` route proves a returned responsibility without wake delivery and creates
 typed `join_completed` authorization; the wake route creates the parallel

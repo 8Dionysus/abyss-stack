@@ -12,19 +12,26 @@ from __future__ import annotations
 
 import argparse
 import base64
+import contextlib
+import ctypes
+import errno
 import fcntl
 import hashlib
 import json
 import os
 import re
+import select
 import secrets
 import shlex
 import shutil
 import signal
+import socket
 import stat
+import struct
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import tomllib
 from datetime import UTC, datetime
@@ -32,7 +39,9 @@ from pathlib import Path
 from typing import Any, Sequence
 
 
-SCHEMA_VERSION = "abyss_stack_codex_incarnation_home_v2"
+LEGACY_SCHEMA_VERSION = "abyss_stack_codex_incarnation_home_v2"
+SCHEMA_VERSION = "abyss_stack_codex_incarnation_home_v3"
+SUPPORTED_SCHEMA_VERSIONS = frozenset({LEGACY_SCHEMA_VERSION, SCHEMA_VERSION})
 CAPABILITY_PROJECTION_SCHEMA_VERSION = (
     "abyss_stack_codex_capability_projection_v2"
 )
@@ -51,7 +60,32 @@ CAPABILITY_CLASS_POLICIES = {
 }
 CAPABILITY_CLASS_ID_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
 CAPABILITY_ENTRY_NAME_PATTERN = re.compile(r"^(?!\.\.?$)[^/]+$")
+STAGED_FILE_NAME_PATTERN = re.compile(
+    r"^\.(?P<target>[^/]+)\.stage-(?P<token>[0-9a-f]{32})$"
+)
+STAGED_QUARANTINE_NAME_PATTERN = re.compile(
+    r"^\.(?P<stage>\.[^/]+\.stage-[0-9a-f]{32})\.quarantine-[0-9a-f]{32}$"
+)
 HOLDER_RECEIPT_SCHEMA_VERSION = "abyss_stack_visible_incarnation_holder_terminal_v1"
+HOLDER_BINDING_CONTEXT_SCHEMA_VERSION = (
+    "abyss_stack_visible_incarnation_holder_binding_context_v1"
+)
+HOLDER_BINDING_CONTEXT_FIELDS = ("holder_ref", "task_ref", "run_ref")
+TERMINAL_BINDING_CONTEXT_FIELDS = (
+    "goal_ref",
+    "actor_ref",
+    "incarnation_ref",
+    "session_ref",
+    "runtime_state_root",
+    "closeout_route",
+)
+HOLDER_CLAIM_SCHEMA_VERSION = "abyss_stack_visible_incarnation_holder_claim_v1"
+HOLDER_CLAIM_FILE_NAME = "holder-claim.json"
+PREPARATION_LOCK_FILE_NAME = ".incarnation-home.lock"
+PREPARATION_OWNER_FILE_NAME = ".prepare-owner.json"
+PREPARATION_OWNER_SCHEMA_VERSION = (
+    "abyss_stack_visible_incarnation_prepare_owner_v1"
+)
 HOLDER_LOSS_REENTRY_SCHEMA_VERSION = (
     "task_local_external_actor_holder_loss_reentry_v1"
 )
@@ -103,6 +137,19 @@ SAFE_PROJECTION_FORBIDDEN_KEYS = frozenset(
 LOCAL_NAMES = frozenset(
     {"config.toml", "cache", "log", "tmp", DESCENDANT_BIN_NAME}
 )
+
+
+def _is_declared_staging_recovery_name(name: str) -> bool:
+    stage = STAGED_FILE_NAME_PATTERN.fullmatch(name)
+    if stage is not None:
+        return stage.group("target") in LOCAL_NAMES
+    quarantine = STAGED_QUARANTINE_NAME_PATTERN.fullmatch(name)
+    if quarantine is None:
+        return False
+    stage = STAGED_FILE_NAME_PATTERN.fullmatch(quarantine.group("stage"))
+    return stage is not None and stage.group("target") in LOCAL_NAMES
+
+
 ROOT_KEY_LINE = re.compile(
     r"^\s*(?P<key>model|model_reasoning_effort|\"model\"|\"model_reasoning_effort\")\s*="
 )
@@ -631,6 +678,57 @@ def _build_capability_projection(
     }
 
 
+def _preserve_disappeared_denied_projection_entries(
+    expected_projection: dict[str, Any],
+    previous_projection: object,
+) -> dict[str, Any]:
+    """Retain only validated prior denied rows whose ambient names disappeared."""
+
+    if not isinstance(previous_projection, dict):
+        return expected_projection
+    expected_entries = expected_projection.get("entries")
+    previous_entries = previous_projection.get("entries")
+    if not isinstance(expected_entries, dict) or not isinstance(previous_entries, dict):
+        return expected_projection
+
+    _registry, definitions, unknown = _load_capability_class_registry()
+    required_entry_fields = {
+        "capability_class",
+        "projection",
+        "grantable",
+        "explicit_grant",
+    }
+    for name, previous_entry in previous_entries.items():
+        if name in expected_entries:
+            continue
+        if not isinstance(previous_entry, dict) or previous_entry.get("projection") != "denied":
+            continue
+        if (
+            not isinstance(name, str)
+            or CAPABILITY_ENTRY_NAME_PATTERN.fullmatch(name) is None
+            or name in {".", ".."}
+            or name in LOCAL_NAMES
+            or Path(name).name != name
+            or set(previous_entry) != required_entry_fields
+            or previous_entry.get("explicit_grant") is not None
+            or not isinstance(previous_entry.get("capability_class"), str)
+            or not isinstance(previous_entry.get("grantable"), bool)
+        ):
+            raise IncarnationHomeError("capability projection drift")
+        classification = _classify_ambient_entry(
+            name,
+            definitions=definitions,
+            unknown=unknown,
+        )
+        if (
+            previous_entry["capability_class"] != classification["capability_class"]
+            or previous_entry["grantable"] is not classification["grantable"]
+        ):
+            raise IncarnationHomeError("capability projection drift")
+        expected_entries[name] = dict(previous_entry)
+    return expected_projection
+
+
 def _incarnation_coordinate(realization_id: str, fingerprint: str) -> str:
     """Give equal configurations with different realization identities distinct homes."""
 
@@ -642,6 +740,1037 @@ def _incarnation_coordinate(realization_id: str, fingerprint: str) -> str:
             }
         )
     )
+
+
+def _holder_binding_context_coordinate(
+    context: dict[str, str], binding_digest: str
+) -> str:
+    """Derive a home coordinate from one exact typed responsibility context."""
+
+    if SHA256_DIGEST_PATTERN.fullmatch(binding_digest) is None:
+        raise IncarnationHomeError("holder binding context digest is invalid")
+    identity = {
+        "schema_version": context["schema_version"],
+        **{
+            key: context[key]
+            for key in TERMINAL_BINDING_CONTEXT_FIELDS
+            + HOLDER_BINDING_CONTEXT_FIELDS
+        },
+        "binding_digest": binding_digest,
+    }
+    return sha256_bytes(canonical_bytes(identity))
+
+
+def _holder_binding_manifest_record(
+    context: dict[str, str], binding_digest: str, coordinate: str
+) -> dict[str, str]:
+    if SHA256_DIGEST_PATTERN.fullmatch(binding_digest) is None:
+        raise IncarnationHomeError("holder binding context digest is invalid")
+    if SHA256_DIGEST_PATTERN.fullmatch(coordinate) is None:
+        raise IncarnationHomeError("holder binding coordinate is invalid")
+    return {
+        "schema_version": context["schema_version"],
+        "binding_digest": binding_digest,
+        "coordinate": coordinate,
+        **{
+            key: context[key]
+            for key in ("goal_ref", "actor_ref", "incarnation_ref", "session_ref")
+            + ("runtime_state_root", "closeout_route")
+            + HOLDER_BINDING_CONTEXT_FIELDS
+        },
+    }
+
+
+def _holder_incarnation_root(
+    *, runtime_root: Path, incarnation_coordinate: str, holder_coordinate: str | None
+) -> Path:
+    realization_root = runtime_root / (
+        "sha256-" + incarnation_coordinate.removeprefix("sha256:")
+    )
+    if holder_coordinate is None:
+        return realization_root
+    if SHA256_DIGEST_PATTERN.fullmatch(holder_coordinate) is None:
+        raise IncarnationHomeError("holder binding coordinate is invalid")
+    return realization_root / (
+        "holder-sha256-" + holder_coordinate.removeprefix("sha256:")
+    )
+
+
+def _ambient_inode_identities(ambient_home: Path) -> set[tuple[int, int]]:
+    """Collect ambient inode identities from retained directory entries.
+
+    ``DirEntry.inode()`` is the identity returned by the directory's readdir
+    snapshot, so it survives a rename between enumeration and the later stat
+    of that name.  The descriptor-relative walk never follows an ambient
+    symlink and refuses a replacement directory rather than traversing it.
+    """
+
+    try:
+        initial = os.lstat(ambient_home)
+    except OSError as exc:
+        raise IncarnationHomeError(
+            f"ambient capability entry cannot be inspected: {ambient_home}"
+        ) from exc
+    if stat.S_ISLNK(initial.st_mode) or not stat.S_ISDIR(initial.st_mode):
+        raise IncarnationHomeError(
+            f"ambient capability entry is not a real directory: {ambient_home}"
+        )
+    flags = (
+        os.O_RDONLY
+        | getattr(os, "O_DIRECTORY", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_CLOEXEC", 0)
+    )
+    try:
+        root_fd = os.open(ambient_home, flags)
+    except OSError as exc:
+        raise IncarnationHomeError(
+            f"ambient capability directory cannot be opened: {ambient_home}"
+        ) from exc
+    pending: list[tuple[int, os.stat_result]] = []
+    try:
+        root_opened = os.fstat(root_fd)
+        if (
+            (root_opened.st_dev, root_opened.st_ino, root_opened.st_mode)
+            != (initial.st_dev, initial.st_ino, initial.st_mode)
+        ):
+            raise IncarnationHomeError(
+                f"ambient capability directory changed during safe open: {ambient_home}"
+            )
+        root_identity = (root_opened.st_dev, root_opened.st_ino)
+        identities: set[tuple[int, int]] = {root_identity}
+        visited_directories: set[tuple[int, int]] = {root_identity}
+        pending.append((root_fd, root_opened))
+        root_fd = -1
+        while pending:
+            descriptor, opened_directory = pending.pop()
+            try:
+                try:
+                    with os.scandir(descriptor) as entries:
+                        entries_snapshot = list(entries)
+                    after_listing = os.fstat(descriptor)
+                except OSError as exc:
+                    raise IncarnationHomeError(
+                        "ambient capability directory cannot be enumerated"
+                    ) from exc
+                if (
+                    (after_listing.st_dev, after_listing.st_ino, after_listing.st_mode)
+                    != (
+                        opened_directory.st_dev,
+                        opened_directory.st_ino,
+                        opened_directory.st_mode,
+                    )
+                ):
+                    raise IncarnationHomeError(
+                        "ambient capability directory changed during enumeration"
+                    )
+                parent_device = after_listing.st_dev
+                for entry in entries_snapshot:
+                    try:
+                        directory_entry_inode = entry.inode()
+                        directory_entry_is_directory = entry.is_dir(
+                            follow_symlinks=False
+                        )
+                    except OSError as exc:
+                        raise IncarnationHomeError(
+                            f"ambient capability entry cannot be inspected: {entry.name}"
+                        ) from exc
+                    if isinstance(directory_entry_inode, int) and directory_entry_inode > 0:
+                        identities.add((parent_device, directory_entry_inode))
+                    try:
+                        observed = entry.stat(follow_symlinks=False)
+                    except FileNotFoundError:
+                        # The directory entry identity above is the retained
+                        # provenance when the name was renamed away before
+                        # stat could inspect it.
+                        if directory_entry_is_directory:
+                            raise IncarnationHomeError(
+                                "ambient capability directory changed during enumeration"
+                            )
+                        if not isinstance(directory_entry_inode, int) or directory_entry_inode < 1:
+                            raise IncarnationHomeError(
+                                f"ambient capability entry cannot be inspected: {entry.name}"
+                            )
+                        continue
+                    except OSError as exc:
+                        raise IncarnationHomeError(
+                            f"ambient capability entry cannot be inspected: {entry.name}"
+                        ) from exc
+                    observed_identity = (observed.st_dev, observed.st_ino)
+                    identities.add(observed_identity)
+                    if directory_entry_is_directory != stat.S_ISDIR(observed.st_mode):
+                        raise IncarnationHomeError(
+                            "ambient capability entry changed during enumeration"
+                        )
+                    if (
+                        directory_entry_is_directory
+                        and isinstance(directory_entry_inode, int)
+                        and directory_entry_inode > 0
+                        and (parent_device, directory_entry_inode)
+                        != observed_identity
+                    ):
+                        raise IncarnationHomeError(
+                            "ambient capability directory changed during enumeration"
+                        )
+                    if not stat.S_ISDIR(observed.st_mode):
+                        continue
+                    child_flags = (
+                        os.O_RDONLY
+                        | getattr(os, "O_DIRECTORY", 0)
+                        | getattr(os, "O_NOFOLLOW", 0)
+                        | getattr(os, "O_CLOEXEC", 0)
+                    )
+                    try:
+                        child_fd = os.open(
+                            entry.name,
+                            child_flags,
+                            dir_fd=descriptor,
+                        )
+                    except FileNotFoundError as exc:
+                        raise IncarnationHomeError(
+                            "ambient capability directory changed before safe open"
+                        ) from exc
+                    except OSError as exc:
+                        raise IncarnationHomeError(
+                            f"ambient capability directory cannot be opened: {entry.name}"
+                        ) from exc
+                    try:
+                        child_opened = os.fstat(child_fd)
+                    except OSError as exc:
+                        os.close(child_fd)
+                        raise IncarnationHomeError(
+                            f"ambient capability directory cannot be inspected: {entry.name}"
+                        ) from exc
+                    child_identity = (child_opened.st_dev, child_opened.st_ino)
+                    if (
+                        not stat.S_ISDIR(child_opened.st_mode)
+                        or child_identity != observed_identity
+                    ):
+                        os.close(child_fd)
+                        raise IncarnationHomeError(
+                            "ambient capability directory changed before safe open"
+                        )
+                    if child_identity in visited_directories:
+                        os.close(child_fd)
+                        continue
+                    visited_directories.add(child_identity)
+                    identities.add(child_identity)
+                    pending.append((child_fd, child_opened))
+            finally:
+                os.close(descriptor)
+        try:
+            current_root = os.lstat(ambient_home)
+        except OSError as exc:
+            raise IncarnationHomeError(
+                f"ambient capability directory changed during enumeration: {ambient_home}"
+            ) from exc
+        if (
+            (current_root.st_dev, current_root.st_ino, current_root.st_mode)
+            != (initial.st_dev, initial.st_ino, initial.st_mode)
+        ):
+            raise IncarnationHomeError(
+                f"ambient capability directory changed during enumeration: {ambient_home}"
+            )
+        return identities
+    finally:
+        if root_fd >= 0:
+            os.close(root_fd)
+        while pending:
+            descriptor, _opened = pending.pop()
+            os.close(descriptor)
+
+
+def _entry_identity(path: Path, label: str) -> tuple[int, int] | None:
+    """Read one pathname identity without following a symlink or alias."""
+
+    try:
+        observed = os.lstat(path)
+    except FileNotFoundError:
+        return None
+    except OSError as exc:
+        raise IncarnationHomeError(f"{label} cannot be inspected: {path}") from exc
+    return observed.st_dev, observed.st_ino
+
+
+def _identity_record(identity: tuple[int, int] | None) -> dict[str, int] | None:
+    if identity is None:
+        return None
+    return {"device": identity[0], "inode": identity[1]}
+
+
+def _identity_from_record(value: object, label: str) -> tuple[int, int] | None:
+    if value is None:
+        return None
+    if not isinstance(value, dict) or set(value) != {"device", "inode"}:
+        raise IncarnationHomeError(f"{label} identity is invalid")
+    device = value.get("device")
+    inode = value.get("inode")
+    if (
+        not isinstance(device, int)
+        or isinstance(device, bool)
+        or device < 0
+        or not isinstance(inode, int)
+        or isinstance(inode, bool)
+        or inode < 1
+    ):
+        raise IncarnationHomeError(f"{label} identity is invalid")
+    return device, inode
+
+
+def _actor_local_open_flags(observed: os.stat_result) -> int:
+    if stat.S_ISDIR(observed.st_mode):
+        flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+    else:
+        flags = getattr(os, "O_PATH", os.O_RDONLY)
+    return flags | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
+
+
+def _actor_local_identity_mode(observed: os.stat_result) -> tuple[int, int, int]:
+    return observed.st_dev, observed.st_ino, observed.st_mode
+
+
+def _actor_local_source_version(observed: os.stat_result) -> tuple[int, ...]:
+    """Return a kernel-owned source version that cannot be restored by a rewrite."""
+
+    return (
+        observed.st_dev,
+        observed.st_ino,
+        observed.st_mode,
+        observed.st_nlink,
+        observed.st_size,
+        observed.st_mtime_ns,
+        observed.st_ctime_ns,
+    )
+
+
+def _open_stable_actor_local_path_descriptor(
+    target: Path, name: str
+) -> tuple[int, os.stat_result, os.stat_result]:
+    """Open one path without following a replacement symlink and retain it."""
+
+    try:
+        initial = os.lstat(target)
+    except OSError as exc:
+        raise IncarnationHomeError(
+            f"actor-local capability entry cannot be inspected: {target}"
+        ) from exc
+    if stat.S_ISLNK(initial.st_mode):
+        raise IncarnationHomeError(
+            f"actor-local capability entry may not be a symlink: {target}"
+        )
+    try:
+        descriptor = os.open(target, _actor_local_open_flags(initial))
+    except OSError as exc:
+        raise IncarnationHomeError(
+            f"actor-local capability entry cannot be opened safely: {target}"
+        ) from exc
+    try:
+        opened = os.fstat(descriptor)
+        observed = os.lstat(target)
+        if (
+            _actor_local_identity_mode(opened) != _actor_local_identity_mode(initial)
+            or _actor_local_identity_mode(opened) != _actor_local_identity_mode(observed)
+        ):
+            raise IncarnationHomeError(
+                f"actor-local capability entry changed during validation: {name}"
+            )
+        return descriptor, initial, opened
+    except IncarnationHomeError:
+        os.close(descriptor)
+        raise
+    except OSError as exc:
+        os.close(descriptor)
+        raise IncarnationHomeError(
+            f"actor-local capability entry cannot be inspected: {target}"
+        ) from exc
+
+
+def _open_stable_actor_local_child_descriptor(
+    parent_fd: int, child_name: str, label: str
+) -> tuple[int, os.stat_result, os.stat_result]:
+    """Open one directory child relative to a retained parent descriptor."""
+
+    try:
+        initial = os.stat(child_name, dir_fd=parent_fd, follow_symlinks=False)
+    except OSError as exc:
+        raise IncarnationHomeError(
+            f"actor-local capability entry cannot be inspected: {label}"
+        ) from exc
+    if stat.S_ISLNK(initial.st_mode):
+        raise IncarnationHomeError(
+            f"actor-local capability entry may not be a symlink: {label}"
+        )
+    try:
+        descriptor = os.open(
+            child_name,
+            _actor_local_open_flags(initial),
+            dir_fd=parent_fd,
+        )
+    except OSError as exc:
+        raise IncarnationHomeError(
+            f"actor-local capability entry cannot be opened safely: {label}"
+        ) from exc
+    try:
+        opened = os.fstat(descriptor)
+        observed = os.stat(child_name, dir_fd=parent_fd, follow_symlinks=False)
+        if (
+            _actor_local_identity_mode(opened) != _actor_local_identity_mode(initial)
+            or _actor_local_identity_mode(opened) != _actor_local_identity_mode(observed)
+        ):
+            raise IncarnationHomeError(
+                f"actor-local capability entry changed during validation: {label}"
+            )
+        return descriptor, initial, opened
+    except IncarnationHomeError:
+        os.close(descriptor)
+        raise
+    except OSError as exc:
+        os.close(descriptor)
+        raise IncarnationHomeError(
+            f"actor-local capability entry cannot be inspected: {label}"
+        ) from exc
+
+
+def _revalidate_actor_local_path(
+    target: Path,
+    descriptor: int,
+    initial: os.stat_result,
+    label: str,
+) -> None:
+    try:
+        observed = os.lstat(target)
+        opened = os.fstat(descriptor)
+    except OSError as exc:
+        raise IncarnationHomeError(
+            f"actor-local capability entry changed during validation: {label}"
+        ) from exc
+    if (
+        _actor_local_identity_mode(opened) != _actor_local_identity_mode(initial)
+        or _actor_local_identity_mode(opened) != _actor_local_identity_mode(observed)
+    ):
+        raise IncarnationHomeError(
+            f"actor-local capability entry changed during validation: {label}"
+        )
+
+
+def _revalidate_actor_local_child(
+    parent_fd: int,
+    child_name: str,
+    descriptor: int,
+    initial: os.stat_result,
+    label: str,
+) -> None:
+    try:
+        observed = os.stat(child_name, dir_fd=parent_fd, follow_symlinks=False)
+        opened = os.fstat(descriptor)
+    except OSError as exc:
+        raise IncarnationHomeError(
+            f"actor-local capability entry changed during validation: {label}"
+        ) from exc
+    if (
+        _actor_local_identity_mode(opened) != _actor_local_identity_mode(initial)
+        or _actor_local_identity_mode(opened) != _actor_local_identity_mode(observed)
+    ):
+        raise IncarnationHomeError(
+            f"actor-local capability entry changed during validation: {label}"
+        )
+
+
+def _walk_stable_actor_local_tree(
+    target: Path, name: str
+) -> list[tuple[str, os.stat_result]]:
+    """Walk actor-local state through retained descriptors, not mutable paths."""
+
+    root_fd, root_initial, root_opened = _open_stable_actor_local_path_descriptor(
+        target, name
+    )
+    records: list[tuple[str, os.stat_result]] = []
+    visited_directories: set[tuple[int, int]] = set()
+
+    def visit(
+        descriptor: int,
+        initial: os.stat_result,
+        opened: os.stat_result,
+        relative: str,
+        *,
+        parent_fd: int | None,
+        child_name: str | None,
+    ) -> None:
+        try:
+            current = os.fstat(descriptor)
+            if _actor_local_identity_mode(current) != _actor_local_identity_mode(opened):
+                raise IncarnationHomeError(
+                    f"actor-local capability entry changed during validation: {relative}"
+                )
+            records.append((relative, current))
+            if stat.S_ISDIR(current.st_mode):
+                identity = (current.st_dev, current.st_ino)
+                if identity in visited_directories:
+                    raise IncarnationHomeError(
+                        f"actor-local capability directory is aliased: {relative}"
+                    )
+                visited_directories.add(identity)
+                try:
+                    children = sorted(os.listdir(descriptor))
+                    after_listing = os.fstat(descriptor)
+                except OSError as exc:
+                    raise IncarnationHomeError(
+                        f"actor-local capability directory cannot be enumerated: {relative}"
+                    ) from exc
+                if _actor_local_identity_mode(after_listing) != _actor_local_identity_mode(current):
+                    raise IncarnationHomeError(
+                        f"actor-local capability directory changed during validation: {relative}"
+                    )
+                for child_name_value in children:
+                    child_label = f"{relative}/{child_name_value}"
+                    child_fd, child_initial, child_opened = (
+                        _open_stable_actor_local_child_descriptor(
+                            descriptor, child_name_value, child_label
+                        )
+                    )
+                    visit(
+                        child_fd,
+                        child_initial,
+                        child_opened,
+                        child_label,
+                        parent_fd=descriptor,
+                        child_name=child_name_value,
+                    )
+            if parent_fd is None:
+                _revalidate_actor_local_path(
+                    target, descriptor, initial, relative
+                )
+            else:
+                assert child_name is not None
+                _revalidate_actor_local_child(
+                    parent_fd, child_name, descriptor, initial, relative
+                )
+        finally:
+            try:
+                if parent_fd is not None:
+                    assert child_name is not None
+                    _revalidate_actor_local_child(
+                        parent_fd, child_name, descriptor, initial, relative
+                    )
+            finally:
+                os.close(descriptor)
+
+    visit(
+        root_fd,
+        root_initial,
+        root_opened,
+        name,
+        parent_fd=None,
+        child_name=None,
+    )
+    return records
+
+
+def _open_stable_actor_local_entry(target: Path, name: str) -> os.stat_result:
+    """Open one entry without following a replacement symlink and recheck it."""
+
+    descriptor, _initial, opened = _open_stable_actor_local_path_descriptor(
+        target, name
+    )
+    try:
+        return opened
+    finally:
+        os.close(descriptor)
+
+
+def _validate_actor_local_top_level_names(
+    codex_home: Path, expected_names: set[str]
+) -> None:
+    """Reject undeclared top-level state before any home mutation."""
+
+    if not codex_home.exists() and not codex_home.is_symlink():
+        return
+    descriptor, _initial, opened = _open_stable_actor_local_path_descriptor(
+        codex_home, "codex-home"
+    )
+    try:
+        if not stat.S_ISDIR(opened.st_mode):
+            raise IncarnationHomeError("incarnation Codex home is not a directory")
+        try:
+            with os.scandir(descriptor) as entries:
+                observed_names = {entry.name for entry in entries}
+            after_listing = os.fstat(descriptor)
+        except OSError as exc:
+            raise IncarnationHomeError(
+                "incarnation Codex home cannot be enumerated safely"
+            ) from exc
+        if _actor_local_identity_mode(after_listing) != _actor_local_identity_mode(opened):
+            raise IncarnationHomeError(
+                "incarnation Codex home changed during top-level validation"
+            )
+        unexpected = sorted(
+            name
+            for name in observed_names
+            if name not in expected_names
+            and not _is_declared_staging_recovery_name(name)
+        )
+        if unexpected:
+            raise IncarnationHomeError(
+                f"unexpected incarnation-home entry: {unexpected[0]}"
+            )
+    finally:
+        os.close(descriptor)
+
+
+def _validate_actor_local_entry(
+    target: Path,
+    name: str,
+    *,
+    ambient_identities: set[tuple[int, int]] | None = None,
+) -> None:
+    """Permit only unaliased Codex-owned regular files/directories."""
+
+    ambient_identities = ambient_identities or set()
+    for label, observed in _walk_stable_actor_local_tree(target, name):
+        identity = (observed.st_dev, observed.st_ino)
+        mode = observed.st_mode
+        if identity in ambient_identities:
+            raise IncarnationHomeError(
+                f"actor-local capability entry aliases ambient state: {label}"
+            )
+        if stat.S_ISREG(mode):
+            if observed.st_nlink != 1:
+                raise IncarnationHomeError(
+                    f"actor-local capability entry is multiply linked: {label}"
+                )
+        elif not stat.S_ISDIR(mode):
+            raise IncarnationHomeError(
+                f"actor-local capability entry is not a regular file or directory: {label}"
+            )
+
+
+def _validate_actor_local_entries(
+    codex_home: Path,
+    names: Sequence[str],
+    ambient_home: Path,
+    *,
+    initially_ambient_identities: set[tuple[int, int]] | None = None,
+) -> None:
+    ambient_identities = _ambient_inode_identities(ambient_home)
+    if initially_ambient_identities is not None:
+        # Keep the first ambient classification in force for the complete
+        # materialization.  A denied inode can otherwise be moved into the
+        # holder home and replaced at its ambient pathname before this final
+        # walk, making a severed alias look newly actor-local.
+        ambient_identities.update(initially_ambient_identities)
+    for name in names:
+        target = codex_home / name
+        if target.exists() or target.is_symlink():
+            _validate_actor_local_entry(
+                target,
+                name,
+                ambient_identities=ambient_identities,
+            )
+
+
+def _local_tree_digest(target: Path, name: str) -> str | None:
+    """Digest one local tree's bounded inode topology, never its mutable bytes."""
+
+    if not target.exists() and not target.is_symlink():
+        return None
+    rows: list[dict[str, object]] = []
+    for relative, observed in _walk_stable_actor_local_tree(target, name):
+        rows.append(
+            {
+                "path": relative,
+                "device": observed.st_dev,
+                "inode": observed.st_ino,
+                "mode": stat.S_IMODE(observed.st_mode),
+                "kind": "directory" if stat.S_ISDIR(observed.st_mode) else "file",
+                "links": observed.st_nlink,
+            }
+        )
+    return sha256_bytes(canonical_bytes(rows))
+
+
+def _local_tree_content_digest(
+    target: Path,
+    name: str,
+    *,
+    ambient_identities: set[tuple[int, int]] | None = None,
+    include_source_version: bool = False,
+) -> str | None:
+    """Digest one local tree through retained descriptors and stable reads."""
+
+    if not target.exists() and not target.is_symlink():
+        return None
+    ambient_identities = ambient_identities or set()
+    root_fd, root_initial, root_opened = _open_stable_actor_local_path_descriptor(
+        target, name
+    )
+    rows: list[dict[str, object]] = []
+    visited_directories: set[tuple[int, int]] = set()
+
+    def read_regular(
+        descriptor: int,
+        current: os.stat_result,
+        *,
+        parent_fd: int | None,
+        child_name: str | None,
+        label: str,
+    ) -> bytes:
+        if current.st_nlink != 1:
+            raise IncarnationHomeError(
+                f"actor-local capability entry is multiply linked: {label}"
+            )
+        read_parent_fd: int | None = None
+        read_descriptor: int | None = None
+        try:
+            if parent_fd is None:
+                read_parent_fd = _open_pinned_parent_directory(target, label)
+                read_descriptor, read_opened = _open_stable_regular_file_at(
+                    read_parent_fd,
+                    target.name,
+                    label=label,
+                    ambient_identities=ambient_identities,
+                )
+            else:
+                assert child_name is not None
+                read_descriptor, read_opened = _open_stable_regular_file_at(
+                    parent_fd,
+                    child_name,
+                    label=label,
+                    ambient_identities=ambient_identities,
+                )
+            if _actor_local_identity_mode(read_opened) != _actor_local_identity_mode(
+                current
+            ) or _actor_local_source_version(read_opened) != _actor_local_source_version(
+                current
+            ):
+                raise IncarnationHomeError(f"actor-local capability entry changed: {label}")
+            source_version = _actor_local_source_version(read_opened)
+            content = _read_descriptor_bytes(read_descriptor, label)
+            after_first_read = os.fstat(read_descriptor)
+            if _actor_local_source_version(after_first_read) != source_version:
+                raise IncarnationHomeError(
+                    f"actor-local capability entry changed while reading: {label}"
+                )
+            repeated_content = _read_descriptor_bytes(read_descriptor, label)
+            if repeated_content != content:
+                raise IncarnationHomeError(
+                    f"actor-local capability entry changed while reading: {label}"
+                )
+            after_read = os.fstat(read_descriptor)
+            if _actor_local_identity_mode(after_read) != _actor_local_identity_mode(
+                current
+            ) or _actor_local_source_version(after_read) != source_version:
+                raise IncarnationHomeError(
+                    f"actor-local capability entry changed while reading: {label}"
+                )
+            return repeated_content
+        finally:
+            if read_descriptor is not None:
+                os.close(read_descriptor)
+            if read_parent_fd is not None:
+                os.close(read_parent_fd)
+
+    def visit(
+        descriptor: int,
+        initial: os.stat_result,
+        opened: os.stat_result,
+        relative: str,
+        *,
+        parent_fd: int | None,
+        child_name: str | None,
+    ) -> None:
+        current = os.fstat(descriptor)
+        if (
+            _actor_local_identity_mode(current)
+            != _actor_local_identity_mode(opened)
+            or _actor_local_source_version(current)
+            != _actor_local_source_version(opened)
+        ):
+            raise IncarnationHomeError(
+                f"actor-local capability entry changed during content validation: {relative}"
+            )
+        identity = (current.st_dev, current.st_ino)
+        if identity in ambient_identities:
+            raise IncarnationHomeError(
+                f"actor-local capability entry aliases ambient state: {relative}"
+            )
+        if stat.S_ISREG(current.st_mode):
+            content = read_regular(
+                descriptor,
+                current,
+                parent_fd=parent_fd,
+                child_name=child_name,
+                label=relative,
+            )
+            row: dict[str, object] = {
+                "path": relative,
+                "kind": "file",
+                "mode": stat.S_IMODE(current.st_mode),
+                "content_digest": sha256_bytes(content),
+            }
+            if include_source_version:
+                row["source_version"] = list(_actor_local_source_version(current))
+            rows.append(row)
+        elif stat.S_ISDIR(current.st_mode):
+            if identity in visited_directories:
+                raise IncarnationHomeError(
+                    f"actor-local capability directory is aliased: {relative}"
+                )
+            visited_directories.add(identity)
+            row = {
+                "path": relative,
+                "kind": "directory",
+                "mode": stat.S_IMODE(current.st_mode),
+            }
+            if include_source_version:
+                row["source_version"] = list(_actor_local_source_version(current))
+            rows.append(row)
+            try:
+                children = sorted(os.listdir(descriptor))
+                after_listing = os.fstat(descriptor)
+            except OSError as exc:
+                raise IncarnationHomeError(
+                    f"actor-local capability directory cannot be enumerated: {relative}"
+                ) from exc
+            if (
+                _actor_local_identity_mode(after_listing)
+                != _actor_local_identity_mode(current)
+                or _actor_local_source_version(after_listing)
+                != _actor_local_source_version(current)
+            ):
+                raise IncarnationHomeError(
+                    f"actor-local capability directory changed during content validation: {relative}"
+                )
+            for child_name_value in children:
+                child_label = f"{relative}/{child_name_value}"
+                child_fd, child_initial, child_opened = (
+                    _open_stable_actor_local_child_descriptor(
+                        descriptor, child_name_value, child_label
+                    )
+                )
+                try:
+                    visit(
+                        child_fd,
+                        child_initial,
+                        child_opened,
+                        child_label,
+                        parent_fd=descriptor,
+                        child_name=child_name_value,
+                    )
+                finally:
+                    os.close(child_fd)
+        else:
+            raise IncarnationHomeError(
+                f"actor-local capability entry is not a regular file or directory: {relative}"
+            )
+        if _actor_local_source_version(os.fstat(descriptor)) != _actor_local_source_version(
+            current
+        ):
+            raise IncarnationHomeError(
+                f"actor-local capability entry changed during content validation: {relative}"
+            )
+        if parent_fd is None:
+            _revalidate_actor_local_path(target, descriptor, initial, relative)
+        else:
+            assert child_name is not None
+            _revalidate_actor_local_child(
+                parent_fd, child_name, descriptor, initial, relative
+            )
+
+    try:
+        visit(
+            root_fd,
+            root_initial,
+            root_opened,
+            name,
+            parent_fd=None,
+            child_name=None,
+        )
+    finally:
+        os.close(root_fd)
+    return sha256_bytes(canonical_bytes(rows))
+
+
+def _legacy_migration_content_snapshot(
+    *,
+    home: Path,
+    names: Sequence[str],
+    ambient_identities: set[tuple[int, int]],
+    include_source_version: bool,
+) -> dict[str, str | None]:
+    """Capture migration state through stable content reads, not topology only."""
+
+    return {
+        name: _local_tree_content_digest(
+            home / name,
+            name,
+            ambient_identities=ambient_identities,
+            include_source_version=include_source_version,
+        )
+        for name in names
+        if name != "config.toml"
+    }
+
+
+def _validate_legacy_migration_content_snapshot(
+    *,
+    home: Path,
+    expected: dict[str, str | None],
+    ambient_identities: set[tuple[int, int]],
+    include_source_version: bool,
+    stage: str,
+) -> None:
+    current = _legacy_migration_content_snapshot(
+        home=home,
+        names=sorted(expected),
+        ambient_identities=ambient_identities,
+        include_source_version=include_source_version,
+    )
+    if current != expected:
+        raise IncarnationHomeError(
+            f"legacy migration state changed during {stage}"
+        )
+
+
+def _revalidate_legacy_migration_source_root(
+    *,
+    source_home: Path,
+    source_root_descriptor: int,
+    source_root_version: tuple[int, ...],
+    stage: str,
+) -> None:
+    """Keep the migration source pathname bound to its retained root inode."""
+
+    try:
+        retained = os.fstat(source_root_descriptor)
+        observed = os.lstat(source_home)
+    except OSError as exc:
+        raise IncarnationHomeError(
+            f"legacy migration source home changed during migration: {stage}"
+        ) from exc
+    if (
+        _actor_local_source_version(retained) != source_root_version
+        or _actor_local_source_version(observed)
+        != _actor_local_source_version(retained)
+    ):
+        raise IncarnationHomeError(
+            f"legacy migration source home changed during migration: {stage}"
+        )
+
+
+def _denied_state_provenance(
+    *,
+    codex_home: Path,
+    ambient_home: Path,
+    names: Sequence[str],
+    initially_ambient_identities: set[tuple[int, int]] | None = None,
+    local_tree_content_digests: dict[str, str | None] | None = None,
+) -> dict[str, dict[str, object]]:
+    """Record one current identity and one admitted local-tree digest per name."""
+
+    ambient_identities = _ambient_inode_identities(ambient_home)
+    if initially_ambient_identities is not None:
+        ambient_identities.update(initially_ambient_identities)
+    provenance: dict[str, dict[str, object]] = {}
+    for name in names:
+        target = codex_home / name
+        if target.exists() or target.is_symlink():
+            _validate_actor_local_entry(
+                target,
+                name,
+                ambient_identities=ambient_identities,
+            )
+        record: dict[str, object] = {
+            "ambient_entry": _identity_record(
+                _entry_identity(ambient_home / name, f"ambient denied entry {name}")
+            ),
+            "local_tree_digest": _local_tree_digest(target, name),
+        }
+        if local_tree_content_digests is not None:
+            record["local_tree_content_digest"] = local_tree_content_digests.get(name)
+        provenance[name] = record
+    return provenance
+
+
+def _validate_denied_state_provenance(
+    *,
+    manifest: dict[str, Any],
+    codex_home: Path,
+    ambient_home: Path,
+    names: Sequence[str],
+    required: bool,
+    allow_projection_expansion: bool = False,
+) -> None:
+    """Reject unknown local state after an ambient denied-entry transition.
+
+    The record is bounded by the current typed denied projection: it stores no
+    path/history denylist.  A changed ambient identity is safe only when the
+    local tree is the exact tree already admitted by the previous manifest.
+    """
+
+    raw = manifest.get("denied_state_provenance")
+    if raw is None:
+        if required:
+            raise IncarnationHomeError(
+                "current incarnation-home manifest lacks denied-state provenance"
+            )
+        return
+    if not isinstance(raw, dict) or (
+        set(raw) != set(names)
+        and (
+            not allow_projection_expansion
+            or not set(raw) <= set(names)
+        )
+    ):
+        raise IncarnationHomeError("denied-state provenance does not match projection")
+    for name in names:
+        record = raw.get(name)
+        if record is None and allow_projection_expansion:
+            continue
+        if not isinstance(record, dict) or not set(record) <= {
+            "ambient_entry",
+            "local_tree_digest",
+            "local_tree_content_digest",
+        } or set(record) < {"ambient_entry", "local_tree_digest"}:
+            raise IncarnationHomeError(
+                f"denied-state provenance is invalid for {name}"
+            )
+        previous_ambient = _identity_from_record(
+            record.get("ambient_entry"), f"denied-state ambient {name}"
+        )
+        previous_local = record.get("local_tree_digest")
+        if previous_local is not None and (
+            not isinstance(previous_local, str)
+            or SHA256_DIGEST_PATTERN.fullmatch(previous_local) is None
+        ):
+            raise IncarnationHomeError(
+                f"denied-state local provenance is invalid for {name}"
+            )
+        previous_content = record.get("local_tree_content_digest")
+        if previous_content is not None and (
+            not isinstance(previous_content, str)
+            or SHA256_DIGEST_PATTERN.fullmatch(previous_content) is None
+        ):
+            raise IncarnationHomeError(
+                f"denied-state local content provenance is invalid for {name}"
+            )
+        current_ambient = _entry_identity(
+            ambient_home / name, f"ambient denied entry {name}"
+        )
+        current_local = _local_tree_digest(codex_home / name, name)
+        if previous_content is not None:
+            current_content = _local_tree_content_digest(
+                codex_home / name,
+                name,
+                include_source_version=False,
+            )
+            if current_content != previous_content:
+                raise IncarnationHomeError(
+                    f"denied-state local content changed: {name}"
+                )
+        if current_ambient != previous_ambient and current_local != previous_local:
+            raise IncarnationHomeError(
+                f"denied-state provenance changed across ambient replacement: {name}"
+            )
 
 
 def _reject_custom_model_provider(parsed: dict[str, Any]) -> None:
@@ -695,21 +1824,1607 @@ def _bound_config(ambient_config: bytes, model_slug: str, effort: str) -> bytes:
     return bound.encode("utf-8")
 
 
-def _write_exact(path: Path, content: bytes, mode: int) -> None:
-    if path.exists() or path.is_symlink():
-        if path.is_symlink() or not path.is_file():
-            raise IncarnationHomeError(f"refusing to replace non-file: {path}")
-        if path.read_bytes() == content:
-            path.chmod(mode)
-            return
-    temporary = path.with_name(path.name + f".tmp-{os.getpid()}")
+def _open_pinned_parent_directory(path: Path, label: str) -> int:
+    """Open and pin one target parent before any file mutation."""
+
+    if not path.is_absolute() or not path.name:
+        raise IncarnationHomeError(f"{label} must be an absolute file path: {path}")
+    parent = path.parent
     try:
-        temporary.write_bytes(content)
-        temporary.chmod(mode)
-        os.replace(temporary, path)
+        observed = os.lstat(parent)
+    except OSError as exc:
+        raise IncarnationHomeError(
+            f"{label} parent cannot be inspected: {parent}"
+        ) from exc
+    if stat.S_ISLNK(observed.st_mode) or not stat.S_ISDIR(observed.st_mode):
+        raise IncarnationHomeError(f"{label} parent must be a real directory: {parent}")
+    flags = os.O_RDONLY
+    flags |= getattr(os, "O_DIRECTORY", 0)
+    flags |= getattr(os, "O_NOFOLLOW", 0)
+    flags |= getattr(os, "O_CLOEXEC", 0)
+    try:
+        parent_fd = os.open(parent, flags)
+    except OSError as exc:
+        raise IncarnationHomeError(
+            f"{label} parent cannot be opened safely: {parent}"
+        ) from exc
+    try:
+        opened = os.fstat(parent_fd)
+        if (
+            (opened.st_dev, opened.st_ino, opened.st_mode)
+            != (observed.st_dev, observed.st_ino, observed.st_mode)
+        ):
+            raise IncarnationHomeError(
+                f"{label} parent changed during safe open: {parent}"
+            )
+        return parent_fd
+    except IncarnationHomeError:
+        os.close(parent_fd)
+        raise
+    except OSError as exc:
+        os.close(parent_fd)
+        raise IncarnationHomeError(
+            f"{label} parent cannot be inspected after safe open: {parent}"
+        ) from exc
+
+
+def _chmod_stable_directory(path: Path, mode: int, label: str) -> None:
+    """Apply directory mode through the identity-validated retained descriptor."""
+
+    parent_fd = _open_pinned_parent_directory(path, label)
+    descriptor: int | None = None
+    target_mode = stat.S_IMODE(mode)
+    try:
+        try:
+            initial = os.stat(path.name, dir_fd=parent_fd, follow_symlinks=False)
+        except OSError as exc:
+            raise IncarnationHomeError(
+                f"{label} cannot be inspected safely"
+            ) from exc
+        if stat.S_ISLNK(initial.st_mode) or not stat.S_ISDIR(initial.st_mode):
+            raise IncarnationHomeError(f"{label} is not a real directory")
+        flags = (
+            os.O_RDONLY
+            | getattr(os, "O_DIRECTORY", 0)
+            | getattr(os, "O_NOFOLLOW", 0)
+            | getattr(os, "O_CLOEXEC", 0)
+        )
+        try:
+            descriptor = os.open(path.name, flags, dir_fd=parent_fd)
+            opened = os.fstat(descriptor)
+            observed = os.stat(path.name, dir_fd=parent_fd, follow_symlinks=False)
+        except OSError as exc:
+            raise IncarnationHomeError(
+                f"{label} cannot be opened safely"
+            ) from exc
+        if (
+            _actor_local_identity_mode(opened)
+            != _actor_local_identity_mode(initial)
+            or _actor_local_identity_mode(opened)
+            != _actor_local_identity_mode(observed)
+        ):
+            raise IncarnationHomeError(f"{label} changed before mode binding")
+        try:
+            os.fchmod(descriptor, target_mode)
+            bound = os.fstat(descriptor)
+            observed_bound = os.stat(
+                path.name, dir_fd=parent_fd, follow_symlinks=False
+            )
+            os.fsync(descriptor)
+        except OSError as exc:
+            raise IncarnationHomeError(
+                f"{label} could not be mode-bound safely"
+            ) from exc
+        if (
+            not stat.S_ISDIR(bound.st_mode)
+            or (bound.st_dev, bound.st_ino) != (initial.st_dev, initial.st_ino)
+            or _actor_local_identity_mode(observed_bound)
+            != _actor_local_identity_mode(bound)
+            or stat.S_IMODE(bound.st_mode) != target_mode
+        ):
+            raise IncarnationHomeError(f"{label} changed during mode binding")
     finally:
-        if temporary.exists():
-            temporary.unlink()
+        if descriptor is not None:
+            os.close(descriptor)
+        os.close(parent_fd)
+
+
+def _open_stable_regular_file_at(
+    parent_fd: int,
+    name: str,
+    *,
+    label: str,
+    ambient_identities: set[tuple[int, int]],
+    writable: bool = False,
+) -> tuple[int, os.stat_result]:
+    """Open one regular child through a pinned parent and recheck its identity."""
+
+    try:
+        initial = os.lstat(name, dir_fd=parent_fd)
+    except OSError as exc:
+        raise IncarnationHomeError(f"{label} cannot be inspected") from exc
+    if stat.S_ISLNK(initial.st_mode) or not stat.S_ISREG(initial.st_mode):
+        raise IncarnationHomeError(f"{label} is not a regular file")
+    flags = (os.O_RDWR if writable else os.O_RDONLY) | getattr(
+        os, "O_NOFOLLOW", 0
+    ) | getattr(os, "O_CLOEXEC", 0)
+    try:
+        descriptor = os.open(name, flags, dir_fd=parent_fd)
+    except OSError as exc:
+        raise IncarnationHomeError(f"{label} cannot be opened safely") from exc
+    try:
+        opened = os.fstat(descriptor)
+        observed = os.lstat(name, dir_fd=parent_fd)
+        if (
+            (opened.st_dev, opened.st_ino, opened.st_mode)
+            != (initial.st_dev, initial.st_ino, initial.st_mode)
+            or (opened.st_dev, opened.st_ino, opened.st_mode)
+            != (observed.st_dev, observed.st_ino, observed.st_mode)
+            or (opened.st_dev, opened.st_ino) in ambient_identities
+            or opened.st_nlink != 1
+        ):
+            raise IncarnationHomeError(f"{label} changed during safe validation")
+        return descriptor, opened
+    except IncarnationHomeError:
+        os.close(descriptor)
+        raise
+    except OSError as exc:
+        os.close(descriptor)
+        raise IncarnationHomeError(f"{label} cannot be revalidated safely") from exc
+
+
+def _read_descriptor_bytes(descriptor: int, label: str) -> bytes:
+    try:
+        os.lseek(descriptor, 0, os.SEEK_SET)
+        chunks: list[bytes] = []
+        while True:
+            chunk = os.read(descriptor, 1024 * 1024)
+            if not chunk:
+                return b"".join(chunks)
+            chunks.append(chunk)
+    except OSError as exc:
+        raise IncarnationHomeError(f"{label} cannot be read safely") from exc
+
+
+def _create_unnameable_temporary_file_at(parent_fd: int, label: str) -> int:
+    """Create a temporary inode that has no replaceable source pathname."""
+
+    tmpfile = getattr(os, "O_TMPFILE", 0)
+    if not tmpfile:
+        raise IncarnationHomeError(
+            f"{label} requires an unnameable temporary file boundary"
+        )
+    flags = tmpfile | os.O_RDWR | getattr(os, "O_CLOEXEC", 0)
+    try:
+        descriptor = os.open(".", flags, 0o600, dir_fd=parent_fd)
+    except OSError as exc:
+        raise IncarnationHomeError(
+            f"{label} cannot create an unnameable temporary file"
+        ) from exc
+    try:
+        opened = os.fstat(descriptor)
+        if not stat.S_ISREG(opened.st_mode) or opened.st_nlink != 0:
+            raise IncarnationHomeError(
+                f"{label} temporary inode is not unnameable"
+            )
+        return descriptor
+    except IncarnationHomeError:
+        os.close(descriptor)
+        raise
+    except OSError as exc:
+        os.close(descriptor)
+        raise IncarnationHomeError(
+            f"{label} temporary inode cannot be validated"
+        ) from exc
+
+
+def _write_descriptor_exact(
+    descriptor: int, content: bytes, mode: int, label: str
+) -> None:
+    """Write one already-admitted descriptor without reopening its pathname."""
+
+    try:
+        os.fchmod(descriptor, mode)
+        os.ftruncate(descriptor, 0)
+        os.lseek(descriptor, 0, os.SEEK_SET)
+        view = memoryview(content)
+        while view:
+            view = view[os.write(descriptor, view) :]
+        os.fsync(descriptor)
+    except OSError as exc:
+        raise IncarnationHomeError(f"cannot write admitted file: {label}") from exc
+
+
+def _revalidate_regular_file_at(
+    parent_fd: int,
+    name: str,
+    descriptor: int,
+    initial: os.stat_result,
+    *,
+    label: str,
+    ambient_identities: set[tuple[int, int]],
+) -> None:
+    """Recheck a retained regular-file descriptor before a name-based effect."""
+
+    try:
+        opened = os.fstat(descriptor)
+        observed = os.lstat(name, dir_fd=parent_fd)
+    except OSError as exc:
+        raise IncarnationHomeError(f"{label} changed before mutation") from exc
+    if (
+        (opened.st_dev, opened.st_ino, opened.st_mode)
+        != (initial.st_dev, initial.st_ino, initial.st_mode)
+        or (opened.st_dev, opened.st_ino, opened.st_mode)
+        != (observed.st_dev, observed.st_ino, observed.st_mode)
+        or not stat.S_ISREG(opened.st_mode)
+        or opened.st_nlink != 1
+        or (opened.st_dev, opened.st_ino) in ambient_identities
+    ):
+        raise IncarnationHomeError(f"{label} changed before mutation")
+
+
+def _revalidate_writable_regular_file_at(
+    parent_fd: int,
+    name: str,
+    descriptor: int,
+    initial: os.stat_result,
+    *,
+    label: str,
+    ambient_identities: set[tuple[int, int]],
+) -> None:
+    """Recheck a writable descriptor immediately before its first effect."""
+
+    _revalidate_regular_file_at(
+        parent_fd,
+        name,
+        descriptor,
+        initial,
+        label=label,
+        ambient_identities=ambient_identities,
+    )
+
+
+def _publish_unnameable_file_at(
+    parent_fd: int, descriptor: int, name: str, label: str
+) -> None:
+    """Create the destination link from the admitted descriptor, never its name."""
+
+    try:
+        os.link(
+            f"/proc/self/fd/{descriptor}",
+            name,
+            dst_dir_fd=parent_fd,
+            follow_symlinks=True,
+        )
+    except FileExistsError as exc:
+        raise IncarnationHomeError(f"{label} already exists") from exc
+    except OSError as exc:
+        raise IncarnationHomeError(
+            f"cannot publish unnameable {label}"
+        ) from exc
+
+
+def _stage_unnameable_file_at(
+    parent_fd: int, target_name: str, descriptor: int, label: str
+) -> str:
+    """Give a fully written anonymous inode one private staging name."""
+
+    for _attempt in range(8):
+        staged_name = f".{target_name}.stage-{secrets.token_hex(16)}"
+        try:
+            os.link(
+                f"/proc/self/fd/{descriptor}",
+                staged_name,
+                dst_dir_fd=parent_fd,
+                follow_symlinks=True,
+            )
+            return staged_name
+        except FileExistsError:
+            continue
+        except OSError as exc:
+            raise IncarnationHomeError(
+                f"cannot stage unnameable {label}"
+            ) from exc
+    raise IncarnationHomeError(f"cannot allocate a private staging name for {label}")
+
+
+def _remove_staged_file_at(
+    parent_fd: int,
+    name: str,
+    descriptor: int,
+    label: str,
+    *,
+    require_unlinked: bool = False,
+) -> None:
+    """Remove only the exact private staging link retained by descriptor.
+
+    The staging name is first moved into a private, newly-created directory.
+    The final unlink therefore targets the quarantined inode rather than a
+    mutable destination pathname; a replacement at the original name is
+    preserved and causes a fail-closed error.
+    """
+
+    try:
+        observed = os.lstat(name, dir_fd=parent_fd)
+    except FileNotFoundError:
+        if require_unlinked:
+            raise IncarnationHomeError(
+                f"{label} staging entry disappeared before cleanup"
+            )
+        return
+    except OSError as exc:
+        raise IncarnationHomeError(f"{label} staging entry cannot be inspected") from exc
+    try:
+        opened = os.fstat(descriptor)
+    except OSError as exc:
+        raise IncarnationHomeError(f"{label} staging inode cannot be inspected") from exc
+    if (
+        (observed.st_dev, observed.st_ino, observed.st_mode)
+        != (opened.st_dev, opened.st_ino, opened.st_mode)
+        or not stat.S_ISREG(opened.st_mode)
+        or opened.st_nlink != 1
+    ):
+        raise IncarnationHomeError(f"{label} staging entry changed before cleanup")
+    quarantine_name: str | None = None
+    quarantine_fd: int | None = None
+    quarantine_opened: os.stat_result | None = None
+    quarantine_entry_moved = False
+    try:
+        for _attempt in range(8):
+            candidate = f".{name}.quarantine-{secrets.token_hex(16)}"
+            try:
+                os.mkdir(candidate, 0o700, dir_fd=parent_fd)
+            except FileExistsError:
+                continue
+            quarantine_name = candidate
+            break
+        if quarantine_name is None:
+            raise IncarnationHomeError(
+                f"{label} could not allocate a private cleanup directory"
+            )
+        quarantine_flags = (
+            os.O_RDONLY
+            | getattr(os, "O_DIRECTORY", 0)
+            | getattr(os, "O_NOFOLLOW", 0)
+            | getattr(os, "O_CLOEXEC", 0)
+        )
+        try:
+            quarantine_fd = os.open(
+                quarantine_name,
+                quarantine_flags,
+                dir_fd=parent_fd,
+            )
+            quarantine_opened = os.fstat(quarantine_fd)
+            quarantine_observed = os.lstat(quarantine_name, dir_fd=parent_fd)
+            if (
+                (quarantine_opened.st_dev, quarantine_opened.st_ino, quarantine_opened.st_mode)
+                != (
+                    quarantine_observed.st_dev,
+                    quarantine_observed.st_ino,
+                    quarantine_observed.st_mode,
+                )
+                or not stat.S_ISDIR(quarantine_opened.st_mode)
+            ):
+                raise IncarnationHomeError(
+                    f"{label} cleanup directory changed during safe open"
+                )
+            try:
+                os.rename(
+                    name,
+                    name,
+                    src_dir_fd=parent_fd,
+                    dst_dir_fd=quarantine_fd,
+                )
+            except FileNotFoundError:
+                if require_unlinked:
+                    raise IncarnationHomeError(
+                        f"{label} staging entry disappeared before quarantine"
+                    )
+                return
+            except OSError as exc:
+                raise IncarnationHomeError(
+                    f"{label} staging entry could not be quarantined"
+                ) from exc
+            quarantine_entry_moved = True
+            quarantined = os.lstat(name, dir_fd=quarantine_fd)
+            retained = os.fstat(descriptor)
+            if (
+                (quarantined.st_dev, quarantined.st_ino, quarantined.st_mode)
+                != (retained.st_dev, retained.st_ino, retained.st_mode)
+                or not stat.S_ISREG(retained.st_mode)
+                or retained.st_nlink != 1
+            ):
+                quarantine_entry_moved = _restore_quarantined_entry_at(
+                    parent_fd=parent_fd,
+                    quarantine_fd=quarantine_fd,
+                    quarantine_name=name,
+                    target_name=name,
+                    label=f"{label} raced staging entry",
+                )
+                raise IncarnationHomeError(
+                    f"{label} staging entry changed during quarantine"
+                )
+            os.unlink(name, dir_fd=quarantine_fd)
+            quarantine_entry_moved = False
+            if require_unlinked:
+                try:
+                    remaining = os.fstat(descriptor)
+                except OSError as exc:
+                    raise IncarnationHomeError(
+                        f"{label} staging inode cannot be checked after cleanup"
+                    ) from exc
+                if remaining.st_nlink != 0:
+                    raise IncarnationHomeError(
+                        f"{label} staging inode remained linked after cleanup"
+                    )
+        except FileNotFoundError:
+            if not quarantine_entry_moved:
+                return
+            raise
+    except IncarnationHomeError:
+        raise
+    except OSError as exc:
+        raise IncarnationHomeError(f"{label} staging entry could not be removed") from exc
+    finally:
+        try:
+            if quarantine_name is not None and not quarantine_entry_moved:
+                if quarantine_fd is None or quarantine_opened is None:
+                    raise IncarnationHomeError(
+                        f"{label} cleanup directory was not safely opened"
+                    )
+                _revalidate_recovery_entry_before_removal(
+                    parent_fd,
+                    quarantine_name,
+                    quarantine_fd,
+                    quarantine_opened,
+                    f"{label} cleanup directory",
+                )
+                try:
+                    os.rmdir(quarantine_name, dir_fd=parent_fd)
+                except FileNotFoundError:
+                    pass
+                except OSError as exc:
+                    raise IncarnationHomeError(
+                        f"{label} cleanup directory could not be removed"
+                    ) from exc
+        finally:
+            if quarantine_fd is not None:
+                os.close(quarantine_fd)
+
+
+def _retained_regular_file_names(
+    parent_fd: int,
+    descriptor: int,
+    label: str,
+) -> list[str]:
+    """Find the one directory entry still linked to a retained file inode."""
+
+    try:
+        retained = os.fstat(descriptor)
+    except OSError as exc:
+        raise IncarnationHomeError(
+            f"{label} retained inode cannot be inspected"
+        ) from exc
+    if not stat.S_ISREG(retained.st_mode) or retained.st_nlink != 1:
+        raise IncarnationHomeError(
+            f"{label} retained inode is not an isolated regular file"
+        )
+    try:
+        names = sorted(os.listdir(parent_fd))
+    except OSError as exc:
+        raise IncarnationHomeError(
+            f"{label} retained inode cannot be located"
+        ) from exc
+    matches: list[str] = []
+    for name in names:
+        try:
+            observed = os.lstat(name, dir_fd=parent_fd)
+        except FileNotFoundError:
+            continue
+        except OSError as exc:
+            raise IncarnationHomeError(
+                f"{label} retained inode cannot be revalidated"
+            ) from exc
+        if (
+            observed.st_dev,
+            observed.st_ino,
+            observed.st_mode,
+        ) == (
+            retained.st_dev,
+            retained.st_ino,
+            retained.st_mode,
+        ):
+            matches.append(name)
+    return matches
+
+
+def _remove_retained_regular_file_at(
+    parent_fd: int,
+    descriptor: int,
+    label: str,
+) -> None:
+    """Retire a regular inode even when its original pathname was replaced.
+
+    The retained descriptor is the authority.  The parent directory is only
+    enumerated to rediscover a name for that exact inode; every candidate is
+    then quarantined and compared to the descriptor before unlinking.  A race
+    can therefore preserve a replacement and be retried against the moved
+    retained inode instead of falling back to a pathname unlink.
+    """
+
+    for attempt in range(8):
+        try:
+            retained = os.fstat(descriptor)
+        except OSError as exc:
+            raise IncarnationHomeError(
+                f"{label} retained inode cannot be inspected"
+            ) from exc
+        if retained.st_nlink == 0:
+            return
+        matches = _retained_regular_file_names(parent_fd, descriptor, label)
+        if len(matches) != 1:
+            if not matches:
+                detail = "has no discoverable pathname"
+            else:
+                detail = "has multiple discoverable pathnames"
+            raise IncarnationHomeError(f"{label} retained inode {detail}")
+        try:
+            _remove_staged_file_at(
+                parent_fd,
+                matches[0],
+                descriptor,
+                label,
+                require_unlinked=True,
+            )
+        except IncarnationHomeError:
+            try:
+                if os.fstat(descriptor).st_nlink == 0:
+                    return
+            except OSError as exc:
+                raise IncarnationHomeError(
+                    f"{label} retained inode cannot be checked after race"
+                ) from exc
+            if attempt == 7:
+                raise
+            continue
+        try:
+            remaining = os.fstat(descriptor)
+        except OSError as exc:
+            raise IncarnationHomeError(
+                f"{label} retained inode cannot be checked after cleanup"
+            ) from exc
+        if remaining.st_nlink == 0:
+            return
+        if attempt == 7:
+            raise IncarnationHomeError(
+                f"{label} retained inode remained linked after cleanup"
+            )
+
+
+def _remove_retained_regular_file(
+    path: Path,
+    *,
+    ambient_identities: set[tuple[int, int]],
+    label: str,
+) -> None:
+    """Remove one published regular file through its retained inode."""
+
+    parent_fd = _open_pinned_parent_directory(path, label)
+    descriptor: int | None = None
+    try:
+        descriptor, _opened = _open_stable_regular_file_at(
+            parent_fd,
+            path.name,
+            label=label,
+            ambient_identities=ambient_identities,
+        )
+        _remove_retained_regular_file_at(parent_fd, descriptor, label)
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+        os.close(parent_fd)
+
+
+def _recover_abandoned_staged_files(
+    codex_home: Path,
+    *,
+    ambient_identities: set[tuple[int, int]],
+) -> None:
+    """Remove only inode-validated stages left by an interrupted publication."""
+
+    parent_fd = _open_pinned_parent_directory(
+        codex_home / "config.toml", "incarnation Codex home staging recovery"
+    )
+    changed = False
+    try:
+        try:
+            names = sorted(os.listdir(parent_fd))
+        except OSError as exc:
+            raise IncarnationHomeError(
+                "incarnation Codex home staging entries cannot be enumerated"
+            ) from exc
+        for name in names:
+            match = STAGED_FILE_NAME_PATTERN.fullmatch(name)
+            if match is not None:
+                if match.group("target") not in LOCAL_NAMES:
+                    continue
+                try:
+                    observed = os.lstat(name, dir_fd=parent_fd)
+                except FileNotFoundError:
+                    continue
+                except OSError as exc:
+                    raise IncarnationHomeError(
+                        f"abandoned staging entry cannot be inspected: {name}"
+                    ) from exc
+                if stat.S_ISLNK(observed.st_mode) or not stat.S_ISREG(observed.st_mode):
+                    raise IncarnationHomeError(
+                        f"abandoned staging entry is not an isolated regular file: {name}"
+                    )
+                descriptor, _opened = _open_stable_regular_file_at(
+                    parent_fd,
+                    name,
+                    label=f"abandoned staging entry {name}",
+                    ambient_identities=ambient_identities,
+                )
+                try:
+                    _remove_staged_file_at(
+                        parent_fd,
+                        name,
+                        descriptor,
+                        f"abandoned staging entry {name}",
+                    )
+                    changed = True
+                finally:
+                    os.close(descriptor)
+                continue
+            quarantine = STAGED_QUARANTINE_NAME_PATTERN.fullmatch(name)
+            if quarantine is None:
+                continue
+            stage_name = quarantine.group("stage")
+            stage_match = STAGED_FILE_NAME_PATTERN.fullmatch(stage_name)
+            if stage_match is None or stage_match.group("target") not in LOCAL_NAMES:
+                continue
+            _recover_staging_quarantine_directory_at(
+                parent_fd,
+                name,
+                stage_name=stage_name,
+                ambient_identities=ambient_identities,
+            )
+            changed = True
+        if changed:
+            os.fsync(parent_fd)
+    finally:
+        os.close(parent_fd)
+
+
+def _rename_noreplace_between_at(
+    source_parent_fd: int,
+    source_name: str,
+    target_parent_fd: int,
+    target_name: str,
+    label: str,
+) -> bool:
+    """Restore a raced entry without overwriting a newer destination."""
+
+    try:
+        libc = ctypes.CDLL(None, use_errno=True)
+        renameat2 = libc.renameat2
+    except (AttributeError, OSError) as exc:
+        raise IncarnationHomeError(
+            f"{label} requires atomic no-replace support"
+        ) from exc
+    renameat2.argtypes = [
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_uint,
+    ]
+    renameat2.restype = ctypes.c_int
+    result = renameat2(
+        source_parent_fd,
+        os.fsencode(source_name),
+        target_parent_fd,
+        os.fsencode(target_name),
+        0x1,  # Linux renameat2 RENAME_NOREPLACE.
+    )
+    if result != 0:
+        error_number = ctypes.get_errno()
+        if error_number == errno.EEXIST:
+            return False
+        detail = os.strerror(error_number) if error_number else "unknown error"
+        raise IncarnationHomeError(f"{label} atomic no-replace restore failed: {detail}")
+    return True
+
+
+def _rename_exchange_between_at(
+    source_parent_fd: int,
+    source_name: str,
+    target_parent_fd: int,
+    target_name: str,
+    label: str,
+) -> None:
+    """Atomically exchange two names without unlinking an unvalidated target."""
+
+    try:
+        libc = ctypes.CDLL(None, use_errno=True)
+        renameat2 = libc.renameat2
+    except (AttributeError, OSError) as exc:
+        raise IncarnationHomeError(
+            f"{label} requires atomic exchange support"
+        ) from exc
+    renameat2.argtypes = [
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_uint,
+    ]
+    renameat2.restype = ctypes.c_int
+    result = renameat2(
+        source_parent_fd,
+        os.fsencode(source_name),
+        target_parent_fd,
+        os.fsencode(target_name),
+        0x2,  # Linux renameat2 RENAME_EXCHANGE.
+    )
+    if result != 0:
+        error_number = ctypes.get_errno()
+        detail = os.strerror(error_number) if error_number else "unknown error"
+        raise IncarnationHomeError(f"{label} atomic exchange failed: {detail}")
+
+
+def _rename_exchange_at(
+    parent_fd: int, source_name: str, target_name: str, label: str
+) -> None:
+    _rename_exchange_between_at(
+        parent_fd, source_name, parent_fd, target_name, label
+    )
+
+
+def _restore_quarantined_entry_at(
+    *,
+    parent_fd: int,
+    quarantine_fd: int,
+    quarantine_name: str,
+    target_name: str,
+    label: str,
+) -> bool:
+    """Put a raced victim back, preserving a concurrent replacement if needed.
+
+    The normal path uses RENAME_NOREPLACE so a concurrent new destination is
+    never overwritten.  If a destination appeared after quarantine, an
+    exchange restores the quarantined victim atomically and leaves the newer
+    entry in the private quarantine; the caller must then retain that
+    quarantine and fail closed rather than deleting either entry.
+    """
+
+    restored = _rename_noreplace_between_at(
+        quarantine_fd,
+        quarantine_name,
+        parent_fd,
+        target_name,
+        label,
+    )
+    if restored:
+        return False
+    _rename_exchange_between_at(
+        quarantine_fd,
+        quarantine_name,
+        parent_fd,
+        target_name,
+        f"{label} occupied-destination restore",
+    )
+    return True
+
+
+def _remove_validated_projection_link_at(
+    target: Path,
+    expected_source: Path,
+    label: str,
+) -> None:
+    """Remove only the symlink inode retained across a rename quarantine."""
+
+    parent_fd = _open_pinned_parent_directory(target, label)
+    descriptor: int | None = None
+    quarantine_name: str | None = None
+    quarantine_fd: int | None = None
+    quarantine_opened: os.stat_result | None = None
+    quarantine_entry_moved = False
+    try:
+        try:
+            initial = os.lstat(target.name, dir_fd=parent_fd)
+            initial_target = Path(os.readlink(target.name, dir_fd=parent_fd))
+        except OSError as exc:
+            raise IncarnationHomeError(
+                f"{label} cannot be inspected safely"
+            ) from exc
+        if not stat.S_ISLNK(initial.st_mode) or initial_target != expected_source:
+            raise IncarnationHomeError(f"{label} projection link changed")
+        path_flag = getattr(os, "O_PATH", 0)
+        if not path_flag:
+            raise IncarnationHomeError(
+                f"{label} requires descriptor-backed symlink removal"
+            )
+        flags = path_flag | getattr(os, "O_NOFOLLOW", 0) | getattr(
+            os, "O_CLOEXEC", 0
+        )
+        try:
+            descriptor = os.open(target.name, flags, dir_fd=parent_fd)
+            opened = os.fstat(descriptor)
+            observed = os.lstat(target.name, dir_fd=parent_fd)
+            observed_target = Path(os.readlink(target.name, dir_fd=parent_fd))
+        except OSError as exc:
+            raise IncarnationHomeError(
+                f"{label} cannot be opened safely"
+            ) from exc
+        if (
+            _actor_local_identity_mode(opened)
+            != _actor_local_identity_mode(initial)
+            or _actor_local_identity_mode(opened)
+            != _actor_local_identity_mode(observed)
+            or observed_target != initial_target
+            or opened.st_nlink != 1
+        ):
+            raise IncarnationHomeError(f"{label} changed during safe validation")
+
+        for _attempt in range(8):
+            candidate = f".{target.name}.quarantine-{secrets.token_hex(16)}"
+            try:
+                os.mkdir(candidate, 0o700, dir_fd=parent_fd)
+            except FileExistsError:
+                continue
+            quarantine_name = candidate
+            break
+        if quarantine_name is None:
+            raise IncarnationHomeError(
+                f"{label} could not allocate a private cleanup directory"
+            )
+        quarantine_flags = (
+            os.O_RDONLY
+            | getattr(os, "O_DIRECTORY", 0)
+            | getattr(os, "O_NOFOLLOW", 0)
+            | getattr(os, "O_CLOEXEC", 0)
+        )
+        try:
+            quarantine_fd = os.open(
+                quarantine_name,
+                quarantine_flags,
+                dir_fd=parent_fd,
+            )
+            quarantine_opened = os.fstat(quarantine_fd)
+            quarantine_observed = os.lstat(quarantine_name, dir_fd=parent_fd)
+            if (
+                _actor_local_identity_mode(quarantine_opened)
+                != _actor_local_identity_mode(quarantine_observed)
+                or not stat.S_ISDIR(quarantine_opened.st_mode)
+            ):
+                raise IncarnationHomeError(
+                    f"{label} cleanup directory changed during safe open"
+                )
+            try:
+                os.rename(
+                    target.name,
+                    target.name,
+                    src_dir_fd=parent_fd,
+                    dst_dir_fd=quarantine_fd,
+                )
+            except OSError as exc:
+                raise IncarnationHomeError(
+                    f"{label} projection link could not be quarantined"
+                ) from exc
+            quarantine_entry_moved = True
+            quarantined = os.lstat(target.name, dir_fd=quarantine_fd)
+            retained = os.fstat(descriptor)
+            quarantined_target: Path | None = None
+            if stat.S_ISLNK(quarantined.st_mode):
+                quarantined_target = Path(
+                    os.readlink(target.name, dir_fd=quarantine_fd)
+                )
+            if (
+                _actor_local_identity_mode(quarantined)
+                != _actor_local_identity_mode(retained)
+                or not stat.S_ISLNK(retained.st_mode)
+                or retained.st_nlink != 1
+                or quarantined_target != initial_target
+            ):
+                quarantine_entry_moved = _restore_quarantined_entry_at(
+                    parent_fd=parent_fd,
+                    quarantine_fd=quarantine_fd,
+                    quarantine_name=target.name,
+                    target_name=target.name,
+                    label=f"{label} raced projection link",
+                )
+                raise IncarnationHomeError(
+                    f"{label} projection link changed during quarantine"
+                )
+            os.unlink(target.name, dir_fd=quarantine_fd)
+            quarantine_entry_moved = False
+            if os.fstat(descriptor).st_nlink != 0:
+                raise IncarnationHomeError(
+                    f"{label} projection link remained linked after cleanup"
+                )
+        finally:
+            if (
+                quarantine_name is not None
+                and not quarantine_entry_moved
+                and quarantine_fd is not None
+                and quarantine_opened is not None
+            ):
+                _revalidate_recovery_entry_before_removal(
+                    parent_fd,
+                    quarantine_name,
+                    quarantine_fd,
+                    quarantine_opened,
+                    f"{label} cleanup directory",
+                )
+                try:
+                    os.rmdir(quarantine_name, dir_fd=parent_fd)
+                except FileNotFoundError:
+                    pass
+                except OSError as exc:
+                    raise IncarnationHomeError(
+                        f"{label} cleanup directory could not be removed"
+                    ) from exc
+    finally:
+        if quarantine_fd is not None:
+            os.close(quarantine_fd)
+        if descriptor is not None:
+            os.close(descriptor)
+        os.close(parent_fd)
+
+
+def _recover_staging_quarantine_directory_at(
+    parent_fd: int,
+    name: str,
+    *,
+    stage_name: str,
+    ambient_identities: set[tuple[int, int]],
+) -> None:
+    """Recover one owner-created quarantine directory without path trust."""
+
+    descriptor, initial, opened = _open_recovery_directory_at(
+        parent_fd,
+        name,
+        f"staging quarantine {name}",
+    )
+    try:
+        try:
+            children = sorted(os.listdir(descriptor))
+        except OSError as exc:
+            raise IncarnationHomeError(
+                f"staging quarantine cannot be enumerated: {name}"
+            ) from exc
+        for child in children:
+            if child == stage_name:
+                child_descriptor, _child_opened = _open_stable_regular_file_at(
+                    descriptor,
+                    child,
+                    label=f"staging quarantine entry {name}/{child}",
+                    ambient_identities=ambient_identities,
+                )
+                try:
+                    _remove_staged_file_at(
+                        descriptor,
+                        child,
+                        child_descriptor,
+                        f"staging quarantine entry {name}/{child}",
+                    )
+                finally:
+                    os.close(child_descriptor)
+                continue
+            nested = STAGED_QUARANTINE_NAME_PATTERN.fullmatch(child)
+            if nested is not None and nested.group("stage") == stage_name:
+                _recover_staging_quarantine_directory_at(
+                    descriptor,
+                    child,
+                    stage_name=stage_name,
+                    ambient_identities=ambient_identities,
+                )
+                continue
+            raise IncarnationHomeError(
+                f"staging quarantine contains an unexpected entry: {name}"
+            )
+        _revalidate_recovery_entry_before_removal(
+            parent_fd,
+            name,
+            descriptor,
+            initial,
+            f"staging quarantine {name}",
+        )
+        try:
+            os.rmdir(name, dir_fd=parent_fd)
+        except OSError as exc:
+            raise IncarnationHomeError(
+                f"staging quarantine could not be removed: {name}"
+            ) from exc
+    finally:
+        os.close(descriptor)
+
+
+def _replace_with_staged_file_at(
+    *,
+    parent_fd: int,
+    target_name: str,
+    target_descriptor: int,
+    target_initial: os.stat_result,
+    staged_descriptor: int,
+    label: str,
+    ambient_identities: set[tuple[int, int]],
+) -> None:
+    """Atomically publish a fully written replacement after identity rechecks."""
+
+    staged_name: str | None = None
+    try:
+        staged_name = _stage_unnameable_file_at(
+            parent_fd, target_name, staged_descriptor, label
+        )
+        staged_initial = os.fstat(staged_descriptor)
+        _revalidate_regular_file_at(
+            parent_fd,
+            staged_name,
+            staged_descriptor,
+            staged_initial,
+            label=f"{label} staged file",
+            ambient_identities=ambient_identities,
+        )
+        _revalidate_regular_file_at(
+            parent_fd,
+            target_name,
+            target_descriptor,
+            target_initial,
+            label=label,
+            ambient_identities=ambient_identities,
+        )
+        _rename_exchange_at(parent_fd, staged_name, target_name, label)
+        try:
+            published = os.lstat(target_name, dir_fd=parent_fd)
+            displaced = os.lstat(staged_name, dir_fd=parent_fd)
+            staged = os.fstat(staged_descriptor)
+            retained_target = os.fstat(target_descriptor)
+        except OSError as exc:
+            raise IncarnationHomeError(f"{label} changed after exchange") from exc
+        published_matches_stage = (
+            (published.st_dev, published.st_ino, published.st_mode)
+            == (staged.st_dev, staged.st_ino, staged.st_mode)
+            and stat.S_ISREG(staged.st_mode)
+            and staged.st_nlink == 1
+            and (staged.st_dev, staged.st_ino) not in ambient_identities
+        )
+        displaced_matches_target = (
+            (displaced.st_dev, displaced.st_ino, displaced.st_mode)
+            == (
+                retained_target.st_dev,
+                retained_target.st_ino,
+                retained_target.st_mode,
+            )
+            and stat.S_ISREG(retained_target.st_mode)
+        )
+        if not (published_matches_stage and displaced_matches_target):
+            if published_matches_stage:
+                try:
+                    _rename_exchange_at(
+                        parent_fd,
+                        target_name,
+                        staged_name,
+                        f"{label} rollback",
+                    )
+                except IncarnationHomeError:
+                    staged_name = None
+                    raise
+                _remove_staged_file_at(
+                    parent_fd,
+                    staged_name,
+                    staged_descriptor,
+                    f"{label} rollback staged file",
+                )
+                staged_name = None
+            raise IncarnationHomeError(f"{label} target changed during exchange")
+        displaced_name = staged_name
+        staged_name = None
+        _remove_staged_file_at(
+            parent_fd,
+            displaced_name,
+            target_descriptor,
+            f"{label} displaced target",
+        )
+    finally:
+        if staged_name is not None:
+            _remove_staged_file_at(
+                parent_fd, staged_name, staged_descriptor, f"{label} staged file"
+            )
+
+
+def _write_exact(
+    path: Path,
+    content: bytes,
+    mode: int,
+    *,
+    ambient_identities: set[tuple[int, int]] | None = None,
+) -> None:
+    """Publish bytes only after the current target has passed alias admission."""
+
+    ambient_identities = ambient_identities or set()
+    parent_fd = _open_pinned_parent_directory(path, "exact file")
+    existing_descriptor: int | None = None
+    staged_descriptor: int | None = None
+    try:
+        try:
+            existing = os.lstat(path.name, dir_fd=parent_fd)
+        except FileNotFoundError:
+            existing = None
+        except OSError as exc:
+            raise IncarnationHomeError(
+                f"refusing to inspect unsafe file path: {path}"
+            ) from exc
+        if existing is not None:
+            existing_descriptor, opened = _open_stable_regular_file_at(
+                parent_fd,
+                path.name,
+                label=f"existing file {path}",
+                ambient_identities=ambient_identities,
+            )
+            try:
+                same_content = _read_descriptor_bytes(existing_descriptor, str(path)) == content
+                _revalidate_regular_file_at(
+                    parent_fd,
+                    path.name,
+                    existing_descriptor,
+                    opened,
+                    label=f"existing file {path}",
+                    ambient_identities=ambient_identities,
+                )
+                if same_content and stat.S_IMODE(opened.st_mode) == mode:
+                    return
+                staged_descriptor = _create_unnameable_temporary_file_at(
+                    parent_fd, str(path)
+                )
+                _write_descriptor_exact(staged_descriptor, content, mode, str(path))
+                _replace_with_staged_file_at(
+                    parent_fd=parent_fd,
+                    target_name=path.name,
+                    target_descriptor=existing_descriptor,
+                    target_initial=opened,
+                    staged_descriptor=staged_descriptor,
+                    label=f"existing file {path}",
+                    ambient_identities=ambient_identities,
+                )
+                os.fsync(parent_fd)
+                os.close(staged_descriptor)
+                staged_descriptor = None
+                return
+            finally:
+                os.close(existing_descriptor)
+                existing_descriptor = None
+        else:
+            staged_descriptor = _create_unnameable_temporary_file_at(
+                parent_fd, str(path)
+            )
+            _write_descriptor_exact(staged_descriptor, content, mode, str(path))
+            _publish_unnameable_file_at(
+                parent_fd, staged_descriptor, path.name, str(path)
+            )
+        os.fsync(parent_fd)
+    except IncarnationHomeError:
+        raise
+    except OSError as exc:
+        raise IncarnationHomeError(f"cannot safely publish file: {path}") from exc
+    finally:
+        if existing_descriptor is not None:
+            os.close(existing_descriptor)
+        if staged_descriptor is not None:
+            os.close(staged_descriptor)
+        os.close(parent_fd)
+
+
+def _copy_legacy_actor_local_state_impl(
+    *,
+    source_home: Path,
+    target_home: Path,
+    source_expected_names: set[str],
+    source_actor_local_names: Sequence[str],
+    target_actor_local_names: set[str],
+    ambient_home: Path,
+    ambient_identities: set[tuple[int, int]],
+    source_root_descriptor: int,
+    source_root_opened: os.stat_result,
+) -> tuple[dict[str, str | None], dict[str, str | None]]:
+    """Copy validated legacy local state into an unpublished typed home."""
+
+    source_root_version = _actor_local_source_version(source_root_opened)
+
+    def revalidate_source_root(stage: str) -> None:
+        try:
+            _revalidate_legacy_migration_source_root(
+                source_home=source_home,
+                source_root_descriptor=source_root_descriptor,
+                source_root_version=source_root_version,
+                stage=stage,
+            )
+        except IncarnationHomeError as exc:
+            raise IncarnationHomeError(
+                f"legacy actor-local source home changed during migration: {stage}"
+            ) from exc
+
+    revalidate_source_root("before validation")
+    _validate_actor_local_top_level_names(source_home, source_expected_names)
+    source_names = sorted(set(source_actor_local_names) | LOCAL_NAMES)
+    _validate_actor_local_entries(
+        source_home,
+        source_names,
+        ambient_home,
+        initially_ambient_identities=ambient_identities,
+    )
+    allowed_target_names = set(target_actor_local_names) | LOCAL_NAMES
+    try:
+        source_content_digests = _legacy_migration_content_snapshot(
+            home=source_home,
+            names=source_names,
+            ambient_identities=ambient_identities,
+            include_source_version=False,
+        )
+        source_content_versions = _legacy_migration_content_snapshot(
+            home=source_home,
+            names=source_names,
+            ambient_identities=ambient_identities,
+            include_source_version=True,
+        )
+    except IncarnationHomeError as exc:
+        raise IncarnationHomeError(
+            "legacy actor-local state directory changed during migration"
+        ) from exc
+    revalidate_source_root("after initial snapshot")
+    visited_directories: set[tuple[int, int]] = set()
+
+    def stable_directory_children(
+        descriptor: int,
+        expected: os.stat_result,
+        label: str,
+    ) -> list[str]:
+        try:
+            first = sorted(os.listdir(descriptor))
+            first_stat = os.fstat(descriptor)
+            second = sorted(os.listdir(descriptor))
+            second_stat = os.fstat(descriptor)
+        except OSError as exc:
+            raise IncarnationHomeError(
+                f"legacy actor-local state directory cannot be enumerated: {label}"
+            ) from exc
+        if (
+            first != second
+            or _actor_local_identity_mode(first_stat)
+            != _actor_local_identity_mode(second_stat)
+            or _actor_local_identity_mode(first_stat)
+            != _actor_local_identity_mode(expected)
+            or _actor_local_source_version(first_stat)
+            != _actor_local_source_version(second_stat)
+            or _actor_local_source_version(first_stat)
+            != _actor_local_source_version(expected)
+        ):
+            raise IncarnationHomeError(
+                f"legacy actor-local state directory changed during migration: {label}"
+            )
+        return first
+
+    def ensure_target_directory(
+        target: Path,
+        mode: int,
+        label: str,
+        *,
+        final: bool = False,
+    ) -> None:
+        source_mode = stat.S_IMODE(mode)
+        target_mode = source_mode if final else source_mode | 0o700
+        target_parent_fd: int | None = None
+        target_descriptor: int | None = None
+        try:
+            try:
+                observed = os.lstat(target)
+            except FileNotFoundError:
+                observed = None
+            if observed is not None and (
+                stat.S_ISLNK(observed.st_mode) or not stat.S_ISDIR(observed.st_mode)
+            ):
+                raise IncarnationHomeError(
+                    f"migration target is not a real directory: {label}"
+                )
+            target_parent_fd = _open_pinned_parent_directory(target, label)
+            if observed is None:
+                try:
+                    os.mkdir(
+                        target.name,
+                        target_mode,
+                        dir_fd=target_parent_fd,
+                    )
+                except FileExistsError as exc:
+                    raise IncarnationHomeError(
+                        f"migration target directory changed before safe open: {label}"
+                    ) from exc
+                observed = os.lstat(target.name, dir_fd=target_parent_fd)
+            expected_identity = (observed.st_dev, observed.st_ino)
+            flags = (
+                os.O_RDONLY
+                | getattr(os, "O_DIRECTORY", 0)
+                | getattr(os, "O_NOFOLLOW", 0)
+                | getattr(os, "O_CLOEXEC", 0)
+            )
+            target_descriptor = os.open(
+                target.name,
+                flags,
+                dir_fd=target_parent_fd,
+            )
+            opened = os.fstat(target_descriptor)
+            if (
+                not stat.S_ISDIR(opened.st_mode)
+                or (opened.st_dev, opened.st_ino) != expected_identity
+            ):
+                raise IncarnationHomeError(
+                    f"migration target directory changed during safe open: {label}"
+                )
+            os.fchmod(target_descriptor, target_mode)
+            after = os.fstat(target_descriptor)
+            if (
+                not stat.S_ISDIR(after.st_mode)
+                or (after.st_dev, after.st_ino) != expected_identity
+                or stat.S_IMODE(after.st_mode) != target_mode
+            ):
+                raise IncarnationHomeError(
+                    f"migration target directory mode could not be verified: {label}"
+                )
+            os.fsync(target_descriptor)
+            os.fsync(target_parent_fd)
+        except IncarnationHomeError:
+            raise
+        except FileNotFoundError as exc:
+            raise IncarnationHomeError(
+                f"migration target directory changed before safe open: {label}"
+            ) from exc
+        except OSError as exc:
+            raise IncarnationHomeError(
+                f"migration target directory cannot be safely mode-bound: {label}"
+            ) from exc
+        finally:
+            if target_descriptor is not None:
+                os.close(target_descriptor)
+            if target_parent_fd is not None:
+                os.close(target_parent_fd)
+
+    def revalidate_source(
+        source: Path,
+        descriptor: int,
+        initial: os.stat_result,
+        parent_fd: int | None,
+        child_name: str | None,
+        label: str,
+    ) -> None:
+        if parent_fd is None:
+            _revalidate_actor_local_path(source, descriptor, initial, label)
+        else:
+            assert child_name is not None
+            _revalidate_actor_local_child(
+                parent_fd, child_name, descriptor, initial, label
+            )
+
+    def copy_opened(
+        source: Path,
+        target: Path,
+        descriptor: int,
+        initial: os.stat_result,
+        opened: os.stat_result,
+        *,
+        parent_fd: int | None,
+        child_name: str | None,
+        label: str,
+    ) -> None:
+        current = os.fstat(descriptor)
+        if (
+            _actor_local_identity_mode(current)
+            != _actor_local_identity_mode(opened)
+            or _actor_local_source_version(current)
+            != _actor_local_source_version(opened)
+        ):
+            raise IncarnationHomeError(
+                f"legacy actor-local state changed during migration: {label}"
+            )
+        identity = (current.st_dev, current.st_ino)
+        if identity in ambient_identities:
+            raise IncarnationHomeError(
+                f"legacy actor-local state aliases ambient state: {label}"
+            )
+        if stat.S_ISREG(current.st_mode):
+            if current.st_nlink != 1:
+                raise IncarnationHomeError(
+                    f"legacy actor-local state is multiply linked: {label}"
+                )
+            read_parent_fd: int | None = None
+            read_descriptor: int | None = None
+            try:
+                if parent_fd is None:
+                    read_parent_fd = _open_pinned_parent_directory(source, label)
+                    read_descriptor, read_opened = _open_stable_regular_file_at(
+                        read_parent_fd,
+                        source.name,
+                        label=label,
+                        ambient_identities=ambient_identities,
+                    )
+                else:
+                    assert child_name is not None
+                    read_descriptor, read_opened = _open_stable_regular_file_at(
+                        parent_fd,
+                        child_name,
+                        label=label,
+                        ambient_identities=ambient_identities,
+                    )
+                if (
+                    _actor_local_identity_mode(read_opened)
+                    != _actor_local_identity_mode(current)
+                    or _actor_local_source_version(read_opened)
+                    != _actor_local_source_version(current)
+                ):
+                    raise IncarnationHomeError(
+                        f"legacy actor-local state changed during migration: {label}"
+                    )
+                source_version = _actor_local_source_version(read_opened)
+                content = _read_descriptor_bytes(read_descriptor, label)
+                after_first_read = os.fstat(read_descriptor)
+                if _actor_local_source_version(after_first_read) != source_version:
+                    raise IncarnationHomeError(
+                        f"legacy actor-local state changed while reading: {label}"
+                    )
+                repeated_content = _read_descriptor_bytes(read_descriptor, label)
+                if repeated_content != content:
+                    raise IncarnationHomeError(
+                        f"legacy actor-local state changed while reading: {label}"
+                    )
+                content = repeated_content
+                after_read = os.fstat(read_descriptor)
+                if _actor_local_source_version(after_read) != source_version:
+                    raise IncarnationHomeError(
+                        f"legacy actor-local state changed while reading: {label}"
+                    )
+            finally:
+                if read_descriptor is not None:
+                    os.close(read_descriptor)
+                if read_parent_fd is not None:
+                    os.close(read_parent_fd)
+            revalidate_source(
+                source, descriptor, initial, parent_fd, child_name, label
+            )
+            _write_exact(
+                target,
+                content,
+                stat.S_IMODE(current.st_mode),
+                ambient_identities=ambient_identities,
+            )
+            return
+        if not stat.S_ISDIR(current.st_mode):
+            raise IncarnationHomeError(
+                f"legacy actor-local state is not a regular file or directory: {label}"
+            )
+        if identity in visited_directories:
+            raise IncarnationHomeError(
+                f"legacy actor-local state directory is aliased: {label}"
+            )
+        visited_directories.add(identity)
+        directory_mode = stat.S_IMODE(current.st_mode)
+        ensure_target_directory(target, directory_mode, label)
+        children = stable_directory_children(descriptor, current, label)
+        for child in children:
+            child_label = f"{label}/{child}"
+            child_descriptor, child_initial, child_opened = (
+                _open_stable_actor_local_child_descriptor(
+                    descriptor, child, child_label
+                )
+            )
+            try:
+                copy_opened(
+                    source / child,
+                    target / child,
+                    child_descriptor,
+                    child_initial,
+                    child_opened,
+                    parent_fd=descriptor,
+                    child_name=child,
+                    label=child_label,
+                )
+            finally:
+                os.close(child_descriptor)
+        if stable_directory_children(descriptor, current, label) != children:
+            raise IncarnationHomeError(
+                f"legacy actor-local state directory changed during migration: {label}"
+            )
+        ensure_target_directory(target, directory_mode, label, final=True)
+        revalidate_source(source, descriptor, initial, parent_fd, child_name, label)
+
+    for name in source_names:
+        source = source_home / name
+        revalidate_source_root(f"before source entry {name}")
+        try:
+            os.lstat(source)
+        except FileNotFoundError:
+            continue
+        except OSError as exc:
+            raise IncarnationHomeError(
+                f"legacy actor-local state cannot be inspected: {source}"
+            ) from exc
+        if name == "config.toml":
+            continue
+        if name not in allowed_target_names:
+            raise IncarnationHomeError(
+                f"legacy actor-local state is no longer denied: {name}"
+            )
+        descriptor, initial, opened = _open_stable_actor_local_path_descriptor(
+            source, name
+        )
+        try:
+            copy_opened(
+                source,
+                target_home / name,
+                descriptor,
+                initial,
+                opened,
+                parent_fd=None,
+                child_name=None,
+                label=f"legacy actor-local state {name}",
+            )
+        finally:
+            os.close(descriptor)
+        revalidate_source_root(f"after source entry {name}")
+    revalidate_source_root("before final snapshot")
+    final_source_content_digests = _legacy_migration_content_snapshot(
+        home=source_home,
+        names=source_names,
+        ambient_identities=ambient_identities,
+        include_source_version=False,
+    )
+    final_source_content_versions = _legacy_migration_content_snapshot(
+        home=source_home,
+        names=source_names,
+        ambient_identities=ambient_identities,
+        include_source_version=True,
+    )
+    revalidate_source_root("after final snapshot")
+    if (
+        final_source_content_digests != source_content_digests
+        or final_source_content_versions != source_content_versions
+    ):
+        raise IncarnationHomeError(
+            "legacy actor-local state changed during migration"
+        )
+    return source_content_digests, source_content_versions
+
+
+def _copy_legacy_actor_local_state(
+    *,
+    source_home: Path,
+    target_home: Path,
+    source_expected_names: set[str],
+    source_actor_local_names: Sequence[str],
+    target_actor_local_names: set[str],
+    ambient_home: Path,
+    ambient_identities: set[tuple[int, int]],
+) -> tuple[dict[str, str | None], dict[str, str | None]]:
+    """Copy legacy local state while retaining the source-home fence."""
+
+    source_root_descriptor, _source_root_initial, source_root_opened = (
+        _open_stable_actor_local_path_descriptor(
+            source_home, "legacy migration source home"
+        )
+    )
+    try:
+        return _copy_legacy_actor_local_state_impl(
+            source_home=source_home,
+            target_home=target_home,
+            source_expected_names=source_expected_names,
+            source_actor_local_names=source_actor_local_names,
+            target_actor_local_names=target_actor_local_names,
+            ambient_home=ambient_home,
+            ambient_identities=ambient_identities,
+            source_root_descriptor=source_root_descriptor,
+            source_root_opened=source_root_opened,
+        )
+    finally:
+        os.close(source_root_descriptor)
 
 
 def _utc_now() -> str:
@@ -1103,6 +3818,285 @@ def _secure_control_socket(
     }
 
 
+def _socket_peer_credentials(
+    peer: socket.socket, label: str
+) -> tuple[int, int, int]:
+    """Read Linux's kernel-authenticated peer identity or fail closed."""
+
+    option = getattr(socket, "SO_PEERCRED", None)
+    if not isinstance(option, int):
+        raise IncarnationHomeError(f"{label} credentials are unavailable")
+    size = struct.calcsize("3i")
+    try:
+        raw = peer.getsockopt(socket.SOL_SOCKET, option, size)
+    except OSError as exc:
+        raise IncarnationHomeError(f"{label} credentials cannot be read") from exc
+    if not isinstance(raw, bytes) or len(raw) != size:
+        raise IncarnationHomeError(f"{label} credentials are malformed")
+    try:
+        peer_pid, peer_uid, peer_gid = struct.unpack("3i", raw)
+    except struct.error as exc:
+        raise IncarnationHomeError(f"{label} credentials are malformed") from exc
+    if peer_pid <= 0 or peer_uid < 0 or peer_gid < 0:
+        raise IncarnationHomeError(f"{label} credentials are invalid")
+    return peer_pid, peer_uid, peer_gid
+
+
+def _require_socket_peer_identity(
+    peer: socket.socket,
+    *,
+    expected_pid: int,
+    expected_start_ticks: int,
+    label: str,
+) -> None:
+    peer_pid, peer_uid, _peer_gid = _socket_peer_credentials(peer, label)
+    if peer_pid != expected_pid or peer_uid != os.getuid():
+        raise IncarnationHomeError(f"{label} identity does not match the admitted process")
+    try:
+        observed_start_ticks = _proc_start_ticks(peer_pid)
+    except IncarnationHomeError as exc:
+        raise IncarnationHomeError(f"{label} process identity cannot be confirmed") from exc
+    if observed_start_ticks != expected_start_ticks:
+        raise IncarnationHomeError(f"{label} process start identity has drifted")
+
+
+def _send_text_through_bound_socket(
+    *,
+    kitty_executable: str,
+    socket_record: dict[str, object],
+    window_id: object,
+    text: str,
+    terminal_pid: int,
+    terminal_start_ticks: int,
+) -> None:
+    """Deliver directed input through the inode and process admitted before the effect.
+
+    Kitty accepts a Unix socket address, but opening the recorded pathname in
+    a child process would leave a pathname-replacement race between validation
+    and delivery. The runtime therefore connects to the admitted pathname
+    itself, authenticates the actual connected Kitty peer with kernel peer
+    credentials, and gives Kitty a fresh abstract endpoint whose client is
+    authenticated against the spawned process. The relay never re-opens the
+    recorded pathname.
+    """
+
+    if (
+        not isinstance(terminal_pid, int)
+        or isinstance(terminal_pid, bool)
+        or terminal_pid <= 0
+        or not isinstance(terminal_start_ticks, int)
+        or isinstance(terminal_start_ticks, bool)
+        or terminal_start_ticks <= 0
+    ):
+        raise IncarnationHomeError("bound terminal process identity is incomplete")
+    address = str(socket_record["address"])
+    expected_device = socket_record.get("device")
+    expected_inode = socket_record.get("inode")
+    if not isinstance(expected_device, int) or not isinstance(expected_inode, int):
+        raise IncarnationHomeError("bound control socket identity is incomplete")
+
+    _secure_control_socket(
+        address,
+        harden=False,
+        expected_device=expected_device,
+        expected_inode=expected_inode,
+    )
+    path = _socket_path(address)
+    retained_peer = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    relay_listener: socket.socket | None = None
+    cancel_reader: socket.socket | None = None
+    cancel_writer: socket.socket | None = None
+    bridge_thread: threading.Thread | None = None
+    kitty_process: subprocess.Popen[str] | None = None
+    kitty_start_ticks: int | None = None
+    bridge_done = threading.Event()
+    bridge_accepted = threading.Event()
+    bridge_payload = threading.Event()
+    cancelled = threading.Event()
+    bridge_errors: list[BaseException] = []
+    abstract_raw = "\0aoa-send-text-" + secrets.token_hex(16)
+    abstract_address = "unix:@" + abstract_raw.removeprefix("\0")
+
+    try:
+        try:
+            retained_peer.connect(str(path))
+        except OSError as exc:
+            raise IncarnationHomeError(
+                "bound control socket could not be opened before directed input"
+            ) from exc
+        _require_socket_peer_identity(
+            retained_peer,
+            expected_pid=terminal_pid,
+            expected_start_ticks=terminal_start_ticks,
+            label="bound control socket peer",
+        )
+        _secure_control_socket(
+            address,
+            harden=False,
+            expected_device=expected_device,
+            expected_inode=expected_inode,
+        )
+
+        relay_listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        relay_listener.bind(abstract_raw)
+        relay_listener.listen(1)
+        cancel_reader, cancel_writer = socket.socketpair()
+
+        def bridge() -> None:
+            client: socket.socket | None = None
+            try:
+                assert relay_listener is not None
+                assert cancel_reader is not None
+                while not cancelled.is_set():
+                    readable, _writable, _exceptional = select.select(
+                        [relay_listener, cancel_reader], [], []
+                    )
+                    if cancel_reader in readable:
+                        return
+                    if relay_listener not in readable:
+                        continue
+                    candidate, _ = relay_listener.accept()
+                    try:
+                        if kitty_process is None or kitty_start_ticks is None:
+                            candidate.close()
+                            continue
+                        _require_socket_peer_identity(
+                            candidate,
+                            expected_pid=kitty_process.pid,
+                            expected_start_ticks=kitty_start_ticks,
+                            label="directed input relay client",
+                        )
+                    except IncarnationHomeError:
+                        candidate.close()
+                        continue
+                    client = candidate
+                    bridge_accepted.set()
+                    break
+                if client is None or cancelled.is_set():
+                    return
+                while not cancelled.is_set():
+                    readable, _writable, _exceptional = select.select(
+                        [client, cancel_reader], [], []
+                    )
+                    if cancel_reader in readable:
+                        break
+                    if client not in readable:
+                        continue
+                    payload = client.recv(64 * 1024)
+                    if not payload:
+                        break
+                    bridge_payload.set()
+                    retained_peer.sendall(payload)
+                if not cancelled.is_set():
+                    retained_peer.shutdown(socket.SHUT_WR)
+            except BaseException as exc:  # pragma: no cover - asserted through caller
+                if not cancelled.is_set():
+                    bridge_errors.append(exc)
+            finally:
+                if client is not None:
+                    client.close()
+                bridge_done.set()
+
+        try:
+            kitty_process = subprocess.Popen(
+                [
+                    kitty_executable,
+                    "@",
+                    "--to",
+                    abstract_address,
+                    "send-text",
+                    "--match",
+                    f"id:{window_id}",
+                    "--stdin",
+                ],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            kitty_start_ticks = _proc_start_ticks(kitty_process.pid)
+        except (OSError, IncarnationHomeError) as exc:
+            if kitty_process is not None and kitty_process.poll() is None:
+                try:
+                    kitty_process.kill()
+                except OSError:
+                    pass
+                try:
+                    kitty_process.communicate(timeout=1)
+                except (OSError, subprocess.TimeoutExpired):
+                    pass
+            raise IncarnationHomeError(
+                "directed terminal input client identity could not be established"
+            ) from exc
+        bridge_thread = threading.Thread(
+            target=bridge,
+            name="aoa-bound-control-socket-relay",
+            daemon=True,
+        )
+        bridge_thread.start()
+        try:
+            kitty_process.communicate(input=text, timeout=5)
+        except subprocess.TimeoutExpired as exc:
+            try:
+                kitty_process.kill()
+            except OSError:
+                pass
+            try:
+                kitty_process.communicate(timeout=1)
+            except (OSError, subprocess.TimeoutExpired):
+                pass
+            raise IncarnationHomeError("directed terminal input failed") from exc
+        except OSError as exc:
+            raise IncarnationHomeError("directed terminal input failed") from exc
+        if kitty_process.returncode != 0:
+            raise IncarnationHomeError("directed terminal input returned an error")
+        if not bridge_done.wait(timeout=1):
+            raise IncarnationHomeError("directed terminal input relay did not complete")
+    finally:
+        if kitty_process is not None and kitty_process.poll() is None:
+            try:
+                kitty_process.kill()
+            except OSError:
+                pass
+            try:
+                kitty_process.communicate(timeout=1)
+            except (OSError, subprocess.TimeoutExpired):
+                pass
+        cancelled.set()
+        if cancel_writer is not None:
+            try:
+                cancel_writer.send(b"x")
+            except OSError:
+                pass
+        if relay_listener is not None:
+            try:
+                waker = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                try:
+                    waker.connect(abstract_raw)
+                finally:
+                    waker.close()
+            except OSError:
+                pass
+            relay_listener.close()
+        if bridge_thread is not None:
+            bridge_thread.join(timeout=1)
+        if cancel_reader is not None:
+            cancel_reader.close()
+        if cancel_writer is not None:
+            cancel_writer.close()
+        retained_peer.close()
+    if bridge_thread is not None and bridge_thread.is_alive():
+        raise IncarnationHomeError("directed terminal input relay did not terminate")
+    if bridge_errors:
+        raise IncarnationHomeError("directed terminal input relay failed") from bridge_errors[0]
+    if (
+        not bridge_accepted.is_set()
+        or not bridge_payload.is_set()
+        or not bridge_done.is_set()
+    ):
+        raise IncarnationHomeError("directed terminal input was not delivered to the bound socket")
+
+
 def _allocate_control_socket() -> str:
     runtime_dir_value = os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}"
     runtime_dir = Path(runtime_dir_value)
@@ -1130,15 +4124,11 @@ def _holder_tty(pid: int) -> str:
 
 
 def _validate_binding_context(context: dict[str, Any]) -> dict[str, str]:
-    required = (
-        "goal_ref",
-        "actor_ref",
-        "incarnation_ref",
-        "session_ref",
-        "runtime_state_root",
-        "closeout_route",
-    )
+    required = TERMINAL_BINDING_CONTEXT_FIELDS
     values = {key: _binding_ref(context.get(key), key) for key in required}
+    for key in ("schema_version",) + HOLDER_BINDING_CONTEXT_FIELDS:
+        if key in context:
+            values[key] = _binding_ref(context[key], key)
     runtime_state_root = Path(values["runtime_state_root"])
     if (
         not runtime_state_root.is_absolute()
@@ -1152,6 +4142,34 @@ def _validate_binding_context(context: dict[str, Any]) -> dict[str, str]:
     return values
 
 
+def _validate_holder_binding_context(context: dict[str, Any]) -> dict[str, str]:
+    """Require the typed holder/task/run coordinates used for home identity."""
+
+    values = _validate_binding_context(context)
+    if values.get("schema_version") != HOLDER_BINDING_CONTEXT_SCHEMA_VERSION:
+        raise IncarnationHomeError(
+            "holder binding context schema is missing or unsupported"
+        )
+    for key in HOLDER_BINDING_CONTEXT_FIELDS:
+        if key not in values:
+            raise IncarnationHomeError(f"holder binding context {key} is missing")
+    return values
+
+
+def _holder_binding_context_input(
+    value: Path | dict[str, Any],
+) -> tuple[dict[str, str], bytes, str]:
+    if isinstance(value, Path):
+        context_document, raw = _load_json_snapshot(value, "holder binding context")
+    elif isinstance(value, dict):
+        context_document = value
+        raw = canonical_bytes(value)
+    else:
+        raise IncarnationHomeError("holder binding context input is invalid")
+    context = _validate_holder_binding_context(context_document)
+    return context, raw, sha256_bytes(raw)
+
+
 def _load_binding_context(path: Path) -> dict[str, str]:
     context = _load_json(path, "terminal binding context")
     return _validate_binding_context(context)
@@ -1160,6 +4178,12 @@ def _load_binding_context(path: Path) -> dict[str, str]:
 def _load_binding_context_snapshot(raw: bytes) -> dict[str, str]:
     return _validate_binding_context(
         _decode_json_snapshot(raw, "terminal binding context snapshot")
+    )
+
+
+def _load_holder_binding_context_snapshot(raw: bytes) -> dict[str, str]:
+    return _validate_holder_binding_context(
+        _decode_json_snapshot(raw, "holder binding context snapshot")
     )
 
 
@@ -1277,7 +4301,11 @@ def _load_holder_loss_reentry(
 
 
 def _load_rebind_manifest(
-    path: Path, *, runtime_state_root: Path
+    path: Path,
+    *,
+    runtime_state_root: Path,
+    binding_context: dict[str, str] | None = None,
+    binding_context_digest: str | None = None,
 ) -> tuple[dict[str, Any], bytes, str]:
     """Load and fully revalidate the manifest admitted by a replacement."""
 
@@ -1285,7 +4313,12 @@ def _load_rebind_manifest(
         raise IncarnationHomeError(
             "replacement incarnation manifest is outside the bound runtime state root"
         )
-    return _load_manifest_snapshot(path)
+    return _load_manifest_snapshot(
+        path,
+        binding_context=binding_context,
+        binding_context_digest=binding_context_digest,
+        require_holder_binding=binding_context is not None,
+    )
 
 
 def _validate_replacement_reentry_binding(
@@ -1493,6 +4526,22 @@ def _validate_receipt_binding_consistency(
         raise IncarnationHomeError(
             "embedded terminal binding terminal identity or socket disagrees with top-level terminal"
         )
+    runtime = receipt.get("runtime")
+    runtime_holder_binding = (
+        runtime.get("holder_binding")
+        if isinstance(runtime, dict)
+        else None
+    )
+    if runtime_holder_binding is not None:
+        if not isinstance(runtime_holder_binding, dict):
+            raise IncarnationHomeError(
+                "embedded terminal binding holder context is invalid"
+            )
+        for key in TERMINAL_BINDING_CONTEXT_FIELDS:
+            if binding.get(key) != runtime_holder_binding.get(key):
+                raise IncarnationHomeError(
+                    "embedded terminal binding context disagrees with runtime holder binding"
+                )
 
 
 def _validate_terminal_binding_shape(binding: object) -> dict[str, object]:
@@ -2084,54 +5133,501 @@ def _write_atomic_json(
     label: str,
     *,
     replace: bool,
+    ambient_identities: set[tuple[int, int]] | None = None,
 ) -> None:
-    if not path.is_absolute() or path.is_symlink():
-        raise IncarnationHomeError(f"{label} must be an absolute non-symlink path: {path}")
-    parent = path.parent
-    if parent.is_symlink() or not parent.is_dir():
-        raise IncarnationHomeError(f"{label} parent must be a real directory: {parent}")
     payload = canonical_bytes(value) + b"\n"
-    fd: int | None = None
-    temporary_path: Path | None = None
+    ambient_identities = ambient_identities or set()
+    parent_fd = _open_pinned_parent_directory(path, label)
+    existing_fd: int | None = None
+    staged_fd: int | None = None
     try:
-        fd, temporary_name = tempfile.mkstemp(prefix=path.name + ".tmp.", dir=str(parent))
-        temporary_path = Path(temporary_name)
-        os.fchmod(fd, 0o600)
-        view = memoryview(payload)
-        while view:
-            view = view[os.write(fd, view) :]
-        os.fsync(fd)
-        if replace:
-            if path.is_symlink():
-                raise IncarnationHomeError(
-                    f"{label} became a symlink before publication: {path}"
-                )
-            os.replace(temporary_path, path)
-        else:
-            os.link(temporary_path, path)
-        directory_flags = os.O_RDONLY
-        if hasattr(os, "O_DIRECTORY"):
-            directory_flags |= os.O_DIRECTORY
-        if hasattr(os, "O_NOFOLLOW"):
-            directory_flags |= os.O_NOFOLLOW
-        directory_fd = os.open(parent, directory_flags)
         try:
-            os.fsync(directory_fd)
-        finally:
-            os.close(directory_fd)
+            target = os.lstat(path.name, dir_fd=parent_fd)
+        except FileNotFoundError:
+            target = None
+        if target is not None:
+            if not replace:
+                raise IncarnationHomeError(f"{label} already exists: {path}")
+            existing_fd, opened = _open_stable_regular_file_at(
+                parent_fd,
+                path.name,
+                label=label,
+                ambient_identities=ambient_identities,
+            )
+            try:
+                _revalidate_regular_file_at(
+                    parent_fd,
+                    path.name,
+                    existing_fd,
+                    opened,
+                    label=label,
+                    ambient_identities=ambient_identities,
+                )
+                staged_fd = _create_unnameable_temporary_file_at(parent_fd, label)
+                _write_descriptor_exact(staged_fd, payload, 0o600, str(path))
+                _replace_with_staged_file_at(
+                    parent_fd=parent_fd,
+                    target_name=path.name,
+                    target_descriptor=existing_fd,
+                    target_initial=opened,
+                    staged_descriptor=staged_fd,
+                    label=label,
+                    ambient_identities=ambient_identities,
+                )
+                os.fsync(parent_fd)
+                os.close(staged_fd)
+                staged_fd = None
+            finally:
+                os.close(existing_fd)
+                existing_fd = None
+        else:
+            staged_fd = _create_unnameable_temporary_file_at(parent_fd, label)
+            _write_descriptor_exact(staged_fd, payload, 0o600, str(path))
+            _publish_unnameable_file_at(parent_fd, staged_fd, path.name, label)
+            os.fsync(parent_fd)
     except FileExistsError as exc:
         raise IncarnationHomeError(f"{label} already exists: {path}") from exc
     except OSError as exc:
         raise IncarnationHomeError(f"cannot write {label}: {path}") from exc
     finally:
-        if fd is not None:
-            os.close(fd)
-        if temporary_path is not None:
-            temporary_path.unlink(missing_ok=True)
+        if existing_fd is not None:
+            os.close(existing_fd)
+        if staged_fd is not None:
+            os.close(staged_fd)
+        os.close(parent_fd)
 
 
-def _write_new_json(path: Path, value: dict[str, Any], label: str) -> None:
-    _write_atomic_json(path, value, label, replace=False)
+def _write_new_json(
+    path: Path,
+    value: dict[str, Any],
+    label: str,
+    *,
+    ambient_identities: set[tuple[int, int]] | None = None,
+) -> None:
+    _write_atomic_json(
+        path,
+        value,
+        label,
+        replace=False,
+        ambient_identities=ambient_identities,
+    )
+
+
+def _holder_claim_path(manifest_path: Path) -> Path:
+    return manifest_path.with_name(HOLDER_CLAIM_FILE_NAME)
+
+
+def _reject_claimed_home_repreparation(manifest_path: Path) -> None:
+    """Freeze a home as soon as its durable holder claim is published."""
+
+    claim_path = _holder_claim_path(manifest_path)
+    try:
+        os.lstat(claim_path)
+    except FileNotFoundError:
+        return
+    except OSError as exc:
+        raise IncarnationHomeError(
+            f"holder claim cannot be inspected before re-preparation: {claim_path}"
+        ) from exc
+    raise IncarnationHomeError(
+        "holder-claimed incarnation home is frozen against re-preparation"
+    )
+
+
+def _reserve_holder_claim(
+    *,
+    manifest_path: Path,
+    manifest: dict[str, Any],
+    manifest_digest: str,
+    binding_context_digest: str,
+    holder_receipt_path: Path,
+    ambient_identities: set[tuple[int, int]] | None = None,
+) -> tuple[Path, str]:
+    if SHA256_DIGEST_PATTERN.fullmatch(manifest_digest) is None:
+        raise IncarnationHomeError("holder claim manifest digest is invalid")
+    if SHA256_DIGEST_PATTERN.fullmatch(binding_context_digest) is None:
+        raise IncarnationHomeError("holder claim binding context digest is invalid")
+    claim_path = _holder_claim_path(manifest_path)
+    expected_manifest_path = manifest_path.resolve()
+    if claim_path.resolve().parent != expected_manifest_path.parent:
+        raise IncarnationHomeError("holder claim path escaped the manifest home")
+    _validate_owner_private_parent(claim_path, "holder claim")
+    if claim_path.is_symlink() or claim_path.exists():
+        raise IncarnationHomeError(
+            "incarnation home already has an active or completed holder claim"
+        )
+    holder_binding = _validate_holder_binding_manifest_record(
+        manifest.get("holder_binding")
+    )
+    if holder_binding["binding_digest"] != binding_context_digest:
+        raise IncarnationHomeError("holder claim binding context digest disagrees")
+    receipt_ref = _safe_source_receipt_path(holder_receipt_path)
+    claim = {
+        "schema_version": HOLDER_CLAIM_SCHEMA_VERSION,
+        "manifest_path": str(expected_manifest_path),
+        "manifest_digest": manifest_digest,
+        "holder_binding": holder_binding,
+        "holder_receipt": receipt_ref,
+        "created_at": _utc_now(),
+    }
+    _write_new_json(
+        claim_path,
+        claim,
+        "holder claim",
+        ambient_identities=ambient_identities,
+    )
+    try:
+        claim_digest = sha256_bytes(claim_path.read_bytes())
+    except OSError as exc:
+        raise IncarnationHomeError("holder claim could not be hashed") from exc
+    return claim_path, claim_digest
+
+
+def _validate_holder_claim(
+    *,
+    claim_path: Path,
+    claim_digest: str,
+    manifest_path: Path,
+    manifest: dict[str, Any],
+    manifest_digest: str,
+    binding_context_digest: str,
+    holder_receipt_path: Path,
+) -> None:
+    claim, raw = _load_json_snapshot(claim_path, "holder claim")
+    if sha256_bytes(raw) != claim_digest:
+        raise IncarnationHomeError("holder claim digest drifted")
+    expected_fields = {
+        "schema_version",
+        "manifest_path",
+        "manifest_digest",
+        "holder_binding",
+        "holder_receipt",
+        "created_at",
+    }
+    if set(claim) != expected_fields:
+        raise IncarnationHomeError("holder claim fields are not exact")
+    if claim.get("schema_version") != HOLDER_CLAIM_SCHEMA_VERSION:
+        raise IncarnationHomeError("unsupported holder claim schema")
+    if not isinstance(claim_digest, str) or SHA256_DIGEST_PATTERN.fullmatch(
+        claim_digest
+    ) is None:
+        raise IncarnationHomeError("holder claim digest is invalid")
+    if not isinstance(claim.get("created_at"), str) or not claim["created_at"].strip():
+        raise IncarnationHomeError("holder claim creation time is invalid")
+    expected_claim = {
+        "manifest_path": str(manifest_path.resolve()),
+        "manifest_digest": manifest_digest,
+        "holder_binding": _validate_holder_binding_manifest_record(
+            manifest.get("holder_binding")
+        ),
+        "holder_receipt": _safe_source_receipt_path(holder_receipt_path),
+    }
+    if SHA256_DIGEST_PATTERN.fullmatch(manifest_digest) is None:
+        raise IncarnationHomeError("holder claim manifest digest is invalid")
+    if SHA256_DIGEST_PATTERN.fullmatch(binding_context_digest) is None:
+        raise IncarnationHomeError("holder claim binding context digest is invalid")
+    for key, expected in expected_claim.items():
+        if claim.get(key) != expected:
+            raise IncarnationHomeError(f"holder claim {key} disagrees with launch")
+    if claim["holder_binding"]["binding_digest"] != binding_context_digest:
+        raise IncarnationHomeError("holder claim binding context digest disagrees")
+
+
+def _reserve_or_transfer_holder_claim(
+    *,
+    manifest_path: Path,
+    manifest: dict[str, Any],
+    manifest_digest: str,
+    binding_context_digest: str,
+    holder_receipt_path: Path,
+    ambient_identities: set[tuple[int, int]] | None = None,
+) -> tuple[Path, str]:
+    """Reserve a claim, or transfer the exact claim to a replacement receipt."""
+
+    claim_path = _holder_claim_path(manifest_path)
+    try:
+        observed = os.lstat(claim_path)
+    except FileNotFoundError:
+        return _reserve_holder_claim(
+            manifest_path=manifest_path,
+            manifest=manifest,
+            manifest_digest=manifest_digest,
+            binding_context_digest=binding_context_digest,
+            holder_receipt_path=holder_receipt_path,
+            ambient_identities=ambient_identities,
+        )
+    except OSError as exc:
+        raise IncarnationHomeError(
+            f"holder claim cannot be inspected: {claim_path}"
+        ) from exc
+    if stat.S_ISLNK(observed.st_mode) or not stat.S_ISREG(observed.st_mode):
+        raise IncarnationHomeError(
+            "incarnation home already has an active or completed holder claim"
+        )
+    claim, raw = _load_json_snapshot(claim_path, "holder claim")
+    claim_digest = sha256_bytes(raw)
+    requested_receipt = _safe_source_receipt_path(holder_receipt_path)
+    current_receipt = claim.get("holder_receipt")
+    if not isinstance(current_receipt, str):
+        raise IncarnationHomeError("holder claim holder_receipt is invalid")
+    if current_receipt == requested_receipt:
+        _validate_holder_claim(
+            claim_path=claim_path,
+            claim_digest=claim_digest,
+            manifest_path=manifest_path,
+            manifest=manifest,
+            manifest_digest=manifest_digest,
+            binding_context_digest=binding_context_digest,
+            holder_receipt_path=holder_receipt_path,
+        )
+        return claim_path, claim_digest
+    previous_receipt_path = Path(current_receipt)
+    if _safe_source_receipt_path(previous_receipt_path) != current_receipt:
+        raise IncarnationHomeError("holder claim holder_receipt is invalid")
+    _validate_holder_claim(
+        claim_path=claim_path,
+        claim_digest=claim_digest,
+        manifest_path=manifest_path,
+        manifest=manifest,
+        manifest_digest=manifest_digest,
+        binding_context_digest=binding_context_digest,
+        holder_receipt_path=previous_receipt_path,
+    )
+    transferred = dict(claim)
+    transferred["holder_receipt"] = requested_receipt
+    _write_atomic_json(
+        claim_path,
+        transferred,
+        "holder claim transfer",
+        replace=True,
+        ambient_identities=ambient_identities,
+    )
+    try:
+        transferred_raw = _regular_file(claim_path, "holder claim").read_bytes()
+    except OSError as exc:
+        raise IncarnationHomeError("holder claim transfer could not be hashed") from exc
+    return claim_path, sha256_bytes(transferred_raw)
+
+
+def _stable_regular_file_bytes(
+    path: Path,
+    label: str,
+    *,
+    ambient_identities: set[tuple[int, int]],
+) -> bytes | None:
+    """Read one regular file through a retained, unaliased descriptor."""
+
+    parent_fd = _open_pinned_parent_directory(path, label)
+    descriptor: int | None = None
+    try:
+        try:
+            observed = os.lstat(path.name, dir_fd=parent_fd)
+        except FileNotFoundError:
+            return None
+        except OSError as exc:
+            raise IncarnationHomeError(f"{label} cannot be inspected") from exc
+        if stat.S_ISLNK(observed.st_mode) or not stat.S_ISREG(observed.st_mode):
+            raise IncarnationHomeError(f"{label} is not a regular file")
+        descriptor, opened = _open_stable_regular_file_at(
+            parent_fd,
+            path.name,
+            label=label,
+            ambient_identities=ambient_identities,
+        )
+        raw = _read_descriptor_bytes(descriptor, str(path))
+        _revalidate_regular_file_at(
+            parent_fd,
+            path.name,
+            descriptor,
+            opened,
+            label=label,
+            ambient_identities=ambient_identities,
+        )
+        return raw
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+        os.close(parent_fd)
+
+
+def _restore_holder_claim_snapshot(
+    *,
+    claim_path: Path,
+    before_raw: bytes | None,
+    after_digest: str,
+    ambient_identities: set[tuple[int, int]],
+    retained_parent_fd: int | None = None,
+    retained_descriptor: int | None = None,
+    retained_initial: os.stat_result | None = None,
+) -> None:
+    """Restore or retire a claim through its retained inode descriptor."""
+
+    if SHA256_DIGEST_PATTERN.fullmatch(after_digest) is None:
+        raise IncarnationHomeError("holder claim rollback digest is invalid")
+    owns_parent_fd = retained_parent_fd is None
+    parent_fd = (
+        _open_pinned_parent_directory(claim_path, "holder claim rollback")
+        if retained_parent_fd is None
+        else retained_parent_fd
+    )
+    owns_descriptor = retained_descriptor is None
+    descriptor: int | None = retained_descriptor
+    opened = retained_initial
+    try:
+        if descriptor is None:
+            descriptor, opened = _open_stable_regular_file_at(
+                parent_fd,
+                claim_path.name,
+                label="holder claim rollback",
+                ambient_identities=ambient_identities,
+            )
+        if opened is None:
+            raise IncarnationHomeError(
+                "holder claim rollback retained inode is not bound"
+            )
+        try:
+            retained = os.fstat(descriptor)
+        except OSError as exc:
+            raise IncarnationHomeError(
+                "holder claim rollback retained inode cannot be inspected"
+            ) from exc
+        if (
+            (retained.st_dev, retained.st_ino, retained.st_mode)
+            != (opened.st_dev, opened.st_ino, opened.st_mode)
+            or not stat.S_ISREG(retained.st_mode)
+            or retained.st_nlink != 1
+            or (retained.st_dev, retained.st_ino) in ambient_identities
+        ):
+            raise IncarnationHomeError(
+                "holder claim rollback retained inode changed"
+            )
+        current_raw = _read_descriptor_bytes(descriptor, str(claim_path))
+        if sha256_bytes(current_raw) != after_digest:
+            raise IncarnationHomeError("holder claim changed before rollback")
+        if before_raw is None:
+            _remove_retained_regular_file_at(
+                parent_fd,
+                descriptor,
+                "holder claim rollback",
+            )
+        else:
+            _write_descriptor_exact(
+                descriptor,
+                before_raw,
+                0o600,
+                "holder claim rollback",
+            )
+        os.fsync(parent_fd)
+    finally:
+        if owns_descriptor and descriptor is not None:
+            os.close(descriptor)
+        if owns_parent_fd:
+            os.close(parent_fd)
+
+
+def _existing_rebind_receipt(
+    path: Path,
+    expected: dict[str, Any],
+    *,
+    ambient_identities: set[tuple[int, int]],
+) -> dict[str, Any] | None:
+    """Accept only the exact canonical receipt as an idempotent retry."""
+
+    raw = _stable_regular_file_bytes(
+        path,
+        "replacement holder terminal receipt",
+        ambient_identities=ambient_identities,
+    )
+    if raw is None:
+        return None
+    existing = _decode_json_snapshot(raw, "replacement holder terminal receipt")
+    _assert_safe_projection(existing)
+    existing, _validated_raw, _digest = _load_holder_receipt_snapshot(
+        path,
+        snapshot=(existing, raw),
+    )
+    comparable_existing = dict(existing)
+    comparable_expected = dict(expected)
+    comparable_existing.pop("created_at", None)
+    comparable_expected.pop("created_at", None)
+    if comparable_existing != comparable_expected:
+        raise IncarnationHomeError(
+            "replacement holder terminal receipt already exists with different binding"
+        )
+    return existing
+
+
+def _holder_receipt_matches_claim(
+    *, claim_path: Path, claim_digest: str, receipt_path: Path
+) -> bool:
+    """Prove that a receipt was published before releasing its claim.
+
+    Payload admission crosses an exec boundary, so an asynchronous exception
+    can arrive after the receipt's atomic publication but before the caller's
+    in-memory publication flag is updated.  Only the exact canonical receipt
+    bound by the unchanged claim counts as publication; missing, malformed, or
+    foreign receipt bytes leave the claim eligible for rollback.
+    """
+
+    try:
+        claim, claim_raw = _load_json_snapshot(claim_path, "holder claim")
+        if sha256_bytes(claim_raw) != claim_digest:
+            return False
+        receipt, _receipt_raw, _receipt_digest = _load_holder_receipt_snapshot(
+            receipt_path
+        )
+        expected_receipt = _safe_source_receipt_path(receipt_path)
+    except IncarnationHomeError:
+        return False
+    runtime = receipt.get("runtime")
+    if not isinstance(runtime, dict):
+        return False
+    return (
+        claim.get("holder_receipt") == expected_receipt
+        and receipt.get("receipt_ref") == expected_receipt
+        and runtime.get("incarnation_manifest") == claim.get("manifest_path")
+        and runtime.get("incarnation_manifest_digest") == claim.get("manifest_digest")
+        and runtime.get("holder_binding") == claim.get("holder_binding")
+    )
+
+
+def _release_holder_claim(
+    *,
+    claim_path: Path,
+    claim_digest: str,
+    receipt_path: Path | None = None,
+    label: str = "holder claim",
+) -> None:
+    """Remove only the exact unpublished reservation; uncertainty is retained."""
+
+    if receipt_path is not None and _holder_receipt_matches_claim(
+        claim_path=claim_path,
+        claim_digest=claim_digest,
+        receipt_path=receipt_path,
+    ):
+        return
+    parent_fd = _open_pinned_parent_directory(claim_path, label)
+    descriptor: int | None = None
+    try:
+        descriptor, _opened = _open_stable_regular_file_at(
+            parent_fd,
+            claim_path.name,
+            label=label,
+            ambient_identities=set(),
+        )
+        raw = _read_descriptor_bytes(descriptor, label)
+        if sha256_bytes(raw) != claim_digest:
+            raise IncarnationHomeError(f"{label} changed before rollback")
+        _remove_staged_file_at(parent_fd, claim_path.name, descriptor, label)
+        os.fsync(parent_fd)
+    except IncarnationHomeError:
+        raise
+    except OSError as exc:
+        raise IncarnationHomeError(f"cannot roll back {label}") from exc
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+        os.close(parent_fd)
 
 
 def _write_reservation_json(
@@ -2421,6 +5917,7 @@ def _holder_receipt(
     manifest_bytes: bytes | None = None,
     manifest_digest: str | None = None,
     companion_binding: dict[str, str] | None = None,
+    holder_binding: dict[str, str] | None = None,
     binding_context: dict[str, str] | None = None,
     control_socket: str | None = None,
     terminal_title: str | None = None,
@@ -2483,6 +5980,10 @@ def _holder_receipt(
         "ambient_codex_home": str(manifest["ambient_codex_home"]),
         "incarnation_codex_home": str(manifest["codex_home"]),
     }
+    if holder_binding is not None:
+        runtime["holder_binding"] = _validate_holder_binding_manifest_record(
+            holder_binding
+        )
     if companion_binding is not None:
         runtime["codex_companion"] = dict(companion_binding)
     _decode_holder_manifest_snapshot(runtime)
@@ -2566,10 +6067,11 @@ def _rebind_replacement_holder_receipt(
     digest are re-observed before a new canonical holder receipt is published.
     """
 
-    context_document, _context_raw = _load_json_snapshot(
+    context_document, context_raw = _load_json_snapshot(
         binding_context_path, "terminal binding context"
     )
-    context = _validate_binding_context(context_document)
+    context = _validate_holder_binding_context(context_document)
+    context_digest = sha256_bytes(context_raw)
     context_workspace = context_document.get("workspace")
     if not isinstance(context_workspace, str) or not Path(context_workspace).is_absolute():
         raise IncarnationHomeError("terminal binding context workspace is invalid")
@@ -2612,6 +6114,11 @@ def _rebind_replacement_holder_receipt(
     manifest, manifest_bytes, manifest_digest = _load_rebind_manifest(
         manifest_path,
         runtime_state_root=Path(context["runtime_state_root"]),
+        binding_context=context,
+        binding_context_digest=context_digest,
+    )
+    holder_binding = _validate_holder_binding_manifest_record(
+        manifest.get("holder_binding")
     )
     executable = _regular_file(codex_executable_path, "replacement Codex executable")
     holder_environment = _proc_environ(holder_pid)
@@ -2668,6 +6175,7 @@ def _rebind_replacement_holder_receipt(
             "reasoning_effort": str(manifest["reasoning_effort"]),
             "ambient_codex_home": str(manifest["ambient_codex_home"]),
             "incarnation_codex_home": str(manifest["codex_home"]),
+            "holder_binding": holder_binding,
         },
         "terminal": {
             "binding": "kitty_ancestor_at_exec",
@@ -2693,8 +6201,85 @@ def _rebind_replacement_holder_receipt(
         },
     }
     _assert_safe_projection(receipt)
-    _write_new_json(receipt_path, receipt, "replacement holder terminal receipt")
-    return receipt
+    runtime_root_value = manifest.get("runtime_root")
+    ambient_home_value = manifest.get("ambient_codex_home")
+    if not isinstance(runtime_root_value, str) or not isinstance(
+        ambient_home_value, str
+    ):
+        raise IncarnationHomeError(
+            "replacement holder rebind lacks runtime and ambient roots"
+        )
+    runtime_root = _absolute_directory(Path(runtime_root_value), "runtime root")
+    ambient_home = _absolute_directory(
+        Path(ambient_home_value), "ambient Codex home"
+    )
+    ambient_identities = _ambient_inode_identities(ambient_home)
+    claim_path = _holder_claim_path(manifest_path)
+    with _incarnation_preparation_lock(runtime_root, ambient_identities):
+        existing = _existing_rebind_receipt(
+            receipt_path,
+            receipt,
+            ambient_identities=ambient_identities,
+        )
+        before_claim_raw = _stable_regular_file_bytes(
+            claim_path,
+            "holder claim",
+            ambient_identities=ambient_identities,
+        )
+        _claim_path, after_claim_digest = _reserve_holder_claim_for_launch_locked(
+            manifest_path=manifest_path,
+            manifest=manifest,
+            manifest_digest=manifest_digest,
+            binding_context_digest=context_digest,
+            binding_context=context,
+            holder_receipt_path=receipt_path,
+            ambient_identities=ambient_identities,
+            allow_existing_claim=True,
+        )
+        if existing is not None:
+            return existing
+        claim_parent_fd: int | None = None
+        claim_descriptor: int | None = None
+        claim_initial: os.stat_result | None = None
+        try:
+            claim_parent_fd = _open_pinned_parent_directory(
+                claim_path, "holder claim rollback"
+            )
+            claim_descriptor, claim_initial = _open_stable_regular_file_at(
+                claim_parent_fd,
+                claim_path.name,
+                label="holder claim rollback",
+                ambient_identities=ambient_identities,
+                writable=True,
+            )
+            _write_new_json(
+                receipt_path,
+                receipt,
+                "replacement holder terminal receipt",
+                ambient_identities=ambient_identities,
+            )
+        except BaseException:
+            try:
+                _restore_holder_claim_snapshot(
+                    claim_path=claim_path,
+                    before_raw=before_claim_raw,
+                    after_digest=after_claim_digest,
+                    ambient_identities=ambient_identities,
+                    retained_parent_fd=claim_parent_fd,
+                    retained_descriptor=claim_descriptor,
+                    retained_initial=claim_initial,
+                )
+            except BaseException as rollback_exc:
+                raise IncarnationHomeError(
+                    "holder claim rollback became uncertain"
+                ) from rollback_exc
+            raise
+        finally:
+            if claim_descriptor is not None:
+                os.close(claim_descriptor)
+            if claim_parent_fd is not None:
+                os.close(claim_parent_fd)
+        return receipt
 
 
 def _decode_holder_manifest_snapshot(runtime: dict[str, Any]) -> bytes | None:
@@ -2728,7 +6313,7 @@ def _decode_holder_manifest_snapshot(runtime: dict[str, Any]) -> bytes | None:
         raise IncarnationHomeError(
             "holder incarnation manifest snapshot is not valid JSON"
         ) from exc
-    if not isinstance(manifest, dict) or manifest.get("schema_version") != SCHEMA_VERSION:
+    if not isinstance(manifest, dict) or manifest.get("schema_version") not in SUPPORTED_SCHEMA_VERSIONS:
         raise IncarnationHomeError("holder incarnation manifest snapshot is unsupported")
     for manifest_key, runtime_key in (
         ("model_slug", "model"),
@@ -2740,6 +6325,27 @@ def _decode_holder_manifest_snapshot(runtime: dict[str, Any]) -> bytes | None:
             raise IncarnationHomeError(
                 "holder incarnation manifest snapshot binding has drifted"
             )
+    runtime_holder_binding = runtime.get("holder_binding")
+    manifest_holder_binding = manifest.get("holder_binding")
+    if manifest_holder_binding is not None:
+        if runtime_holder_binding is None:
+            raise IncarnationHomeError(
+                "holder incarnation manifest snapshot holder binding is missing"
+            )
+        if _validate_holder_binding_manifest_record(
+            runtime_holder_binding
+        ) != _validate_holder_binding_manifest_record(manifest_holder_binding):
+            raise IncarnationHomeError(
+                "holder incarnation manifest snapshot holder binding has drifted"
+            )
+    elif runtime_holder_binding is not None:
+        raise IncarnationHomeError(
+            "holder incarnation manifest snapshot has an unexpected holder binding"
+        )
+    else:
+        raise IncarnationHomeError(
+            "holder incarnation manifest snapshot holder binding is missing"
+        )
     return snapshot
 
 
@@ -3961,6 +7567,7 @@ def _validate_visible_launch_receipt(
     executable: Path,
     executable_digest: str,
     binding_context: dict[str, str],
+    holder_binding: dict[str, str],
     control_socket: str,
     terminal_title: str,
     companion_binding: dict[str, str] | None,
@@ -3979,6 +7586,7 @@ def _validate_visible_launch_receipt(
         "reasoning_effort": str(manifest["reasoning_effort"]),
         "ambient_codex_home": str(manifest["ambient_codex_home"]),
         "incarnation_codex_home": str(manifest["codex_home"]),
+        "holder_binding": _validate_holder_binding_manifest_record(holder_binding),
     }
     if receipt.get("receipt_ref") != str(receipt_path.resolve()):
         raise IncarnationHomeError("visible launch receipt path identity drifted")
@@ -4002,7 +7610,8 @@ def _validate_visible_launch_receipt(
     binding_value = receipt.get("binding")
     binding = _validate_terminal_binding_shape(binding_value)
     _validate_receipt_binding_consistency(receipt, binding)
-    for key, value in binding_context.items():
+    for key in TERMINAL_BINDING_CONTEXT_FIELDS:
+        value = binding_context[key]
         if binding.get(key) != value:
             raise IncarnationHomeError(
                 f"visible launch receipt binding context drifted: {key}"
@@ -4160,6 +7769,8 @@ def command_send_text(args: argparse.Namespace) -> int:
         )
     socket_record = terminal["control_socket"]
     assert isinstance(socket_record, dict)
+    terminal_start_ticks = terminal["start_ticks"]
+    assert isinstance(terminal_start_ticks, int)
     _secure_control_socket(
         str(socket_record["address"]),
         harden=False,
@@ -4167,28 +7778,14 @@ def command_send_text(args: argparse.Namespace) -> int:
         expected_inode=socket_record["inode"],
     )
     _revalidate_bound_holder_identity(holder)
-    try:
-        completed = subprocess.run(
-            [
-                args.kitty_executable,
-                "@",
-                "--to",
-                str(socket_record["address"]),
-                "send-text",
-                "--match",
-                f"id:{terminal['window_id']}",
-                "--stdin",
-            ],
-            input=args.text,
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        raise IncarnationHomeError("directed terminal input failed") from exc
-    if completed.returncode != 0:
-        raise IncarnationHomeError("directed terminal input returned an error")
+    _send_text_through_bound_socket(
+        kitty_executable=args.kitty_executable,
+        socket_record=socket_record,
+        window_id=terminal["window_id"],
+        text=args.text,
+        terminal_pid=terminal_pid,
+        terminal_start_ticks=terminal_start_ticks,
+    )
     result = {
         "schema_version": TERMINAL_BINDING_SCHEMA_VERSION,
         "sent": True,
@@ -4808,13 +8405,886 @@ def command_close(args: argparse.Namespace) -> int:
     return 0
 
 
-def prepare_home(
+@contextlib.contextmanager
+def _incarnation_preparation_lock(
+    runtime_root: Path, ambient_identities: set[tuple[int, int]]
+) -> Any:
+    """Serialize every preparation through the pinned runtime directory."""
+
+    lock_path = runtime_root / PREPARATION_LOCK_FILE_NAME
+    parent_fd = _open_pinned_parent_directory(
+        lock_path, "incarnation preparation lock"
+    )
+    directory_locked = False
+    lock_fd: int | None = None
+    lock_file_locked = False
+    try:
+        try:
+            initial = os.lstat(
+                PREPARATION_LOCK_FILE_NAME, dir_fd=parent_fd
+            )
+        except FileNotFoundError:
+            initial = None
+        except OSError as exc:
+            raise IncarnationHomeError(
+                f"incarnation preparation lock cannot be inspected: {lock_path}"
+            ) from exc
+        if initial is not None and (
+            stat.S_ISLNK(initial.st_mode) or not stat.S_ISREG(initial.st_mode)
+        ):
+            raise IncarnationHomeError(
+                f"incarnation preparation lock is not an isolated regular file: {lock_path}"
+            )
+        fcntl.flock(parent_fd, fcntl.LOCK_EX)
+        directory_locked = True
+        try:
+            locked_initial = os.lstat(
+                PREPARATION_LOCK_FILE_NAME, dir_fd=parent_fd
+            )
+        except FileNotFoundError:
+            locked_initial = None
+        except OSError as exc:
+            raise IncarnationHomeError(
+                f"incarnation preparation lock cannot be inspected after directory lock: {lock_path}"
+            ) from exc
+        if initial is not None and (
+            locked_initial is None
+            or (locked_initial.st_dev, locked_initial.st_ino, locked_initial.st_mode)
+            != (initial.st_dev, initial.st_ino, initial.st_mode)
+        ):
+            raise IncarnationHomeError(
+                f"incarnation preparation lock changed before acquisition: {lock_path}"
+            )
+        initial = locked_initial
+        flags = os.O_RDWR | getattr(os, "O_CLOEXEC", 0)
+        flags |= getattr(os, "O_NOFOLLOW", 0)
+        if initial is None:
+            flags |= os.O_CREAT | os.O_EXCL
+        lock_fd = os.open(
+            PREPARATION_LOCK_FILE_NAME,
+            flags,
+            0o600,
+            dir_fd=parent_fd,
+        )
+        opened = os.fstat(lock_fd)
+        observed = os.lstat(PREPARATION_LOCK_FILE_NAME, dir_fd=parent_fd)
+        if (
+            initial is not None
+            and (opened.st_dev, opened.st_ino, opened.st_mode)
+            != (initial.st_dev, initial.st_ino, initial.st_mode)
+        ) or (
+            (opened.st_dev, opened.st_ino, opened.st_mode)
+            != (observed.st_dev, observed.st_ino, observed.st_mode)
+            or not stat.S_ISREG(opened.st_mode)
+            or opened.st_nlink != 1
+            or (opened.st_dev, opened.st_ino) in ambient_identities
+        ):
+            raise IncarnationHomeError(
+                f"incarnation preparation lock is not an isolated regular file: {lock_path}"
+            )
+        fcntl.flock(lock_fd, fcntl.LOCK_EX)
+        lock_file_locked = True
+        reopened = os.fstat(lock_fd)
+        renamed = os.lstat(PREPARATION_LOCK_FILE_NAME, dir_fd=parent_fd)
+        if (
+            (reopened.st_dev, reopened.st_ino)
+            != (opened.st_dev, opened.st_ino)
+            or (renamed.st_dev, renamed.st_ino)
+            != (opened.st_dev, opened.st_ino)
+            or not stat.S_ISREG(reopened.st_mode)
+            or reopened.st_nlink != 1
+            or (reopened.st_dev, reopened.st_ino) in ambient_identities
+            or stat.S_IMODE(reopened.st_mode) != 0o600
+        ):
+            raise IncarnationHomeError(
+                f"incarnation preparation lock changed after acquisition: {lock_path}"
+            )
+        yield
+    except IncarnationHomeError:
+        raise
+    except OSError as exc:
+        raise IncarnationHomeError(
+            f"incarnation preparation lock cannot be acquired: {lock_path}"
+        ) from exc
+    finally:
+        if lock_fd is not None and lock_file_locked:
+            try:
+                fcntl.flock(lock_fd, fcntl.LOCK_UN)
+            finally:
+                os.close(lock_fd)
+        elif lock_fd is not None:
+            os.close(lock_fd)
+        if directory_locked:
+            try:
+                fcntl.flock(parent_fd, fcntl.LOCK_UN)
+            finally:
+                os.close(parent_fd)
+        else:
+            os.close(parent_fd)
+
+
+def _reserve_holder_claim_for_launch_locked(
+    *,
+    manifest_path: Path,
+    manifest: dict[str, Any],
+    manifest_digest: str,
+    binding_context_digest: str,
+    binding_context: dict[str, str],
+    holder_receipt_path: Path,
+    ambient_identities: set[tuple[int, int]],
+    allow_existing_claim: bool = False,
+) -> tuple[Path, str]:
+    """Publish or rebind a holder claim while the preparation lock is held."""
+
+    _locked_manifest, _locked_bytes, locked_digest = _load_manifest_snapshot(
+        manifest_path,
+        binding_context=binding_context,
+        binding_context_digest=binding_context_digest,
+        require_holder_binding=True,
+    )
+    if locked_digest != manifest_digest:
+        raise IncarnationHomeError(
+            "incarnation-home manifest changed before holder claim"
+        )
+    reserve = (
+        _reserve_or_transfer_holder_claim
+        if allow_existing_claim
+        else _reserve_holder_claim
+    )
+    return reserve(
+        manifest_path=manifest_path,
+        manifest=_locked_manifest,
+        manifest_digest=manifest_digest,
+        binding_context_digest=binding_context_digest,
+        holder_receipt_path=holder_receipt_path,
+        ambient_identities=ambient_identities,
+    )
+
+
+def _reserve_holder_claim_for_launch(
+    *,
+    manifest_path: Path,
+    manifest: dict[str, Any],
+    manifest_digest: str,
+    binding_context_digest: str,
+    binding_context: dict[str, str],
+    holder_receipt_path: Path,
+    allow_existing_claim: bool = False,
+) -> tuple[Path, str]:
+    """Publish or rebind a holder claim under the preparation serialization boundary."""
+
+    runtime_root_value = manifest.get("runtime_root")
+    ambient_home_value = manifest.get("ambient_codex_home")
+    if not isinstance(runtime_root_value, str) or not isinstance(
+        ambient_home_value, str
+    ):
+        raise IncarnationHomeError(
+            "holder claim launch lock lacks runtime and ambient roots"
+        )
+    runtime_root = _absolute_directory(Path(runtime_root_value), "runtime root")
+    ambient_home = _absolute_directory(
+        Path(ambient_home_value), "ambient Codex home"
+    )
+    ambient_identities = _ambient_inode_identities(ambient_home)
+    with _incarnation_preparation_lock(runtime_root, ambient_identities):
+        return _reserve_holder_claim_for_launch_locked(
+            manifest_path=manifest_path,
+            manifest=manifest,
+            manifest_digest=manifest_digest,
+            binding_context=binding_context,
+            binding_context_digest=binding_context_digest,
+            holder_receipt_path=holder_receipt_path,
+            ambient_identities=ambient_identities,
+            allow_existing_claim=allow_existing_claim,
+        )
+
+
+def _preparation_owner_record(
+    *,
+    ambient_home: Path,
+    runtime_root: Path,
+    realization_root: Path,
+    incarnation_root: Path,
+    coordinate: str,
+    holder_coordinate: str | None,
+) -> dict[str, Any]:
+    return {
+        "schema_version": PREPARATION_OWNER_SCHEMA_VERSION,
+        "owner_token": sha256_bytes(secrets.token_bytes(32)),
+        "ambient_home": str(ambient_home),
+        "runtime_root": str(runtime_root),
+        "realization_root": str(realization_root),
+        "incarnation_root": str(incarnation_root),
+        "coordinate": coordinate,
+        "holder_coordinate": holder_coordinate,
+        "pid": os.getpid(),
+        "start_ticks": _proc_start_ticks(os.getpid()),
+        "created_at": _utc_now(),
+    }
+
+
+def _validate_preparation_owner_record(
+    value: object,
+    *,
+    ambient_home: Path,
+    runtime_root: Path,
+    realization_root: Path,
+    incarnation_root: Path,
+    coordinate: str,
+    holder_coordinate: str | None,
+) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise IncarnationHomeError("incarnation preparation owner token is invalid")
+    expected_fields = {
+        "schema_version",
+        "owner_token",
+        "ambient_home",
+        "runtime_root",
+        "realization_root",
+        "incarnation_root",
+        "coordinate",
+        "holder_coordinate",
+        "pid",
+        "start_ticks",
+        "created_at",
+    }
+    if set(value) != expected_fields:
+        raise IncarnationHomeError(
+            "incarnation preparation owner token fields are not exact"
+        )
+    if value.get("schema_version") != PREPARATION_OWNER_SCHEMA_VERSION:
+        raise IncarnationHomeError("unsupported incarnation preparation owner token")
+    token = value.get("owner_token")
+    if not isinstance(token, str) or SHA256_DIGEST_PATTERN.fullmatch(token) is None:
+        raise IncarnationHomeError("incarnation preparation owner token digest is invalid")
+    if (
+        value.get("ambient_home") != str(ambient_home)
+        or value.get("runtime_root") != str(runtime_root)
+        or value.get("realization_root") != str(realization_root)
+        or value.get("incarnation_root") != str(incarnation_root)
+        or value.get("coordinate") != coordinate
+        or value.get("holder_coordinate") != holder_coordinate
+    ):
+        raise IncarnationHomeError(
+            "incarnation preparation owner token target does not match"
+        )
+    if (
+        not isinstance(value.get("pid"), int)
+        or isinstance(value.get("pid"), bool)
+        or value["pid"] < 1
+        or not isinstance(value.get("start_ticks"), int)
+        or isinstance(value.get("start_ticks"), bool)
+        or value["start_ticks"] < 1
+        or not isinstance(value.get("created_at"), str)
+        or not value["created_at"].strip()
+    ):
+        raise IncarnationHomeError("incarnation preparation owner token identity is invalid")
+    return dict(value)
+
+
+def _open_recovery_directory_at(
+    parent_fd: int, name: str, label: str
+) -> tuple[int, os.stat_result, os.stat_result]:
+    """Open one recovery directory relative to a retained parent descriptor."""
+
+    try:
+        initial = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+    except OSError as exc:
+        raise IncarnationHomeError(
+            f"{label} cannot be inspected safely"
+        ) from exc
+    if stat.S_ISLNK(initial.st_mode) or not stat.S_ISDIR(initial.st_mode):
+        raise IncarnationHomeError(f"{label} is not a real directory")
+    flags = (
+        os.O_RDONLY
+        | getattr(os, "O_DIRECTORY", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_CLOEXEC", 0)
+    )
+    try:
+        descriptor = os.open(name, flags, dir_fd=parent_fd)
+    except OSError as exc:
+        raise IncarnationHomeError(f"{label} cannot be opened safely") from exc
+    try:
+        opened = os.fstat(descriptor)
+        if (
+            _actor_local_identity_mode(opened)
+            != _actor_local_identity_mode(initial)
+        ):
+            raise IncarnationHomeError(f"{label} changed during safe open")
+        return descriptor, initial, opened
+    except IncarnationHomeError:
+        os.close(descriptor)
+        raise
+    except OSError as exc:
+        os.close(descriptor)
+        raise IncarnationHomeError(f"{label} cannot be inspected after safe open") from exc
+
+
+def _revalidate_recovery_entry(
+    parent_fd: int,
+    name: str,
+    descriptor: int,
+    initial: os.stat_result,
+    label: str,
+) -> os.stat_result:
+    try:
+        observed = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+        opened = os.fstat(descriptor)
+    except OSError as exc:
+        raise IncarnationHomeError(f"{label} changed during recovery") from exc
+    if (
+        _actor_local_identity_mode(observed)
+        != _actor_local_identity_mode(initial)
+        or _actor_local_identity_mode(opened)
+        != _actor_local_identity_mode(initial)
+    ):
+        raise IncarnationHomeError(f"{label} changed during recovery")
+    return observed
+
+
+def _revalidate_recovery_entry_before_removal(
+    parent_fd: int,
+    name: str,
+    descriptor: int,
+    initial: os.stat_result,
+    label: str,
+) -> None:
+    """Require two adjacent identity checks before removing an empty directory."""
+
+    _revalidate_recovery_entry(parent_fd, name, descriptor, initial, label)
+    _revalidate_recovery_entry(parent_fd, name, descriptor, initial, label)
+
+
+def _make_recovery_directory_writable(
+    parent_fd: int,
+    name: str,
+    descriptor: int,
+    initial: os.stat_result,
+    label: str,
+) -> tuple[os.stat_result, os.stat_result]:
+    """Temporarily grant owner write/execute access through the retained fd."""
+
+    _revalidate_recovery_entry_before_removal(
+        parent_fd, name, descriptor, initial, label
+    )
+    try:
+        current = os.fstat(descriptor)
+        if _actor_local_identity_mode(current) != _actor_local_identity_mode(initial):
+            raise IncarnationHomeError(f"{label} changed during recovery")
+        writable_mode = stat.S_IMODE(current.st_mode) | 0o700
+        os.fchmod(descriptor, writable_mode)
+        opened = os.fstat(descriptor)
+        observed = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+    except IncarnationHomeError:
+        raise
+    except OSError as exc:
+        raise IncarnationHomeError(
+            f"{label} could not be made writable for recovery"
+        ) from exc
+    if (
+        not stat.S_ISDIR(opened.st_mode)
+        or (opened.st_dev, opened.st_ino) != (initial.st_dev, initial.st_ino)
+        or _actor_local_identity_mode(observed) != _actor_local_identity_mode(opened)
+        or stat.S_IMODE(opened.st_mode) != writable_mode
+    ):
+        raise IncarnationHomeError(f"{label} changed while becoming writable")
+    return observed, opened
+
+
+def _validate_recoverable_entry_at(
+    parent_fd: int,
+    name: str,
+    *,
+    ambient_identities: set[tuple[int, int]],
+    label: str,
+) -> None:
+    try:
+        observed = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+    except OSError as exc:
+        raise IncarnationHomeError(
+            f"stale incarnation preparation entry cannot be inspected: {label}"
+        ) from exc
+    if stat.S_ISLNK(observed.st_mode):
+        return
+    identity = (observed.st_dev, observed.st_ino)
+    if identity in ambient_identities:
+        raise IncarnationHomeError(
+            f"stale incarnation preparation aliases ambient state: {label}"
+        )
+    if stat.S_ISREG(observed.st_mode):
+        if observed.st_nlink != 1:
+            raise IncarnationHomeError(
+                f"stale incarnation preparation entry is multiply linked: {label}"
+            )
+        return
+    if not stat.S_ISDIR(observed.st_mode):
+        raise IncarnationHomeError(
+            f"stale incarnation preparation contains a special file: {label}"
+        )
+    descriptor, initial, opened = _open_recovery_directory_at(
+        parent_fd, name, label
+    )
+    try:
+        try:
+            children = sorted(os.listdir(descriptor))
+            after_listing = os.fstat(descriptor)
+        except OSError as exc:
+            raise IncarnationHomeError(
+                f"stale incarnation preparation directory cannot be enumerated: {label}"
+            ) from exc
+        if _actor_local_identity_mode(after_listing) != _actor_local_identity_mode(opened):
+            raise IncarnationHomeError(
+                f"stale incarnation preparation directory changed during validation: {label}"
+            )
+        for child_name in children:
+            _validate_recoverable_entry_at(
+                descriptor,
+                child_name,
+                ambient_identities=ambient_identities,
+                label=f"{label}/{child_name}",
+            )
+        _revalidate_recovery_entry_before_removal(
+            parent_fd, name, descriptor, initial, label
+        )
+    finally:
+        os.close(descriptor)
+
+
+def _remove_recoverable_entry_at(
+    parent_fd: int,
+    name: str,
+    *,
+    ambient_identities: set[tuple[int, int]],
+    label: str,
+) -> None:
+    try:
+        observed = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+    except OSError as exc:
+        raise IncarnationHomeError(
+            f"stale incarnation preparation entry changed during recovery: {label}"
+        ) from exc
+    if stat.S_ISLNK(observed.st_mode):
+        try:
+            current = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+            if _actor_local_identity_mode(current) != _actor_local_identity_mode(observed):
+                raise IncarnationHomeError(f"{label} changed during recovery")
+            os.unlink(name, dir_fd=parent_fd)
+        except IncarnationHomeError:
+            raise
+        except OSError as exc:
+            raise IncarnationHomeError(f"{label} could not be removed safely") from exc
+        return
+    identity = (observed.st_dev, observed.st_ino)
+    if identity in ambient_identities:
+        raise IncarnationHomeError(
+            f"stale incarnation preparation aliases ambient state: {label}"
+        )
+    if stat.S_ISREG(observed.st_mode):
+        if observed.st_nlink != 1:
+            raise IncarnationHomeError(
+                f"stale incarnation preparation entry is multiply linked: {label}"
+            )
+        try:
+            current = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+            if (
+                _actor_local_identity_mode(current)
+                != _actor_local_identity_mode(observed)
+                or current.st_nlink != 1
+            ):
+                raise IncarnationHomeError(f"{label} changed during recovery")
+            os.unlink(name, dir_fd=parent_fd)
+        except IncarnationHomeError:
+            raise
+        except OSError as exc:
+            raise IncarnationHomeError(f"{label} could not be removed safely") from exc
+        return
+    if not stat.S_ISDIR(observed.st_mode):
+        raise IncarnationHomeError(
+            f"stale incarnation preparation contains a special file: {label}"
+        )
+    descriptor, initial, opened = _open_recovery_directory_at(
+        parent_fd, name, label
+    )
+    try:
+        try:
+            children = sorted(os.listdir(descriptor))
+            after_listing = os.fstat(descriptor)
+        except OSError as exc:
+            raise IncarnationHomeError(
+                f"stale incarnation preparation directory cannot be enumerated: {label}"
+            ) from exc
+        if _actor_local_identity_mode(after_listing) != _actor_local_identity_mode(opened):
+            raise IncarnationHomeError(f"{label} changed during recovery")
+        initial, opened = _make_recovery_directory_writable(
+            parent_fd, name, descriptor, initial, label
+        )
+        for child_name in children:
+            _remove_recoverable_entry_at(
+                descriptor,
+                child_name,
+                ambient_identities=ambient_identities,
+                label=f"{label}/{child_name}",
+            )
+        _revalidate_recovery_entry_before_removal(
+            parent_fd, name, descriptor, initial, label
+        )
+        try:
+            os.rmdir(name, dir_fd=parent_fd)
+        except OSError as exc:
+            raise IncarnationHomeError(f"{label} could not be removed safely") from exc
+    finally:
+        os.close(descriptor)
+
+
+def _recover_stale_preparation_root(
+    *,
+    incarnation_root: Path,
+    ambient_home: Path,
+    realization_root: Path,
+    runtime_root: Path,
+    coordinate: str,
+    holder_coordinate: str | None,
+    ambient_identities: set[tuple[int, int]],
+) -> None:
+    """Remove one tokened root through a retained inode-bound directory handle."""
+
+    parent_fd = _open_pinned_parent_directory(
+        incarnation_root, "stale incarnation preparation root"
+    )
+    root_fd: int | None = None
+    try:
+        root_fd, root_initial, root_opened = _open_recovery_directory_at(
+            parent_fd,
+            incarnation_root.name,
+            "stale incarnation preparation root",
+        )
+        try:
+            try:
+                marker = os.stat(
+                    "incarnation-home.json",
+                    dir_fd=root_fd,
+                    follow_symlinks=False,
+                )
+            except FileNotFoundError:
+                marker = None
+            except OSError as exc:
+                raise IncarnationHomeError(
+                    "published incarnation home marker cannot be inspected safely"
+                ) from exc
+            if marker is not None:
+                raise IncarnationHomeError(
+                    "published incarnation home cannot be treated as stale preparation"
+                )
+            owner_fd, _owner_opened = _open_stable_regular_file_at(
+                root_fd,
+                PREPARATION_OWNER_FILE_NAME,
+                label="incarnation preparation owner token",
+                ambient_identities=ambient_identities,
+            )
+            try:
+                owner = _decode_json_snapshot(
+                    _read_descriptor_bytes(
+                        owner_fd, "incarnation preparation owner token"
+                    ),
+                    "incarnation preparation owner token",
+                )
+            finally:
+                os.close(owner_fd)
+            _validate_preparation_owner_record(
+                owner,
+                ambient_home=ambient_home,
+                runtime_root=runtime_root,
+                realization_root=realization_root,
+                incarnation_root=incarnation_root,
+                coordinate=coordinate,
+                holder_coordinate=holder_coordinate,
+            )
+            try:
+                children = sorted(os.listdir(root_fd))
+                after_listing = os.fstat(root_fd)
+            except OSError as exc:
+                raise IncarnationHomeError(
+                    "stale incarnation preparation root cannot be enumerated safely"
+                ) from exc
+            if _actor_local_identity_mode(after_listing) != _actor_local_identity_mode(root_opened):
+                raise IncarnationHomeError(
+                    "stale incarnation preparation root changed during validation"
+                )
+            for child_name in children:
+                _validate_recoverable_entry_at(
+                    root_fd,
+                    child_name,
+                    ambient_identities=ambient_identities,
+                    label=child_name,
+                )
+            _revalidate_recovery_entry_before_removal(
+                parent_fd,
+                incarnation_root.name,
+                root_fd,
+                root_initial,
+                "stale incarnation preparation root",
+            )
+            for child_name in sorted(os.listdir(root_fd)):
+                _remove_recoverable_entry_at(
+                    root_fd,
+                    child_name,
+                    ambient_identities=ambient_identities,
+                    label=child_name,
+                )
+            _revalidate_recovery_entry_before_removal(
+                parent_fd,
+                incarnation_root.name,
+                root_fd,
+                root_initial,
+                "stale incarnation preparation root",
+            )
+            try:
+                os.rmdir(incarnation_root.name, dir_fd=parent_fd)
+            except OSError as exc:
+                raise IncarnationHomeError(
+                    "stale incarnation preparation root could not be recovered"
+                ) from exc
+        finally:
+            os.close(root_fd)
+            root_fd = None
+    finally:
+        os.close(parent_fd)
+
+
+def _remove_empty_directory_if_stable(path: Path, label: str) -> None:
+    """Remove an empty directory only through its pinned parent and identity."""
+
+    parent_fd = _open_pinned_parent_directory(path, label)
+    descriptor: int | None = None
+    try:
+        try:
+            initial = os.stat(path.name, dir_fd=parent_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            return
+        except OSError as exc:
+            raise IncarnationHomeError(f"{label} cannot be inspected safely") from exc
+        if stat.S_ISLNK(initial.st_mode) or not stat.S_ISDIR(initial.st_mode):
+            return
+        descriptor, _opened_initial, opened = _open_recovery_directory_at(
+            parent_fd, path.name, label
+        )
+        try:
+            try:
+                if os.listdir(descriptor):
+                    return
+            except OSError as exc:
+                raise IncarnationHomeError(f"{label} cannot be enumerated safely") from exc
+            _revalidate_recovery_entry_before_removal(
+                parent_fd, path.name, descriptor, initial, label
+            )
+            try:
+                os.rmdir(path.name, dir_fd=parent_fd)
+            except FileNotFoundError:
+                return
+            except OSError as exc:
+                raise IncarnationHomeError(f"{label} could not be removed safely") from exc
+        finally:
+            os.close(descriptor)
+            descriptor = None
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+        os.close(parent_fd)
+
+
+def _claim_preparation_root(
+    *,
+    incarnation_root: Path,
+    ambient_home: Path,
+    realization_root: Path,
+    runtime_root: Path,
+    coordinate: str,
+    holder_coordinate: str | None,
+    ambient_identities: set[tuple[int, int]],
+    owner_token: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    """Create a token before materialization, or recover an old tokened root."""
+
+    marker = incarnation_root / "incarnation-home.json"
+    if marker.exists() or marker.is_symlink():
+        return None
+    if incarnation_root.exists():
+        if incarnation_root.is_symlink() or not incarnation_root.is_dir():
+            raise IncarnationHomeError(
+                "unpublished incarnation root is not a real directory"
+            )
+        _recover_stale_preparation_root(
+            incarnation_root=incarnation_root,
+            ambient_home=ambient_home,
+            realization_root=realization_root,
+            runtime_root=runtime_root,
+            coordinate=coordinate,
+            holder_coordinate=holder_coordinate,
+            ambient_identities=ambient_identities,
+        )
+    incarnation_root.mkdir(mode=0o700, exist_ok=False)
+    record = owner_token or _preparation_owner_record(
+        ambient_home=ambient_home,
+        runtime_root=runtime_root,
+        realization_root=realization_root,
+        incarnation_root=incarnation_root,
+        coordinate=coordinate,
+        holder_coordinate=holder_coordinate,
+    )
+    try:
+        _validate_preparation_owner_record(
+            record,
+            ambient_home=ambient_home,
+            runtime_root=runtime_root,
+            realization_root=realization_root,
+            incarnation_root=incarnation_root,
+            coordinate=coordinate,
+            holder_coordinate=holder_coordinate,
+        )
+        _write_new_json(
+            incarnation_root / PREPARATION_OWNER_FILE_NAME,
+            record,
+            "incarnation preparation owner token",
+        )
+    except BaseException:
+        # The root has no published marker and no other attempt can observe it
+        # while the runtime preparation lock is held.  Remove only this empty
+        # root if token creation itself failed, so the caller never leaves an
+        # unowned first-preparation coordinate behind.
+        try:
+            incarnation_root.rmdir()
+        except OSError:
+            pass
+        raise
+    return record
+
+
+def _finish_preparation_owner(owner: dict[str, Any] | None) -> None:
+    if owner is None:
+        return
+    owner_path = Path(str(owner["incarnation_root"])) / PREPARATION_OWNER_FILE_NAME
+    parent_fd = _open_pinned_parent_directory(
+        owner_path, "incarnation preparation owner token"
+    )
+    descriptor: int | None = None
+    try:
+        try:
+            initial = os.lstat(owner_path.name, dir_fd=parent_fd)
+        except FileNotFoundError:
+            return
+        except OSError as exc:
+            raise IncarnationHomeError(
+                "incarnation preparation owner token cannot be inspected"
+            ) from exc
+        if stat.S_ISLNK(initial.st_mode) or not stat.S_ISREG(initial.st_mode):
+            return
+        descriptor, opened = _open_stable_regular_file_at(
+            parent_fd,
+            owner_path.name,
+            label="incarnation preparation owner token",
+            ambient_identities=set(),
+        )
+        observed = _decode_json_snapshot(
+            _read_descriptor_bytes(descriptor, str(owner_path)),
+            "incarnation preparation owner token",
+        )
+        if observed != owner:
+            raise IncarnationHomeError(
+                "incarnation preparation owner token changed before publication cleanup"
+            )
+        try:
+            _revalidate_regular_file_at(
+                parent_fd,
+                owner_path.name,
+                descriptor,
+                opened,
+                label="incarnation preparation owner token",
+                ambient_identities=set(),
+            )
+        except IncarnationHomeError as exc:
+            raise IncarnationHomeError(
+                "incarnation preparation owner token changed before publication cleanup"
+            ) from exc
+        _remove_staged_file_at(
+            parent_fd,
+            owner_path.name,
+            descriptor,
+            "incarnation preparation owner token retirement",
+            require_unlinked=True,
+        )
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+        os.close(parent_fd)
+
+
+def _prepare_home_attempt_owner(
+    *,
+    ambient_home: Path,
+    realization_path: Path,
+    runtime_root: Path,
+    binding_context: Path | dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    if binding_context is None:
+        return None
+    try:
+        runtime_root = _absolute_directory(runtime_root, "runtime root")
+        ambient_home = _absolute_directory(ambient_home, "ambient Codex home")
+        realization_path = _regular_file(realization_path, "model realization")
+        realization, _model, _effort, _version, fingerprint = _realization(
+            realization_path
+        )
+        context, _raw, context_digest = _holder_binding_context_input(binding_context)
+        if Path(context["runtime_state_root"]).resolve() != runtime_root:
+            return None
+        coordinate = _incarnation_coordinate(
+            str(realization.get("model_realization_id")), fingerprint
+        )
+        holder_coordinate = _holder_binding_context_coordinate(
+            context, context_digest
+        )
+        realization_root = _holder_incarnation_root(
+            runtime_root=runtime_root,
+            incarnation_coordinate=coordinate,
+            holder_coordinate=None,
+        )
+        incarnation_root = _holder_incarnation_root(
+            runtime_root=runtime_root,
+            incarnation_coordinate=coordinate,
+            holder_coordinate=holder_coordinate,
+        )
+        return _preparation_owner_record(
+            ambient_home=ambient_home,
+            runtime_root=runtime_root,
+            realization_root=realization_root,
+            incarnation_root=incarnation_root,
+            coordinate=coordinate,
+            holder_coordinate=holder_coordinate,
+        )
+    except IncarnationHomeError:
+        return None
+
+
+def _prepare_home_impl(
     *,
     ambient_home: Path,
     realization_path: Path,
     runtime_root: Path,
     capability_grants: Sequence[Path] = (),
+    binding_context: Path | dict[str, Any] | None = None,
+    holder_namespace: str | None = None,
+    _owner_token: dict[str, Any] | None = None,
+    _migration_source_home: Path | None = None,
+    _migration_source_expected_names: set[str] | None = None,
+    _migration_source_actor_local_names: Sequence[str] = (),
+    _migration_source_manifest_digest: str | None = None,
+    _migration_previous_capability_projection: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    if holder_namespace is not None:
+        raise IncarnationHomeError(
+            "holder namespace is not an identity proof; use a typed holder binding context"
+        )
     ambient_home = _absolute_directory(ambient_home, "ambient Codex home")
     runtime_root = _absolute_directory(runtime_root, "runtime root")
     realization_path = _regular_file(realization_path, "model realization")
@@ -4828,33 +9298,87 @@ def prepare_home(
     coordinate = _incarnation_coordinate(
         str(realization.get("model_realization_id")), fingerprint
     )
-    fingerprint_value = coordinate.removeprefix("sha256:")
-    incarnation_root = runtime_root / f"sha256-{fingerprint_value}"
+    holder_context: dict[str, str] | None = None
+    holder_context_digest: str | None = None
+    holder_coordinate: str | None = None
+    if binding_context is not None:
+        holder_context, _holder_context_bytes, holder_context_digest = (
+            _holder_binding_context_input(binding_context)
+        )
+        if Path(holder_context["runtime_state_root"]).resolve() != runtime_root:
+            raise IncarnationHomeError(
+                "holder binding runtime state root does not match runtime root"
+            )
+        holder_coordinate = _holder_binding_context_coordinate(
+            holder_context, holder_context_digest
+        )
+    realization_root = _holder_incarnation_root(
+        runtime_root=runtime_root,
+        incarnation_coordinate=coordinate,
+        holder_coordinate=None,
+    )
+    if realization_root.is_symlink():
+        raise IncarnationHomeError("realization incarnation root may not be a symlink")
+    if holder_coordinate is None and not (
+        (realization_root / "incarnation-home.json").is_file()
+        and not (realization_root / "incarnation-home.json").is_symlink()
+    ):
+        raise IncarnationHomeError(
+            "typed holder binding context is required for a new incarnation home"
+        )
+    incarnation_root = _holder_incarnation_root(
+        runtime_root=runtime_root,
+        incarnation_coordinate=coordinate,
+        holder_coordinate=holder_coordinate,
+    )
     codex_home = incarnation_root / "codex-home"
     ambient_identity = _ambient_home_identity(ambient_home)
     if incarnation_root.is_symlink():
         raise IncarnationHomeError("incarnation root may not be a symlink")
     existing_marker = incarnation_root / "incarnation-home.json"
     existing: dict[str, Any] = {}
+    unpublished_root = False
     if incarnation_root.exists():
-        if existing_marker.is_symlink() or not existing_marker.is_file():
+        if existing_marker.is_symlink():
             raise IncarnationHomeError(
-                "existing incarnation home lacks an ownership marker"
+                "existing incarnation home marker may not be a symlink"
             )
-        existing = _load_json(existing_marker, "existing incarnation-home manifest")
-        if existing.get("ambient_codex_home") != str(ambient_home):
-            raise IncarnationHomeError(
-                "incarnation home is owned by another ambient Codex home"
-            )
-        if existing.get("ambient_home_identity") not in {None, ambient_identity}:
-            raise IncarnationHomeError("incarnation ambient-home identity drift")
-        if existing.get("model_realization_id") not in {
-            None,
-            realization.get("model_realization_id"),
-        }:
-            raise IncarnationHomeError("incarnation model realization identity drift")
-        if existing.get("codex_home") != str(codex_home):
-            raise IncarnationHomeError("incarnation home coordinate drift")
+        if not existing_marker.is_file():
+            unpublished_root = True
+        else:
+            existing = _load_json(existing_marker, "existing incarnation-home manifest")
+        if unpublished_root:
+            pass
+        else:
+            if existing.get("ambient_codex_home") != str(ambient_home):
+                raise IncarnationHomeError(
+                    "incarnation home is owned by another ambient Codex home"
+                )
+            if existing.get("ambient_home_identity") not in {None, ambient_identity}:
+                raise IncarnationHomeError("incarnation ambient-home identity drift")
+            if existing.get("model_realization_id") not in {
+                None,
+                realization.get("model_realization_id"),
+            }:
+                raise IncarnationHomeError("incarnation model realization identity drift")
+            if existing.get("codex_home") != str(codex_home):
+                raise IncarnationHomeError("incarnation home coordinate drift")
+            existing_holder_binding = existing.get("holder_binding")
+            if holder_context is None:
+                if existing_holder_binding is not None:
+                    raise IncarnationHomeError(
+                        "typed holder binding context is required for this incarnation home"
+                    )
+            else:
+                if not isinstance(existing_holder_binding, dict):
+                    raise IncarnationHomeError(
+                        "incarnation home lacks its typed holder binding"
+                    )
+                if existing_holder_binding.get("coordinate") != holder_coordinate:
+                    raise IncarnationHomeError("incarnation holder binding drift")
+                if existing_holder_binding.get("binding_digest") != holder_context_digest:
+                    raise IncarnationHomeError("incarnation holder binding digest drift")
+            _reject_claimed_home_repreparation(existing_marker)
 
     # Validate ambient inputs before creating a new content-addressed root. A
     # failed first preparation must not leave an unowned directory that blocks
@@ -4863,6 +9387,10 @@ def prepare_home(
         ambient_home / "config.toml", "ambient Codex config"
     ).read_bytes()
     config = _bound_config(ambient_config, model_slug, effort)
+    # This snapshot is the bounded provenance boundary for the complete
+    # materialization.  It must be captured before projection and retained
+    # even if ambient pathnames are later unlinked and replaced.
+    ambient_identities = _ambient_inode_identities(ambient_home)
     capability_projection = _build_capability_projection(
         ambient_home=ambient_home,
         ambient_home_identity=ambient_identity,
@@ -4870,38 +9398,34 @@ def prepare_home(
         incarnation_coordinate=coordinate,
         capability_grants=capability_grants,
     )
+    previous_capability_projection = existing.get("capability_projection")
+    if previous_capability_projection is None:
+        previous_capability_projection = _migration_previous_capability_projection
+    capability_projection = _preserve_disappeared_denied_projection_entries(
+        capability_projection,
+        previous_capability_projection,
+    )
     projected_entries = {
         name: entry
         for name, entry in capability_projection["entries"].items()
         if entry["projection"] == "shared_link"
     }
     shared_names = sorted(projected_entries)
-
-    incarnation_root.mkdir(mode=0o700, exist_ok=True)
-    codex_home.mkdir(mode=0o700, exist_ok=True)
-    if incarnation_root.is_symlink() or codex_home.is_symlink():
-        raise IncarnationHomeError("incarnation home may not be a symlink")
-    incarnation_root.chmod(0o700)
-    codex_home.chmod(0o700)
-    for name in ("cache", "log", "tmp", DESCENDANT_BIN_NAME):
-        local = codex_home / name
-        local.mkdir(mode=0o700, exist_ok=True)
-        if local.is_symlink() or not local.is_dir():
-            raise IncarnationHomeError(f"actor-local {name} is not a real directory")
-        local.chmod(0o700)
-
-    _write_exact(codex_home / "config.toml", config, 0o600)
-
+    actor_local_state_names = sorted(
+        name
+        for name, entry in capability_projection["entries"].items()
+        if entry["projection"] == "denied"
+    )
     previous_shared_names: set[str] = set()
-    if incarnation_root.exists() and isinstance(existing.get("shared_state_names"), list):
+    if isinstance(existing.get("shared_state_names"), list):
         previous_shared_names = {
             name
             for name in existing["shared_state_names"]
-            if isinstance(name, str) and name not in LOCAL_NAMES and Path(name).name == name
+            if isinstance(name, str)
+            and name not in LOCAL_NAMES
+            and Path(name).name == name
         }
-    if incarnation_root.exists() and isinstance(
-        existing.get("capability_projection"), dict
-    ):
+    if isinstance(existing.get("capability_projection"), dict):
         existing_entries = existing["capability_projection"].get("entries", {})
         if isinstance(existing_entries, dict):
             existing_entries_iter = existing_entries.values()
@@ -4916,6 +9440,113 @@ def prepare_home(
                 and isinstance(entry.get("name"), str)
             ):
                 previous_shared_names.add(entry["name"])
+
+    expected_names = (
+        set(shared_names)
+        | set(actor_local_state_names)
+        | LOCAL_NAMES
+        | previous_shared_names
+    )
+    if incarnation_root.exists() and not unpublished_root:
+        _validate_actor_local_top_level_names(codex_home, expected_names)
+
+    if incarnation_root.exists() and not unpublished_root:
+        if incarnation_root.is_symlink() or not incarnation_root.is_dir():
+            raise IncarnationHomeError("incarnation root is not a real directory")
+        if codex_home.exists() or codex_home.is_symlink():
+            observed_home = _open_stable_actor_local_entry(codex_home, "codex-home")
+            if not stat.S_ISDIR(observed_home.st_mode):
+                raise IncarnationHomeError("incarnation Codex home is not a directory")
+            prevalidated_names = [
+                name
+                for name in sorted(set(actor_local_state_names) | set(LOCAL_NAMES))
+                if not (
+                    name in previous_shared_names
+                    and (codex_home / name).is_symlink()
+                    and (codex_home / name).readlink() == ambient_home / name
+                )
+            ]
+            _validate_actor_local_entries(
+                codex_home,
+                prevalidated_names,
+                ambient_home,
+                initially_ambient_identities=ambient_identities,
+            )
+        _validate_denied_state_provenance(
+            manifest=existing,
+            codex_home=codex_home,
+            ambient_home=ambient_home,
+            names=actor_local_state_names,
+            required=existing.get("schema_version") == SCHEMA_VERSION,
+            allow_projection_expansion=True,
+        )
+    elif not unpublished_root and (codex_home.exists() or codex_home.is_symlink()):
+        raise IncarnationHomeError(
+            "unpublished incarnation home requires an ownership token"
+        )
+    for name in sorted(previous_shared_names - set(shared_names)):
+        target = codex_home / name
+        source = ambient_home / name
+        if not target.exists() and not target.is_symlink():
+            continue
+        if target.is_symlink() and target.readlink() == source:
+            continue
+        if name in actor_local_state_names:
+            _validate_actor_local_entry(
+                target,
+                name,
+                ambient_identities=ambient_identities,
+            )
+            continue
+        raise IncarnationHomeError(
+            f"obsolete capability projection link drift: {target}"
+        )
+
+    if holder_coordinate is not None:
+        realization_root.mkdir(mode=0o700, exist_ok=True)
+        if realization_root.is_symlink() or not realization_root.is_dir():
+            raise IncarnationHomeError("realization incarnation root is not a real directory")
+        _chmod_stable_directory(
+            realization_root,
+            0o700,
+            "realization incarnation root",
+        )
+    active_owner = _claim_preparation_root(
+        incarnation_root=incarnation_root,
+        ambient_home=ambient_home,
+        realization_root=realization_root,
+        runtime_root=runtime_root,
+        coordinate=coordinate,
+        holder_coordinate=holder_coordinate,
+        ambient_identities=ambient_identities,
+        owner_token=_owner_token,
+    )
+
+    codex_home.mkdir(mode=0o700, exist_ok=True)
+    if incarnation_root.is_symlink() or codex_home.is_symlink():
+        raise IncarnationHomeError("incarnation home may not be a symlink")
+    _recover_abandoned_staged_files(
+        codex_home,
+        ambient_identities=ambient_identities,
+    )
+    _chmod_stable_directory(incarnation_root, 0o700, "incarnation root")
+    _chmod_stable_directory(codex_home, 0o700, "incarnation Codex home")
+    for name in ("cache", "log", "tmp", DESCENDANT_BIN_NAME):
+        local = codex_home / name
+        if local.is_symlink():
+            raise IncarnationHomeError(f"actor-local {name} is not a real directory")
+        if not local.exists():
+            local.mkdir(mode=0o700, exist_ok=False)
+        if local.is_symlink() or not local.is_dir():
+            raise IncarnationHomeError(f"actor-local {name} is not a real directory")
+        _chmod_stable_directory(local, 0o700, f"actor-local {name}")
+
+    _write_exact(
+        codex_home / "config.toml",
+        config,
+        0o600,
+        ambient_identities=ambient_identities,
+    )
 
     for name in shared_names:
         source = ambient_home / name
@@ -4934,23 +9565,114 @@ def prepare_home(
         else:
             target.symlink_to(source)
 
-    all_capability_names = set(capability_projection["entries"])
-    for name in sorted(
-        (previous_shared_names | all_capability_names) - set(shared_names)
-    ):
+    for name in sorted(previous_shared_names - set(shared_names)):
         target = codex_home / name
         source = ambient_home / name
         if not target.exists() and not target.is_symlink():
             continue
-        if not target.is_symlink() or target.readlink() != source:
+        if target.is_symlink() and target.readlink() == source:
+            _remove_validated_projection_link_at(
+                target,
+                source,
+                f"obsolete capability projection link {name}",
+            )
+            continue
+        if name in actor_local_state_names:
+            _validate_actor_local_entry(
+                target,
+                name,
+                ambient_identities=ambient_identities,
+            )
+            continue
+        if not target.is_symlink():
             raise IncarnationHomeError(
                 f"obsolete capability projection link drift: {target}"
             )
-        target.unlink()
+        if target.readlink() != source:
+            raise IncarnationHomeError(
+                f"obsolete capability projection link drift: {target}"
+            )
+
+    migration_source_content_digests: dict[str, str | None] | None = None
+    migration_source_content_versions: dict[str, str | None] | None = None
+    if _migration_source_home is not None:
+        if _migration_source_expected_names is None:
+            raise IncarnationHomeError("legacy migration source declaration is missing")
+        (
+            migration_source_content_digests,
+            migration_source_content_versions,
+        ) = _copy_legacy_actor_local_state(
+            source_home=_migration_source_home,
+            target_home=codex_home,
+            source_expected_names=_migration_source_expected_names,
+            source_actor_local_names=_migration_source_actor_local_names,
+            target_actor_local_names=set(actor_local_state_names),
+            ambient_home=ambient_home,
+            ambient_identities=ambient_identities,
+        )
+
+    for entry in codex_home.iterdir():
+        if entry.name not in expected_names:
+            raise IncarnationHomeError(
+                f"unexpected incarnation-home entry: {entry.name}"
+            )
+    _validate_actor_local_entries(
+        codex_home,
+        sorted(set(actor_local_state_names) | set(LOCAL_NAMES)),
+        ambient_home,
+        initially_ambient_identities=ambient_identities,
+    )
+    if (
+        _migration_source_home is not None
+        and migration_source_content_digests is not None
+        and migration_source_content_versions is not None
+    ):
+        _validate_legacy_migration_content_snapshot(
+            home=codex_home,
+            expected=migration_source_content_digests,
+            ambient_identities=ambient_identities,
+            include_source_version=False,
+            stage="target validation",
+        )
+        _validate_legacy_migration_content_snapshot(
+            home=_migration_source_home,
+            expected=migration_source_content_versions,
+            ambient_identities=ambient_identities,
+            include_source_version=True,
+            stage="source validation",
+        )
+    denied_provenance = _denied_state_provenance(
+        codex_home=codex_home,
+        ambient_home=ambient_home,
+        names=actor_local_state_names,
+        initially_ambient_identities=ambient_identities,
+        local_tree_content_digests=migration_source_content_digests,
+    )
+    if (
+        _migration_source_home is not None
+        and migration_source_content_digests is not None
+        and migration_source_content_versions is not None
+    ):
+        _validate_legacy_migration_content_snapshot(
+            home=codex_home,
+            expected=migration_source_content_digests,
+            ambient_identities=ambient_identities,
+            include_source_version=False,
+            stage="publication validation",
+        )
+        _validate_legacy_migration_content_snapshot(
+            home=_migration_source_home,
+            expected=migration_source_content_versions,
+            ambient_identities=ambient_identities,
+            include_source_version=True,
+            stage="publication source validation",
+        )
 
     manifest = {
         "$schema": "schemas/external-codex-incarnation-home.schema.json",
-        "schema_version": SCHEMA_VERSION,
+        "schema_version": (
+            SCHEMA_VERSION if holder_context is not None else LEGACY_SCHEMA_VERSION
+        ),
         "model_realization_id": realization.get("model_realization_id"),
         "model_realization_ref": str(realization_path),
         "configuration_fingerprint": fingerprint,
@@ -4963,21 +9685,226 @@ def prepare_home(
         "codex_home": str(codex_home),
         "config_digest": sha256_bytes(config),
         "shared_state_names": shared_names,
+        "actor_local_state_names": actor_local_state_names,
         "capability_projection": capability_projection,
         "top_level_posture": "incarnation-home",
         "child_posture": "incarnation-home-via-shell-environment-policy",
     }
-    _write_exact(
-        incarnation_root / "incarnation-home.json",
-        json.dumps(manifest, ensure_ascii=False, sort_keys=True, indent=2).encode("utf-8")
-        + b"\n",
-        0o600,
+    if holder_context is not None and holder_context_digest is not None:
+        manifest["denied_state_provenance"] = denied_provenance
+        manifest["holder_binding"] = _holder_binding_manifest_record(
+            holder_context,
+            holder_context_digest,
+            holder_coordinate or "",
+        )
+        if _migration_source_manifest_digest is not None:
+            if SHA256_DIGEST_PATTERN.fullmatch(_migration_source_manifest_digest) is None:
+                raise IncarnationHomeError(
+                    "legacy migration source manifest digest is invalid"
+                )
+            manifest["migration_source_manifest_digest"] = (
+                _migration_source_manifest_digest
+            )
+    manifest_path = incarnation_root / "incarnation-home.json"
+    manifest_bytes = (
+        json.dumps(manifest, ensure_ascii=False, sort_keys=True, indent=2).encode(
+            "utf-8"
+        )
+        + b"\n"
     )
+    _write_exact(
+        manifest_path,
+        manifest_bytes,
+        0o600,
+        ambient_identities=ambient_identities,
+    )
+    if (
+        _migration_source_home is not None
+        and migration_source_content_digests is not None
+        and migration_source_content_versions is not None
+    ):
+        try:
+            _validate_legacy_migration_content_snapshot(
+                home=codex_home,
+                expected=migration_source_content_digests,
+                ambient_identities=ambient_identities,
+                include_source_version=False,
+                stage="post-publication validation",
+            )
+            _validate_legacy_migration_content_snapshot(
+                home=_migration_source_home,
+                expected=migration_source_content_versions,
+                ambient_identities=ambient_identities,
+                include_source_version=True,
+                stage="post-publication source validation",
+            )
+        except IncarnationHomeError as exc:
+            try:
+                _remove_retained_regular_file(
+                    manifest_path,
+                    ambient_identities=ambient_identities,
+                    label="failed legacy migration manifest",
+                )
+            except IncarnationHomeError as cleanup_exc:
+                raise cleanup_exc from exc
+            if active_owner is not None:
+                _rollback_unpublished_home(owner_token=active_owner)
+            raise
+    _finish_preparation_owner(active_owner)
     return manifest
 
 
+def _rollback_unpublished_home(
+    *,
+    owner_token: dict[str, Any] | None,
+) -> None:
+    """Remove only the unpublished root carrying this attempt's exact token."""
+
+    if owner_token is None:
+        return
+    incarnation_root = Path(str(owner_token["incarnation_root"]))
+    realization_root = Path(str(owner_token["realization_root"]))
+    runtime_root = Path(str(owner_token["runtime_root"]))
+    coordinate = str(owner_token["coordinate"])
+    holder_coordinate = owner_token.get("holder_coordinate")
+    if incarnation_root.is_symlink() or not incarnation_root.is_dir():
+        return
+    marker = incarnation_root / "incarnation-home.json"
+    if marker.exists() or marker.is_symlink():
+        return
+    owner_path = incarnation_root / PREPARATION_OWNER_FILE_NAME
+    owner = _load_json(owner_path, "incarnation preparation owner token")
+    _validate_preparation_owner_record(
+        owner,
+        ambient_home=Path(str(owner_token["ambient_home"])),
+        runtime_root=runtime_root,
+        realization_root=realization_root,
+        incarnation_root=incarnation_root,
+        coordinate=coordinate,
+        holder_coordinate=holder_coordinate,
+    )
+    if owner != owner_token:
+        raise IncarnationHomeError(
+            "failed home preparation is owned by another attempt"
+        )
+    ambient_identities: set[tuple[int, int]] = set()
+    ambient_path = owner_token.get("ambient_home")
+    if isinstance(ambient_path, str):
+        ambient = Path(ambient_path)
+        if ambient.is_dir() and not ambient.is_symlink():
+            ambient_identities = _ambient_inode_identities(ambient)
+    _recover_stale_preparation_root(
+        incarnation_root=incarnation_root,
+        ambient_home=Path(str(owner_token["ambient_home"])),
+        realization_root=realization_root,
+        runtime_root=runtime_root,
+        coordinate=coordinate,
+        holder_coordinate=holder_coordinate,
+        ambient_identities=ambient_identities,
+    )
+    _remove_empty_directory_if_stable(
+        realization_root,
+        "failed home preparation realization root",
+    )
+
+
+def prepare_home(
+    *,
+    ambient_home: Path,
+    realization_path: Path,
+    runtime_root: Path,
+    capability_grants: Sequence[Path] = (),
+    binding_context: Path | dict[str, Any] | None = None,
+    holder_namespace: str | None = None,
+) -> dict[str, Any]:
+    """Prepare one home under a stable runtime lock and owner-token rollback."""
+
+    ambient = _absolute_directory(ambient_home, "ambient Codex home")
+    runtime = _absolute_directory(runtime_root, "runtime root")
+    ambient_identities = _ambient_inode_identities(ambient)
+    owner_token = None
+    if holder_namespace is None:
+        owner_token = _prepare_home_attempt_owner(
+            ambient_home=ambient,
+            realization_path=realization_path,
+            runtime_root=runtime,
+            binding_context=binding_context,
+        )
+    try:
+        with _incarnation_preparation_lock(runtime, ambient_identities):
+            try:
+                return _prepare_home_impl(
+                    ambient_home=ambient,
+                    realization_path=realization_path,
+                    runtime_root=runtime,
+                    capability_grants=capability_grants,
+                    binding_context=binding_context,
+                    holder_namespace=holder_namespace,
+                    _owner_token=owner_token,
+                )
+            except BaseException:
+                _rollback_unpublished_home(owner_token=owner_token)
+                raise
+    except BaseException:
+        raise
+
+
+def _validate_holder_binding_manifest_record(value: object) -> dict[str, str]:
+    if not isinstance(value, dict):
+        raise IncarnationHomeError("incarnation-home holder binding is not an object")
+    expected = {
+        "schema_version",
+        "binding_digest",
+        "coordinate",
+        "goal_ref",
+        "actor_ref",
+        "incarnation_ref",
+        "session_ref",
+        "runtime_state_root",
+        "closeout_route",
+        "holder_ref",
+        "task_ref",
+        "run_ref",
+    }
+    if set(value) != expected:
+        raise IncarnationHomeError(
+            "incarnation-home holder binding fields are not exact"
+        )
+    result = {
+        key: _binding_ref(value.get(key), key)
+        for key in expected - {"binding_digest", "coordinate"}
+    }
+    binding_digest = value.get("binding_digest")
+    coordinate = value.get("coordinate")
+    if not isinstance(binding_digest, str) or SHA256_DIGEST_PATTERN.fullmatch(
+        binding_digest
+    ) is None:
+        raise IncarnationHomeError("incarnation-home holder binding digest is invalid")
+    if not isinstance(coordinate, str) or SHA256_DIGEST_PATTERN.fullmatch(
+        coordinate
+    ) is None:
+        raise IncarnationHomeError("incarnation-home holder binding coordinate is invalid")
+    result["binding_digest"] = binding_digest
+    result["coordinate"] = coordinate
+    if result["schema_version"] != HOLDER_BINDING_CONTEXT_SCHEMA_VERSION:
+        raise IncarnationHomeError("incarnation-home holder binding schema is invalid")
+    expected_coordinate = _holder_binding_context_coordinate(
+        result, result["binding_digest"]
+    )
+    if result["coordinate"] != expected_coordinate:
+        raise IncarnationHomeError(
+            "incarnation-home holder binding coordinate is not derived from context"
+        )
+    return result
+
+
 def _load_manifest_snapshot(
-    path: Path, *, snapshot_bytes: bytes | None = None
+    path: Path,
+    *,
+    snapshot_bytes: bytes | None = None,
+    binding_context: dict[str, str] | None = None,
+    binding_context_digest: str | None = None,
+    require_holder_binding: bool = False,
 ) -> tuple[dict[str, Any], bytes, str]:
     if snapshot_bytes is None:
         manifest, raw = _load_json_snapshot(path, "incarnation-home manifest")
@@ -4986,10 +9913,56 @@ def _load_manifest_snapshot(
         manifest = _decode_json_snapshot(
             raw, "incarnation-home manifest snapshot"
         )
-    if manifest.get("schema_version") != SCHEMA_VERSION:
+    manifest_schema_version = manifest.get("schema_version")
+    if manifest_schema_version not in SUPPORTED_SCHEMA_VERSIONS:
         raise IncarnationHomeError("unsupported incarnation-home manifest")
     if manifest.get("$schema") != "schemas/external-codex-incarnation-home.schema.json":
         raise IncarnationHomeError("incarnation-home manifest schema binding is invalid")
+    if manifest_schema_version == LEGACY_SCHEMA_VERSION:
+        if require_holder_binding:
+            raise IncarnationHomeError(
+                "legacy v2 incarnation-home manifest requires migration before canonical launch"
+            )
+        if "denied_state_provenance" in manifest:
+            raise IncarnationHomeError(
+                "legacy v2 incarnation-home manifest cannot carry denied-state provenance"
+            )
+    holder_binding_value = manifest.get("holder_binding")
+    if holder_binding_value is None:
+        if require_holder_binding or manifest_schema_version == SCHEMA_VERSION:
+            raise IncarnationHomeError(
+                "incarnation-home manifest lacks a typed holder binding"
+            )
+        holder_coordinate = manifest.get("holder_namespace_coordinate")
+        if holder_coordinate is not None and (
+            not isinstance(holder_coordinate, str)
+            or SHA256_DIGEST_PATTERN.fullmatch(holder_coordinate) is None
+        ):
+            raise IncarnationHomeError("legacy holder coordinate is invalid")
+        holder_binding: dict[str, str] | None = None
+    else:
+        holder_binding = _validate_holder_binding_manifest_record(holder_binding_value)
+        holder_coordinate = holder_binding["coordinate"]
+    if binding_context is not None:
+        binding_context = _validate_holder_binding_context(binding_context)
+        if binding_context_digest is None:
+            binding_context_digest = sha256_bytes(canonical_bytes(binding_context))
+        expected_coordinate = _holder_binding_context_coordinate(
+            binding_context, binding_context_digest
+        )
+        if holder_binding is None:
+            raise IncarnationHomeError(
+                "manifest holder binding is missing for the supplied context"
+            )
+        expected_binding = _holder_binding_manifest_record(
+            binding_context,
+            binding_context_digest,
+            expected_coordinate,
+        )
+        if holder_binding != expected_binding:
+            raise IncarnationHomeError(
+                "incarnation-home manifest holder binding does not match context"
+            )
     codex_home = _absolute_directory(Path(str(manifest.get("codex_home"))), "incarnation Codex home")
     ambient_home = _absolute_directory(
         Path(str(manifest.get("ambient_codex_home"))), "ambient Codex home"
@@ -5019,16 +9992,33 @@ def _load_manifest_snapshot(
         or manifest.get("runtime_version") != runtime_version
     ):
         raise IncarnationHomeError("model realization binding drift")
-    expected_home = (
-        runtime_root
-        / (
-            "sha256-"
-            + _incarnation_coordinate(
-                str(realization.get("model_realization_id")), fingerprint
-            ).removeprefix("sha256:")
+    incarnation_coordinate = _incarnation_coordinate(
+        str(realization.get("model_realization_id")), fingerprint
+    )
+    if binding_context is not None and Path(
+        binding_context["runtime_state_root"]
+    ).resolve() != runtime_root:
+        raise IncarnationHomeError(
+            "holder binding runtime state root does not match manifest runtime root"
         )
-        / "codex-home"
-    ).resolve()
+    realization_root = _holder_incarnation_root(
+        runtime_root=runtime_root,
+        incarnation_coordinate=incarnation_coordinate,
+        holder_coordinate=None,
+    )
+    expected_root = _holder_incarnation_root(
+        runtime_root=runtime_root,
+        incarnation_coordinate=incarnation_coordinate,
+        holder_coordinate=holder_coordinate,
+    )
+    if realization_root.is_symlink() or expected_root.is_symlink():
+        raise IncarnationHomeError("incarnation root may not be a symlink")
+    expected_manifest = expected_root / "incarnation-home.json"
+    if path.resolve() != expected_manifest.resolve():
+        raise IncarnationHomeError(
+            "incarnation-home manifest path is not its derived binding path"
+        )
+    expected_home = (expected_root / "codex-home").resolve()
     if codex_home != expected_home:
         raise IncarnationHomeError("incarnation Codex home is not derived from realization")
     try:
@@ -5074,6 +10064,10 @@ def _load_manifest_snapshot(
             if isinstance(grant, dict) and isinstance(grant.get("path"), str)
         ],
     )
+    expected_capability_projection = _preserve_disappeared_denied_projection_entries(
+        expected_capability_projection,
+        capability_projection,
+    )
     if capability_projection != expected_capability_projection:
         raise IncarnationHomeError("capability projection drift")
 
@@ -5100,7 +10094,45 @@ def _load_manifest_snapshot(
         raise IncarnationHomeError(
             "shared-state manifest no longer matches capability projection"
         )
-    expected_names = set(shared_names) | LOCAL_NAMES
+    expected_actor_local_names = sorted(
+        name
+        for name, entry in expected_capability_projection["entries"].items()
+        if entry["projection"] == "denied"
+    )
+    actor_local_names = manifest.get("actor_local_state_names")
+    if actor_local_names is None:
+        if manifest_schema_version == SCHEMA_VERSION:
+            raise IncarnationHomeError(
+                "current incarnation-home manifest lacks actor-local state names"
+            )
+        # Pre-repair v2 manifests did not name the derived denied-state set.
+        # Recompute it only on the explicitly legacy compatibility route.
+        actor_local_names = expected_actor_local_names
+    elif (
+        not isinstance(actor_local_names, list)
+        or any(
+            not isinstance(name, str)
+            or not name
+            or name in {".", ".."}
+            or name in LOCAL_NAMES
+            or Path(name).name != name
+            for name in actor_local_names
+        )
+        or len(set(actor_local_names)) != len(actor_local_names)
+    ):
+        raise IncarnationHomeError("actor-local state manifest is invalid")
+    if sorted(actor_local_names) != expected_actor_local_names:
+        raise IncarnationHomeError(
+            "actor-local state manifest no longer matches capability projection"
+        )
+    _validate_denied_state_provenance(
+        manifest=manifest,
+        codex_home=codex_home,
+        ambient_home=ambient_home,
+        names=actor_local_names,
+        required=manifest_schema_version == SCHEMA_VERSION,
+    )
+    expected_names = set(shared_names) | set(actor_local_names) | LOCAL_NAMES
     for entry in codex_home.iterdir():
         if entry.name not in expected_names:
             raise IncarnationHomeError(
@@ -5120,7 +10152,363 @@ def _load_manifest_snapshot(
         local = codex_home / name
         if local.is_symlink() or not local.is_dir():
             raise IncarnationHomeError(f"actor-local {name} is not a real directory")
+    _validate_actor_local_entries(
+        codex_home,
+        sorted(set(actor_local_names) | set(LOCAL_NAMES)),
+        ambient_home,
+    )
     return manifest, raw, sha256_bytes(raw)
+
+
+def _legacy_migration_actor_local_names(manifest: dict[str, Any]) -> list[str]:
+    projection = manifest.get("capability_projection")
+    entries = projection.get("entries") if isinstance(projection, dict) else None
+    if not isinstance(entries, dict):
+        raise IncarnationHomeError(
+            "legacy incarnation-home capability projection is unavailable for migration"
+        )
+    names = [
+        name
+        for name, entry in entries.items()
+        if isinstance(name, str)
+        and isinstance(entry, dict)
+        and entry.get("projection") == "denied"
+    ]
+    return sorted(names)
+
+
+def _validate_idempotent_legacy_migration_target(
+    *,
+    target_manifest: dict[str, Any],
+    target_home: Path,
+    legacy_manifest_digest: str,
+    source_home: Path,
+    source_actor_local_names: Sequence[str],
+    ambient_home: Path,
+    ambient_identities: set[tuple[int, int]],
+    expected_config: bytes,
+    expected_capability_projection: dict[str, Any],
+) -> None:
+    """Accept only a target that is the exact result of this migration."""
+
+    expected_capability_projection = _preserve_disappeared_denied_projection_entries(
+        expected_capability_projection,
+        target_manifest.get("capability_projection"),
+    )
+    if target_manifest.get("migration_source_manifest_digest") != legacy_manifest_digest:
+        raise IncarnationHomeError(
+            "legacy migration refuses to overwrite a pre-existing typed home"
+        )
+    expected_shared_names = sorted(
+        name
+        for name, entry in expected_capability_projection["entries"].items()
+        if entry["projection"] == "shared_link"
+    )
+    expected_actor_local_names = sorted(
+        name
+        for name, entry in expected_capability_projection["entries"].items()
+        if entry["projection"] == "denied"
+    )
+    if target_manifest.get("config_digest") != sha256_bytes(expected_config):
+        raise IncarnationHomeError(
+            "legacy migration target is not an exact idempotent match"
+        )
+    if target_manifest.get("capability_projection") != expected_capability_projection:
+        raise IncarnationHomeError(
+            "legacy migration target is not an exact idempotent match"
+        )
+    if target_manifest.get("shared_state_names") != expected_shared_names:
+        raise IncarnationHomeError(
+            "legacy migration target is not an exact idempotent match"
+        )
+    if target_manifest.get("actor_local_state_names") != expected_actor_local_names:
+        raise IncarnationHomeError(
+            "legacy migration target is not an exact idempotent match"
+        )
+    expected_names = (
+        set(expected_shared_names) | set(expected_actor_local_names) | LOCAL_NAMES
+    )
+    _validate_actor_local_top_level_names(target_home, expected_names)
+    _validate_actor_local_entries(
+        target_home,
+        sorted(set(expected_actor_local_names) | set(LOCAL_NAMES)),
+        ambient_home,
+        initially_ambient_identities=ambient_identities,
+    )
+    target_config_digest = _local_tree_content_digest(
+        target_home / "config.toml",
+        "config.toml",
+        ambient_identities=ambient_identities,
+    )
+    expected_config_record = sha256_bytes(
+        canonical_bytes(
+            [
+                {
+                    "path": "config.toml",
+                    "kind": "file",
+                    "mode": 0o600,
+                    "content_digest": sha256_bytes(expected_config),
+                }
+            ]
+        )
+    )
+    if target_config_digest != expected_config_record:
+        raise IncarnationHomeError(
+            "legacy migration target is not an exact idempotent match"
+        )
+    if set(source_actor_local_names) - set(expected_actor_local_names):
+        raise IncarnationHomeError(
+            "legacy migration source state is not admitted by the target projection"
+        )
+    source_names = sorted(set(source_actor_local_names) | LOCAL_NAMES)
+    source_root_descriptor, _source_root_initial, source_root_opened = (
+        _open_stable_actor_local_path_descriptor(
+            source_home, "legacy migration source home"
+        )
+    )
+    source_root_version = _actor_local_source_version(source_root_opened)
+    try:
+        _revalidate_legacy_migration_source_root(
+            source_home=source_home,
+            source_root_descriptor=source_root_descriptor,
+            source_root_version=source_root_version,
+            stage="before idempotent snapshot",
+        )
+        source_content_digests = _legacy_migration_content_snapshot(
+            home=source_home,
+            names=source_names,
+            ambient_identities=ambient_identities,
+            include_source_version=False,
+        )
+        source_content_versions = _legacy_migration_content_snapshot(
+            home=source_home,
+            names=source_names,
+            ambient_identities=ambient_identities,
+            include_source_version=True,
+        )
+        _revalidate_legacy_migration_source_root(
+            source_home=source_home,
+            source_root_descriptor=source_root_descriptor,
+            source_root_version=source_root_version,
+            stage="after source snapshot",
+        )
+        target_content_digests = _legacy_migration_content_snapshot(
+            home=target_home,
+            names=source_names,
+            ambient_identities=ambient_identities,
+            include_source_version=False,
+        )
+        if target_content_digests != source_content_digests:
+            raise IncarnationHomeError(
+                "legacy migration target is not an exact idempotent match"
+            )
+        final_source_content_versions = _legacy_migration_content_snapshot(
+            home=source_home,
+            names=source_names,
+            ambient_identities=ambient_identities,
+            include_source_version=True,
+        )
+        _revalidate_legacy_migration_source_root(
+            source_home=source_home,
+            source_root_descriptor=source_root_descriptor,
+            source_root_version=source_root_version,
+            stage="after source version snapshot",
+        )
+        if final_source_content_versions != source_content_versions:
+            raise IncarnationHomeError(
+                "legacy migration source state changed during migration"
+            )
+        final_target_content_digests = _legacy_migration_content_snapshot(
+            home=target_home,
+            names=source_names,
+            ambient_identities=ambient_identities,
+            include_source_version=False,
+        )
+        if final_target_content_digests != source_content_digests:
+            raise IncarnationHomeError(
+                "legacy migration target is not an exact idempotent match"
+            )
+    finally:
+        os.close(source_root_descriptor)
+    for name in expected_shared_names:
+        source = ambient_home / name
+        target = target_home / name
+        if (
+            source.is_symlink()
+            or not source.exists()
+            or not target.is_symlink()
+            or target.readlink() != source
+        ):
+            raise IncarnationHomeError(
+                "legacy migration target is not an exact idempotent match"
+            )
+
+
+def migrate_legacy_home(
+    *,
+    legacy_manifest_path: Path,
+    binding_context: Path | dict[str, Any],
+    capability_grants: Sequence[Path] = (),
+) -> dict[str, Any]:
+    """Explicitly carry legacy v2 local state into a new typed v3 home."""
+
+    legacy_path = _regular_file(
+        legacy_manifest_path, "legacy incarnation-home manifest"
+    )
+    legacy, _legacy_bytes, legacy_digest = _load_manifest_snapshot(legacy_path)
+    if legacy.get("schema_version") != LEGACY_SCHEMA_VERSION:
+        raise IncarnationHomeError(
+            "legacy migration requires an incarnation-home v2 manifest"
+        )
+    context, _context_bytes, context_digest = _holder_binding_context_input(
+        binding_context
+    )
+    runtime_root = _absolute_directory(
+        Path(str(legacy["runtime_root"])), "runtime root"
+    )
+    ambient_home = _absolute_directory(
+        Path(str(legacy["ambient_codex_home"])), "ambient Codex home"
+    )
+    if Path(context["runtime_state_root"]).resolve() != runtime_root:
+        raise IncarnationHomeError(
+            "holder binding runtime state root does not match legacy runtime root"
+        )
+    realization_path = _regular_file(
+        Path(str(legacy["model_realization_ref"])), "model realization"
+    )
+    source_home = Path(str(legacy["codex_home"])).resolve()
+    source_actor_local_names = _legacy_migration_actor_local_names(legacy)
+    source_expected_names = (
+        set(str(name) for name in legacy["shared_state_names"])
+        | set(source_actor_local_names)
+        | LOCAL_NAMES
+    )
+    ambient_identities = _ambient_inode_identities(ambient_home)
+    _validate_actor_local_top_level_names(source_home, source_expected_names)
+    _validate_actor_local_entries(
+        source_home,
+        sorted(set(source_actor_local_names) | LOCAL_NAMES),
+        ambient_home,
+        initially_ambient_identities=ambient_identities,
+    )
+    owner_token = _prepare_home_attempt_owner(
+        ambient_home=ambient_home,
+        realization_path=realization_path,
+        runtime_root=runtime_root,
+        binding_context=context,
+    )
+    if owner_token is None:
+        raise IncarnationHomeError(
+            "legacy migration requires a typed holder binding for the target home"
+        )
+    target_home = (Path(str(owner_token["incarnation_root"])) / "codex-home").resolve()
+    if target_home == source_home:
+        raise IncarnationHomeError(
+            "legacy migration requires a distinct typed target home"
+        )
+    try:
+        with _incarnation_preparation_lock(runtime_root, ambient_identities):
+            locked_legacy, _locked_bytes, locked_digest = _load_manifest_snapshot(
+                legacy_path
+            )
+            if locked_digest != legacy_digest:
+                raise IncarnationHomeError(
+                    "legacy incarnation-home manifest changed before migration"
+                )
+            if locked_legacy.get("schema_version") != LEGACY_SCHEMA_VERSION:
+                raise IncarnationHomeError(
+                    "legacy migration requires an incarnation-home v2 manifest"
+                )
+            _validate_actor_local_top_level_names(source_home, source_expected_names)
+            _validate_actor_local_entries(
+                source_home,
+                sorted(set(source_actor_local_names) | LOCAL_NAMES),
+                ambient_home,
+                initially_ambient_identities=ambient_identities,
+            )
+            realization, model_slug, effort, _runtime_version, fingerprint = _realization(
+                realization_path
+            )
+            expected_config = _bound_config(
+                _regular_file(
+                    ambient_home / "config.toml", "ambient Codex config"
+                ).read_bytes(),
+                model_slug,
+                effort,
+            )
+            expected_coordinate = _incarnation_coordinate(
+                str(realization.get("model_realization_id")), fingerprint
+            )
+            expected_capability_projection = _build_capability_projection(
+                ambient_home=ambient_home,
+                ambient_home_identity=_ambient_home_identity(ambient_home),
+                model_realization_id=str(realization.get("model_realization_id")),
+                incarnation_coordinate=expected_coordinate,
+                capability_grants=capability_grants,
+            )
+            target_marker = Path(str(owner_token["incarnation_root"])) / (
+                "incarnation-home.json"
+            )
+            try:
+                target_marker_stat = os.lstat(target_marker)
+            except FileNotFoundError:
+                target_marker_stat = None
+            except OSError as exc:
+                raise IncarnationHomeError(
+                    "legacy migration target marker cannot be inspected"
+                ) from exc
+            if target_marker_stat is not None:
+                if stat.S_ISLNK(target_marker_stat.st_mode) or not stat.S_ISREG(
+                    target_marker_stat.st_mode
+                ):
+                    raise IncarnationHomeError(
+                        "legacy migration target marker is not a regular file"
+                    )
+                try:
+                    target_manifest, _target_bytes, _target_digest = (
+                        _load_manifest_snapshot(
+                            target_marker,
+                            binding_context=context,
+                            binding_context_digest=context_digest,
+                            require_holder_binding=True,
+                        )
+                    )
+                except IncarnationHomeError as exc:
+                    if "denied-state local content changed" not in str(exc):
+                        raise
+                    raise IncarnationHomeError(
+                        "legacy migration target is not an exact idempotent match"
+                    ) from exc
+                _validate_idempotent_legacy_migration_target(
+                    target_manifest=target_manifest,
+                    target_home=target_home,
+                    legacy_manifest_digest=legacy_digest,
+                    source_home=source_home,
+                    source_actor_local_names=source_actor_local_names,
+                    ambient_home=ambient_home,
+                    ambient_identities=ambient_identities,
+                    expected_config=expected_config,
+                    expected_capability_projection=expected_capability_projection,
+                )
+                return target_manifest
+            return _prepare_home_impl(
+                ambient_home=ambient_home,
+                realization_path=realization_path,
+                runtime_root=runtime_root,
+                capability_grants=capability_grants,
+                binding_context=context,
+                _owner_token=owner_token,
+                _migration_source_home=source_home,
+                _migration_source_expected_names=source_expected_names,
+                _migration_source_actor_local_names=source_actor_local_names,
+                _migration_source_manifest_digest=legacy_digest,
+                _migration_previous_capability_projection=locked_legacy.get(
+                    "capability_projection"
+                ),
+            )
+    except BaseException:
+        _rollback_unpublished_home(owner_token=owner_token)
+        raise
 
 
 def _load_manifest(path: Path) -> dict[str, Any]:
@@ -5148,6 +10536,321 @@ def _resolved_executable(codex_executable: Path) -> Path:
     return executable
 
 
+def _snapshot_directory_flags() -> int:
+    return (
+        os.O_RDONLY
+        | getattr(os, "O_DIRECTORY", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_CLOEXEC", 0)
+    )
+
+
+def _remove_snapshot_tree_contents(directory_fd: int, label: str) -> None:
+    """Remove a snapshot tree through retained directory descriptors only."""
+
+    try:
+        names = sorted(os.listdir(directory_fd))
+    except OSError as exc:
+        raise IncarnationHomeError(
+            f"{label} cannot be enumerated through its retained descriptor"
+        ) from exc
+    for name in names:
+        try:
+            initial = os.lstat(name, dir_fd=directory_fd)
+        except FileNotFoundError:
+            continue
+        except OSError as exc:
+            raise IncarnationHomeError(
+                f"{label} entry cannot be inspected: {name}"
+            ) from exc
+        if stat.S_ISLNK(initial.st_mode) or not (
+            stat.S_ISDIR(initial.st_mode) or stat.S_ISREG(initial.st_mode)
+        ):
+            raise IncarnationHomeError(
+                f"{label} contains an unsupported entry: {name}"
+            )
+        flags = (
+            _snapshot_directory_flags()
+            if stat.S_ISDIR(initial.st_mode)
+            else os.O_RDONLY
+            | getattr(os, "O_NOFOLLOW", 0)
+            | getattr(os, "O_CLOEXEC", 0)
+        )
+        try:
+            child_fd = os.open(name, flags, dir_fd=directory_fd)
+        except FileNotFoundError:
+            continue
+        except OSError as exc:
+            raise IncarnationHomeError(
+                f"{label} entry cannot be opened safely: {name}"
+            ) from exc
+        try:
+            opened = os.fstat(child_fd)
+            observed = os.lstat(name, dir_fd=directory_fd)
+            if (
+                _actor_local_identity_mode(opened)
+                != _actor_local_identity_mode(initial)
+                or _actor_local_identity_mode(observed)
+                != _actor_local_identity_mode(initial)
+            ):
+                raise IncarnationHomeError(
+                    f"{label} entry changed during safe cleanup: {name}"
+                )
+            child_label = f"{label}/{name}"
+            if stat.S_ISDIR(initial.st_mode):
+                _remove_snapshot_directory_at(
+                    directory_fd,
+                    name,
+                    child_fd,
+                    initial,
+                    child_label,
+                )
+            else:
+                _remove_staged_file_at(
+                    directory_fd,
+                    name,
+                    child_fd,
+                    child_label,
+                )
+        finally:
+            os.close(child_fd)
+
+
+def _remove_snapshot_directory_at(
+    parent_fd: int,
+    name: str,
+    directory_fd: int,
+    initial: os.stat_result,
+    label: str,
+) -> None:
+    """Quarantine and remove one retained snapshot directory inode."""
+
+    quarantine_name: str | None = None
+    quarantine_fd: int | None = None
+    quarantine_opened: os.stat_result | None = None
+    quarantine_entry_moved = False
+    try:
+        retained_before = os.fstat(directory_fd)
+        if (
+            _actor_local_identity_mode(retained_before)
+            != _actor_local_identity_mode(initial)
+            or not stat.S_ISDIR(retained_before.st_mode)
+        ):
+            raise IncarnationHomeError(f"{label} changed before cleanup")
+        # Frozen snapshot directories are intentionally not writable.  Change
+        # only the retained inode before quarantine; never use its mutable
+        # pathname as a mode or cleanup authority.
+        os.fchmod(directory_fd, 0o700)
+        prepared = os.fstat(directory_fd)
+        if (
+            prepared.st_dev,
+            prepared.st_ino,
+            stat.S_IMODE(prepared.st_mode),
+        ) != (
+            initial.st_dev,
+            initial.st_ino,
+            0o700,
+        ):
+            raise IncarnationHomeError(f"{label} changed while becoming writable")
+        for _attempt in range(8):
+            candidate = f".{name}.quarantine-{secrets.token_hex(16)}"
+            try:
+                os.mkdir(candidate, 0o700, dir_fd=parent_fd)
+            except FileExistsError:
+                continue
+            quarantine_name = candidate
+            break
+        if quarantine_name is None:
+            raise IncarnationHomeError(
+                f"{label} could not allocate a private cleanup directory"
+            )
+        try:
+            quarantine_fd = os.open(
+                quarantine_name,
+                _snapshot_directory_flags(),
+                dir_fd=parent_fd,
+            )
+            quarantine_opened = os.fstat(quarantine_fd)
+            quarantine_observed = os.lstat(
+                quarantine_name,
+                dir_fd=parent_fd,
+            )
+            if (
+                _actor_local_identity_mode(quarantine_opened)
+                != _actor_local_identity_mode(quarantine_observed)
+                or not stat.S_ISDIR(quarantine_opened.st_mode)
+            ):
+                raise IncarnationHomeError(
+                    f"{label} cleanup directory changed during safe open"
+                )
+            try:
+                os.rename(
+                    name,
+                    name,
+                    src_dir_fd=parent_fd,
+                    dst_dir_fd=quarantine_fd,
+                )
+            except FileNotFoundError:
+                return
+            except OSError as exc:
+                raise IncarnationHomeError(
+                    f"{label} could not be quarantined"
+                ) from exc
+            quarantine_entry_moved = True
+            quarantined = os.lstat(name, dir_fd=quarantine_fd)
+            retained = os.fstat(directory_fd)
+            if (
+                _actor_local_identity_mode(quarantined)
+                != _actor_local_identity_mode(prepared)
+                or _actor_local_identity_mode(retained)
+                != _actor_local_identity_mode(prepared)
+                or not stat.S_ISDIR(retained.st_mode)
+            ):
+                quarantine_entry_moved = _restore_quarantined_entry_at(
+                    parent_fd=parent_fd,
+                    quarantine_fd=quarantine_fd,
+                    quarantine_name=name,
+                    target_name=name,
+                    label=f"{label} raced directory",
+                )
+                raise IncarnationHomeError(
+                    f"{label} changed during quarantine"
+                )
+            _remove_snapshot_tree_contents(directory_fd, label)
+            remaining = os.fstat(directory_fd)
+            if os.listdir(directory_fd):
+                raise IncarnationHomeError(
+                    f"{label} was repopulated during cleanup"
+                )
+            _revalidate_recovery_entry_before_removal(
+                quarantine_fd,
+                name,
+                directory_fd,
+                remaining,
+                f"{label} retained directory",
+            )
+            os.rmdir(name, dir_fd=quarantine_fd)
+            quarantine_entry_moved = False
+        except FileNotFoundError:
+            if not quarantine_entry_moved:
+                return
+            raise
+    finally:
+        if (
+            quarantine_name is not None
+            and not quarantine_entry_moved
+            and quarantine_fd is not None
+            and quarantine_opened is not None
+        ):
+            _revalidate_recovery_entry_before_removal(
+                parent_fd,
+                quarantine_name,
+                quarantine_fd,
+                quarantine_opened,
+                f"{label} cleanup directory",
+            )
+            try:
+                os.rmdir(quarantine_name, dir_fd=parent_fd)
+            except FileNotFoundError:
+                pass
+        if quarantine_fd is not None:
+            os.close(quarantine_fd)
+
+
+def _remove_snapshot_tree_from_descriptor(
+    snapshot_path: Path,
+    snapshot_dir: Path,
+    snapshot_dir_fd: int,
+) -> None:
+    """Clean and remove a named snapshot using its retained root descriptor."""
+
+    try:
+        root_initial = os.fstat(snapshot_dir_fd)
+        if not stat.S_ISDIR(root_initial.st_mode):
+            return
+        try:
+            snapshot_path.relative_to(snapshot_dir)
+        except ValueError:
+            return
+        # This effect is descriptor-relative; the pathname can be replaced or
+        # renamed without changing the inode whose mode is being repaired.
+        os.fchmod(snapshot_dir_fd, 0o700)
+        _remove_snapshot_tree_contents(snapshot_dir_fd, "named snapshot")
+        try:
+            bound = Path(os.readlink(f"/proc/self/fd/{snapshot_dir_fd}"))
+        except OSError:
+            return
+        if not bound.is_absolute() or str(bound).endswith(" (deleted)"):
+            return
+        parent_fd = _open_pinned_parent_directory(bound, "named snapshot cleanup")
+        try:
+            observed = os.lstat(bound.name, dir_fd=parent_fd)
+            retained = os.fstat(snapshot_dir_fd)
+            if (
+                _actor_local_identity_mode(observed)
+                != _actor_local_identity_mode(retained)
+                or not stat.S_ISDIR(observed.st_mode)
+            ):
+                return
+            _remove_snapshot_directory_at(
+                parent_fd,
+                bound.name,
+                snapshot_dir_fd,
+                observed,
+                "named snapshot",
+            )
+            os.fsync(parent_fd)
+        finally:
+            os.close(parent_fd)
+    except (IncarnationHomeError, OSError):
+        return
+
+
+def _open_snapshot_root_for_cleanup(
+    snapshot_path: Path,
+    snapshot_dir: Path,
+) -> None:
+    """Open a snapshot root safely before descriptor-relative cleanup."""
+
+    try:
+        parent_fd = _open_pinned_parent_directory(
+            snapshot_dir,
+            "named snapshot cleanup",
+        )
+    except (IncarnationHomeError, OSError):
+        return
+    root_fd: int | None = None
+    try:
+        try:
+            initial = os.lstat(snapshot_dir.name, dir_fd=parent_fd)
+            root_fd = os.open(
+                snapshot_dir.name,
+                _snapshot_directory_flags(),
+                dir_fd=parent_fd,
+            )
+            opened = os.fstat(root_fd)
+            observed = os.lstat(snapshot_dir.name, dir_fd=parent_fd)
+        except OSError:
+            return
+        if (
+            _actor_local_identity_mode(initial)
+            != _actor_local_identity_mode(opened)
+            or _actor_local_identity_mode(observed)
+            != _actor_local_identity_mode(opened)
+            or not stat.S_ISDIR(opened.st_mode)
+        ):
+            return
+        _remove_snapshot_tree_from_descriptor(
+            snapshot_path,
+            snapshot_dir,
+            root_fd,
+        )
+    finally:
+        if root_fd is not None:
+            os.close(root_fd)
+        os.close(parent_fd)
+
+
 def _remove_named_snapshot(
     snapshot_path: Path,
     *,
@@ -5156,47 +10859,31 @@ def _remove_named_snapshot(
 ) -> None:
     cleanup_dir = snapshot_dir
     if cleanup_dir is not None:
-        try:
-            if snapshot_dir_fd is not None:
+        if (
+            not cleanup_dir.name.startswith("abyss-stack-codex-package-")
+            or not snapshot_path.is_relative_to(cleanup_dir)
+        ):
+            return
+        if snapshot_dir_fd is not None:
+            try:
                 expected = os.fstat(snapshot_dir_fd)
                 observed = os.lstat(cleanup_dir)
-                if (
-                    not stat.S_ISDIR(expected.st_mode)
-                    or not stat.S_ISDIR(observed.st_mode)
-                    or (expected.st_dev, expected.st_ino)
-                    != (observed.st_dev, observed.st_ino)
-                ):
-                    return
+            except OSError:
+                return
             if (
-                cleanup_dir.is_symlink()
-                or not cleanup_dir.is_dir()
-                or not cleanup_dir.name.startswith("abyss-stack-codex-package-")
+                not stat.S_ISDIR(expected.st_mode)
+                or _actor_local_identity_mode(expected)
+                != _actor_local_identity_mode(observed)
             ):
                 return
-            snapshot_path.relative_to(cleanup_dir)
-            os.chmod(cleanup_dir, 0o700)
-        except (OSError, ValueError):
+            _remove_snapshot_tree_from_descriptor(
+                snapshot_path,
+                cleanup_dir,
+                snapshot_dir_fd,
+            )
             return
-    if cleanup_dir is not None:
-        try:
-            def remove_tree(root: Path) -> None:
-                os.chmod(root, 0o700)
-                with os.scandir(root) as entries:
-                    for entry in entries:
-                        child = Path(entry.path)
-                        if entry.is_symlink():
-                            child.unlink(missing_ok=True)
-                        elif entry.is_dir(follow_symlinks=False):
-                            remove_tree(child)
-                        else:
-                            child.unlink(missing_ok=True)
-                os.chmod(root, 0o700)
-                root.rmdir()
-
-            remove_tree(cleanup_dir)
-        except OSError:
-            return
-        sync_path = cleanup_dir.parent
+        _open_snapshot_root_for_cleanup(snapshot_path, cleanup_dir)
+        return
     else:
         try:
             snapshot_path.unlink(missing_ok=True)
@@ -5299,6 +10986,85 @@ def _execution_snapshot_root(preferred: Path | None) -> Path:
             f"shebang snapshot filesystem is mounted noexec: {root}"
         )
     return root
+
+
+def _snapshot_root_matches(root: Path, root_fd: int) -> bool:
+    """Check that the retained root still names the opened directory inode."""
+
+    try:
+        observed = os.lstat(root)
+        retained = os.fstat(root_fd)
+    except OSError:
+        return False
+    return (
+        stat.S_ISDIR(retained.st_mode)
+        and _actor_local_identity_mode(observed)
+        == _actor_local_identity_mode(retained)
+    )
+
+
+def _open_execution_snapshot_root(preferred: Path | None) -> tuple[Path, int]:
+    """Open and retain the exact admitted runtime scratch directory."""
+
+    root = _execution_snapshot_root(preferred)
+    parent_fd = _open_pinned_parent_directory(root, "shebang snapshot root")
+    root_fd: int | None = None
+    try:
+        initial = os.lstat(root.name, dir_fd=parent_fd)
+        if stat.S_ISLNK(initial.st_mode) or not stat.S_ISDIR(initial.st_mode):
+            raise IncarnationHomeError(
+                f"shebang snapshot root changed before safe open: {root}"
+            )
+        root_fd = os.open(
+            root.name,
+            _snapshot_directory_flags(),
+            dir_fd=parent_fd,
+        )
+        opened = os.fstat(root_fd)
+        observed = os.lstat(root.name, dir_fd=parent_fd)
+        if (
+            not stat.S_ISDIR(opened.st_mode)
+            or _actor_local_identity_mode(opened)
+            != _actor_local_identity_mode(initial)
+            or _actor_local_identity_mode(observed)
+            != _actor_local_identity_mode(opened)
+        ):
+            raise IncarnationHomeError(
+                f"shebang snapshot root changed during safe open: {root}"
+            )
+        try:
+            flags = os.fstatvfs(root_fd).f_flag
+        except OSError as exc:
+            raise IncarnationHomeError(
+                f"shebang snapshot filesystem could not be inspected: {root}"
+            ) from exc
+        noexec = getattr(os, "ST_NOEXEC", 0)
+        if isinstance(noexec, int) and noexec and flags & noexec:
+            raise IncarnationHomeError(
+                f"shebang snapshot filesystem is mounted noexec: {root}"
+            )
+        return root, root_fd
+    except IncarnationHomeError:
+        if root_fd is not None:
+            os.close(root_fd)
+        raise
+    except OSError as exc:
+        if root_fd is not None:
+            os.close(root_fd)
+        raise IncarnationHomeError(
+            f"shebang snapshot root could not be opened safely: {root}"
+        ) from exc
+    finally:
+        os.close(parent_fd)
+
+
+def _launch_snapshot_root(manifest: dict[str, Any]) -> Path:
+    """Use runtime-owned scratch space, not holder-local state, for mirrors."""
+
+    runtime_root = manifest.get("runtime_root")
+    if not isinstance(runtime_root, str):
+        raise IncarnationHomeError("manifest runtime root is missing")
+    return _execution_snapshot_root(Path(runtime_root))
 
 
 def _package_root(executable: Path) -> Path:
@@ -5463,6 +11229,45 @@ def _adjacent_code_mode_host(
     )
 
 
+def _effective_execute_access(descriptor: int) -> bool:
+    """Use ACL-aware kernel access checks against a retained source inode."""
+
+    return os.access(
+        f"/proc/self/fd/{descriptor}",
+        os.X_OK,
+        effective_ids=True,
+    )
+
+
+def _package_source_version_changed(
+    before: os.stat_result,
+    after: os.stat_result,
+) -> bool:
+    """Detect source changes that can alter copied bytes or effective access."""
+
+    if (
+        before.st_dev,
+        before.st_ino,
+        before.st_mode,
+        before.st_size,
+        before.st_mtime_ns,
+    ) != (
+        after.st_dev,
+        after.st_ino,
+        after.st_mode,
+        after.st_size,
+        after.st_mtime_ns,
+    ):
+        return True
+    # Unlinking the ambient name legitimately changes link count and ctime on
+    # the retained inode.  A ctime-only change with a stable link count still
+    # identifies an ACL, ownership, or other metadata mutation.
+    return (
+        before.st_ctime_ns != after.st_ctime_ns
+        and before.st_nlink == after.st_nlink
+    )
+
+
 def _copy_package_file(
     source: Path,
     target: Path,
@@ -5488,26 +11293,22 @@ def _copy_package_file(
                 break
             chunks.append(chunk)
         after = os.fstat(source_fd)
-        if (
-            before.st_dev,
-            before.st_ino,
-            before.st_size,
-            before.st_mtime_ns,
-            before.st_ctime_ns,
-            stat.S_IMODE(before.st_mode),
-        ) != (
-            after.st_dev,
-            after.st_ino,
-            after.st_size,
-            after.st_mtime_ns,
-            after.st_ctime_ns,
-            stat.S_IMODE(after.st_mode),
-        ):
+        if _package_source_version_changed(before, after):
             raise IncarnationHomeError(
                 f"package snapshot source changed while reading: {source}"
             )
         content = b"".join(chunks)
-        target_mode = 0o500 if os.access(source, os.X_OK) else 0o400
+        access_before = os.fstat(source_fd)
+        if _package_source_version_changed(after, access_before):
+            raise IncarnationHomeError(
+                f"package snapshot source changed before access check: {source}"
+            )
+        target_mode = 0o500 if _effective_execute_access(source_fd) else 0o400
+        access_after = os.fstat(source_fd)
+        if _package_source_version_changed(access_before, access_after):
+            raise IncarnationHomeError(
+                f"package snapshot source changed during access check: {source}"
+            )
         target_flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
         if hasattr(os, "O_NOFOLLOW"):
             target_flags |= os.O_NOFOLLOW
@@ -5593,8 +11394,8 @@ def _copy_package_tree(
 
 
 def _mirror_package_layout(
-    *, executable: Path, snapshot_root: Path
-) -> tuple[Path, Path, dict[Path, tuple[int, int, str, int]], Path]:
+    *, executable: Path, snapshot_root: Path | None
+) -> tuple[Path, Path, dict[Path, tuple[int, int, str, int]], Path, int]:
     """Build a private package snapshot with stable ancestor coordinates.
 
     Only the directory coordinates needed to reach the admitted package are
@@ -5603,13 +11404,52 @@ def _mirror_package_layout(
     depend on unrelated packages and prior snapshots.
     """
 
-    snapshot_dir = Path(
-        tempfile.mkdtemp(prefix="abyss-stack-codex-package-", dir=snapshot_root)
-    )
+    snapshot_root, snapshot_root_fd = _open_execution_snapshot_root(snapshot_root)
+    snapshot_dir: Path | None = None
+    bound_snapshot_dir: Path | None = None
+    snapshot_dir_name: str | None = None
+    snapshot_dir_fd: int | None = None
     try:
-        os.chmod(snapshot_dir, 0o700)
+        for _attempt in range(8):
+            candidate = f"abyss-stack-codex-package-{secrets.token_hex(16)}"
+            try:
+                os.mkdir(candidate, 0o700, dir_fd=snapshot_root_fd)
+            except FileExistsError:
+                continue
+            snapshot_dir_name = candidate
+            break
+        if snapshot_dir_name is None:
+            raise IncarnationHomeError(
+                "shebang snapshot root could not allocate a private directory"
+            )
+        if not _snapshot_root_matches(snapshot_root, snapshot_root_fd):
+            raise IncarnationHomeError(
+                f"shebang snapshot root changed during private directory creation: {snapshot_root}"
+            )
+        snapshot_dir_fd = os.open(
+            snapshot_dir_name,
+            _snapshot_directory_flags(),
+            dir_fd=snapshot_root_fd,
+        )
+        opened_snapshot_dir = os.fstat(snapshot_dir_fd)
+        observed_snapshot_dir = os.lstat(
+            snapshot_dir_name,
+            dir_fd=snapshot_root_fd,
+        )
+        if (
+            not stat.S_ISDIR(opened_snapshot_dir.st_mode)
+            or _actor_local_identity_mode(opened_snapshot_dir)
+            != _actor_local_identity_mode(observed_snapshot_dir)
+        ):
+            raise IncarnationHomeError(
+                "shebang snapshot directory changed during safe open"
+            )
+        bound_snapshot_dir = (
+            Path(f"/proc/self/fd/{snapshot_root_fd}") / snapshot_dir_name
+        )
+        snapshot_dir = snapshot_root / snapshot_dir_name
         source_dir = Path("/")
-        target_dir = snapshot_dir
+        target_dir = bound_snapshot_dir
         records: dict[Path, tuple[int, int, str, int]] = {}
         package_root = _package_root(executable)
         source_parts = package_root.parts
@@ -5623,23 +11463,137 @@ def _mirror_package_layout(
             source_dir,
             target_dir,
             excluded=executable,
+            # Source enumeration uses the ambient package coordinates, while
+            # target writes are descriptor-bound through /proc/self/fd.  The
+            # snapshot must therefore be excluded by its ambient coordinate;
+            # comparing it with the bound target spelling would recurse into
+            # the newly created mirror whenever both live below /tmp.
             ignored_source=snapshot_dir,
             records=records,
         )
+        if not _snapshot_root_matches(snapshot_root, snapshot_root_fd):
+            raise IncarnationHomeError(
+                f"shebang snapshot root changed while building private mirror: {snapshot_root}"
+            )
+        assert snapshot_dir is not None
+        assert bound_snapshot_dir is not None
+        records = {
+            snapshot_dir / path.relative_to(bound_snapshot_dir): value
+            for path, value in records.items()
+        }
+        stable_target_dir = snapshot_dir / target_dir.relative_to(bound_snapshot_dir)
+        retained_snapshot_dir_fd = snapshot_dir_fd
+        snapshot_dir_fd = None
         return (
-            target_dir / executable.relative_to(package_root),
+            stable_target_dir / executable.relative_to(package_root),
             snapshot_dir,
             records,
-            target_dir,
+            stable_target_dir,
+            retained_snapshot_dir_fd,
         )
     except BaseException:
-        _remove_named_snapshot(
-            snapshot_dir / executable.name, snapshot_dir=snapshot_dir
-        )
+        if snapshot_dir_fd is not None:
+            try:
+                _remove_snapshot_tree_contents(
+                    snapshot_dir_fd,
+                    "failed shebang package snapshot",
+                )
+                if snapshot_dir_name is not None:
+                    os.rmdir(snapshot_dir_name, dir_fd=snapshot_root_fd)
+            except (IncarnationHomeError, OSError):
+                pass
+        elif snapshot_dir_name is not None:
+            try:
+                os.rmdir(snapshot_dir_name, dir_fd=snapshot_root_fd)
+            except OSError:
+                pass
         raise
+    finally:
+        if snapshot_dir_fd is not None:
+            os.close(snapshot_dir_fd)
+        os.close(snapshot_root_fd)
 
 
-def _freeze_snapshot_tree(snapshot_dir: Path) -> None:
+def _freeze_snapshot_tree(
+    snapshot_dir: Path,
+    *,
+    snapshot_dir_fd: int | None = None,
+) -> None:
+    if snapshot_dir_fd is not None:
+        def freeze_descriptor(directory_fd: int, label: str) -> None:
+            try:
+                names = sorted(os.listdir(directory_fd))
+            except OSError as exc:
+                raise IncarnationHomeError(
+                    f"{label} cannot be enumerated through its retained descriptor"
+                ) from exc
+            for name in names:
+                try:
+                    initial = os.lstat(name, dir_fd=directory_fd)
+                except OSError as exc:
+                    raise IncarnationHomeError(
+                        f"{label} entry cannot be inspected: {name}"
+                    ) from exc
+                if stat.S_ISLNK(initial.st_mode) or not (
+                    stat.S_ISDIR(initial.st_mode) or stat.S_ISREG(initial.st_mode)
+                ):
+                    raise IncarnationHomeError(
+                        f"{label} contains an unsupported entry: {name}"
+                    )
+                flags = (
+                    _snapshot_directory_flags()
+                    if stat.S_ISDIR(initial.st_mode)
+                    else os.O_RDONLY
+                    | getattr(os, "O_NOFOLLOW", 0)
+                    | getattr(os, "O_CLOEXEC", 0)
+                )
+                child_fd: int | None = None
+                try:
+                    child_fd = os.open(name, flags, dir_fd=directory_fd)
+                    opened = os.fstat(child_fd)
+                    observed = os.lstat(name, dir_fd=directory_fd)
+                    if (
+                        _actor_local_identity_mode(opened)
+                        != _actor_local_identity_mode(initial)
+                        or _actor_local_identity_mode(observed)
+                        != _actor_local_identity_mode(initial)
+                    ):
+                        raise IncarnationHomeError(
+                            f"{label} entry changed during safe freeze: {name}"
+                        )
+                    if stat.S_ISDIR(initial.st_mode):
+                        os.fchmod(child_fd, 0o500)
+                        frozen = os.fstat(child_fd)
+                        if (
+                            frozen.st_dev,
+                            frozen.st_ino,
+                            stat.S_IMODE(frozen.st_mode),
+                        ) != (
+                            initial.st_dev,
+                            initial.st_ino,
+                            0o500,
+                        ):
+                            raise IncarnationHomeError(
+                                f"{label} directory changed while freezing: {name}"
+                            )
+                        freeze_descriptor(child_fd, f"{label}/{name}")
+                        retained = os.fstat(child_fd)
+                        if (
+                            _actor_local_identity_mode(retained)
+                            != _actor_local_identity_mode(frozen)
+                            or stat.S_IMODE(retained.st_mode) != 0o500
+                        ):
+                            raise IncarnationHomeError(
+                                f"{label} directory changed after freezing: {name}"
+                            )
+                finally:
+                    if child_fd is not None:
+                        os.close(child_fd)
+
+        os.fchmod(snapshot_dir_fd, 0o500)
+        freeze_descriptor(snapshot_dir_fd, "named snapshot")
+        return
+
     directory_flags = os.O_RDONLY
     if hasattr(os, "O_DIRECTORY"):
         directory_flags |= os.O_DIRECTORY
@@ -5938,14 +11892,30 @@ def _open_verified_executable(
                     snapshot_dir,
                     snapshot_records,
                     snapshot_package_root,
+                    snapshot_root_fd,
                 ) = _mirror_package_layout(
                     executable=executable,
-                    snapshot_root=_execution_snapshot_root(snapshot_root),
+                    snapshot_root=snapshot_root,
                 )
+                assert snapshot_dir is not None
+                assert snapshot_path is not None
+                assert snapshot_package_root is not None
+                assert snapshot_root_fd is not None
+                bound_snapshot_dir = Path(f"/proc/self/fd/{snapshot_root_fd}")
+                bound_snapshot_path = bound_snapshot_dir / snapshot_path.relative_to(
+                    snapshot_dir
+                )
+                bound_snapshot_package_root = bound_snapshot_dir / (
+                    snapshot_package_root.relative_to(snapshot_dir)
+                )
+                bound_snapshot_records = {
+                    bound_snapshot_dir / path.relative_to(snapshot_dir): value
+                    for path, value in snapshot_records.items()
+                }
                 snapshot_flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
                 if hasattr(os, "O_NOFOLLOW"):
                     snapshot_flags |= os.O_NOFOLLOW
-                snapshot_fd = os.open(snapshot_path, snapshot_flags, 0o500)
+                snapshot_fd = os.open(bound_snapshot_path, snapshot_flags, 0o500)
                 view = memoryview(content)
                 while view:
                     view = view[os.write(snapshot_fd, view) :]
@@ -5953,25 +11923,28 @@ def _open_verified_executable(
                 os.fchmod(snapshot_fd, 0o500)
                 os.fsync(snapshot_fd)
                 snapshot_info = os.fstat(snapshot_fd)
-                snapshot_records[snapshot_path] = (
+                bound_snapshot_records[bound_snapshot_path] = (
                     snapshot_info.st_dev,
                     snapshot_info.st_ino,
                     sha256_bytes(content),
                     0o500,
                 )
-                _freeze_snapshot_tree(snapshot_dir)
+                _freeze_snapshot_tree(
+                    bound_snapshot_dir,
+                    snapshot_dir_fd=snapshot_root_fd,
+                )
                 # A shebang interpreter must reopen a named path. Every
                 # actual directory from the private mirror root through the
                 # launcher's parent is frozen before that reopen, so a normal
                 # same-user rename cannot replace the verified final entry.
                 os.close(snapshot_fd)
                 snapshot_fd = None
-                snapshot_fd = os.open(snapshot_path, os.O_RDONLY)
+                snapshot_fd = os.open(bound_snapshot_path, os.O_RDONLY)
                 if hasattr(os, "O_NOFOLLOW"):
                     os.close(snapshot_fd)
                     snapshot_fd = None
                     snapshot_fd = os.open(
-                        snapshot_path, os.O_RDONLY | os.O_NOFOLLOW
+                        bound_snapshot_path, os.O_RDONLY | os.O_NOFOLLOW
                     )
                 info = os.fstat(snapshot_fd)
                 if not stat.S_ISREG(info.st_mode):
@@ -5990,20 +11963,14 @@ def _open_verified_executable(
                         "named executable snapshot bytes changed before exec"
                     )
                 snapshot_mount = _open_snapshot_mount(
-                    snapshot_path=snapshot_path,
-                    snapshot_dir=snapshot_dir,
-                    package_root=snapshot_package_root,
-                    records=snapshot_records,
+                    snapshot_path=bound_snapshot_path,
+                    snapshot_dir=bound_snapshot_dir,
+                    package_root=bound_snapshot_package_root,
+                    records=bound_snapshot_records,
                     companion_binding=(
                         companion_data[2] if companion_data is not None else None
                     ),
                 )
-                directory_flags = os.O_RDONLY
-                if hasattr(os, "O_DIRECTORY"):
-                    directory_flags |= os.O_DIRECTORY
-                if hasattr(os, "O_NOFOLLOW"):
-                    directory_flags |= os.O_NOFOLLOW
-                snapshot_root_fd = os.open(snapshot_dir, directory_flags)
                 os.set_inheritable(snapshot_root_fd, True)
                 execution_path = snapshot_mount["executable_path"]
                 os.close(snapshot_fd)
@@ -6021,27 +11988,31 @@ def _open_verified_executable(
                 if snapshot_fd is not None:
                     os.close(snapshot_fd)
                     snapshot_fd = None
-                if snapshot_root_fd is not None:
-                    os.close(snapshot_root_fd)
-                    snapshot_root_fd = None
                 _close_snapshot_mount(snapshot_mount)
                 if snapshot_path is not None:
                     _remove_named_snapshot(
-                        snapshot_path, snapshot_dir=snapshot_dir
+                        snapshot_path,
+                        snapshot_dir=snapshot_dir,
+                        snapshot_dir_fd=snapshot_root_fd,
                     )
+                if snapshot_root_fd is not None:
+                    os.close(snapshot_root_fd)
+                    snapshot_root_fd = None
                 raise
             except OSError as exc:
                 if snapshot_fd is not None:
                     os.close(snapshot_fd)
                     snapshot_fd = None
-                if snapshot_root_fd is not None:
-                    os.close(snapshot_root_fd)
-                    snapshot_root_fd = None
                 _close_snapshot_mount(snapshot_mount)
                 if snapshot_path is not None:
                     _remove_named_snapshot(
-                        snapshot_path, snapshot_dir=snapshot_dir
+                        snapshot_path,
+                        snapshot_dir=snapshot_dir,
+                        snapshot_dir_fd=snapshot_root_fd,
                     )
+                if snapshot_root_fd is not None:
+                    os.close(snapshot_root_fd)
+                    snapshot_root_fd = None
                 raise IncarnationHomeError(
                     "Codex shebang executable could not be snapshotted in a private package mirror"
                 ) from exc
@@ -6313,48 +12284,66 @@ def command_prepare(args: argparse.Namespace) -> int:
         realization_path=Path(args.model_realization),
         runtime_root=Path(args.runtime_root),
         capability_grants=[Path(path) for path in (args.capability_grant or [])],
+        binding_context=Path(args.binding_context),
+    )
+    print(json.dumps(manifest, ensure_ascii=False, sort_keys=True))
+    return 0
+
+
+def command_migrate(args: argparse.Namespace) -> int:
+    manifest = migrate_legacy_home(
+        legacy_manifest_path=Path(args.legacy_manifest),
+        binding_context=Path(args.binding_context),
+        capability_grants=[Path(path) for path in (args.capability_grant or [])],
     )
     print(json.dumps(manifest, ensure_ascii=False, sort_keys=True))
     return 0
 
 
 def command_payload_launch(args: argparse.Namespace) -> int:
+    """Run a payload and release an unpublished claim if admission fails."""
+
+    claim_state: dict[str, bool] = {}
+    try:
+        return _command_payload_launch_impl(args, claim_state=claim_state)
+    except BaseException:
+        if claim_state.get("reserved") and not claim_state.get("published"):
+            claim_path = Path(args.holder_claim)
+            claim_digest = args.holder_claim_digest
+            try:
+                _release_holder_claim(
+                    claim_path=claim_path,
+                    claim_digest=claim_digest,
+                    receipt_path=Path(args.holder_receipt),
+                    label="payload holder claim rollback",
+                )
+            except BaseException as rollback_exc:
+                raise IncarnationHomeError(
+                    "payload holder claim rollback became uncertain"
+                ) from rollback_exc
+        raise
+
+
+def _command_payload_launch_impl(
+    args: argparse.Namespace, *, claim_state: dict[str, bool] | None = None
+) -> int:
     """Bind the receipt to the exact process that owns the private payload."""
 
     manifest_path = Path(args.manifest)
-    manifest_snapshot_b64 = getattr(args, "manifest_snapshot_b64", None)
-    if manifest_snapshot_b64 is None:
-        manifest_path = _regular_file(manifest_path, "incarnation-home manifest")
-        manifest, manifest_bytes, manifest_digest = _load_manifest_snapshot(
-            manifest_path
+    if not args.holder_receipt:
+        raise IncarnationHomeError(
+            "canonical payload launch requires a holder receipt"
         )
-    else:
-        if not isinstance(manifest_snapshot_b64, str) or not manifest_snapshot_b64:
-            raise IncarnationHomeError(
-                "payload launch manifest snapshot is invalid"
-            )
-        try:
-            manifest_bytes = base64.b64decode(
-                manifest_snapshot_b64.encode("ascii"), validate=True
-            )
-        except (UnicodeEncodeError, ValueError, base64.binascii.Error) as exc:
-            raise IncarnationHomeError(
-                "payload launch manifest snapshot is not valid base64"
-            ) from exc
-        if not manifest_bytes:
-            raise IncarnationHomeError("payload launch manifest snapshot is empty")
-        manifest, manifest_bytes, manifest_digest = _load_manifest_snapshot(
-            manifest_path, snapshot_bytes=manifest_bytes
-        )
-    if manifest_digest != args.manifest_digest:
-        raise IncarnationHomeError("payload launch manifest digest drifted")
-
-    binding_context: dict[str, str] | None = None
+    claim_argument = getattr(args, "holder_claim", None)
+    claim_digest = getattr(args, "holder_claim_digest", None)
+    if not isinstance(claim_argument, str) or not isinstance(claim_digest, str):
+        raise IncarnationHomeError("canonical payload launch requires a holder claim")
+    if claim_state is not None:
+        claim_state["reserved"] = True
+    binding_context: dict[str, str]
     binding_context_path = getattr(args, "binding_context", None)
     binding_context_snapshot_b64 = getattr(args, "binding_context_snapshot_b64", None)
     binding_context_digest = getattr(args, "binding_context_digest", None)
-    control_socket = getattr(args, "control_socket", None)
-    terminal_title = getattr(args, "terminal_title", None)
     if (binding_context_snapshot_b64 is None) != (binding_context_digest is None):
         raise IncarnationHomeError("payload binding context snapshot is incomplete")
     if binding_context_snapshot_b64 is not None:
@@ -6375,28 +12364,85 @@ def command_payload_launch(args: argparse.Namespace) -> int:
             or sha256_bytes(binding_context_bytes) != binding_context_digest
         ):
             raise IncarnationHomeError("payload binding context snapshot digest drifted")
-        binding_context = _load_binding_context_snapshot(binding_context_bytes)
+        binding_context = _load_holder_binding_context_snapshot(binding_context_bytes)
     elif binding_context_path is not None:
-        binding_context = _load_binding_context(Path(binding_context_path))
-    if binding_context is not None and (
+        _context_document, binding_context_bytes = _load_json_snapshot(
+            Path(binding_context_path), "holder binding context"
+        )
+        binding_context = _validate_holder_binding_context(_context_document)
+        binding_context_digest = sha256_bytes(binding_context_bytes)
+    else:
+        raise IncarnationHomeError(
+            "canonical payload launch requires a typed holder binding context"
+        )
+    manifest_snapshot_b64 = getattr(args, "manifest_snapshot_b64", None)
+    if manifest_snapshot_b64 is None:
+        manifest_path = _regular_file(manifest_path, "incarnation-home manifest")
+        manifest, manifest_bytes, manifest_digest = _load_manifest_snapshot(
+            manifest_path,
+            binding_context=binding_context,
+            binding_context_digest=binding_context_digest,
+            require_holder_binding=True,
+        )
+    else:
+        if not isinstance(manifest_snapshot_b64, str) or not manifest_snapshot_b64:
+            raise IncarnationHomeError(
+                "payload launch manifest snapshot is invalid"
+            )
+        try:
+            manifest_bytes = base64.b64decode(
+                manifest_snapshot_b64.encode("ascii"), validate=True
+            )
+        except (UnicodeEncodeError, ValueError, base64.binascii.Error) as exc:
+            raise IncarnationHomeError(
+                "payload launch manifest snapshot is not valid base64"
+            ) from exc
+        if not manifest_bytes:
+            raise IncarnationHomeError("payload launch manifest snapshot is empty")
+        manifest, manifest_bytes, manifest_digest = _load_manifest_snapshot(
+            manifest_path,
+            snapshot_bytes=manifest_bytes,
+            binding_context=binding_context,
+            binding_context_digest=binding_context_digest,
+            require_holder_binding=True,
+        )
+    if manifest_digest != args.manifest_digest:
+        raise IncarnationHomeError("payload launch manifest digest drifted")
+
+    control_socket = getattr(args, "control_socket", None)
+    terminal_title = getattr(args, "terminal_title", None)
+    terminal_binding_requested = terminal_title is not None or control_socket is not None
+    if terminal_binding_requested and (
         not isinstance(control_socket, str) or not isinstance(terminal_title, str)
     ):
-        raise IncarnationHomeError(
-            "payload terminal binding lacks control socket or title"
-        )
-    if binding_context is not None:
+        raise IncarnationHomeError("payload terminal binding lacks control socket or title")
+    if terminal_title is not None:
         terminal_title = _safe_terminal_title(terminal_title)
     launch_gate_argument = getattr(args, "launch_gate", None)
     launch_gate_token = getattr(args, "launch_gate_token", None)
-    if binding_context is not None and (
-        not args.holder_receipt
-        or not isinstance(launch_gate_argument, str)
+    if terminal_title is not None and (
+        not isinstance(launch_gate_argument, str)
         or not isinstance(launch_gate_token, str)
         or not launch_gate_token
     ):
         raise IncarnationHomeError(
             "canonical payload launch requires a holder receipt and admission gate"
         )
+    holder_claim_path = Path(claim_argument)
+    _validate_holder_claim(
+        claim_path=holder_claim_path,
+        claim_digest=claim_digest,
+        manifest_path=manifest_path,
+        manifest=manifest,
+        manifest_digest=manifest_digest,
+        binding_context_digest=binding_context_digest,
+        holder_receipt_path=Path(args.holder_receipt),
+    )
+    if claim_state is not None:
+        claim_state["validated"] = True
+    holder_binding = _validate_holder_binding_manifest_record(
+        manifest.get("holder_binding")
+    )
 
     payload_path = _regular_file(
         Path(args.payload_executable), "private payload executable"
@@ -6486,11 +12532,14 @@ def command_payload_launch(args: argparse.Namespace) -> int:
             manifest_bytes=manifest_bytes,
             manifest_digest=manifest_digest,
             companion_binding=companion_binding,
-            binding_context=binding_context,
+            holder_binding=holder_binding,
+            binding_context=(binding_context if terminal_title is not None else None),
             control_socket=control_socket,
             terminal_title=terminal_title,
         )
-        if binding_context is not None:
+        if claim_state is not None:
+            claim_state["published"] = True
+        if terminal_title is not None:
             _await_visible_launch_admission(
                 gate_path=Path(launch_gate_argument),
                 holder_receipt_path=Path(args.holder_receipt),
@@ -6507,30 +12556,36 @@ def command_launch(args: argparse.Namespace) -> int:
     control_socket_argument = getattr(args, "control_socket", None)
     if terminal_title is not None:
         terminal_title = _safe_terminal_title(terminal_title)
-    if terminal_title is None and (
-        binding_context_argument is not None or control_socket_argument is not None
-    ):
+    if terminal_title is None and control_socket_argument is not None:
         raise IncarnationHomeError(
             "visible launch binding options require --terminal-title"
         )
-    if terminal_title is not None and (
-        not holder_receipt_argument or not binding_context_argument
-    ):
+    if not holder_receipt_argument or not binding_context_argument:
         raise IncarnationHomeError(
-            "canonical visible launch requires --holder-receipt and --binding-context"
+            "canonical visible launch requires --holder-receipt and a typed --binding-context"
         )
+    _binding_context_value, binding_context_bytes = _load_json_snapshot(
+        Path(binding_context_argument), "holder binding context"
+    )
+    binding_context = _validate_holder_binding_context(_binding_context_value)
+    binding_context_digest = sha256_bytes(binding_context_bytes)
     manifest_path = _regular_file(Path(args.manifest), "incarnation-home manifest")
-    manifest, manifest_bytes, manifest_digest = _load_manifest_snapshot(manifest_path)
+    manifest, manifest_bytes, manifest_digest = _load_manifest_snapshot(
+        manifest_path,
+        binding_context=binding_context,
+        binding_context_digest=binding_context_digest,
+        require_holder_binding=True,
+    )
+    holder_binding = _validate_holder_binding_manifest_record(
+        manifest.get("holder_binding")
+    )
     command = Path(args.codex_executable)
     executable = _resolved_executable(command)
     environment = dict(os.environ)
     environment["CODEX_HOME"] = str(manifest["codex_home"])
+    holder_receipt_path = Path(holder_receipt_argument)
+    _require_unoccupied_receipt_path(holder_receipt_path)
     if terminal_title is not None:
-        _binding_context_value, binding_context_bytes = _load_json_snapshot(
-            Path(binding_context_argument), "terminal binding context"
-        )
-        binding_context = _load_binding_context_snapshot(binding_context_bytes)
-        binding_context_digest = sha256_bytes(binding_context_bytes)
         control_socket = getattr(args, "control_socket", None) or _allocate_control_socket()
         _socket_path(control_socket)
         _validate_socket_parent(_socket_path(control_socket))
@@ -6538,25 +12593,39 @@ def command_launch(args: argparse.Namespace) -> int:
             raise IncarnationHomeError(
                 f"control socket path is already occupied: {control_socket}"
             )
-        holder_receipt_path = Path(holder_receipt_argument)
-        _require_unoccupied_receipt_path(holder_receipt_path)
         launch_gate_path = holder_receipt_path.with_name(
             holder_receipt_path.name + ".launch-gate.json"
         )
         _require_unoccupied_launch_gate_path(launch_gate_path)
         launch_gate_token = secrets.token_hex(32)
-        (
-            executable_fd,
-            _executable_fd_path,
-            executable_bytes,
-            executable_digest,
-            executable_snapshot_dir,
-            executable_snapshot_path,
-            executable_snapshot_mount,
-        ) = _open_verified_executable(
-            executable,
-            snapshot_root=Path(str(manifest["codex_home"])) / "tmp",
+        holder_claim_path, holder_claim_digest = _reserve_holder_claim_for_launch(
+            manifest_path=manifest_path,
+            manifest=manifest,
+            manifest_digest=manifest_digest,
+            binding_context_digest=binding_context_digest,
+            binding_context=binding_context,
+            holder_receipt_path=holder_receipt_path,
         )
+        try:
+            (
+                executable_fd,
+                _executable_fd_path,
+                executable_bytes,
+                executable_digest,
+                executable_snapshot_dir,
+                executable_snapshot_path,
+                executable_snapshot_mount,
+            ) = _open_verified_executable(
+                executable,
+                snapshot_root=_launch_snapshot_root(manifest),
+            )
+        except BaseException:
+            _release_holder_claim(
+                claim_path=holder_claim_path,
+                claim_digest=holder_claim_digest,
+                receipt_path=Path(holder_receipt_argument),
+            )
+            raise
         launcher_fd: int | None = None
         cleanup_started = False
         launch_candidate: dict[str, Any] | None = None
@@ -6622,6 +12691,10 @@ def command_launch(args: argparse.Namespace) -> int:
                 base64.b64encode(manifest_bytes).decode("ascii"),
                 "--holder-receipt",
                 str(Path(holder_receipt_argument)),
+                "--holder-claim",
+                str(holder_claim_path),
+                "--holder-claim-digest",
+                str(holder_claim_digest),
                 "--binding-context-snapshot-b64",
                 base64.b64encode(binding_context_bytes).decode("ascii"),
                 "--binding-context-digest",
@@ -6697,6 +12770,7 @@ def command_launch(args: argparse.Namespace) -> int:
                                 executable=executable,
                                 executable_digest=executable_digest,
                                 binding_context=binding_context,
+                                holder_binding=holder_binding,
                                 control_socket=control_socket,
                                 terminal_title=terminal_title,
                                 companion_binding=companion_binding,
@@ -6782,6 +12856,17 @@ def command_launch(args: argparse.Namespace) -> int:
                         "rejected visible launch holder did not terminate"
                     )
             if (
+                holder_claim_path is not None
+                and holder_claim_digest is not None
+                and not launch_accepted
+                and launch_candidate is None
+            ):
+                _release_holder_claim(
+                    claim_path=holder_claim_path,
+                    claim_digest=holder_claim_digest,
+                    receipt_path=holder_receipt_path,
+                )
+            if (
                 executable_snapshot_dir is not None
                 and executable_snapshot_path is not None
                 and not cleanup_started
@@ -6803,18 +12888,34 @@ def command_launch(args: argparse.Namespace) -> int:
                 pass
             if rejected_cleanup_error is not None:
                 raise rejected_cleanup_error
-    (
-        executable_fd,
-        executable_fd_path,
-        executable_bytes,
-        executable_digest,
-        executable_snapshot_dir,
-        executable_snapshot_path,
-        executable_snapshot_mount,
-    ) = _open_verified_executable(
-        executable,
-        snapshot_root=Path(str(manifest["codex_home"])) / "tmp",
+    holder_claim_path, holder_claim_digest = _reserve_holder_claim_for_launch(
+        manifest_path=manifest_path,
+        manifest=manifest,
+        manifest_digest=manifest_digest,
+        binding_context_digest=binding_context_digest,
+        binding_context=binding_context,
+        holder_receipt_path=holder_receipt_path,
     )
+    holder_receipt_published = False
+    try:
+        (
+            executable_fd,
+            executable_fd_path,
+            executable_bytes,
+            executable_digest,
+            executable_snapshot_dir,
+            executable_snapshot_path,
+            executable_snapshot_mount,
+        ) = _open_verified_executable(
+            executable,
+            snapshot_root=_launch_snapshot_root(manifest),
+        )
+    except BaseException:
+        _release_holder_claim(
+            claim_path=holder_claim_path,
+            claim_digest=holder_claim_digest,
+        )
+        raise
     snapshot_component_fds: list[int] = []
     cleanup_started = False
     try:
@@ -6871,7 +12972,9 @@ def command_launch(args: argparse.Namespace) -> int:
                 executable_digest=executable_digest,
                 manifest_bytes=manifest_bytes,
                 manifest_digest=manifest_digest,
+                holder_binding=holder_binding,
             )
+            holder_receipt_published = True
         final_argv = launch_argv
         if executable_snapshot_mount is not None and args.holder_receipt:
             # The bwrap monitor is not the responsibility holder.  Its payload
@@ -6887,6 +12990,14 @@ def command_launch(args: argparse.Namespace) -> int:
                 base64.b64encode(manifest_bytes).decode("ascii"),
                 "--holder-receipt",
                 str(args.holder_receipt),
+                "--holder-claim",
+                str(holder_claim_path),
+                "--holder-claim-digest",
+                str(holder_claim_digest),
+                "--binding-context-snapshot-b64",
+                base64.b64encode(binding_context_bytes).decode("ascii"),
+                "--binding-context-digest",
+                binding_context_digest,
                 "--codex-executable",
                 str(executable),
                 "--payload-executable",
@@ -6948,6 +13059,12 @@ def command_launch(args: argparse.Namespace) -> int:
             os.close(executable_fd)
         except OSError:
             pass
+        if not holder_receipt_published:
+            _release_holder_claim(
+                claim_path=holder_claim_path,
+                claim_digest=holder_claim_digest,
+                receipt_path=Path(args.holder_receipt),
+            )
 
 
 def parser() -> argparse.ArgumentParser:
@@ -6958,12 +13075,34 @@ def parser() -> argparse.ArgumentParser:
     prepare.add_argument("--model-realization", required=True)
     prepare.add_argument("--runtime-root", required=True)
     prepare.add_argument(
+        "--binding-context",
+        required=True,
+        help="typed holder/task/run responsibility context for this home",
+    )
+    prepare.add_argument(
         "--capability-grant",
         action="append",
         default=[],
         help="owner-authored exact grant for one operator capability entry",
     )
     prepare.set_defaults(handler=command_prepare)
+    migrate = subcommands.add_parser(
+        "migrate",
+        help="carry a legacy v2 home into a new typed v3 home",
+    )
+    migrate.add_argument("--legacy-manifest", required=True)
+    migrate.add_argument(
+        "--binding-context",
+        required=True,
+        help="typed holder/task/run responsibility context for the v3 target",
+    )
+    migrate.add_argument(
+        "--capability-grant",
+        action="append",
+        default=[],
+        help="owner-authored exact grant for one operator capability entry",
+    )
+    migrate.set_defaults(handler=command_migrate)
     launch = subcommands.add_parser("launch")
     launch.add_argument("--manifest", required=True)
     launch.add_argument("--codex-executable", required=True)
@@ -6971,6 +13110,7 @@ def parser() -> argparse.ArgumentParser:
     launch.add_argument("--kitty-executable", default="/usr/bin/kitty")
     launch.add_argument(
         "--holder-receipt",
+        required=True,
         help=(
             "non-replacing receipt for this direct responsibility-holder process; "
             "the shebang payload writes it immediately before exec"
@@ -6978,6 +13118,7 @@ def parser() -> argparse.ArgumentParser:
     )
     launch.add_argument(
         "--binding-context",
+        required=True,
         help="owner context required for a canonical detached visible holder",
     )
     launch.add_argument(
@@ -6988,7 +13129,9 @@ def parser() -> argparse.ArgumentParser:
     launch.set_defaults(handler=command_launch)
     payload = subcommands.add_parser("payload-launch")
     payload.add_argument("--manifest", required=True)
-    payload.add_argument("--holder-receipt")
+    payload.add_argument("--holder-receipt", required=True)
+    payload.add_argument("--holder-claim", required=True)
+    payload.add_argument("--holder-claim-digest", required=True)
     payload.add_argument("--codex-executable", required=True)
     payload.add_argument("--payload-executable", required=True)
     payload.add_argument("--manifest-digest", required=True)

@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 30078395,
+  "allowed_tracked_bytes": 38269857,
+  "approved_by": "repository-owner",
+  "base_ref": "efa14a2c0cbd4ab2d3b4044f851742f323f27c96",
+  "changed_generated_bytes": 30078395,
+  "changed_generated_files": 328,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "8267366cd9d34183978d5b214ad3b4477c5a1b85cc68559d3290302ca426056c",
+  "reason": "Regenerate the stale owner portable family for the bounded visible-incarnation home source repair and its typed holder-state contract; preserve the standing generated-delta budget and bind this one measured exceedance to the exact family digest.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 38269857,
+  "tracked_bytes_max": 24117248
+}
