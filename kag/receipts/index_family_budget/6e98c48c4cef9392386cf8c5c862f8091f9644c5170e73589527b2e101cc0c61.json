@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 25847253,
+  "allowed_tracked_bytes": 38363125,
+  "approved_by": "repository-owner",
+  "base_ref": "3b2bda61c1138da2af8f6c5d84bee9e4526e4f0f",
+  "changed_generated_bytes": 25847253,
+  "changed_generated_files": 256,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "6e98c48c4cef9392386cf8c5c862f8091f9644c5170e73589527b2e101cc0c61",
+  "reason": "Refresh the exact CI-pinned repository-local KAG family after bounding landing-effect request mappings before admission while preserving the standing generated-delta budget.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 38363125,
+  "tracked_bytes_max": 24117248
+}
