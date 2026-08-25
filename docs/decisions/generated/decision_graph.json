@@ -1,19 +1,19 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
-  "decision_count": 136,
-  "edge_count": 3053,
+  "decision_count": 137,
+  "edge_count": 3074,
   "edge_type_counts": {
-    "CITES_SOURCE_SURFACE": 1108,
-    "DATED": 136,
-    "GUARDED_BY": 420,
-    "HAS_STATUS": 136,
-    "HAS_SURFACE_CLASS": 371,
-    "IN_STACK_LANE": 325,
-    "NEXT_DECISION": 135,
-    "OWNED_BY_SURFACE": 142,
-    "OWNS_DECISION": 136,
+    "CITES_SOURCE_SURFACE": 1114,
+    "DATED": 137,
+    "GUARDED_BY": 423,
+    "HAS_STATUS": 137,
+    "HAS_SURFACE_CLASS": 374,
+    "IN_STACK_LANE": 328,
+    "NEXT_DECISION": 136,
+    "OWNED_BY_SURFACE": 143,
+    "OWNS_DECISION": 137,
     "SUPERSEDED_BY": 2,
-    "UNDER_MECHANIC_PARENT": 142
+    "UNDER_MECHANIC_PARENT": 143
   },
   "edges": [
     {
@@ -14593,12 +14593,112 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0136",
+      "target": "decision:ABYSS-STACK-D-0137",
+      "type": "NEXT_DECISION"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0136",
       "target": "owner_surface:mcp/services/aoa-kag-mcp/",
       "type": "OWNED_BY_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0136",
       "target": "mechanic_parent:%60mechanics/federation-seams/parts/kag-seam%60",
+      "type": "UNDER_MECHANIC_PARENT"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0137",
+      "target": "source_surface:ABYSS-STACK-D-0128",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0137",
+      "target": "source_surface:aoa-models",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0137",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/CONTRACT.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0137",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/bind_external_actor_launch.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0137",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/external_codex_agent.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0137",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/runtime-profile.v1.json",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0137",
+      "target": "date:2026-08-25",
+      "type": "DATED"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0137",
+      "target": "guard_family:model%20admission",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0137",
+      "target": "guard_family:runtime%20identity",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0137",
+      "target": "guard_family:source/runtime%20separation",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0137",
+      "target": "status:accepted",
+      "type": "HAS_STATUS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0137",
+      "target": "surface_class:public-contract",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0137",
+      "target": "surface_class:runtime-profile",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0137",
+      "target": "surface_class:source/runtime%20boundary",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0137",
+      "target": "stack_lane:external%20Codex%20runtime",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0137",
+      "target": "stack_lane:governed-execution",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0137",
+      "target": "stack_lane:model%20admission",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0137",
+      "target": "owner_surface:mechanics/governed-execution/parts/external-codex-agent",
+      "type": "OWNED_BY_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0137",
+      "target": "mechanic_parent:%60mechanics/governed-execution/parts/external-codex-agent%60",
       "type": "UNDER_MECHANIC_PARENT"
     },
     {
@@ -15280,19 +15380,24 @@
       "source": "repo:abyss-stack",
       "target": "decision:ABYSS-STACK-D-0136",
       "type": "OWNS_DECISION"
+    },
+    {
+      "source": "repo:abyss-stack",
+      "target": "decision:ABYSS-STACK-D-0137",
+      "type": "OWNS_DECISION"
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 1324,
+  "node_count": 1331,
   "node_type_counts": {
-    "date": 45,
-    "decision": 136,
+    "date": 46,
+    "decision": 137,
     "guard_family": 230,
-    "mechanic_parent": 12,
+    "mechanic_parent": 13,
     "owner_surface": 68,
     "repo": 1,
-    "source_surface": 624,
-    "stack_lane": 54,
+    "source_surface": 626,
+    "stack_lane": 56,
     "status": 4,
     "surface_class": 150
   },
@@ -15520,6 +15625,11 @@
     {
       "id": "date:2026-08-24",
       "label": "2026-08-24",
+      "type": "date"
+    },
+    {
+      "id": "date:2026-08-25",
+      "label": "2026-08-25",
       "type": "date"
     },
     {
@@ -16883,6 +16993,16 @@
       "type": "decision"
     },
     {
+      "date": "2026-08-25",
+      "id": "decision:ABYSS-STACK-D-0137",
+      "label": "ABYSS-STACK-D-0137",
+      "path": "docs/decisions/ABYSS-STACK-D-0137-canonical-codex-0-149-1-runtime-subject-admission.md",
+      "posture": "accepted migration rationale",
+      "status": "accepted",
+      "title": "ABYSS-STACK-D-0137 Canonical Codex 0.149.1 Runtime Subject Admission",
+      "type": "decision"
+    },
+    {
       "id": "guard_family:A/B/C%20freeze",
       "label": "A/B/C freeze",
       "type": "guard_family"
@@ -18043,6 +18163,11 @@
       "type": "mechanic_parent"
     },
     {
+      "id": "mechanic_parent:%60mechanics/governed-execution/parts/external-codex-agent%60",
+      "label": "`mechanics/governed-execution/parts/external-codex-agent`",
+      "type": "mechanic_parent"
+    },
+    {
       "id": "mechanic_parent:agon-runtime",
       "label": "agon-runtime",
       "type": "mechanic_parent"
@@ -18514,6 +18639,11 @@
       "type": "source_surface"
     },
     {
+      "id": "source_surface:ABYSS-STACK-D-0128",
+      "label": "ABYSS-STACK-D-0128",
+      "type": "source_surface"
+    },
+    {
       "id": "source_surface:AGENTS.md",
       "label": "AGENTS.md",
       "type": "source_surface"
@@ -18676,6 +18806,11 @@
     {
       "id": "source_surface:aoa-memo",
       "label": "aoa-memo",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:aoa-models",
+      "label": "aoa-models",
       "type": "source_surface"
     },
     {
@@ -21649,6 +21784,11 @@
       "type": "stack_lane"
     },
     {
+      "id": "stack_lane:external%20Codex%20runtime",
+      "label": "external Codex runtime",
+      "type": "stack_lane"
+    },
+    {
       "id": "stack_lane:federation%20seam",
       "label": "federation seam",
       "type": "stack_lane"
@@ -21681,6 +21821,11 @@
     {
       "id": "stack_lane:machine%20fit",
       "label": "machine fit",
+      "type": "stack_lane"
+    },
+    {
+      "id": "stack_lane:model%20admission",
+      "label": "model admission",
       "type": "stack_lane"
     },
     {
