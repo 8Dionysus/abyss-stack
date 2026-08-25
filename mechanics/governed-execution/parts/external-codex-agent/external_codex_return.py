@@ -451,7 +451,14 @@ def discover_app_server_socket(
             raise ExternalCodexReturnError(
                 "current app-server discovery requires the canonical Goal/thread binding"
             )
-    factory = rpc_factory if rpc_factory is not None else UnixWebSocketRpc
+    if rpc_factory is None:
+        def factory(endpoint: Path) -> UnixWebSocketRpc:
+            return UnixWebSocketRpc(
+                endpoint,
+                timeout=APP_SERVER_DISCOVERY_PROBE_TIMEOUT_SECONDS,
+            )
+    else:
+        factory = rpc_factory
     explicit = _endpoint_from_owner(owner)
     if explicit is not None:
         path = _socket_path(explicit)

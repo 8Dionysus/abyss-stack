@@ -8,7 +8,7 @@
   "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
   "default_limit_bytes": 1048576,
   "head_family_digest": "8002300851f74974de1fd2691c8fe4a3c962038d50084a5453a7232b7c7103fe",
-  "reason": "Refresh the owner KAG family for the owner-bound restart discovery regression coverage in PR #428; measured generated delta only, standing budget unchanged.",
+  "reason": "Refresh the owner KAG family for the canonical 0.149.1 runtime contract and bounded identity-probe timeout correction in PR #428; measured generated delta only, standing budget unchanged.",
   "repo": "abyss-stack",
   "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
   "scope": "generated_delta_and_tracked_size",
