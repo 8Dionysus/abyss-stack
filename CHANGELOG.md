@@ -50,15 +50,11 @@ Tracking starts with the community-docs baseline for this repository.
   tokens, or credentials.
 - Admit the prepared external Codex lane by exact content-addressed runtime
   subject as well as product, version, transport, and access regime. The source
-  runtime profile now pins Codex CLI `0.148.0`, rejects a realization with a
+  runtime profile now pins Codex CLI `0.149.1`, rejects a realization with a
   different runtime-package digest, and keeps the installed/deployed release
-  outside this source-only repair.
-- Admit the prepared external Codex lane by exact content-addressed runtime
-  subject as well as product, version, transport, and access regime. The source
-  runtime profile now pins Codex CLI `0.148.0`, rejects a realization with a
-  different runtime-package digest, and keeps the installed/deployed release
-  outside this source-only repair.
-- Bind owner-contour launches to the exact Codex 0.148.0 package inventory and
+  outside this source-only repair; the superseding rationale is recorded in
+  `ABYSS-STACK-D-0137`.
+- Bind owner-contour launches to the exact Codex 0.149.1 package inventory and
   recheck its identity sidecars, executable, code-mode host, and bundled
   helpers at preflight; parent re-entry now uses the same model-realization
   admission contract.

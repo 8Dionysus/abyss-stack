@@ -63,6 +63,10 @@ class ExternalCodexReturnError(RuntimeError):
     """A fail-closed return validation or delivery error."""
 
 
+class _AppServerCandidateMismatch(ExternalCodexReturnError):
+    """A discovered endpoint did not prove the owner Goal/thread binding."""
+
+
 class _ReturnAttemptLock:
     def __init__(self, fd: int) -> None:
         self.fd = fd
@@ -356,6 +360,51 @@ def _socket_is_connectable(path: Path) -> bool:
     return True
 
 
+def _initialize_rpc(rpc: Any) -> dict[str, Any]:
+    """Perform the common read-only app-server handshake."""
+
+    initialize = rpc.call(
+        "initialize",
+        {
+            "clientInfo": {
+                "name": "abyss_stack_external_codex_return",
+                "title": "Abyss external Codex return",
+                "version": "1",
+            },
+            "capabilities": {"experimentalApi": True},
+        },
+    )
+    rpc.notify("initialized")
+    return initialize
+
+
+def _probe_owner_goal_binding(
+    owner: dict[str, Any],
+    endpoint: Path,
+    rpc_factory: Callable[[Path], Any],
+) -> str:
+    """Prove that one live endpoint serves the owner-selected Goal/thread.
+
+    Socket liveness alone cannot distinguish the current app-server from a
+    stale or unrelated server left behind during restart/rebind.  The probe is
+    deliberately read-only: it performs the normal handshake and one
+    ``thread/goal/get`` for the canonical owner thread, then closes the
+    connection before delivery opens its own connection.
+    """
+
+    try:
+        with rpc_factory(endpoint) as rpc:
+            _initialize_rpc(rpc)
+            goal_response = rpc.call(
+                "thread/goal/get",
+                {"threadId": owner["thread_id"]},
+            )
+            goal = _goal_object(goal_response, "thread/goal/get")
+            return _validate_goal_binding(goal, owner)
+    except (ExternalCodexReturnError, OSError, TimeoutError) as exc:
+        raise _AppServerCandidateMismatch(str(exc)) from exc
+
+
 def _discovery_candidates() -> list[Path]:
     candidates: list[Path] = []
     value = os.environ.get("AOA_CODEX_APP_SERVER_SOCKET")
@@ -382,23 +431,54 @@ def _discovery_candidates() -> list[Path]:
     return candidates
 
 
-def discover_app_server_socket(owner: dict[str, Any]) -> tuple[Path, str]:
+def discover_app_server_socket(
+    owner: dict[str, Any],
+    *,
+    rpc_factory: Callable[[Path], Any] | None = None,
+) -> tuple[Path, str]:
     """Resolve the current local Codex endpoint across a bounded restart gap.
 
     This is a reconnect allowance, not a watcher: at most five fresh socket
-    snapshots are probed, with a short delay between them.  The caller still
-    owns the exact Goal/return binding and the later RPC verifies that binding
-    through the app-server response.
+    snapshots are probed, with a short delay between them.  Every candidate
+    must also prove the canonical owner Goal/thread binding before it is
+    returned.  An explicit owner endpoint remains authoritative and is never
+    replaced with an ambient candidate.
     """
 
+    for key in ("goal_id", "thread_id"):
+        value = owner.get(key)
+        if not isinstance(value, str) or not value.strip():
+            raise ExternalCodexReturnError(
+                "current app-server discovery requires the canonical Goal/thread binding"
+            )
+    if rpc_factory is None:
+        def factory(endpoint: Path) -> UnixWebSocketRpc:
+            return UnixWebSocketRpc(
+                endpoint,
+                timeout=APP_SERVER_DISCOVERY_PROBE_TIMEOUT_SECONDS,
+                deadline_seconds=APP_SERVER_DISCOVERY_PROBE_TIMEOUT_SECONDS,
+            )
+    else:
+        factory = rpc_factory
     explicit = _endpoint_from_owner(owner)
     if explicit is not None:
         path = _socket_path(explicit)
+        last_mismatch: _AppServerCandidateMismatch | None = None
         for attempt in range(APP_SERVER_DISCOVERY_ATTEMPTS):
             if path.is_socket() and _socket_is_connectable(path):
-                return path, "owner_binding"
+                try:
+                    _probe_owner_goal_binding(owner, path, factory)
+                except _AppServerCandidateMismatch as exc:
+                    last_mismatch = exc
+                else:
+                    return path, "owner_binding"
             if attempt + 1 < APP_SERVER_DISCOVERY_ATTEMPTS:
                 time.sleep(APP_SERVER_DISCOVERY_RETRY_DELAY_SECONDS)
+        if last_mismatch is not None:
+            raise ExternalCodexReturnError(
+                "owner-bound app-server endpoint did not prove the canonical "
+                f"Goal/thread binding after bounded discovery: {path}: {last_mismatch}"
+            ) from last_mismatch
         raise ExternalCodexReturnError(
             f"owner-bound app-server endpoint is not connectable after bounded discovery: {path}"
         )
@@ -408,6 +488,7 @@ def discover_app_server_socket(owner: dict[str, Any]) -> tuple[Path, str]:
             "return owner lacks an explicit endpoint or supported discovery posture"
         )
     candidates: list[Path] = []
+    rejected: list[str] = []
     for attempt in range(APP_SERVER_DISCOVERY_ATTEMPTS):
         candidates = _discovery_candidates()
         seen: set[Path] = set()
@@ -417,13 +498,19 @@ def discover_app_server_socket(owner: dict[str, Any]) -> tuple[Path, str]:
             seen.add(path)
             if path.is_absolute() and not path.is_symlink() and path.is_socket():
                 if _socket_is_connectable(path):
+                    try:
+                        _probe_owner_goal_binding(owner, path, factory)
+                    except _AppServerCandidateMismatch as exc:
+                        rejected.append(f"{path}: {exc}")
+                        continue
                     return path, "current_local_codex_app_server"
         if attempt + 1 < APP_SERVER_DISCOVERY_ATTEMPTS:
             time.sleep(APP_SERVER_DISCOVERY_RETRY_DELAY_SECONDS)
     rendered = ", ".join(str(path) for path in candidates)
+    rejection_detail = f"; identity rejections={rejected}" if rejected else ""
     raise ExternalCodexReturnError(
         "current local Codex app-server socket was not found after bounded "
-        f"discovery ({rendered})"
+        f"identity-checked discovery ({rendered}){rejection_detail}"
     )
 
 
@@ -475,9 +562,17 @@ class UnixWebSocketRpc:
     # the caller can bind the exact request to the durable reservation.
     supports_atomic_goal_transition = False
 
-    def __init__(self, path: Path, *, timeout: float = DEFAULT_TIMEOUT_SECONDS) -> None:
+    def __init__(
+        self,
+        path: Path,
+        *,
+        timeout: float = DEFAULT_TIMEOUT_SECONDS,
+        deadline_seconds: float | None = None,
+    ) -> None:
         self.path = path
         self.timeout = timeout
+        self.deadline_seconds = deadline_seconds
+        self._deadline: float | None = None
         self.socket: socket.socket | None = None
         self._buffer = b""
         self._counter = 0
@@ -497,8 +592,13 @@ class UnixWebSocketRpc:
 
     def __enter__(self) -> "UnixWebSocketRpc":
         connection = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        connection.settimeout(self.timeout)
+        self._deadline = (
+            time.monotonic() + self.deadline_seconds
+            if self.deadline_seconds is not None
+            else None
+        )
         try:
+            connection.settimeout(self._remaining_timeout())
             connection.connect(str(self.path))
             self.socket = connection
             self._handshake()
@@ -517,6 +617,15 @@ class UnixWebSocketRpc:
                 self.socket.close()
         finally:
             self.socket = None
+            self._deadline = None
+
+    def _remaining_timeout(self) -> float:
+        if self._deadline is None:
+            return self.timeout
+        remaining = self._deadline - time.monotonic()
+        if remaining <= 0:
+            raise TimeoutError("Codex app-server probe deadline exceeded")
+        return min(self.timeout, remaining)
 
     def _require_socket(self) -> socket.socket:
         if self.socket is None:
@@ -535,6 +644,7 @@ class UnixWebSocketRpc:
             remaining -= len(buffered)
         connection = self._require_socket()
         while remaining:
+            connection.settimeout(self._remaining_timeout())
             chunk = connection.recv(remaining)
             if not chunk:
                 raise ExternalCodexReturnError("Codex app-server closed the socket")
@@ -545,6 +655,7 @@ class UnixWebSocketRpc:
     def _read_until(self, marker: bytes) -> bytes:
         connection = self._require_socket()
         while marker not in self._buffer:
+            connection.settimeout(self._remaining_timeout())
             chunk = connection.recv(4096)
             if not chunk:
                 raise ExternalCodexReturnError("Codex app-server closed during handshake")
@@ -824,18 +935,7 @@ def deliver_handoff(
     )
     client_message_id = f"external-actor-return-{handoff_digest.removeprefix('sha256:')[:16]}"
     with rpc_factory(endpoint) as rpc:
-        initialize = rpc.call(
-            "initialize",
-            {
-                "clientInfo": {
-                    "name": "abyss_stack_external_codex_return",
-                    "title": "Abyss external Codex return",
-                    "version": "1",
-                },
-                "capabilities": {"experimentalApi": True},
-            },
-        )
-        rpc.notify("initialized")
+        initialize = _initialize_rpc(rpc)
         goal_get_response = rpc.call(
             "thread/goal/get",
             {"threadId": owner["thread_id"]},

@@ -1471,7 +1471,7 @@ def validate_runtime_package_binding(
         or package_manifest.get("target") != "x86_64-unknown-linux-musl"
         or package_manifest.get("version") != expected_runtime_version
     ):
-        invalid("runtime package manifest does not describe the admitted 0.148.0 layout")
+        invalid("runtime package manifest does not describe the profile-admitted layout")
     if (
         codex_executable != package_root / "bin/codex"
         or codex_executable.is_symlink()

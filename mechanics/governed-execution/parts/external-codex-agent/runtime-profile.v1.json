@@ -20,7 +20,7 @@
     "probe_executable": "/usr/bin/true"
   },
   "codex_cli": {
-    "required_version": "codex-cli 0.148.0",
+    "required_version": "codex-cli 0.149.1",
     "ignore_user_config": true,
     "ignore_exec_rules": true,
     "multi_agent_enabled": false,
@@ -32,20 +32,20 @@
     "owner_repo": "aoa-models",
     "schema_version": "aoa_model_realization_v1",
     "runtime_product": "codex-cli",
-    "runtime_version": "0.148.0",
+    "runtime_version": "0.149.1",
     "runtime_subject": {
       "kind": "content_addressed_runtime_package",
       "source": "codex-cli-standalone/x86_64-unknown-linux-musl+codex-code-mode-host",
-      "digest": "sha256:35cc6b0e4e5c527569807be8017b705f410f0c6c2b7a3fa1c6a5407d65889041"
+      "digest": "sha256:304089232ad96d67bf003f0fb59b2fccf305259ac5a1983e969aa6f1b85ca891"
     },
     "runtime_package_subject": {
-      "artifact_subjects_digest": "sha256:3a3797b5d9e2e15912fcad418302250150b96002251ee87658664d844e1af91e",
+      "artifact_subjects_digest": "sha256:7d122aeb32b9c0dfb580a1867db50102e792e3787672b5d7b55104621b5295c2",
       "members": {
-        "bin/codex": "sha256:ac2cfed85fb647d61e0150b8548102b330e4799d9d81ad5d354de701edf6b074",
-        "bin/codex-code-mode-host": "sha256:0c1776efc4f7acfd308e40d31749a4f2f876f94495dd28d511d0a8646f59970e",
-        "codex-package.json": "sha256:899bb78003e6720a12b74c0b30ef257399fa28be8f9d062bafccc85baaae41eb",
+        "bin/codex": "sha256:73dc5888888f411c1f0fa7b81d866e721dcc86b527ce8e3b2cf4708661e823ba",
+        "bin/codex-code-mode-host": "sha256:48f3a0d48033039cc7caccd209edb0ee350b81f82ca851a7b129e146e4bec6fb",
+        "codex-package.json": "sha256:756dcadcf9e968f0e62fa92fd020f4592e92d27dacec9887882600d39df69d5b",
         "codex-path/rg": "sha256:e62198eb19b136b88c330af83647b5a962cb99b6b1f066758568f12de1974849",
-        "codex-resources/bwrap": "sha256:77360cb751ccedc5971391444ac86a8a33c15b04d6b4a6fe45f5d25496e62c4c"
+        "codex-resources/bwrap": "sha256:01fb705f067bd5365b63d8ad2323a61c8d007733ca5e649437e086f3fb9935d8"
       }
     },
     "transport": "exec-jsonl",
