@@ -2361,16 +2361,44 @@ def _remove_retained_regular_file_at(
             ) from exc
         if retained.st_nlink == 0:
             return
-        matches = _retained_regular_file_names(parent_fd, descriptor, label)
-        if len(matches) != 1:
-            if not matches:
-                detail = "has no discoverable pathname"
-            else:
-                detail = "has multiple discoverable pathnames"
-            raise IncarnationHomeError(f"{label} retained inode {detail}")
+        candidate_parent_fd = parent_fd
+        owns_candidate_parent_fd = False
         try:
+            matches = _retained_regular_file_names(
+                candidate_parent_fd, descriptor, label
+            )
+            if not matches:
+                try:
+                    relocated = Path(
+                        os.readlink(f"/proc/self/fd/{descriptor}")
+                    )
+                except OSError as exc:
+                    raise IncarnationHomeError(
+                        f"{label} retained inode cannot be located"
+                    ) from exc
+                if (
+                    not relocated.is_absolute()
+                    or not relocated.name
+                    or str(relocated).endswith(" (deleted)")
+                ):
+                    raise IncarnationHomeError(
+                        f"{label} retained inode has no discoverable pathname"
+                    )
+                candidate_parent_fd = _open_pinned_parent_directory(
+                    relocated, f"{label} relocated inode"
+                )
+                owns_candidate_parent_fd = True
+                matches = _retained_regular_file_names(
+                    candidate_parent_fd, descriptor, label
+                )
+            if len(matches) != 1:
+                if not matches:
+                    detail = "has no discoverable pathname"
+                else:
+                    detail = "has multiple discoverable pathnames"
+                raise IncarnationHomeError(f"{label} retained inode {detail}")
             _remove_staged_file_at(
-                parent_fd,
+                candidate_parent_fd,
                 matches[0],
                 descriptor,
                 label,
@@ -2387,6 +2415,9 @@ def _remove_retained_regular_file_at(
             if attempt == 7:
                 raise
             continue
+        finally:
+            if owns_candidate_parent_fd:
+                os.close(candidate_parent_fd)
         try:
             remaining = os.fstat(descriptor)
         except OSError as exc:
@@ -6258,6 +6289,20 @@ def _rebind_replacement_holder_receipt(
                 "replacement holder terminal receipt",
                 ambient_identities=ambient_identities,
             )
+            _revalidate_regular_file_at(
+                claim_parent_fd,
+                claim_path.name,
+                claim_descriptor,
+                claim_initial,
+                label="holder claim changed after receipt publication",
+                ambient_identities=ambient_identities,
+            )
+            if sha256_bytes(
+                _read_descriptor_bytes(claim_descriptor, str(claim_path))
+            ) != after_claim_digest:
+                raise IncarnationHomeError(
+                    "holder claim changed after receipt publication"
+                )
         except BaseException:
             try:
                 _restore_holder_claim_snapshot(

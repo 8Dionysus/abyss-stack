@@ -4429,8 +4429,20 @@ def test_rebind_receipt_binds_holder_environment_and_manifest_snapshot(
         )
 
 
+@pytest.mark.parametrize(
+    ("publish_receipt_before_failure", "move_claim_outside_parent"),
+    [(False, False), (False, True), (True, True)],
+    ids=[
+        "receipt-fails-before-publication",
+        "receipt-fails-after-sibling-relocation",
+        "claim-replaced-after-publication",
+    ],
+)
 def test_rebind_receipt_failure_removes_renamed_claim_and_preserves_replacement(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    publish_receipt_before_failure: bool,
+    move_claim_outside_parent: bool,
 ) -> None:
     reentry_path, reentry, context = _holder_loss_reentry_fixture(tmp_path)
     holder_pid = os.getpid()
@@ -4491,7 +4503,13 @@ def test_rebind_receipt_failure_removes_renamed_claim_and_preserves_replacement(
     monkeypatch.setattr(MODULE, "_proc_exe_digest", lambda _pid: executable_digest)
 
     original_claim_inode: int | None = None
-    moved_claim_path = claim_path.with_name("moved-holder-claim.json")
+    moved_claim_dir = tmp_path / "moved-holder-claims"
+    moved_claim_dir.mkdir()
+    moved_claim_path = (
+        moved_claim_dir / "moved-holder-claim.json"
+        if move_claim_outside_parent
+        else claim_path.with_name("moved-holder-claim.json")
+    )
     replacement_bytes = b"replacement-at-claim-path\n"
     original_write_new_json = MODULE._write_new_json
 
@@ -4508,7 +4526,17 @@ def test_rebind_receipt_failure_removes_renamed_claim_and_preserves_replacement(
             claim_path.rename(moved_claim_path)
             claim_path.write_bytes(replacement_bytes)
             claim_path.chmod(0o640)
-            raise MODULE.IncarnationHomeError("synthetic receipt publication failure")
+            if not publish_receipt_before_failure:
+                raise MODULE.IncarnationHomeError(
+                    "synthetic receipt publication failure"
+                )
+            original_write_new_json(
+                path,
+                value,
+                label,
+                ambient_identities=ambient_identities,
+            )
+            return
         original_write_new_json(
             path,
             value,
@@ -4519,7 +4547,11 @@ def test_rebind_receipt_failure_removes_renamed_claim_and_preserves_replacement(
     monkeypatch.setattr(MODULE, "_write_new_json", fail_replacement_receipt)
     with pytest.raises(
         MODULE.IncarnationHomeError,
-        match="synthetic receipt publication failure",
+        match=(
+            "synthetic receipt publication failure"
+            if not publish_receipt_before_failure
+            else "holder claim changed after receipt publication"
+        ),
     ):
         MODULE._rebind_replacement_holder_receipt(
             receipt_path=output_path,
@@ -4533,6 +4565,9 @@ def test_rebind_receipt_failure_removes_renamed_claim_and_preserves_replacement(
     assert claim_path.read_bytes() == replacement_bytes
     assert stat.S_IMODE(claim_path.stat().st_mode) == 0o640
     assert not moved_claim_path.exists()
+    if publish_receipt_before_failure:
+        assert output_path.exists()
+        return
     assert not output_path.exists()
     remaining_file_inodes = {
         entry.stat().st_ino
