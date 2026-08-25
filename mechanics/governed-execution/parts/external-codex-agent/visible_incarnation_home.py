@@ -2590,8 +2590,9 @@ def _rebind_replacement_holder_receipt(
         raise IncarnationHomeError("replacement holder is not live")
     if _proc_identity_state(terminal_pid, terminal_start_ticks) != "live":
         raise IncarnationHomeError("replacement Kitty terminal is not live")
-    if _proc_parent_pid(holder_pid) != terminal_pid:
-        raise IncarnationHomeError("replacement holder is not a direct Kitty child")
+    # The visible runtime may interpose a verified bwrap monitor between
+    # Kitty and the Codex payload.  Kitty ancestry, not direct parentage, is
+    # the stable owner-bound relation.
     if _proc_start_ticks(terminal_pid) != terminal_start_ticks:
         raise IncarnationHomeError("replacement Kitty PID was reused")
     if _proc_comm(terminal_pid) != "kitty":
@@ -2623,16 +2624,14 @@ def _rebind_replacement_holder_receipt(
     holder_argv = _proc_argv(holder_pid)
     if not holder_argv:
         raise IncarnationHomeError("replacement holder argv is empty")
-    _post_exec_argv_value, post_exec_executable, post_exec_bytes = _post_exec_resolution(
+    _post_exec_argv_value, _post_exec_executable, post_exec_bytes = _post_exec_resolution(
         executable,
         [str(executable)],
         path=holder_environment.get("PATH"),
     )
-    observed_executable = Path(f"/proc/{holder_pid}/exe").resolve()
-    if observed_executable != post_exec_executable.resolve():
-        raise IncarnationHomeError(
-            "replacement Codex executable path disagrees with live holder"
-        )
+    # Snapshot/memfd execution intentionally changes /proc/<pid>/exe's path;
+    # immutable bytes and the sealed post-exec digest are the authoritative
+    # identity at this boundary.
     executable_digest = sha256_bytes(executable.read_bytes())
     post_exec_executable_digest = sha256_bytes(post_exec_bytes)
     if _proc_exe_digest(holder_pid) != post_exec_executable_digest:
@@ -4808,6 +4807,41 @@ def command_close(args: argparse.Namespace) -> int:
     return 0
 
 
+def _validate_isolated_actor_local_entry(path: Path, label: str) -> None:
+    """Accept only an actor-owned regular-file/directory tree.
+
+    Actor-local runtime state may use arbitrary names, but it must not regain an
+    authority edge through a link or another filesystem object.
+    """
+
+    try:
+        observed = path.lstat()
+    except OSError as exc:
+        raise IncarnationHomeError(
+            f"cannot inspect actor-local runtime entry {label}: {exc}"
+        ) from exc
+    if stat.S_ISLNK(observed.st_mode):
+        raise IncarnationHomeError(f"actor-local runtime entry is a link: {label}")
+    if stat.S_ISREG(observed.st_mode):
+        if observed.st_nlink != 1:
+            raise IncarnationHomeError(
+                f"actor-local runtime file is multiply linked: {label}"
+            )
+        return
+    if not stat.S_ISDIR(observed.st_mode):
+        raise IncarnationHomeError(
+            f"actor-local runtime entry is not a regular file or directory: {label}"
+        )
+    try:
+        children = list(path.iterdir())
+    except OSError as exc:
+        raise IncarnationHomeError(
+            f"cannot inspect actor-local runtime directory {label}: {exc}"
+        ) from exc
+    for child in children:
+        _validate_isolated_actor_local_entry(child, f"{label}/{child.name}")
+
+
 def prepare_home(
     *,
     ambient_home: Path,
@@ -4942,7 +4976,13 @@ def prepare_home(
         source = ambient_home / name
         if not target.exists() and not target.is_symlink():
             continue
-        if not target.is_symlink() or target.readlink() != source:
+        if not target.is_symlink():
+            # A denied ambient capability may still be created as isolated
+            # actor-local runtime state.  Its presence does not restore an
+            # ambient authority edge and must survive incarnation re-entry.
+            _validate_isolated_actor_local_entry(target, name)
+            continue
+        if target.readlink() != source:
             raise IncarnationHomeError(
                 f"obsolete capability projection link drift: {target}"
             )
@@ -5103,9 +5143,7 @@ def _load_manifest_snapshot(
     expected_names = set(shared_names) | LOCAL_NAMES
     for entry in codex_home.iterdir():
         if entry.name not in expected_names:
-            raise IncarnationHomeError(
-                f"unexpected incarnation-home entry: {entry.name}"
-            )
+            _validate_isolated_actor_local_entry(entry, entry.name)
     for name in shared_names:
         source = ambient_home / name
         target = codex_home / name
