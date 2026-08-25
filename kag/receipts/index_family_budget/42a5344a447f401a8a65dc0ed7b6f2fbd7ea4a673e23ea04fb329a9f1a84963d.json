@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 31090728,
+  "allowed_tracked_bytes": 38981994,
+  "approved_by": "repository-owner",
+  "base_ref": "3b2bda61c1138da2af8f6c5d84bee9e4526e4f0f",
+  "changed_generated_bytes": 31090728,
+  "changed_generated_files": 349,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "42a5344a447f401a8a65dc0ed7b6f2fbd7ea4a673e23ea04fb329a9f1a84963d",
+  "reason": "Repair PR #432 owner-family fixed point and bind the generated portable family to the reviewed RB-03 candidate at base 3b2bda61c1138da2af8f6c5d84bee9e4526e4f0f.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 38981994,
+  "tracked_bytes_max": 24117248
+}
