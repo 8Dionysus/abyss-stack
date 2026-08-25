@@ -235,6 +235,20 @@ def test_admission_requires_an_independent_artifact_digest() -> None:
     assert exc.value.code == "landing_effect_grant_artifact_unbound"
 
 
+def test_reviewer_identity_must_differ_from_holder() -> None:
+    grant = _grant()
+    grant["review"]["reviewer_ref"] = {
+        key: value
+        for key, value in grant["holder_ref"].items()
+        if key != "incarnation_id"
+    }
+    _refresh_semantic_digest(grant)
+
+    with pytest.raises(LandingEffectGrantError) as exc:
+        validate_landing_effect_grant(grant)
+    assert exc.value.code == "landing_effect_grant_review_invalid"
+
+
 def test_duplicate_artifact_members_are_rejected() -> None:
     grant = _grant()
     raw = _raw(grant).replace(

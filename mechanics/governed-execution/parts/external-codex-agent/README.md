@@ -170,7 +170,8 @@ and replay only through their matching legacy wake reservation. A retry after a 
   `external_codex_landing_effect.py` and
   `schemas/external-codex-governed-landing-effect-grant.schema.json`. Exact
   admission binds Goal, holder/incarnation, repository revision, branch or
-  pull-request target, an exact landing-effect set, independent review, and
+  pull-request target, an exact landing-effect set, independent review by a
+  reviewer distinct from the holder, and
   reviewed return posture. Branch targets may bind only commit and push;
   pull-request and merge effects require exact pull-request coordinates. The
   owner must also supply the exact artifact-byte digest independently of the

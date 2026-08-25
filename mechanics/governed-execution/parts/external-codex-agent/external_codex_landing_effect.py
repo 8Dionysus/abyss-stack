@@ -293,6 +293,16 @@ def validate_landing_effect_grant(grant: Mapping[str, Any]) -> dict[str, Any]:
         raise LandingEffectGrantError(
             "landing_effect_grant_review_invalid", "landing effects require independent review"
         )
+    holder_identity = {
+        key: value
+        for key, value in copied["holder_ref"].items()
+        if key != "incarnation_id"
+    }
+    if _same_json(holder_identity, copied["review"]["reviewer_ref"]):
+        raise LandingEffectGrantError(
+            "landing_effect_grant_review_invalid",
+            "reviewer identity must differ from holder identity",
+        )
     if copied["return_posture"]["status"] != "review_required":
         raise LandingEffectGrantError(
             "landing_effect_grant_return_invalid", "landing effects require reviewed return"

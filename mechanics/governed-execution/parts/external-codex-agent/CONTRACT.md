@@ -731,7 +731,8 @@ these exact relations in one document:
 - an exact set drawn only from `commit`, `push`, `pull_request`, and `merge`,
   with pull-request and merge effects requiring the pull-request target
   coordinates;
-- an independent-review binding whose status is approved; and
+- an independent-review binding whose status is approved and whose reviewer
+  identity differs from the holder identity; and
 - a `return_posture` with the exact return owner, route, review-required status,
   and wake condition.
 
