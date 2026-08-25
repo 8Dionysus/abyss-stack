@@ -1,7 +1,8 @@
 # Exact Content-Addressed Runtime Subject Admission
 
 - Decision ID: ABYSS-STACK-D-0128
-- Status: accepted
+- Status: superseded
+- Superseded by: `ABYSS-STACK-D-0137-canonical-codex-0-149-1-runtime-subject-admission.md`
 - Date: 2026-08-20
 - Owner surface: `mechanics/governed-execution/parts/external-codex-agent`
 
@@ -12,7 +13,7 @@
 - Stack lanes: governed-execution
 - Mechanic parents: `mechanics/governed-execution`
 - Guard families: model admission, runtime identity, source/runtime separation
-- Posture: accepted runtime rationale
+- Posture: superseded historical runtime rationale
 
 ## Context
 

@@ -694,6 +694,7 @@
 ## model admission
 
 - [ABYSS-STACK-D-0128 Exact Content-Addressed Runtime Subject Admission](../ABYSS-STACK-D-0128-exact-runtime-subject-admission.md) (`docs/decisions/ABYSS-STACK-D-0128-exact-runtime-subject-admission.md`)
+- [ABYSS-STACK-D-0137 Canonical Codex 0.149.1 Runtime Subject Admission](../ABYSS-STACK-D-0137-canonical-codex-0-149-1-runtime-subject-admission.md) (`docs/decisions/ABYSS-STACK-D-0137-canonical-codex-0-149-1-runtime-subject-admission.md`)
 
 ## model-fit evidence
 
@@ -974,6 +975,7 @@
 ## runtime identity
 
 - [ABYSS-STACK-D-0128 Exact Content-Addressed Runtime Subject Admission](../ABYSS-STACK-D-0128-exact-runtime-subject-admission.md) (`docs/decisions/ABYSS-STACK-D-0128-exact-runtime-subject-admission.md`)
+- [ABYSS-STACK-D-0137 Canonical Codex 0.149.1 Runtime Subject Admission](../ABYSS-STACK-D-0137-canonical-codex-0-149-1-runtime-subject-admission.md) (`docs/decisions/ABYSS-STACK-D-0137-canonical-codex-0-149-1-runtime-subject-admission.md`)
 
 ## runtime receipts
 
@@ -1059,6 +1061,7 @@
 ## source/runtime separation
 
 - [ABYSS-STACK-D-0128 Exact Content-Addressed Runtime Subject Admission](../ABYSS-STACK-D-0128-exact-runtime-subject-admission.md) (`docs/decisions/ABYSS-STACK-D-0128-exact-runtime-subject-admission.md`)
+- [ABYSS-STACK-D-0137 Canonical Codex 0.149.1 Runtime Subject Admission](../ABYSS-STACK-D-0137-canonical-codex-0-149-1-runtime-subject-admission.md) (`docs/decisions/ABYSS-STACK-D-0137-canonical-codex-0-149-1-runtime-subject-admission.md`)
 
 ## stale path hygiene
 

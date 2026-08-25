@@ -406,7 +406,7 @@ Before launch the controller verifies:
    identities match across their owner objects;
 4. task correlation, continuation, and expected incarnation IDs match the
    binding without relying on filenames;
-5. the model realization names Codex CLI `0.148.0`, ChatGPT quota/login,
+5. the model realization names Codex CLI `0.149.1`, ChatGPT quota/login,
    `exec-jsonl`, one admitted model/effort, the exact content-addressed runtime
    subject admitted by the runtime profile, and the exact runtime tool profile;
    every launch class carries the runtime package root plus digest-bound
