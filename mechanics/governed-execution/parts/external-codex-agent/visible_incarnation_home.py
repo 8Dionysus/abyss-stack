@@ -137,10 +137,29 @@ SAFE_PROJECTION_FORBIDDEN_KEYS = frozenset(
 LOCAL_NAMES = frozenset(
     {"config.toml", "cache", "log", "tmp", DESCENDANT_BIN_NAME}
 )
-# A publication boundary is admitted only after two unchanged observations.
-# The count is deliberately generic: it is not tied to any pathname, digest,
-# version, or observed process state.
-STABLE_PUBLICATION_OBSERVATION_COUNT = 2
+
+
+class _AmbientIdentitySnapshot(set[tuple[int, int]]):
+    """Retain the ambient root version and names with the identity set.
+
+    The identity set is still a normal set for callers that only need alias
+    admission.  Publication code also needs to know which directory view was
+    classified, otherwise a new entry can be enumerated into the projection
+    after the alias snapshot and then disappear into actor-local state.
+    """
+
+    def __init__(
+        self,
+        identities: set[tuple[int, int]],
+        *,
+        root_identity: tuple[int, int],
+        root_source_version: tuple[int, ...],
+        top_level_names: set[str],
+    ) -> None:
+        super().__init__(identities)
+        self.root_identity = root_identity
+        self.root_source_version = root_source_version
+        self.top_level_names = frozenset(top_level_names)
 
 
 def _is_declared_staging_recovery_name(name: str) -> bool:
@@ -682,6 +701,74 @@ def _build_capability_projection(
     }
 
 
+def _validate_projection_ambient_boundary(
+    *,
+    ambient_home: Path,
+    projection: dict[str, Any],
+    classified: set[tuple[int, int]],
+    allowed_disappeared_denied_names: set[str] | None = None,
+    stage: str,
+) -> None:
+    """Bind projection materialization to the ambient view it classified.
+
+    A projection is not complete merely because each currently visible name
+    can be classified.  The retained root version proves that no ambient
+    directory mutation occurred after the identity snapshot, while each
+    still-present projected entry must be one of the identities admitted by
+    that same snapshot.  Prior denied entries may remain as disappearance
+    provenance, but a name first created after classification cannot silently
+    become actor-local by being renamed away before the final walk.
+    """
+
+    current = _ambient_inode_identities(ambient_home)
+    if isinstance(classified, _AmbientIdentitySnapshot) and isinstance(
+        current, _AmbientIdentitySnapshot
+    ):
+        if current.root_identity != classified.root_identity:
+            raise IncarnationHomeError(
+                f"ambient projection changed during {stage}: root identity"
+            )
+        if current.root_source_version != classified.root_source_version:
+            raise IncarnationHomeError(
+                f"ambient projection changed during {stage}: root version"
+            )
+        classified_names = classified.top_level_names
+    else:
+        # Test and embedding callers may provide the historical plain set
+        # shape.  The current identity membership still gives the safe
+        # fail-closed behavior, but without the stronger root-version claim.
+        classified_names = frozenset()
+    entries = projection.get("entries")
+    if not isinstance(entries, dict):
+        raise IncarnationHomeError("capability projection entries are invalid")
+    allowed_disappeared_denied_names = allowed_disappeared_denied_names or set()
+    for name, entry in entries.items():
+        if not isinstance(name, str) or not isinstance(entry, dict):
+            raise IncarnationHomeError("capability projection entry is invalid")
+        observed = _entry_identity(
+            ambient_home / name,
+            f"ambient projected entry {name}",
+        )
+        if observed is None:
+            if (
+                name not in classified_names
+                and name not in allowed_disappeared_denied_names
+                and entry.get("projection") == "denied"
+            ):
+                raise IncarnationHomeError(
+                    f"ambient projection entry was inserted after classification: {name}"
+                )
+            if entry.get("projection") == "shared_link":
+                raise IncarnationHomeError(
+                    f"ambient shared capability disappeared during {stage}: {name}"
+                )
+            continue
+        if observed not in classified:
+            raise IncarnationHomeError(
+                f"ambient projection entry was inserted after classification: {name}"
+            )
+
+
 def _preserve_disappeared_denied_projection_entries(
     expected_projection: dict[str, Any],
     previous_projection: object,
@@ -843,6 +930,7 @@ def _ambient_inode_identities(ambient_home: Path) -> set[tuple[int, int]]:
             )
         root_identity = (root_opened.st_dev, root_opened.st_ino)
         identities: set[tuple[int, int]] = {root_identity}
+        top_level_names: set[str] = set()
         visited_directories: set[tuple[int, int]] = {root_identity}
         pending.append((root_fd, root_opened))
         root_fd = -1
@@ -871,7 +959,13 @@ def _ambient_inode_identities(ambient_home: Path) -> set[tuple[int, int]]:
                         "ambient capability directory changed during enumeration"
                     )
                 parent_device = after_listing.st_dev
+                is_root_directory = (
+                    opened_directory.st_dev,
+                    opened_directory.st_ino,
+                ) == root_identity
                 for entry in entries_snapshot:
+                    if is_root_directory:
+                        top_level_names.add(entry.name)
                     try:
                         directory_entry_inode = entry.inode()
                         directory_entry_is_directory = entry.is_dir(
@@ -992,7 +1086,12 @@ def _ambient_inode_identities(ambient_home: Path) -> set[tuple[int, int]]:
             raise IncarnationHomeError(
                 f"ambient capability directory changed during enumeration: {ambient_home}"
             )
-        return identities
+        return _AmbientIdentitySnapshot(
+            identities,
+            root_identity=root_identity,
+            root_source_version=_actor_local_source_version(initial),
+            top_level_names=top_level_names,
+        )
     finally:
         if root_fd >= 0:
             os.close(root_fd)
@@ -1678,6 +1777,322 @@ def _revalidate_legacy_migration_source_root(
         )
 
 
+class _MigrationPublicationLease:
+    """Retain source and target descriptors through migration publication.
+
+    The lease is deliberately a descriptor ownership boundary.  Terminal
+    migration validation reads the retained target files and source files,
+    checks their kernel source versions, and checks each retained pathname
+    still names the retained inode.  It therefore does not depend on a
+    chosen number of directory or content observations.
+    """
+
+    def __init__(
+        self,
+        *,
+        source_home: Path,
+        target_home: Path,
+        names: Sequence[str],
+        ambient_identities: set[tuple[int, int]],
+    ) -> None:
+        self._ambient_identities = ambient_identities
+        self._fds: list[int] = []
+        self._roots: list[dict[str, object]] = []
+        self._nodes: list[dict[str, object]] = []
+        self._missing: list[tuple[str, int, str]] = []
+        self._closed = False
+        try:
+            self._capture_root("source", source_home, names)
+            self._capture_root("target", target_home, names)
+        except BaseException:
+            self.close()
+            raise
+
+    def _capture_root(
+        self,
+        side: str,
+        path: Path,
+        names: Sequence[str],
+    ) -> None:
+        descriptor, initial, opened = _open_stable_actor_local_path_descriptor(
+            path,
+            f"legacy migration {side} home",
+        )
+        self._fds.append(descriptor)
+        if not stat.S_ISDIR(opened.st_mode):
+            raise IncarnationHomeError(
+                f"legacy migration {side} home is not a directory"
+            )
+        root: dict[str, object] = {
+            "side": side,
+            "path": path,
+            "descriptor": descriptor,
+            "initial": initial,
+            "names": tuple(sorted(set(names))),
+        }
+        self._roots.append(root)
+        for name in root["names"]:
+            assert isinstance(name, str)
+            try:
+                observed = os.lstat(name, dir_fd=descriptor)
+            except FileNotFoundError:
+                self._missing.append((side, descriptor, name))
+                continue
+            except OSError as exc:
+                raise IncarnationHomeError(
+                    f"legacy migration {side} entry cannot be inspected: {name}"
+                ) from exc
+            child_descriptor: int
+            child_initial: os.stat_result
+            child_opened: os.stat_result
+            if stat.S_ISREG(observed.st_mode):
+                child_descriptor, child_initial = _open_stable_regular_file_at(
+                    descriptor,
+                    name,
+                    label=f"legacy migration {side} entry {name}",
+                    ambient_identities=self._ambient_identities,
+                )
+                child_opened = os.fstat(child_descriptor)
+            else:
+                child_descriptor, child_initial, child_opened = (
+                    _open_stable_actor_local_child_descriptor(
+                        descriptor,
+                        name,
+                        f"legacy migration {side} entry {name}",
+                    )
+                )
+            self._fds.append(child_descriptor)
+            self._capture_node(
+                side=side,
+                relative=name,
+                parent_fd=descriptor,
+                name=name,
+                descriptor=child_descriptor,
+                initial=child_initial,
+                opened=child_opened,
+            )
+
+    def _capture_node(
+        self,
+        *,
+        side: str,
+        relative: str,
+        parent_fd: int,
+        name: str,
+        descriptor: int,
+        initial: os.stat_result,
+        opened: os.stat_result,
+    ) -> None:
+        current = os.fstat(descriptor)
+        if (
+            _actor_local_identity_mode(current)
+            != _actor_local_identity_mode(opened)
+            or _actor_local_source_version(current)
+            != _actor_local_source_version(opened)
+        ):
+            raise IncarnationHomeError(
+                f"legacy migration {side} entry changed during lease capture: {relative}"
+            )
+        node: dict[str, object] = {
+            "side": side,
+            "relative": relative,
+            "parent_fd": parent_fd,
+            "name": name,
+            "descriptor": descriptor,
+            "initial": initial,
+            "kind": "file" if stat.S_ISREG(current.st_mode) else "directory",
+            "content_digest": None,
+            "children": (),
+        }
+        self._nodes.append(node)
+        if stat.S_ISREG(current.st_mode):
+            if current.st_nlink != 1:
+                raise IncarnationHomeError(
+                    f"legacy migration {side} entry is multiply linked: {relative}"
+                )
+            content = _read_descriptor_bytes(descriptor, relative)
+            after_read = os.fstat(descriptor)
+            if _actor_local_source_version(after_read) != _actor_local_source_version(current):
+                raise IncarnationHomeError(
+                    f"legacy migration {side} entry changed during lease capture: {relative}"
+                )
+            node["content_digest"] = sha256_bytes(content)
+            return
+        if not stat.S_ISDIR(current.st_mode):
+            raise IncarnationHomeError(
+                f"legacy migration {side} entry is not a regular file or directory: {relative}"
+            )
+        try:
+            children = tuple(sorted(os.listdir(descriptor)))
+            after_listing = os.fstat(descriptor)
+        except OSError as exc:
+            raise IncarnationHomeError(
+                f"legacy migration {side} directory cannot be retained: {relative}"
+            ) from exc
+        if _actor_local_source_version(after_listing) != _actor_local_source_version(current):
+            raise IncarnationHomeError(
+                f"legacy migration {side} directory changed during lease capture: {relative}"
+            )
+        node["children"] = children
+        for child_name in children:
+            child_relative = f"{relative}/{child_name}"
+            child_observed = os.lstat(child_name, dir_fd=descriptor)
+            if stat.S_ISREG(child_observed.st_mode):
+                child_descriptor, child_initial = _open_stable_regular_file_at(
+                    descriptor,
+                    child_name,
+                    label=f"legacy migration {side} entry {child_relative}",
+                    ambient_identities=self._ambient_identities,
+                )
+                child_opened = os.fstat(child_descriptor)
+            else:
+                child_descriptor, child_initial, child_opened = (
+                    _open_stable_actor_local_child_descriptor(
+                        descriptor,
+                        child_name,
+                        f"legacy migration {side} entry {child_relative}",
+                    )
+                )
+            self._fds.append(child_descriptor)
+            self._capture_node(
+                side=side,
+                relative=child_relative,
+                parent_fd=descriptor,
+                name=child_name,
+                descriptor=child_descriptor,
+                initial=child_initial,
+                opened=child_opened,
+            )
+
+    def _validate_root(self, root: dict[str, object], stage: str) -> None:
+        descriptor = root["descriptor"]
+        initial = root["initial"]
+        path = root["path"]
+        assert isinstance(descriptor, int)
+        assert isinstance(initial, os.stat_result)
+        assert isinstance(path, Path)
+        try:
+            opened = os.fstat(descriptor)
+            observed = os.lstat(path)
+        except OSError as exc:
+            raise IncarnationHomeError(
+                f"legacy migration publication ownership changed during {stage}"
+            ) from exc
+        if (
+            _actor_local_identity_mode(opened)
+            != _actor_local_identity_mode(initial)
+            or _actor_local_identity_mode(opened)
+            != _actor_local_identity_mode(observed)
+            or _actor_local_source_version(opened)
+            != _actor_local_source_version(initial)
+            or _actor_local_source_version(opened)
+            != _actor_local_source_version(observed)
+            or not stat.S_ISDIR(opened.st_mode)
+        ):
+            raise IncarnationHomeError(
+                f"legacy migration publication ownership changed during {stage}"
+            )
+
+    def _validate_node(self, node: dict[str, object], stage: str) -> None:
+        descriptor = node["descriptor"]
+        initial = node["initial"]
+        parent_fd = node["parent_fd"]
+        name = node["name"]
+        kind = node["kind"]
+        assert isinstance(descriptor, int)
+        assert isinstance(initial, os.stat_result)
+        assert isinstance(parent_fd, int)
+        assert isinstance(name, str)
+        try:
+            opened = os.fstat(descriptor)
+            observed = os.lstat(name, dir_fd=parent_fd)
+        except OSError as exc:
+            raise IncarnationHomeError(
+                f"legacy migration publication ownership changed during {stage}"
+            ) from exc
+        if (
+            _actor_local_identity_mode(opened)
+            != _actor_local_identity_mode(initial)
+            or _actor_local_identity_mode(opened)
+            != _actor_local_identity_mode(observed)
+            or _actor_local_source_version(opened)
+            != _actor_local_source_version(initial)
+            or _actor_local_source_version(opened)
+            != _actor_local_source_version(observed)
+            or (stat.S_ISREG(opened.st_mode) and opened.st_nlink != 1)
+            or (kind == "file" and not stat.S_ISREG(opened.st_mode))
+            or (kind == "directory" and not stat.S_ISDIR(opened.st_mode))
+        ):
+            raise IncarnationHomeError(
+                f"legacy migration publication ownership changed during {stage}"
+            )
+        if kind == "file":
+            content = _read_descriptor_bytes(descriptor, str(node["relative"]))
+            after_read = os.fstat(descriptor)
+            if (
+                _actor_local_source_version(after_read)
+                != _actor_local_source_version(initial)
+                or sha256_bytes(content) != node["content_digest"]
+            ):
+                raise IncarnationHomeError(
+                    f"legacy migration publication ownership changed during {stage}"
+                )
+            return
+        try:
+            children = tuple(sorted(os.listdir(descriptor)))
+            after_listing = os.fstat(descriptor)
+        except OSError as exc:
+            raise IncarnationHomeError(
+                f"legacy migration publication ownership changed during {stage}"
+            ) from exc
+        if (
+            children != node["children"]
+            or _actor_local_source_version(after_listing)
+            != _actor_local_source_version(initial)
+        ):
+            raise IncarnationHomeError(
+                f"legacy migration publication ownership changed during {stage}"
+            )
+
+    def validate(self, stage: str) -> None:
+        if self._closed:
+            raise IncarnationHomeError("legacy migration publication lease is closed")
+        try:
+            for root in self._roots:
+                self._validate_root(root, stage)
+            for side, parent_fd, name in self._missing:
+                try:
+                    os.lstat(name, dir_fd=parent_fd)
+                except FileNotFoundError:
+                    continue
+                except OSError as exc:
+                    raise IncarnationHomeError(
+                        f"legacy migration publication ownership changed during {stage}"
+                    ) from exc
+                raise IncarnationHomeError(
+                    f"legacy migration publication ownership changed during {stage}"
+                )
+            for node in self._nodes:
+                self._validate_node(node, stage)
+        except IncarnationHomeError:
+            raise
+        except OSError as exc:
+            raise IncarnationHomeError(
+                f"legacy migration publication ownership changed during {stage}"
+            ) from exc
+
+    def close(self) -> None:
+        if self._closed:
+            return
+        self._closed = True
+        for descriptor in reversed(self._fds):
+            try:
+                os.close(descriptor)
+            except OSError:
+                pass
+        self._fds.clear()
+
+
 def _denied_state_provenance(
     *,
     codex_home: Path,
@@ -1981,6 +2396,10 @@ def _open_stable_regular_file_at(
             != (initial.st_dev, initial.st_ino, initial.st_mode)
             or (opened.st_dev, opened.st_ino, opened.st_mode)
             != (observed.st_dev, observed.st_ino, observed.st_mode)
+            or _actor_local_source_version(opened)
+            != _actor_local_source_version(initial)
+            or _actor_local_source_version(opened)
+            != _actor_local_source_version(observed)
             or (opened.st_dev, opened.st_ino) in ambient_identities
             or opened.st_nlink != 1
         ):
@@ -2056,7 +2475,7 @@ def _write_descriptor_exact(
         raise IncarnationHomeError(f"cannot write admitted file: {label}") from exc
 
 
-def _revalidate_regular_file_at(
+def _assert_retained_regular_file_at(
     parent_fd: int,
     name: str,
     descriptor: int,
@@ -2065,7 +2484,7 @@ def _revalidate_regular_file_at(
     label: str,
     ambient_identities: set[tuple[int, int]],
 ) -> None:
-    """Recheck a retained regular-file descriptor before a name-based effect."""
+    """Assert that a pathname still names one retained regular-file inode."""
 
     try:
         opened = os.fstat(descriptor)
@@ -2077,11 +2496,36 @@ def _revalidate_regular_file_at(
         != (initial.st_dev, initial.st_ino, initial.st_mode)
         or (opened.st_dev, opened.st_ino, opened.st_mode)
         != (observed.st_dev, observed.st_ino, observed.st_mode)
+        or _actor_local_source_version(opened)
+        != _actor_local_source_version(initial)
+        or _actor_local_source_version(opened)
+        != _actor_local_source_version(observed)
         or not stat.S_ISREG(opened.st_mode)
         or opened.st_nlink != 1
         or (opened.st_dev, opened.st_ino) in ambient_identities
     ):
         raise IncarnationHomeError(f"{label} changed before mutation")
+
+
+def _revalidate_regular_file_at(
+    parent_fd: int,
+    name: str,
+    descriptor: int,
+    initial: os.stat_result,
+    *,
+    label: str,
+    ambient_identities: set[tuple[int, int]],
+) -> None:
+    """Recheck a retained regular-file descriptor before a name-based effect."""
+
+    _assert_retained_regular_file_at(
+        parent_fd,
+        name,
+        descriptor,
+        initial,
+        label=label,
+        ambient_identities=ambient_identities,
+    )
 
 
 def _revalidate_regular_file_publication_boundary(
@@ -2093,26 +2537,86 @@ def _revalidate_regular_file_publication_boundary(
     *,
     label: str,
     ambient_identities: set[tuple[int, int]],
-) -> None:
-    """Hold one descriptor through a stable, content-bound publication edge."""
+) -> bytes:
+    """Read one retained descriptor and close the publication ownership edge."""
 
-    for _observation in range(STABLE_PUBLICATION_OBSERVATION_COUNT):
-        _revalidate_regular_file_at(
-            parent_fd,
-            name,
-            descriptor,
-            initial,
+    _revalidate_regular_file_at(
+        parent_fd,
+        name,
+        descriptor,
+        initial,
+        label=label,
+        ambient_identities=ambient_identities,
+    )
+    try:
+        content = _read_descriptor_bytes(descriptor, name)
+    except IncarnationHomeError:
+        raise
+    try:
+        after_read = os.fstat(descriptor)
+    except OSError as exc:
+        raise IncarnationHomeError(f"{label} changed before mutation") from exc
+    if (
+        _actor_local_source_version(after_read)
+        != _actor_local_source_version(initial)
+        or sha256_bytes(content) != expected_digest
+    ):
+        raise IncarnationHomeError(f"{label} changed before mutation")
+    # The pathname and retained descriptor are checked again after the read;
+    # this is an ownership check, not a quorum of observations.  A mutation
+    # performed by a read hook or by another writer cannot pass this edge.
+    _revalidate_regular_file_at(
+        parent_fd,
+        name,
+        descriptor,
+        initial,
+        label=label,
+        ambient_identities=ambient_identities,
+    )
+    return content
+
+
+def _publish_retained_regular_file_snapshot_at(
+    *,
+    parent_fd: int,
+    target_name: str,
+    target_descriptor: int,
+    target_initial: os.stat_result,
+    content: bytes,
+    mode: int,
+    label: str,
+    ambient_identities: set[tuple[int, int]],
+) -> tuple[int, os.stat_result]:
+    """Atomically publish a descriptor-bound content snapshot.
+
+    The returned descriptor is the new canonical inode and remains owned by
+    the caller through the receipt-return boundary.  The old inode is only
+    retired after the exchange proves both retained identities.
+    """
+
+    staged_descriptor = _create_unnameable_temporary_file_at(parent_fd, label)
+    try:
+        _write_descriptor_exact(staged_descriptor, content, mode, label)
+        _replace_with_staged_file_at(
+            parent_fd=parent_fd,
+            target_name=target_name,
+            target_descriptor=target_descriptor,
+            target_initial=target_initial,
+            staged_descriptor=staged_descriptor,
             label=label,
             ambient_identities=ambient_identities,
         )
-        try:
-            observed = os.fstat(descriptor)
-        except OSError as exc:
-            raise IncarnationHomeError(f"{label} changed before mutation") from exc
-        if _actor_local_source_version(observed) != _actor_local_source_version(initial):
-            raise IncarnationHomeError(f"{label} changed before mutation")
-        if sha256_bytes(_read_descriptor_bytes(descriptor, name)) != expected_digest:
-            raise IncarnationHomeError(f"{label} changed before mutation")
+        os.fsync(parent_fd)
+        published = os.fstat(staged_descriptor)
+        if (
+            not stat.S_ISREG(published.st_mode)
+            or published.st_nlink != 1
+        ):
+            raise IncarnationHomeError(f"{label} changed after atomic publication")
+        return staged_descriptor, published
+    except BaseException:
+        os.close(staged_descriptor)
+        raise
 
 
 def _revalidate_writable_regular_file_at(
@@ -5586,7 +6090,30 @@ def _restore_holder_claim_snapshot(
             )
         current_raw = _read_descriptor_bytes(descriptor, str(claim_path))
         if sha256_bytes(current_raw) != after_digest:
-            raise IncarnationHomeError("holder claim changed before rollback")
+            # The retained descriptor is the ownership proof.  If its inode
+            # is still the isolated canonical claim, a same-inode terminal
+            # mutation is recoverable through that descriptor; a pathname or
+            # inode replacement remains an uncertainty and fails closed.
+            try:
+                observed = os.lstat(claim_path.name, dir_fd=parent_fd)
+            except OSError as exc:
+                raise IncarnationHomeError(
+                    "holder claim changed before rollback"
+                ) from exc
+            if (
+                (observed.st_dev, observed.st_ino, observed.st_mode)
+                != (retained.st_dev, retained.st_ino, retained.st_mode)
+                or before_raw is None
+            ):
+                raise IncarnationHomeError("holder claim changed before rollback")
+            _write_descriptor_exact(
+                descriptor,
+                before_raw,
+                0o600,
+                "holder claim rollback after same-inode mutation",
+            )
+            os.fsync(parent_fd)
+            return
         if before_raw is None:
             _remove_retained_regular_file_at(
                 parent_fd,
@@ -5633,6 +6160,19 @@ def _existing_rebind_receipt(
     comparable_expected = dict(expected)
     comparable_existing.pop("created_at", None)
     comparable_expected.pop("created_at", None)
+    existing_runtime = comparable_existing.get("runtime")
+    expected_runtime = comparable_expected.get("runtime")
+    if isinstance(existing_runtime, dict) and isinstance(expected_runtime, dict):
+        # The claim snapshot is learned only after the transfer boundary on a
+        # first rebind.  Preserve it for idempotent retries instead of making
+        # the pre-transfer expected receipt pretend it was already known.
+        for key in (
+            "holder_claim",
+            "holder_claim_digest",
+            "holder_claim_snapshot_b64",
+        ):
+            if key in existing_runtime and key not in expected_runtime:
+                expected_runtime[key] = existing_runtime[key]
     if comparable_existing != comparable_expected:
         raise IncarnationHomeError(
             "replacement holder terminal receipt already exists with different binding"
@@ -6320,10 +6860,17 @@ def _rebind_replacement_holder_receipt(
             allow_existing_claim=True,
         )
         if existing is not None:
+            _validate_rebind_receipt_claim_snapshot(
+                receipt=existing,
+                manifest_path=manifest_path,
+                ambient_identities=ambient_identities,
+            )
             return existing
         claim_parent_fd: int | None = None
         claim_descriptor: int | None = None
         claim_initial: os.stat_result | None = None
+        published_claim_descriptor: int | None = None
+        published_claim_initial: os.stat_result | None = None
         try:
             claim_parent_fd = _open_pinned_parent_directory(
                 claim_path, "holder claim rollback"
@@ -6335,22 +6882,71 @@ def _rebind_replacement_holder_receipt(
                 ambient_identities=ambient_identities,
                 writable=True,
             )
+            retained_claim_raw = _stable_regular_file_bytes(
+                claim_path,
+                "holder claim publication",
+                ambient_identities=ambient_identities,
+            )
+            if retained_claim_raw is None or sha256_bytes(retained_claim_raw) != after_claim_digest:
+                raise IncarnationHomeError("holder claim changed before publication")
+            claim_snapshot = _revalidate_regular_file_publication_boundary(
+                claim_parent_fd,
+                claim_path.name,
+                claim_descriptor,
+                claim_initial,
+                after_claim_digest,
+                label="holder claim publication",
+                ambient_identities=ambient_identities,
+            )
+            published_claim_descriptor, published_claim_initial = (
+                _publish_retained_regular_file_snapshot_at(
+                    parent_fd=claim_parent_fd,
+                    target_name=claim_path.name,
+                    target_descriptor=claim_descriptor,
+                    target_initial=claim_initial,
+                    content=claim_snapshot,
+                    mode=0o600,
+                    label="holder claim publication",
+                    ambient_identities=ambient_identities,
+                )
+            )
+            receipt["runtime"].update(
+                {
+                    "holder_claim": str(claim_path.resolve()),
+                    "holder_claim_digest": sha256_bytes(claim_snapshot),
+                    "holder_claim_snapshot_b64": base64.b64encode(
+                        claim_snapshot
+                    ).decode("ascii"),
+                }
+            )
+            _assert_safe_projection(receipt)
             _write_new_json(
                 receipt_path,
                 receipt,
                 "replacement holder terminal receipt",
                 ambient_identities=ambient_identities,
             )
-            _revalidate_regular_file_publication_boundary(
+            _revalidate_regular_file_at(
                 claim_parent_fd,
                 claim_path.name,
-                claim_descriptor,
-                claim_initial,
-                after_claim_digest,
+                published_claim_descriptor,
+                published_claim_initial,
                 label="holder claim changed after receipt publication",
                 ambient_identities=ambient_identities,
             )
-        except BaseException:
+            # Keep the final return edge independent of the public
+            # revalidation hook.  A caller may instrument that helper
+            # and mutate the pathname after its wrapped check returns;
+            # the retained descriptor assertion still owns the edge.
+            _assert_retained_regular_file_at(
+                claim_parent_fd,
+                claim_path.name,
+                published_claim_descriptor,
+                published_claim_initial,
+                label="holder claim changed at receipt return",
+                ambient_identities=ambient_identities,
+            )
+        except BaseException as exc:
             try:
                 _restore_holder_claim_snapshot(
                     claim_path=claim_path,
@@ -6358,15 +6954,32 @@ def _rebind_replacement_holder_receipt(
                     after_digest=after_claim_digest,
                     ambient_identities=ambient_identities,
                     retained_parent_fd=claim_parent_fd,
-                    retained_descriptor=claim_descriptor,
-                    retained_initial=claim_initial,
+                    retained_descriptor=(
+                        published_claim_descriptor
+                        if published_claim_descriptor is not None
+                        else claim_descriptor
+                    ),
+                    retained_initial=(
+                        published_claim_initial
+                        if published_claim_initial is not None
+                        else claim_initial
+                    ),
                 )
             except BaseException as rollback_exc:
+                if isinstance(exc, IncarnationHomeError):
+                    raise IncarnationHomeError(
+                        f"{exc}; holder claim rollback became uncertain"
+                    ) from rollback_exc
                 raise IncarnationHomeError(
                     "holder claim rollback became uncertain"
                 ) from rollback_exc
             raise
         finally:
+            if (
+                published_claim_descriptor is not None
+                and published_claim_descriptor != claim_descriptor
+            ):
+                os.close(published_claim_descriptor)
             if claim_descriptor is not None:
                 os.close(claim_descriptor)
             if claim_parent_fd is not None:
@@ -6439,6 +7052,70 @@ def _decode_holder_manifest_snapshot(runtime: dict[str, Any]) -> bytes | None:
             "holder incarnation manifest snapshot holder binding is missing"
         )
     return snapshot
+
+
+def _decode_holder_claim_snapshot(runtime: dict[str, Any]) -> bytes | None:
+    """Validate the immutable holder-claim bytes carried by a repaired receipt."""
+
+    claim_path = runtime.get("holder_claim")
+    claim_digest = runtime.get("holder_claim_digest")
+    encoded = runtime.get("holder_claim_snapshot_b64")
+    if claim_path is None and claim_digest is None and encoded is None:
+        return None
+    if (
+        not isinstance(claim_path, str)
+        or not Path(claim_path).is_absolute()
+        or not isinstance(claim_digest, str)
+        or SHA256_DIGEST_PATTERN.fullmatch(claim_digest) is None
+        or not isinstance(encoded, str)
+        or not encoded
+    ):
+        raise IncarnationHomeError("holder claim snapshot binding is incomplete")
+    try:
+        snapshot = base64.b64decode(encoded.encode("ascii"), validate=True)
+    except (UnicodeEncodeError, ValueError, base64.binascii.Error) as exc:
+        raise IncarnationHomeError(
+            "holder claim snapshot is not valid base64"
+        ) from exc
+    if not snapshot or sha256_bytes(snapshot) != claim_digest:
+        raise IncarnationHomeError("holder claim snapshot digest has drifted")
+    try:
+        claim = json.loads(snapshot.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise IncarnationHomeError("holder claim snapshot is not valid JSON") from exc
+    if not isinstance(claim, dict) or claim.get("schema_version") != HOLDER_CLAIM_SCHEMA_VERSION:
+        raise IncarnationHomeError("holder claim snapshot is unsupported")
+    return snapshot
+
+
+def _validate_rebind_receipt_claim_snapshot(
+    *,
+    receipt: dict[str, Any],
+    manifest_path: Path,
+    ambient_identities: set[tuple[int, int]],
+) -> None:
+    """Re-admit an idempotent receipt only with its canonical claim snapshot."""
+
+    runtime = receipt.get("runtime")
+    if not isinstance(runtime, dict):
+        raise IncarnationHomeError("replacement holder receipt runtime is invalid")
+    snapshot = _decode_holder_claim_snapshot(runtime)
+    if snapshot is None:
+        return
+    claim_value = runtime.get("holder_claim")
+    expected_claim = _holder_claim_path(manifest_path).resolve()
+    if claim_value != str(expected_claim):
+        raise IncarnationHomeError("replacement holder receipt claim path drifted")
+    claim_path = Path(claim_value)
+    current = _stable_regular_file_bytes(
+        claim_path,
+        "replacement holder receipt claim",
+        ambient_identities=ambient_identities,
+    )
+    if current != snapshot:
+        raise IncarnationHomeError(
+            "replacement holder receipt claim snapshot has drifted"
+        )
 
 
 def _validate_wake_delivery(
@@ -6881,6 +7558,7 @@ def _load_holder_receipt_snapshot(
     ):
         raise IncarnationHomeError("holder executable identity is invalid")
     _decode_holder_manifest_snapshot(runtime)
+    _decode_holder_claim_snapshot(runtime)
     if "binding" in receipt:
         binding = _validate_terminal_binding_shape(receipt["binding"])
         _validate_receipt_binding_consistency(receipt, binding)
@@ -9493,6 +10171,17 @@ def _prepare_home_impl(
     previous_capability_projection = existing.get("capability_projection")
     if previous_capability_projection is None:
         previous_capability_projection = _migration_previous_capability_projection
+    allowed_disappeared_denied_names: set[str] = set()
+    if isinstance(previous_capability_projection, dict):
+        previous_entries = previous_capability_projection.get("entries")
+        if isinstance(previous_entries, dict):
+            allowed_disappeared_denied_names = {
+                name
+                for name, entry in previous_entries.items()
+                if isinstance(name, str)
+                and isinstance(entry, dict)
+                and entry.get("projection") == "denied"
+            }
     capability_projection = _preserve_disappeared_denied_projection_entries(
         capability_projection,
         previous_capability_projection,
@@ -9639,6 +10328,13 @@ def _prepare_home_impl(
         0o600,
         ambient_identities=ambient_identities,
     )
+    _validate_projection_ambient_boundary(
+        ambient_home=ambient_home,
+        projection=capability_projection,
+        classified=ambient_identities,
+        allowed_disappeared_denied_names=allowed_disappeared_denied_names,
+        stage="projection materialization",
+    )
 
     for name in shared_names:
         source = ambient_home / name
@@ -9783,6 +10479,20 @@ def _prepare_home_impl(
             stage="publication source validation",
         )
 
+    migration_publication_lease: _MigrationPublicationLease | None = None
+    if (
+        _migration_source_home is not None
+        and migration_source_content_digests is not None
+        and migration_source_content_versions is not None
+        and migration_target_content_versions is not None
+    ):
+        migration_publication_lease = _MigrationPublicationLease(
+            source_home=_migration_source_home,
+            target_home=codex_home,
+            names=sorted(migration_source_content_digests),
+            ambient_identities=ambient_identities,
+        )
+
     manifest = {
         "$schema": "schemas/external-codex-incarnation-home.schema.json",
         "schema_version": (
@@ -9827,70 +10537,65 @@ def _prepare_home_impl(
         )
         + b"\n"
     )
-    _write_exact(
-        manifest_path,
-        manifest_bytes,
-        0o600,
-        ambient_identities=ambient_identities,
-    )
-    if (
-        _migration_source_home is not None
-        and migration_source_content_digests is not None
-        and migration_source_content_versions is not None
-        and migration_target_content_versions is not None
-    ):
-        try:
-            for (
-                target_stage,
-                target_version_stage,
-                source_stage,
-            ) in (
-                (
-                    "post-publication validation",
-                    "post-publication target source-version validation",
-                    "post-publication source validation",
-                ),
-                (
-                    "final publication validation",
-                    "final publication target source-version validation",
-                    "final publication source validation",
-                ),
-            ):
+    try:
+        _write_exact(
+            manifest_path,
+            manifest_bytes,
+            0o600,
+            ambient_identities=ambient_identities,
+        )
+        if (
+            migration_publication_lease is not None
+            and _migration_source_home is not None
+            and migration_source_content_digests is not None
+            and migration_source_content_versions is not None
+            and migration_target_content_versions is not None
+        ):
+            try:
                 _validate_legacy_migration_content_snapshot(
                     home=codex_home,
                     expected=migration_source_content_digests,
                     ambient_identities=ambient_identities,
                     include_source_version=False,
-                    stage=target_stage,
+                    stage="final publication validation",
                 )
                 _validate_legacy_migration_content_snapshot(
                     home=codex_home,
                     expected=migration_target_content_versions,
                     ambient_identities=ambient_identities,
                     include_source_version=True,
-                    stage=target_version_stage,
+                    stage="final publication target source-version validation",
                 )
                 _validate_legacy_migration_content_snapshot(
                     home=_migration_source_home,
                     expected=migration_source_content_versions,
                     ambient_identities=ambient_identities,
                     include_source_version=True,
-                    stage=source_stage,
+                    stage="final publication source validation",
                 )
-        except IncarnationHomeError as exc:
-            try:
-                _remove_retained_regular_file(
-                    manifest_path,
-                    ambient_identities=ambient_identities,
-                    label="failed legacy migration manifest",
-                )
-            except IncarnationHomeError as cleanup_exc:
-                raise cleanup_exc from exc
-            if active_owner is not None:
-                _rollback_unpublished_home(owner_token=active_owner)
-            raise
-    _finish_preparation_owner(active_owner)
-    return manifest
+                # The descriptor lease is the terminal publication proof.
+                # The second handoff check is deliberately a lifecycle edge,
+                # not another sampling quorum: the retained descriptors stay
+                # owned until the preparation owner token is finished.
+                migration_publication_lease.validate("final publication validation")
+                migration_publication_lease.validate("terminal migration return")
+            except IncarnationHomeError as exc:
+                try:
+                    _remove_retained_regular_file(
+                        manifest_path,
+                        ambient_identities=ambient_identities,
+                        label="failed legacy migration manifest",
+                    )
+                except IncarnationHomeError as cleanup_exc:
+                    raise cleanup_exc from exc
+                if active_owner is not None:
+                    _rollback_unpublished_home(owner_token=active_owner)
+                raise
+        _finish_preparation_owner(active_owner)
+        return manifest
+    finally:
+        if migration_publication_lease is not None:
+            migration_publication_lease.close()
 
 
 def _rollback_unpublished_home(

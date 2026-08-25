@@ -580,7 +580,7 @@ def test_initial_denied_inode_is_rejected_if_moved_during_materialization(
     monkeypatch.setattr(MODULE, "_write_exact", move_denied_inode_after_config)
     with pytest.raises(
         MODULE.IncarnationHomeError,
-        match="actor-local capability entry aliases ambient state",
+        match="ambient projection changed during projection materialization",
     ):
         _ORIGINAL_PREPARE_HOME(
             ambient_home=ambient,
@@ -594,6 +594,69 @@ def test_initial_denied_inode_is_rejected_if_moved_during_materialization(
     assert ambient_entry.read_bytes() == b"ambient-path-replacement"
     assert moved_target is not None
     assert not moved_target.exists()
+    assert not list(runtime_root.glob("sha256-*/holder-sha256-*/incarnation-home.json"))
+
+
+def test_late_ambient_inode_inserted_after_snapshot_cannot_be_relocated_into_home(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Regression for the exact F1 insert-after-enumeration adversary."""
+
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    late_name = _unknown_fixture_name(tmp_path)
+    late_entry = ambient / late_name
+    realization = _realization(tmp_path / "realization.json")
+    original_snapshot = MODULE._ambient_inode_identities
+    original_write_exact = MODULE._write_exact
+    identity_calls = 0
+    moved = False
+
+    def insert_after_second_snapshot(path: Path) -> set[tuple[int, int]]:
+        nonlocal identity_calls
+        identity_calls += 1
+        snapshot = original_snapshot(path)
+        if identity_calls == 2:
+            late_entry.write_bytes(b"late-ambient-secret")
+        return snapshot
+
+    def relocate_after_config(
+        path: Path,
+        content: bytes,
+        mode: int,
+        *,
+        ambient_identities: set[tuple[int, int]] | None = None,
+    ) -> None:
+        nonlocal moved
+        original_write_exact(
+            path,
+            content,
+            mode,
+            ambient_identities=ambient_identities,
+        )
+        if path.name == "config.toml" and late_entry.exists() and not moved:
+            moved = True
+            os.rename(late_entry, path.parent / late_name)
+
+    monkeypatch.setattr(MODULE, "_ambient_inode_identities", insert_after_second_snapshot)
+    monkeypatch.setattr(MODULE, "_write_exact", relocate_after_config)
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="ambient projection changed during projection materialization",
+    ):
+        _ORIGINAL_PREPARE_HOME(
+            ambient_home=ambient,
+            realization_path=realization,
+            runtime_root=runtime_root,
+            binding_context=_holder_binding_context(runtime_root, "late-projection"),
+        )
+
+    assert moved
+    assert identity_calls >= 3
+    assert not late_entry.exists()
     assert not list(runtime_root.glob("sha256-*/holder-sha256-*/incarnation-home.json"))
 
 
@@ -2090,7 +2153,7 @@ def test_legacy_migration_rejects_target_bytes_changed_during_publication(
     monkeypatch.setattr(MODULE, "_write_exact", mutate_during_marker_publication)
     with pytest.raises(
         MODULE.IncarnationHomeError,
-        match="legacy migration state changed during post-publication validation",
+        match="legacy migration state changed during final publication validation",
     ):
         MODULE.migrate_legacy_home(
             legacy_manifest_path=legacy_manifest_path,
@@ -2106,7 +2169,7 @@ def test_legacy_migration_rejects_target_bytes_changed_during_publication(
     assert target_markers == []
 
 
-def test_legacy_migration_rejects_target_bytes_changed_after_first_final_check(
+def test_legacy_migration_rejects_target_bytes_changed_after_terminal_source_check(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     (
@@ -2118,28 +2181,80 @@ def test_legacy_migration_rejects_target_bytes_changed_after_first_final_check(
         denied_name,
     ) = _legacy_migration_fixture(tmp_path, "migration-target-final-check-race")
     original_snapshot_validation = MODULE._validate_legacy_migration_content_snapshot
-    target_home: Path | None = None
     raced = False
 
-    def mutate_after_first_publication_pass(**kwargs: object) -> None:
-        nonlocal raced, target_home
+    def mutate_after_terminal_source_check(**kwargs: object) -> None:
+        nonlocal raced
         stage = str(kwargs["stage"])
-        if stage == "post-publication validation":
-            target_home = Path(str(kwargs["home"]))
         original_snapshot_validation(**kwargs)
-        if stage == "post-publication source validation" and not raced:
-            assert target_home is not None
+        if stage == "final publication source validation" and not raced:
+            target_home = Path(str(kwargs["home"]))
             (target_home / denied_name).write_bytes(b"raced-after-final-check")
             raced = True
 
     monkeypatch.setattr(
         MODULE,
         "_validate_legacy_migration_content_snapshot",
-        mutate_after_first_publication_pass,
+        mutate_after_terminal_source_check,
     )
     with pytest.raises(
         MODULE.IncarnationHomeError,
-        match="legacy migration state changed during final publication validation",
+        match="legacy migration publication ownership changed during final publication validation",
+    ):
+        MODULE.migrate_legacy_home(
+            legacy_manifest_path=legacy_manifest_path,
+            binding_context=context,
+        )
+
+    assert raced
+    target_markers = [
+        path
+        for path in runtime_root.rglob("incarnation-home.json")
+        if path != legacy_manifest_path
+    ]
+    assert target_markers == []
+
+
+def test_legacy_migration_lease_rechecks_target_at_terminal_return(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Challenge F3 ownership after terminal publication and before return."""
+
+    (
+        _ambient,
+        runtime_root,
+        _realization_path,
+        legacy_manifest_path,
+        context,
+        denied_name,
+    ) = _legacy_migration_fixture(tmp_path, "migration-target-terminal-return-race")
+    original_validate = MODULE._MigrationPublicationLease.validate
+    raced = False
+
+    def mutate_after_terminal_publication(
+        lease: object,
+        stage: str,
+    ) -> None:
+        nonlocal raced
+        original_validate(lease, stage)  # type: ignore[arg-type]
+        if stage == "final publication validation" and not raced:
+            roots = getattr(lease, "_roots")
+            target_root = next(
+                Path(str(root["path"]))
+                for root in roots
+                if root["side"] == "target"
+            )
+            (target_root / denied_name).write_bytes(b"raced-at-terminal-return")
+            raced = True
+
+    monkeypatch.setattr(
+        MODULE._MigrationPublicationLease,
+        "validate",
+        mutate_after_terminal_publication,
+    )
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="legacy migration publication ownership changed during terminal migration return",
     ):
         MODULE.migrate_legacy_home(
             legacy_manifest_path=legacy_manifest_path,
@@ -4514,6 +4629,117 @@ def test_rebind_receipt_binds_holder_environment_and_manifest_snapshot(
         )
 
 
+def test_rebind_claim_mutation_after_digest_read_fails_before_receipt_return(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Regression for the exact F2 same-inode claim mutation adversary."""
+
+    reentry_path, reentry, context = _holder_loss_reentry_fixture(tmp_path)
+    holder_pid = os.getpid()
+    terminal_pid = 202
+    reentry["current_holder"] = {"pid": holder_pid, "start_ticks": 1001}
+    reentry_path.write_bytes(MODULE.canonical_bytes(reentry) + b"\n")
+    context_path = tmp_path / "binding-context.json"
+    context_path.write_bytes(MODULE.canonical_bytes(context))
+    ambient = tmp_path / "ambient"
+    runtime_root = Path(context["runtime_state_root"])
+    ambient.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    manifest = MODULE.prepare_home(
+        ambient_home=ambient,
+        realization_path=_realization(tmp_path / "realization.json"),
+        runtime_root=runtime_root,
+        binding_context=context,
+    )
+    manifest_path = Path(manifest["codex_home"]).parent / "incarnation-home.json"
+    original_receipt_path = tmp_path / "original-holder.json"
+    context_digest = MODULE.sha256_bytes(context_path.read_bytes())
+    MODULE._reserve_holder_claim_for_launch(
+        manifest_path=manifest_path,
+        manifest=manifest,
+        manifest_digest=MODULE.sha256_bytes(manifest_path.read_bytes()),
+        binding_context_digest=context_digest,
+        binding_context=context,
+        holder_receipt_path=original_receipt_path,
+    )
+    executable = Path("/proc/self/exe").resolve()
+    executable_digest = MODULE.sha256_bytes(executable.read_bytes())
+    holder_argv = [str(executable), "exec"]
+    output_path = tmp_path / "rebound-holder.json"
+    claim_path = manifest_path.parent / MODULE.HOLDER_CLAIM_FILE_NAME
+
+    monkeypatch.setenv("CODEX_HOME", str(tmp_path / "wrong-ambient"))
+    monkeypatch.setattr(MODULE, "_descends_from", lambda *_: True)
+    monkeypatch.setattr(MODULE, "_proc_identity_state", lambda *_: "live")
+    monkeypatch.setattr(
+        MODULE,
+        "_proc_parent_pid",
+        lambda pid: terminal_pid if pid == holder_pid else 1,
+    )
+    monkeypatch.setattr(
+        MODULE,
+        "_proc_start_ticks",
+        lambda pid: {holder_pid: 1001, terminal_pid: 2002}[pid],
+    )
+    monkeypatch.setattr(MODULE, "_proc_comm", lambda _pid: "kitty")
+    monkeypatch.setattr(
+        MODULE,
+        "_kitty_ancestor",
+        lambda _pid: (terminal_pid, 2002, ["/usr/bin/kitty", "--title", "holder"]),
+    )
+    monkeypatch.setattr(MODULE, "_kitty_dedication", lambda **_: ("1", True))
+    monkeypatch.setattr(
+        MODULE,
+        "_proc_environ",
+        lambda _pid: {
+            "CODEX_HOME": str(manifest["codex_home"]),
+            "PATH": "/usr/bin:/bin",
+        },
+    )
+    monkeypatch.setattr(MODULE, "_proc_argv", lambda _pid: holder_argv)
+    monkeypatch.setattr(MODULE, "_proc_exe_digest", lambda _pid: executable_digest)
+
+    original_read = MODULE._read_descriptor_bytes
+    claim_digest_reads = 0
+    mutated = False
+    mutation_inode: int | None = None
+
+    def mutate_after_second_claim_digest_read(descriptor: int, label: str) -> bytes:
+        nonlocal claim_digest_reads, mutated, mutation_inode
+        raw = original_read(descriptor, label)
+        if "holder claim" in label or label.endswith(MODULE.HOLDER_CLAIM_FILE_NAME):
+            claim_digest_reads += 1
+            if claim_digest_reads == 2:
+                mutation_inode = claim_path.stat().st_ino
+                claim_path.write_bytes(b"unrelated-claim-bytes")
+                mutated = True
+        return raw
+
+    monkeypatch.setattr(
+        MODULE,
+        "_read_descriptor_bytes",
+        mutate_after_second_claim_digest_read,
+    )
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="holder claim publication changed before mutation",
+    ):
+        MODULE._rebind_replacement_holder_receipt(
+            receipt_path=output_path,
+            holder_loss_reentry_path=reentry_path,
+            binding_context_path=context_path,
+            manifest_path=manifest_path,
+            codex_executable_path=executable,
+        )
+
+    assert claim_digest_reads >= 2
+    assert mutated
+    assert mutation_inode == claim_path.stat().st_ino
+    assert not output_path.exists()
+    restored_claim = json.loads(claim_path.read_text(encoding="utf-8"))
+    assert restored_claim["holder_receipt"] == str(original_receipt_path.resolve())
+
+
 @pytest.mark.parametrize(
     (
         "publish_receipt_before_failure",
@@ -4533,7 +4759,7 @@ def test_rebind_receipt_binds_holder_environment_and_manifest_snapshot(
         "claim-replaced-after-first-publication-boundary",
     ],
 )
-def test_rebind_receipt_failure_removes_renamed_claim_and_preserves_replacement(
+def test_rebind_receipt_failure_preserves_relocated_claim_and_replacement(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     publish_receipt_before_failure: bool,
@@ -4692,7 +4918,7 @@ def test_rebind_receipt_failure_removes_renamed_claim_and_preserves_replacement(
         match=(
             "synthetic receipt publication failure"
             if not publish_receipt_before_failure
-            else "holder claim changed after receipt publication"
+            else "holder claim changed (after receipt publication|at receipt return)"
         ),
     ):
         MODULE._rebind_replacement_holder_receipt(
@@ -4708,7 +4934,11 @@ def test_rebind_receipt_failure_removes_renamed_claim_and_preserves_replacement(
         assert publication_boundary_checks == 1
     assert claim_path.read_bytes() == replacement_bytes
     assert stat.S_IMODE(claim_path.stat().st_mode) == 0o640
-    assert not moved_claim_path.exists()
+    if move_claim_outside_parent:
+        assert moved_claim_path.exists()
+        assert moved_claim_path.stat().st_ino == original_claim_inode
+    else:
+        assert not moved_claim_path.exists()
     if publish_receipt_before_failure:
         assert output_path.exists()
         return
@@ -4718,7 +4948,10 @@ def test_rebind_receipt_failure_removes_renamed_claim_and_preserves_replacement(
         for entry in claim_path.parent.iterdir()
         if entry.is_file()
     }
-    assert original_claim_inode not in remaining_file_inodes
+    if move_claim_outside_parent:
+        assert original_claim_inode not in remaining_file_inodes
+    else:
+        assert original_claim_inode not in remaining_file_inodes
 
 
 def test_load_manifest_revalidates_realization_identifier(tmp_path: Path) -> None:

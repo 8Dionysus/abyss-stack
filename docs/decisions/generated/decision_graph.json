@@ -1,9 +1,9 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
   "decision_count": 137,
-  "edge_count": 3075,
+  "edge_count": 3076,
   "edge_type_counts": {
-    "CITES_SOURCE_SURFACE": 1115,
+    "CITES_SOURCE_SURFACE": 1116,
     "DATED": 137,
     "GUARDED_BY": 423,
     "HAS_STATUS": 137,
@@ -14624,6 +14624,11 @@
     {
       "source": "decision:ABYSS-STACK-D-0137",
       "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/VALIDATION.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0137",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-holder-terminal-receipt.schema.json",
       "type": "CITES_SOURCE_SURFACE"
     },
     {

@@ -123,6 +123,18 @@ revalidates its retained descriptor before unlinking, so a same-name
 replacement cannot delete a newly published marker. An exact-claim retry
 remains idempotent.
 
+The publication boundary is structural rather than a larger observation
+quorum. Ambient classification retains the root directory source version and
+the names in the classified view; projection materialization fails if that
+root changes or a projected identity was not admitted by that view. Regular
+claim publication retains the descriptor-bound content snapshot, rejects
+source-version drift, atomically exchanges the snapshot, and carries the
+snapshot and digest through the replacement receipt. Legacy migration retains
+source and target descriptors through terminal publication and the return
+handoff; a terminal mutation removes the unpublished marker and rolls the
+tokened tree back. These leases remain the proof at the final hook boundary,
+not a substitute for runtime, review, or owner acceptance.
+
 ## Rationale
 
 The denied set is an owner-authored semantic projection, not a hardcoded list of
@@ -156,6 +168,7 @@ putting actor, task, Goal, version, or path identity into policy.
 
 - `mechanics/governed-execution/parts/external-codex-agent/visible_incarnation_home.py`
 - `mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-incarnation-home.schema.json`
+- `mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-holder-terminal-receipt.schema.json`
 - `mechanics/governed-execution/parts/external-codex-agent/tests/test_visible_incarnation_home.py`
 - `mechanics/governed-execution/parts/external-codex-agent/README.md`
 - `mechanics/governed-execution/parts/external-codex-agent/CONTRACT.md`
