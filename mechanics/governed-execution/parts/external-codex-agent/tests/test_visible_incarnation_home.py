@@ -4237,6 +4237,119 @@ def test_rebind_receipt_binds_holder_environment_and_manifest_snapshot(
         )
 
 
+def test_rebind_receipt_failure_removes_renamed_claim_and_preserves_replacement(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    reentry_path, reentry, context = _holder_loss_reentry_fixture(tmp_path)
+    holder_pid = os.getpid()
+    terminal_pid = 202
+    reentry["current_holder"] = {"pid": holder_pid, "start_ticks": 1001}
+    reentry_path.write_bytes(MODULE.canonical_bytes(reentry) + b"\n")
+
+    context_path = tmp_path / "binding-context.json"
+    context_path.write_bytes(MODULE.canonical_bytes(context))
+    ambient = tmp_path / "ambient"
+    runtime_root = Path(context["runtime_state_root"])
+    ambient.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    manifest = MODULE.prepare_home(
+        ambient_home=ambient,
+        realization_path=_realization(tmp_path / "realization.json"),
+        runtime_root=runtime_root,
+        binding_context=context,
+    )
+    manifest_path = Path(manifest["codex_home"]).parent / "incarnation-home.json"
+    claim_path = manifest_path.parent / MODULE.HOLDER_CLAIM_FILE_NAME
+    assert not claim_path.exists()
+
+    executable = Path("/proc/self/exe").resolve()
+    executable_digest = MODULE.sha256_bytes(executable.read_bytes())
+    holder_argv = [str(executable), "exec"]
+    output_path = tmp_path / "rebound-holder.json"
+
+    monkeypatch.setenv("CODEX_HOME", str(tmp_path / "wrong-ambient"))
+    monkeypatch.setattr(MODULE, "_descends_from", lambda *_: True)
+    monkeypatch.setattr(MODULE, "_proc_identity_state", lambda *_: "live")
+    monkeypatch.setattr(
+        MODULE,
+        "_proc_parent_pid",
+        lambda pid: terminal_pid if pid == holder_pid else 1,
+    )
+    monkeypatch.setattr(
+        MODULE,
+        "_proc_start_ticks",
+        lambda pid: {holder_pid: 1001, terminal_pid: 2002}[pid],
+    )
+    monkeypatch.setattr(MODULE, "_proc_comm", lambda _pid: "kitty")
+    monkeypatch.setattr(
+        MODULE,
+        "_kitty_ancestor",
+        lambda _pid: (terminal_pid, 2002, ["/usr/bin/kitty", "--title", "holder"]),
+    )
+    monkeypatch.setattr(MODULE, "_kitty_dedication", lambda **_: ("1", True))
+    monkeypatch.setattr(
+        MODULE,
+        "_proc_environ",
+        lambda _pid: {
+            "CODEX_HOME": str(manifest["codex_home"]),
+            "PATH": "/usr/bin:/bin",
+        },
+    )
+    monkeypatch.setattr(MODULE, "_proc_argv", lambda _pid: holder_argv)
+    monkeypatch.setattr(MODULE, "_proc_exe_digest", lambda _pid: executable_digest)
+
+    original_claim_inode: int | None = None
+    moved_claim_path = claim_path.with_name("moved-holder-claim.json")
+    replacement_bytes = b"replacement-at-claim-path\n"
+    original_write_new_json = MODULE._write_new_json
+
+    def fail_replacement_receipt(
+        path: Path,
+        value: dict[str, object],
+        label: str,
+        *,
+        ambient_identities: set[tuple[int, int]] | None = None,
+    ) -> None:
+        nonlocal original_claim_inode
+        if label == "replacement holder terminal receipt":
+            original_claim_inode = claim_path.stat().st_ino
+            claim_path.rename(moved_claim_path)
+            claim_path.write_bytes(replacement_bytes)
+            claim_path.chmod(0o640)
+            raise MODULE.IncarnationHomeError("synthetic receipt publication failure")
+        original_write_new_json(
+            path,
+            value,
+            label,
+            ambient_identities=ambient_identities,
+        )
+
+    monkeypatch.setattr(MODULE, "_write_new_json", fail_replacement_receipt)
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="synthetic receipt publication failure",
+    ):
+        MODULE._rebind_replacement_holder_receipt(
+            receipt_path=output_path,
+            holder_loss_reentry_path=reentry_path,
+            binding_context_path=context_path,
+            manifest_path=manifest_path,
+            codex_executable_path=executable,
+        )
+
+    assert original_claim_inode is not None
+    assert claim_path.read_bytes() == replacement_bytes
+    assert stat.S_IMODE(claim_path.stat().st_mode) == 0o640
+    assert not moved_claim_path.exists()
+    assert not output_path.exists()
+    remaining_file_inodes = {
+        entry.stat().st_ino
+        for entry in claim_path.parent.iterdir()
+        if entry.is_file()
+    }
+    assert original_claim_inode not in remaining_file_inodes
+
+
 def test_load_manifest_revalidates_realization_identifier(tmp_path: Path) -> None:
     ambient = tmp_path / "ambient"
     runtime_root = tmp_path / "runtime"

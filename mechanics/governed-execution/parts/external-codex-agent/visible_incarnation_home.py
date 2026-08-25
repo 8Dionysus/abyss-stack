@@ -2202,6 +2202,115 @@ def _remove_staged_file_at(
                 os.close(quarantine_fd)
 
 
+def _retained_regular_file_names(
+    parent_fd: int,
+    descriptor: int,
+    label: str,
+) -> list[str]:
+    """Find the one directory entry still linked to a retained file inode."""
+
+    try:
+        retained = os.fstat(descriptor)
+    except OSError as exc:
+        raise IncarnationHomeError(
+            f"{label} retained inode cannot be inspected"
+        ) from exc
+    if not stat.S_ISREG(retained.st_mode) or retained.st_nlink != 1:
+        raise IncarnationHomeError(
+            f"{label} retained inode is not an isolated regular file"
+        )
+    try:
+        names = sorted(os.listdir(parent_fd))
+    except OSError as exc:
+        raise IncarnationHomeError(
+            f"{label} retained inode cannot be located"
+        ) from exc
+    matches: list[str] = []
+    for name in names:
+        try:
+            observed = os.lstat(name, dir_fd=parent_fd)
+        except FileNotFoundError:
+            continue
+        except OSError as exc:
+            raise IncarnationHomeError(
+                f"{label} retained inode cannot be revalidated"
+            ) from exc
+        if (
+            observed.st_dev,
+            observed.st_ino,
+            observed.st_mode,
+        ) == (
+            retained.st_dev,
+            retained.st_ino,
+            retained.st_mode,
+        ):
+            matches.append(name)
+    return matches
+
+
+def _remove_retained_regular_file_at(
+    parent_fd: int,
+    descriptor: int,
+    label: str,
+) -> None:
+    """Retire a regular inode even when its original pathname was replaced.
+
+    The retained descriptor is the authority.  The parent directory is only
+    enumerated to rediscover a name for that exact inode; every candidate is
+    then quarantined and compared to the descriptor before unlinking.  A race
+    can therefore preserve a replacement and be retried against the moved
+    retained inode instead of falling back to a pathname unlink.
+    """
+
+    for attempt in range(8):
+        try:
+            retained = os.fstat(descriptor)
+        except OSError as exc:
+            raise IncarnationHomeError(
+                f"{label} retained inode cannot be inspected"
+            ) from exc
+        if retained.st_nlink == 0:
+            return
+        matches = _retained_regular_file_names(parent_fd, descriptor, label)
+        if len(matches) != 1:
+            if not matches:
+                detail = "has no discoverable pathname"
+            else:
+                detail = "has multiple discoverable pathnames"
+            raise IncarnationHomeError(f"{label} retained inode {detail}")
+        try:
+            _remove_staged_file_at(
+                parent_fd,
+                matches[0],
+                descriptor,
+                label,
+                require_unlinked=True,
+            )
+        except IncarnationHomeError:
+            try:
+                if os.fstat(descriptor).st_nlink == 0:
+                    return
+            except OSError as exc:
+                raise IncarnationHomeError(
+                    f"{label} retained inode cannot be checked after race"
+                ) from exc
+            if attempt == 7:
+                raise
+            continue
+        try:
+            remaining = os.fstat(descriptor)
+        except OSError as exc:
+            raise IncarnationHomeError(
+                f"{label} retained inode cannot be checked after cleanup"
+            ) from exc
+        if remaining.st_nlink == 0:
+            return
+        if attempt == 7:
+            raise IncarnationHomeError(
+                f"{label} retained inode remained linked after cleanup"
+            )
+
+
 def _recover_abandoned_staged_files(
     codex_home: Path,
     *,
@@ -5224,77 +5333,73 @@ def _restore_holder_claim_snapshot(
     before_raw: bytes | None,
     after_digest: str,
     ambient_identities: set[tuple[int, int]],
+    retained_parent_fd: int | None = None,
+    retained_descriptor: int | None = None,
+    retained_initial: os.stat_result | None = None,
 ) -> None:
-    """Restore a transferred claim only while its published inode is retained."""
+    """Restore or retire a claim through its retained inode descriptor."""
 
     if SHA256_DIGEST_PATTERN.fullmatch(after_digest) is None:
         raise IncarnationHomeError("holder claim rollback digest is invalid")
-    parent_fd = _open_pinned_parent_directory(claim_path, "holder claim rollback")
-    descriptor: int | None = None
-    staged_descriptor: int | None = None
+    owns_parent_fd = retained_parent_fd is None
+    parent_fd = (
+        _open_pinned_parent_directory(claim_path, "holder claim rollback")
+        if retained_parent_fd is None
+        else retained_parent_fd
+    )
+    owns_descriptor = retained_descriptor is None
+    descriptor: int | None = retained_descriptor
+    opened = retained_initial
     try:
+        if descriptor is None:
+            descriptor, opened = _open_stable_regular_file_at(
+                parent_fd,
+                claim_path.name,
+                label="holder claim rollback",
+                ambient_identities=ambient_identities,
+            )
+        if opened is None:
+            raise IncarnationHomeError(
+                "holder claim rollback retained inode is not bound"
+            )
         try:
-            observed = os.lstat(claim_path.name, dir_fd=parent_fd)
+            retained = os.fstat(descriptor)
         except OSError as exc:
             raise IncarnationHomeError(
-                "holder claim rollback target cannot be inspected"
+                "holder claim rollback retained inode cannot be inspected"
             ) from exc
-        if stat.S_ISLNK(observed.st_mode) or not stat.S_ISREG(observed.st_mode):
+        if (
+            (retained.st_dev, retained.st_ino, retained.st_mode)
+            != (opened.st_dev, opened.st_ino, opened.st_mode)
+            or not stat.S_ISREG(retained.st_mode)
+            or retained.st_nlink != 1
+            or (retained.st_dev, retained.st_ino) in ambient_identities
+        ):
             raise IncarnationHomeError(
-                "holder claim rollback target is not a regular file"
+                "holder claim rollback retained inode changed"
             )
-        descriptor, opened = _open_stable_regular_file_at(
-            parent_fd,
-            claim_path.name,
-            label="holder claim rollback",
-            ambient_identities=ambient_identities,
-        )
         current_raw = _read_descriptor_bytes(descriptor, str(claim_path))
         if sha256_bytes(current_raw) != after_digest:
             raise IncarnationHomeError("holder claim changed before rollback")
-        _revalidate_regular_file_at(
-            parent_fd,
-            claim_path.name,
-            descriptor,
-            opened,
-            label="holder claim rollback",
-            ambient_identities=ambient_identities,
-        )
         if before_raw is None:
-            try:
-                os.unlink(claim_path.name, dir_fd=parent_fd)
-            except OSError as exc:
-                raise IncarnationHomeError(
-                    "holder claim could not be rolled back"
-                ) from exc
-        else:
-            staged_descriptor = _create_unnameable_temporary_file_at(
-                parent_fd, "holder claim rollback"
+            _remove_retained_regular_file_at(
+                parent_fd,
+                descriptor,
+                "holder claim rollback",
             )
+        else:
             _write_descriptor_exact(
-                staged_descriptor,
+                descriptor,
                 before_raw,
                 0o600,
                 "holder claim rollback",
             )
-            _replace_with_staged_file_at(
-                parent_fd=parent_fd,
-                target_name=claim_path.name,
-                target_descriptor=descriptor,
-                target_initial=opened,
-                staged_descriptor=staged_descriptor,
-                label="holder claim rollback",
-                ambient_identities=ambient_identities,
-            )
-            os.close(staged_descriptor)
-            staged_descriptor = None
         os.fsync(parent_fd)
     finally:
-        if staged_descriptor is not None:
-            os.close(staged_descriptor)
-        if descriptor is not None:
+        if owns_descriptor and descriptor is not None:
             os.close(descriptor)
-        os.close(parent_fd)
+        if owns_parent_fd:
+            os.close(parent_fd)
 
 
 def _existing_rebind_receipt(
@@ -6010,7 +6115,20 @@ def _rebind_replacement_holder_receipt(
         )
         if existing is not None:
             return existing
+        claim_parent_fd: int | None = None
+        claim_descriptor: int | None = None
+        claim_initial: os.stat_result | None = None
         try:
+            claim_parent_fd = _open_pinned_parent_directory(
+                claim_path, "holder claim rollback"
+            )
+            claim_descriptor, claim_initial = _open_stable_regular_file_at(
+                claim_parent_fd,
+                claim_path.name,
+                label="holder claim rollback",
+                ambient_identities=ambient_identities,
+                writable=True,
+            )
             _write_new_json(
                 receipt_path,
                 receipt,
@@ -6024,12 +6142,20 @@ def _rebind_replacement_holder_receipt(
                     before_raw=before_claim_raw,
                     after_digest=after_claim_digest,
                     ambient_identities=ambient_identities,
+                    retained_parent_fd=claim_parent_fd,
+                    retained_descriptor=claim_descriptor,
+                    retained_initial=claim_initial,
                 )
             except BaseException as rollback_exc:
                 raise IncarnationHomeError(
                     "holder claim rollback became uncertain"
                 ) from rollback_exc
             raise
+        finally:
+            if claim_descriptor is not None:
+                os.close(claim_descriptor)
+            if claim_parent_fd is not None:
+                os.close(claim_parent_fd)
         return receipt
 
 
