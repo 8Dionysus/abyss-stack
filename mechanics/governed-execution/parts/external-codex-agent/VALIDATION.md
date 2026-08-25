@@ -102,6 +102,13 @@ target with divergent state is rejected before copy or mutation.
 Migration also binds each copied source tree row to the retained inode's
 kernel-owned version (including size, mtime, and ctime) and rejects version
 drift before publication, including a deterministic A-B-A source write.
+The final publication lease retains the ambient and target roots through the
+owner-token handoff, and migration retains its source and target roots while
+walking descendants relative to owned parents; descendant descriptors close
+after each subtree, so descriptor ownership is bounded by tree depth rather
+than node count. Receipt publication also performs a distinct retained-claim
+byte binding after the ordinary return assertion, while existing receipt
+snapshots are validated before any claim transfer.
 Provenance-bearing v2 is rejected even on the non-canonical loader route because
 the public v2 branch forbids that field. A multiply linked preparation lock is
 rejected before any

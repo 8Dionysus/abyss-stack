@@ -129,9 +129,17 @@ the names in the classified view; projection materialization fails if that
 root changes or a projected identity was not admitted by that view. Regular
 claim publication retains the descriptor-bound content snapshot, rejects
 source-version drift, atomically exchanges the snapshot, and carries the
-snapshot and digest through the replacement receipt. Legacy migration retains
-source and target descriptors through terminal publication and the return
-handoff; a terminal mutation removes the unpublished marker and rolls the
+snapshot and digest through the replacement receipt. The receipt return
+handoff performs a distinct descriptor-bound byte and pathname check after the
+ordinary retained-file assertion, so the canonical claim and receipt snapshot
+remain one binding through success. Preparation retains the ambient and target
+root descriptors through marker publication and validates the classified
+projection again at the preparation-owner handoff before retiring the owner
+token. Legacy migration retains source and target root descriptors through
+terminal publication and the return handoff; descendant identities and content
+digests are traversed relative to those roots with descriptors closed after
+each subtree, so descriptor ownership is bounded by tree depth rather than
+node count. A terminal mutation removes the unpublished marker and rolls the
 tokened tree back. These leases remain the proof at the final hook boundary,
 not a substitute for runtime, review, or owner acceptance.
 

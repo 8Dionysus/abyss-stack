@@ -6,6 +6,7 @@ import importlib.util
 import json
 import multiprocessing as mp
 import os
+import resource
 import shutil
 import socket
 import stat
@@ -657,6 +658,57 @@ def test_late_ambient_inode_inserted_after_snapshot_cannot_be_relocated_into_hom
     assert moved
     assert identity_calls >= 3
     assert not late_entry.exists()
+    assert not list(runtime_root.glob("sha256-*/holder-sha256-*/incarnation-home.json"))
+
+
+def test_late_ambient_inode_after_manifest_publication_fails_before_return(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The owner handoff must still own the ambient view after marker publication."""
+
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    late_name = _unknown_fixture_name(tmp_path)
+    late_entry = ambient / late_name
+    realization = _realization(tmp_path / "realization.json")
+    original_write_exact = MODULE._write_exact
+    moved = False
+
+    def mutate_after_manifest_publication(
+        path: Path,
+        content: bytes,
+        mode: int,
+        *,
+        ambient_identities: set[tuple[int, int]] | None = None,
+    ) -> None:
+        nonlocal moved
+        original_write_exact(
+            path,
+            content,
+            mode,
+            ambient_identities=ambient_identities,
+        )
+        if path.name == "incarnation-home.json" and not moved:
+            late_entry.write_bytes(b"late-terminal-secret")
+            late_entry.rename(path.parent / "codex-home" / late_name)
+            moved = True
+
+    monkeypatch.setattr(MODULE, "_write_exact", mutate_after_manifest_publication)
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="ambient projection changed during preparation owner handoff",
+    ):
+        _ORIGINAL_PREPARE_HOME(
+            ambient_home=ambient,
+            realization_path=realization,
+            runtime_root=runtime_root,
+            binding_context=_holder_binding_context(runtime_root, "terminal-f1"),
+        )
+
+    assert moved
     assert not list(runtime_root.glob("sha256-*/holder-sha256-*/incarnation-home.json"))
 
 
@@ -2215,8 +2267,15 @@ def test_legacy_migration_rejects_target_bytes_changed_after_terminal_source_che
     assert target_markers == []
 
 
+@pytest.mark.parametrize(
+    "terminal_stage",
+    ["final publication validation", "terminal migration return"],
+    ids=["after-final-validation", "after-terminal-return-validation"],
+)
 def test_legacy_migration_lease_rechecks_target_at_terminal_return(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    terminal_stage: str,
 ) -> None:
     """Challenge F3 ownership after terminal publication and before return."""
 
@@ -2237,7 +2296,7 @@ def test_legacy_migration_lease_rechecks_target_at_terminal_return(
     ) -> None:
         nonlocal raced
         original_validate(lease, stage)  # type: ignore[arg-type]
-        if stage == "final publication validation" and not raced:
+        if stage == terminal_stage and not raced:
             roots = getattr(lease, "_roots")
             target_root = next(
                 Path(str(root["path"]))
@@ -2254,7 +2313,10 @@ def test_legacy_migration_lease_rechecks_target_at_terminal_return(
     )
     with pytest.raises(
         MODULE.IncarnationHomeError,
-        match="legacy migration publication ownership changed during terminal migration return",
+        match=(
+            "legacy migration publication ownership changed during "
+            "(terminal migration return|preparation owner handoff)"
+        ),
     ):
         MODULE.migrate_legacy_home(
             legacy_manifest_path=legacy_manifest_path,
@@ -2268,6 +2330,47 @@ def test_legacy_migration_lease_rechecks_target_at_terminal_return(
         if path != legacy_manifest_path
     ]
     assert target_markers == []
+
+
+def test_legacy_migration_lease_uses_bounded_descriptors_for_large_tree(
+    tmp_path: Path,
+) -> None:
+    """A flat migrated tree must not retain one descriptor per node."""
+
+    (
+        ambient,
+        _runtime_root,
+        _realization_path,
+        legacy_manifest_path,
+        _context,
+        _denied_name,
+    ) = _legacy_migration_fixture(tmp_path, "migration-bounded-descriptors")
+    legacy_home = legacy_manifest_path.parent / "codex-home"
+    cache = legacy_home / "cache"
+    for index in range(256):
+        (cache / f"entry-{index}").write_bytes(f"entry-{index}".encode("ascii"))
+    target_home = tmp_path / "target-home"
+    target_home.mkdir()
+    names = sorted(MODULE.LOCAL_NAMES - {"config.toml"})
+    ambient_identities = MODULE._ambient_inode_identities(ambient)
+    soft_limit, hard_limit = resource.getrlimit(resource.RLIMIT_NOFILE)
+    if hard_limit < 128:
+        pytest.skip("host file-descriptor hard limit is below the bounded fixture")
+    lease = None
+    try:
+        resource.setrlimit(resource.RLIMIT_NOFILE, (128, hard_limit))
+        lease = MODULE._MigrationPublicationLease(
+            source_home=legacy_home,
+            target_home=target_home,
+            names=names,
+            ambient_identities=ambient_identities,
+        )
+        assert len(lease._fds) == 2
+        assert len(lease._nodes) >= 256
+    finally:
+        if lease is not None:
+            lease.close()
+        resource.setrlimit(resource.RLIMIT_NOFILE, (soft_limit, hard_limit))
 
 
 def test_legacy_migration_rejects_child_inserted_after_directory_listing(
@@ -4628,9 +4731,35 @@ def test_rebind_receipt_binds_holder_environment_and_manifest_snapshot(
             binding_context=context,
         )
 
+    tampered_claim = json.loads(claim_path.read_text(encoding="utf-8"))
+    other_receipt = (tmp_path / "other-holder.json").resolve()
+    tampered_claim["holder_receipt"] = str(other_receipt)
+    claim_path.write_bytes(MODULE.canonical_bytes(tampered_claim))
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="replacement holder receipt claim snapshot has drifted",
+    ):
+        MODULE._rebind_replacement_holder_receipt(
+            receipt_path=output_path,
+            holder_loss_reentry_path=reentry_path,
+            binding_context_path=context_path,
+            manifest_path=manifest_path,
+            codex_executable_path=executable,
+        )
+    assert json.loads(claim_path.read_text(encoding="utf-8"))["holder_receipt"] == str(
+        other_receipt
+    )
 
+
+@pytest.mark.parametrize(
+    "mutation_point",
+    ["after-digest-read", "after-return-assertion"],
+    ids=["after-digest-read", "after-return-assertion"],
+)
 def test_rebind_claim_mutation_after_digest_read_fails_before_receipt_return(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    mutation_point: str,
 ) -> None:
     """Regression for the exact F2 same-inode claim mutation adversary."""
 
@@ -4704,25 +4833,64 @@ def test_rebind_claim_mutation_after_digest_read_fails_before_receipt_return(
     mutated = False
     mutation_inode: int | None = None
 
-    def mutate_after_second_claim_digest_read(descriptor: int, label: str) -> bytes:
-        nonlocal claim_digest_reads, mutated, mutation_inode
-        raw = original_read(descriptor, label)
-        if "holder claim" in label or label.endswith(MODULE.HOLDER_CLAIM_FILE_NAME):
-            claim_digest_reads += 1
-            if claim_digest_reads == 2:
+    if mutation_point == "after-digest-read":
+
+        def mutate_after_second_claim_digest_read(
+            descriptor: int, label: str
+        ) -> bytes:
+            nonlocal claim_digest_reads, mutated, mutation_inode
+            raw = original_read(descriptor, label)
+            if "holder claim" in label or label.endswith(MODULE.HOLDER_CLAIM_FILE_NAME):
+                claim_digest_reads += 1
+                if claim_digest_reads == 2:
+                    mutation_inode = claim_path.stat().st_ino
+                    claim_path.write_bytes(b"unrelated-claim-bytes")
+                    mutated = True
+            return raw
+
+        monkeypatch.setattr(
+            MODULE,
+            "_read_descriptor_bytes",
+            mutate_after_second_claim_digest_read,
+        )
+    else:
+        original_assert = MODULE._assert_retained_regular_file_at
+
+        def mutate_after_return_assertion(
+            parent_fd: int,
+            name: str,
+            descriptor: int,
+            initial: os.stat_result,
+            *,
+            label: str,
+            ambient_identities: set[tuple[int, int]],
+        ) -> None:
+            nonlocal mutated, mutation_inode
+            original_assert(
+                parent_fd,
+                name,
+                descriptor,
+                initial,
+                label=label,
+                ambient_identities=ambient_identities,
+            )
+            if label == "holder claim changed at receipt return" and not mutated:
                 mutation_inode = claim_path.stat().st_ino
                 claim_path.write_bytes(b"unrelated-claim-bytes")
                 mutated = True
-        return raw
 
-    monkeypatch.setattr(
-        MODULE,
-        "_read_descriptor_bytes",
-        mutate_after_second_claim_digest_read,
-    )
+        monkeypatch.setattr(
+            MODULE,
+            "_assert_retained_regular_file_at",
+            mutate_after_return_assertion,
+        )
     with pytest.raises(
         MODULE.IncarnationHomeError,
-        match="holder claim publication changed before mutation",
+        match=(
+            "holder claim publication changed before mutation"
+            if mutation_point == "after-digest-read"
+            else "holder claim changed at receipt return"
+        ),
     ):
         MODULE._rebind_replacement_holder_receipt(
             receipt_path=output_path,
@@ -4732,10 +4900,14 @@ def test_rebind_claim_mutation_after_digest_read_fails_before_receipt_return(
             codex_executable_path=executable,
         )
 
-    assert claim_digest_reads >= 2
+    if mutation_point == "after-digest-read":
+        assert claim_digest_reads >= 2
     assert mutated
     assert mutation_inode == claim_path.stat().st_ino
-    assert not output_path.exists()
+    if mutation_point == "after-digest-read":
+        assert not output_path.exists()
+    else:
+        assert output_path.exists()
     restored_claim = json.loads(claim_path.read_text(encoding="utf-8"))
     assert restored_claim["holder_receipt"] == str(original_receipt_path.resolve())
 
