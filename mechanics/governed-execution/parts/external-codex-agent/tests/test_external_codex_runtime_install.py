@@ -65,6 +65,10 @@ def make_sources(tmp_path: Path) -> tuple[Path, Path, Path, Path]:
         "SCHEMA_VERSION = 'fixture'\n",
         encoding="utf-8",
     )
+    (part / "external_codex_landing_effect.py").write_text(
+        "PASS = True\n",
+        encoding="utf-8",
+    )
     (part / "bind_external_actor_launch.py").write_text(
         "import aoa_sdk\n"
         "with open('/dev/null', 'rb+') as null:\n"

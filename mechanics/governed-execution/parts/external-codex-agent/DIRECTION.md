@@ -17,6 +17,16 @@ real load; bounded repo-write preparation follows with independent review.
 Commit, push, merge, release, publication, and general network effects remain
 outside the initial contour.
 
+The provider-neutral governed landing-effect ABI now gives a future owner
+executor one exact, expiring grant shape for commit, push, pull-request, or
+merge duties. The grant repeats the exact Goal, holder/incarnation,
+repository/revision, branch or pull-request target, effect set, independent
+review, and reviewed return posture. Its admission rejects absent, stale,
+wider, contradictory, and drifted artifacts. It is intentionally declarative:
+the current runtime profile still has `external_effects=false`, and command
+classification still retains all ten forbidden effects, so this ABI does not
+perform or enable a landing effect.
+
 The initial write ABI now keeps separate model-neutral aliases for landing and
 structured owner-duty canaries. This preserves exact realization binding while
 leaving role selection and domain meaning upstream; it does not fork the

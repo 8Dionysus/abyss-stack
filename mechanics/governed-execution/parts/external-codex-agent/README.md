@@ -166,6 +166,15 @@ and replay only through their matching legacy wake reservation. A retry after a 
 - requires every task to preserve the complete runtime-wide forbidden-effect
   set, while terminal classification independently applies that set instead of
   trusting a caller-supplied subset;
+- carries the provider-neutral governed landing-effect grant ABI in
+  `external_codex_landing_effect.py` and
+  `schemas/external-codex-governed-landing-effect-grant.schema.json`. Exact
+  admission binds Goal, holder/incarnation, repository revision, branch or
+  pull-request target, an exact landing-effect set, independent review, and
+  reviewed return posture. Missing, stale, wider, contradictory, or
+  artifact-drifted grants fail closed. This is an owner-qualified admission
+  seam only: current profiles keep all external effects disabled and the
+  command observer's ten-effect forbidden closure unchanged;
 - keeps the SDK `summon-request-v4` as the typed active
   `AgentIncarnationBinding.task_request_ref`, while binding the richer
   runtime-owner task separately as an exact snapshot/continuation-pinned

@@ -67,6 +67,15 @@ from external_codex_nested_evidence import (  # noqa: E402
     build_nested_evidence_namespace,
     nested_evidence_namespace_digest,
 )
+from external_codex_landing_effect import (  # noqa: E402
+    LANDING_EFFECTS as _LANDING_EFFECTS,
+    LandingEffectGrantError as _LandingEffectGrantError,
+    admit_landing_effect_grant as _admit_landing_effect_grant,
+    landing_effect_grant_allows as _landing_effect_grant_allows,
+    load_landing_effect_grant as _load_landing_effect_grant,
+    validate_landing_effect_grant as _validate_landing_effect_grant,
+    RUNTIME_WIDE_FORBIDDEN_EFFECTS as _LANDING_RUNTIME_WIDE_FORBIDDEN_EFFECTS,
+)
 
 PROFILE_PATH = PART_ROOT / "runtime-profile.v1.json"
 SUPERVISOR_PATH = PART_ROOT / "external_codex_supervisor.py"
@@ -110,6 +119,10 @@ ACTOR_MANIFEST_SCHEMA_PATH = (
     SCHEMA_ROOT / "external-codex-actor-workspace-manifest.schema.json"
 )
 ACTOR_DELTA_SCHEMA_PATH = SCHEMA_ROOT / "external-codex-actor-delta.schema.json"
+LANDING_EFFECT_GRANT_SCHEMA_PATH = (
+    SCHEMA_ROOT
+    / "external-codex-governed-landing-effect-grant.schema.json"
+)
 REVIEW_SEED_ENVELOPE_SCHEMA_PATH = (
     SCHEMA_ROOT / "external-codex-review-seed-envelope.schema.json"
 )
@@ -706,20 +719,13 @@ SECRET_FILE_TOKEN_RE = re.compile(
     r"password|passwd|secret|secrets|token|tokens)(?:[._-]|$)",
     re.I,
 )
-RUNTIME_WIDE_FORBIDDEN_EFFECTS = frozenset(
-    {
-        "commit",
-        "push",
-        "pull_request",
-        "merge",
-        "tag",
-        "release",
-        "publication",
-        "service_mutation",
-        "secret_access",
-        "global_config_mutation",
-    }
-)
+LANDING_EFFECTS = _LANDING_EFFECTS
+LandingEffectGrantError = _LandingEffectGrantError
+admit_landing_effect_grant = _admit_landing_effect_grant
+landing_effect_grant_allows = _landing_effect_grant_allows
+load_landing_effect_grant = _load_landing_effect_grant
+validate_landing_effect_grant = _validate_landing_effect_grant
+RUNTIME_WIDE_FORBIDDEN_EFFECTS = _LANDING_RUNTIME_WIDE_FORBIDDEN_EFFECTS
 OPAQUE_EFFECT_EXECUTABLES = {
     "awk",
     "deno",

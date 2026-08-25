@@ -716,6 +716,44 @@ All aliases remain no-MCP, no-network, and no-external-effect. The alias must
 match the realization and incarnation binding exactly; it does not choose the
 task family, selected role chain, domain procedure, or model-fit outcome.
 
+### Governed landing-effect grant ABI
+
+The provider-neutral landing ABI is
+`schemas/external-codex-governed-landing-effect-grant.schema.json`, with its
+small admission implementation in `external_codex_landing_effect.py`. A grant
+is a separate owner artifact, not a model or provider identity. It binds all of
+these exact relations in one document:
+
+- `goal_ref` and `holder_ref`, including the holder's exact incarnation;
+- `repository.repository_id` and its exact `revision`;
+- either one exact branch target or one exact pull-request target;
+- an exact set drawn only from `commit`, `push`, `pull_request`, and `merge`;
+- an independent-review binding whose status is approved; and
+- a `return_posture` with the exact return owner, route, review-required status,
+  and wake condition.
+
+`grant_ref.artifact_digest` is the canonical semantic grant digest computed
+with that one self-referential digest field set to the zero digest. Admission
+also requires the exact grant artifact bytes and may bind an external byte
+digest when a controller has one. This keeps the grant identity content-bound
+without inventing a hash fixed point.
+
+`admit_landing_effect_grant` is fail-closed: absent, malformed, stale,
+future-dated, review-pending, artifact-drifted, contradictory, narrower, or
+wider grants are rejected. The request passed to it must repeat the exact
+Goal, holder, repository, target, review, return, and effect-set relations;
+there is no wildcard or subset match. `landing_effect_grant_allows` is only a
+boolean read of that admission result.
+
+This ABI does not lower `RUNTIME_WIDE_FORBIDDEN_EFFECTS`, does not make
+`external_effects` true in any current profile, and does not authorize a
+model-issued shell, Git, provider, or network command. The existing command
+observer therefore continues to reject all ten forbidden effects for ordinary
+actors and for this first runtime contour. A future effect executor may use
+the exact admission only after a separately owned runtime profile and
+owner-qualified execution route consume the same observed target; the grant
+alone cannot perform commit, push, pull-request, or merge.
+
 Codex runs beneath a Linux supervisor that owns a separate process group but
 does not create an outer PID or network namespace. Inference adds only the
 rootless user+mount contour described above. Live proof must show that this
