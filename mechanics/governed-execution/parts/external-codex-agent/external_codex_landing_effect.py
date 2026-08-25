@@ -146,10 +146,22 @@ def _reject_duplicate_json_keys(
 
 
 def _parse_json_bytes(raw: bytes) -> object:
-    return json.loads(
-        raw.decode("utf-8"),
-        object_pairs_hook=_reject_duplicate_json_keys,
-    )
+    text = raw.decode("utf-8")
+    try:
+        return json.loads(
+            text,
+            object_pairs_hook=_reject_duplicate_json_keys,
+        )
+    except LandingEffectGrantError:
+        raise
+    except json.JSONDecodeError:
+        raise
+    except ValueError as exc:
+        # CPython raises a plain ValueError when an integer exceeds its
+        # configured digit limit, even though the input is being parsed as
+        # JSON.  Keep every parser failure on the existing JSONDecodeError
+        # path so callers retain their typed artifact/request denial.
+        raise json.JSONDecodeError("invalid JSON value", text, 0) from exc
 
 
 def _copy_json(value: Mapping[str, Any]) -> dict[str, Any]:

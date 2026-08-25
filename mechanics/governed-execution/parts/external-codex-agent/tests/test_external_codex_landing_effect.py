@@ -403,6 +403,34 @@ def test_loader_rejects_oversized_artifacts_before_json_parse(tmp_path: Path) ->
     assert exc.value.code == "landing_effect_grant_too_large"
 
 
+def test_large_json_integer_is_a_typed_artifact_denial(tmp_path: Path) -> None:
+    integer_limit = sys.get_int_max_str_digits()
+    if integer_limit == 0:
+        pytest.skip("this Python has no JSON integer digit limit")
+
+    grant = _grant()
+    raw = _raw(grant).replace(
+        b'"grant_id": "grant:landing-fixture"',
+        b'"grant_id": ' + (b"9" * (integer_limit + 1)),
+    )
+    path = tmp_path / "large-integer-grant.json"
+    path.write_bytes(raw)
+
+    with pytest.raises(LandingEffectGrantError) as load_exc:
+        load_landing_effect_grant(path, expected_digest=_raw_digest(raw))
+    assert load_exc.value.code == "landing_effect_grant_unavailable"
+
+    with pytest.raises(LandingEffectGrantError) as direct_exc:
+        admit_landing_effect_grant(
+            grant,
+            _request(grant),
+            grant_raw=raw,
+            expected_artifact_digest=_raw_digest(raw),
+            at=AT,
+        )
+    assert direct_exc.value.code == "landing_effect_grant_artifact_invalid"
+
+
 def test_direct_admission_rejects_oversized_artifact_before_json_parse() -> None:
     grant = _grant()
     base_raw = _raw(grant)
