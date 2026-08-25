@@ -69,6 +69,41 @@ def _canonical_bytes(value: object) -> bytes:
         ) from exc
 
 
+def _bounded_canonical_bytes(value: object, *, limit: int) -> bytes:
+    """Canonicalize JSON data without materializing more than the bound."""
+
+    encoder = json.JSONEncoder(
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    chunks: list[bytes] = []
+    total = 0
+    try:
+        for chunk in encoder.iterencode(value):
+            remaining = limit - total
+            if len(chunk) > remaining:
+                raise LandingEffectGrantError(
+                    "landing_effect_grant_too_large",
+                    "grant mapping exceeds the bounded admission size",
+                )
+            encoded = chunk.encode("utf-8")
+            if len(encoded) > remaining:
+                raise LandingEffectGrantError(
+                    "landing_effect_grant_too_large",
+                    "grant mapping exceeds the bounded admission size",
+                )
+            chunks.append(encoded)
+            total += len(encoded)
+    except LandingEffectGrantError:
+        raise
+    except (RecursionError, TypeError, UnicodeError, ValueError, OverflowError) as exc:
+        raise LandingEffectGrantError(
+            "landing_effect_grant_not_json", "grant is not canonical JSON data"
+        ) from exc
+    return b"".join(chunks)
+
+
 def _digest_bytes(raw: bytes) -> str:
     return "sha256:" + hashlib.sha256(raw).hexdigest()
 
@@ -443,8 +478,16 @@ def admit_landing_effect_grant(
         raise LandingEffectGrantError(
             "landing_effect_grant_absent", "no landing-effect grant was supplied"
         )
-    admitted = validate_landing_effect_grant(grant)
     if not isinstance(grant_raw, bytes):
+        # Preserve the normalized direct-mapping errors for callers that have
+        # not supplied an artifact, while still bounding the untrusted object
+        # before schema validation can copy and hash it.
+        if not isinstance(grant, Mapping):
+            raise LandingEffectGrantError(
+                "landing_effect_grant_schema_invalid", "grant must be a JSON object"
+            )
+        _bounded_canonical_bytes(grant, limit=MAX_GRANT_BYTES)
+        validate_landing_effect_grant(grant)
         raise LandingEffectGrantError(
             "landing_effect_grant_artifact_unbound",
             "exact grant admission requires the owner artifact bytes",
@@ -460,13 +503,12 @@ def admit_landing_effect_grant(
         raise LandingEffectGrantError(
             "landing_effect_grant_artifact_invalid", "grant artifact is not UTF-8 JSON"
         ) from exc
-    if not isinstance(parsed, Mapping) or not _same_json(parsed, admitted):
+    if not isinstance(parsed, Mapping):
         raise LandingEffectGrantError(
-            "landing_effect_grant_artifact_mismatch",
-            "grant mapping differs from its supplied artifact bytes",
+            "landing_effect_grant_artifact_invalid", "grant artifact is not a JSON object"
         )
+    admitted = validate_landing_effect_grant(parsed)
     actual_digest = _digest_bytes(grant_raw)
-    semantic_digest = admitted["grant_ref"]["artifact_digest"]
     if expected_artifact_digest is None:
         raise LandingEffectGrantError(
             "landing_effect_grant_artifact_unbound",
@@ -477,6 +519,16 @@ def admit_landing_effect_grant(
             "landing_effect_grant_artifact_drift",
             "grant artifact differs from the expected digest",
         )
+    if not isinstance(grant, Mapping):
+        raise LandingEffectGrantError(
+            "landing_effect_grant_schema_invalid", "grant must be a JSON object"
+        )
+    if _bounded_canonical_bytes(grant, limit=MAX_GRANT_BYTES) != _canonical_bytes(parsed):
+        raise LandingEffectGrantError(
+            "landing_effect_grant_artifact_mismatch",
+            "grant mapping differs from its supplied artifact bytes",
+        )
+    semantic_digest = admitted["grant_ref"]["artifact_digest"]
 
     required_bindings = (
         "goal_ref",

@@ -419,6 +419,23 @@ def test_direct_admission_rejects_oversized_artifact_before_json_parse() -> None
     assert exc.value.code == "landing_effect_grant_too_large"
 
 
+def test_direct_admission_bounds_untrusted_mapping_after_artifact_validation() -> None:
+    grant = _grant()
+    raw = _raw(grant)
+    oversized_mapping = deepcopy(grant)
+    oversized_mapping["grant_id"] = "x" * (MAX_GRANT_BYTES + 1)
+
+    with pytest.raises(LandingEffectGrantError) as exc:
+        admit_landing_effect_grant(
+            oversized_mapping,
+            _request(grant),
+            grant_raw=raw,
+            expected_artifact_digest=_raw_digest(raw),
+            at=AT,
+        )
+    assert exc.value.code == "landing_effect_grant_too_large"
+
+
 def test_git_ref_validation_ignores_ambient_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     fake_git = tmp_path / "git"
     fake_git.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
