@@ -456,6 +456,7 @@ def discover_app_server_socket(
             return UnixWebSocketRpc(
                 endpoint,
                 timeout=APP_SERVER_DISCOVERY_PROBE_TIMEOUT_SECONDS,
+                deadline_seconds=APP_SERVER_DISCOVERY_PROBE_TIMEOUT_SECONDS,
             )
     else:
         factory = rpc_factory
@@ -561,9 +562,17 @@ class UnixWebSocketRpc:
     # the caller can bind the exact request to the durable reservation.
     supports_atomic_goal_transition = False
 
-    def __init__(self, path: Path, *, timeout: float = DEFAULT_TIMEOUT_SECONDS) -> None:
+    def __init__(
+        self,
+        path: Path,
+        *,
+        timeout: float = DEFAULT_TIMEOUT_SECONDS,
+        deadline_seconds: float | None = None,
+    ) -> None:
         self.path = path
         self.timeout = timeout
+        self.deadline_seconds = deadline_seconds
+        self._deadline: float | None = None
         self.socket: socket.socket | None = None
         self._buffer = b""
         self._counter = 0
@@ -583,8 +592,13 @@ class UnixWebSocketRpc:
 
     def __enter__(self) -> "UnixWebSocketRpc":
         connection = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        connection.settimeout(self.timeout)
+        self._deadline = (
+            time.monotonic() + self.deadline_seconds
+            if self.deadline_seconds is not None
+            else None
+        )
         try:
+            connection.settimeout(self._remaining_timeout())
             connection.connect(str(self.path))
             self.socket = connection
             self._handshake()
@@ -603,6 +617,15 @@ class UnixWebSocketRpc:
                 self.socket.close()
         finally:
             self.socket = None
+            self._deadline = None
+
+    def _remaining_timeout(self) -> float:
+        if self._deadline is None:
+            return self.timeout
+        remaining = self._deadline - time.monotonic()
+        if remaining <= 0:
+            raise TimeoutError("Codex app-server probe deadline exceeded")
+        return min(self.timeout, remaining)
 
     def _require_socket(self) -> socket.socket:
         if self.socket is None:
@@ -621,6 +644,7 @@ class UnixWebSocketRpc:
             remaining -= len(buffered)
         connection = self._require_socket()
         while remaining:
+            connection.settimeout(self._remaining_timeout())
             chunk = connection.recv(remaining)
             if not chunk:
                 raise ExternalCodexReturnError("Codex app-server closed the socket")
@@ -631,6 +655,7 @@ class UnixWebSocketRpc:
     def _read_until(self, marker: bytes) -> bytes:
         connection = self._require_socket()
         while marker not in self._buffer:
+            connection.settimeout(self._remaining_timeout())
             chunk = connection.recv(4096)
             if not chunk:
                 raise ExternalCodexReturnError("Codex app-server closed during handshake")
