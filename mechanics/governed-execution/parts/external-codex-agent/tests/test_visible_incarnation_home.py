@@ -187,6 +187,57 @@ def _unknown_fixture_name(seed: Path) -> str:
     return candidate
 
 
+def _legacy_migration_fixture(
+    tmp_path: Path, label: str
+) -> tuple[Path, Path, Path, Path, dict[str, str], str]:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    denied_name = _unknown_fixture_name(tmp_path)
+    (ambient / denied_name).write_bytes(b"ambient-denied-state")
+    realization = _realization(tmp_path / "realization.json")
+    realization_payload = json.loads(realization.read_text(encoding="utf-8"))
+    coordinate = MODULE._incarnation_coordinate(
+        realization_payload["model_realization_id"],
+        realization_payload["configuration_fingerprint"],
+    )
+    legacy_root = runtime_root / ("sha256-" + coordinate.removeprefix("sha256:"))
+    legacy_root.mkdir()
+    legacy_home = legacy_root / "codex-home"
+    (legacy_root / "incarnation-home.json").write_text(
+        json.dumps(
+            {
+                "ambient_codex_home": str(ambient),
+                "ambient_home_identity": MODULE._ambient_home_identity(ambient),
+                "model_realization_id": realization_payload["model_realization_id"],
+                "codex_home": str(legacy_home),
+            }
+        ),
+        encoding="utf-8",
+    )
+    legacy_manifest = _ORIGINAL_PREPARE_HOME(
+        ambient_home=ambient,
+        realization_path=realization,
+        runtime_root=runtime_root,
+    )
+    legacy_home = Path(str(legacy_manifest["codex_home"]))
+    (legacy_home / denied_name).write_bytes(b"legacy-denied-state")
+    (legacy_home / "cache" / "legacy-cache").write_bytes(b"legacy-cache")
+    (ambient / denied_name).unlink()
+    legacy_manifest_path = legacy_home.parent / "incarnation-home.json"
+    context = _holder_binding_context(runtime_root, label)
+    return (
+        ambient,
+        runtime_root,
+        realization,
+        legacy_manifest_path,
+        context,
+        denied_name,
+    )
+
+
 def _capability_grant(
     path: Path,
     *,
@@ -1876,6 +1927,147 @@ def test_explicit_legacy_migration_carries_local_state_into_typed_v3(
             binding_context=context,
         )
     assert (migrated_home / denied_name).read_bytes() == b"current-v3-state"
+
+
+def test_legacy_migration_retry_revalidates_source_version_before_acceptance(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (
+        _ambient,
+        _runtime_root,
+        _realization_path,
+        legacy_manifest_path,
+        context,
+        denied_name,
+    ) = _legacy_migration_fixture(tmp_path, "migration-source-retry-race")
+    migrated = MODULE.migrate_legacy_home(
+        legacy_manifest_path=legacy_manifest_path,
+        binding_context=context,
+    )
+    source_home = Path(
+        json.loads(legacy_manifest_path.read_text(encoding="utf-8"))["codex_home"]
+    )
+    target_home = Path(str(migrated["codex_home"]))
+    original_snapshot = MODULE._legacy_migration_content_snapshot
+    raced = False
+
+    def mutate_after_source_version_snapshot(**kwargs: object) -> dict[str, str | None]:
+        nonlocal raced
+        result = original_snapshot(**kwargs)
+        if (
+            kwargs["home"] == source_home
+            and kwargs["include_source_version"] is True
+            and not raced
+        ):
+            (source_home / denied_name).write_bytes(b"raced-source-state")
+            raced = True
+        return result
+
+    monkeypatch.setattr(
+        MODULE,
+        "_legacy_migration_content_snapshot",
+        mutate_after_source_version_snapshot,
+    )
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="legacy migration source state changed during migration",
+    ):
+        MODULE.migrate_legacy_home(
+            legacy_manifest_path=legacy_manifest_path,
+            binding_context=context,
+        )
+
+    assert raced
+    assert (source_home / denied_name).read_bytes() == b"raced-source-state"
+    assert (target_home / denied_name).read_bytes() == b"legacy-denied-state"
+
+
+def test_legacy_migration_rejects_target_bytes_changed_before_publication(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (
+        _ambient,
+        _runtime_root,
+        _realization_path,
+        legacy_manifest_path,
+        context,
+        denied_name,
+    ) = _legacy_migration_fixture(tmp_path, "migration-target-publication-race")
+    original_provenance = MODULE._denied_state_provenance
+    raced = False
+
+    def mutate_after_provenance(**kwargs: object) -> dict[str, dict[str, object]]:
+        nonlocal raced
+        result = original_provenance(**kwargs)
+        codex_home = Path(str(kwargs["codex_home"]))
+        (codex_home / denied_name).write_bytes(b"raced-target-state")
+        raced = True
+        return result
+
+    monkeypatch.setattr(MODULE, "_denied_state_provenance", mutate_after_provenance)
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="legacy migration state changed during publication validation",
+    ):
+        MODULE.migrate_legacy_home(
+            legacy_manifest_path=legacy_manifest_path,
+            binding_context=context,
+        )
+
+    assert raced
+
+
+def test_legacy_migration_rejects_target_bytes_changed_during_publication(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (
+        _ambient,
+        _runtime_root,
+        _realization_path,
+        legacy_manifest_path,
+        context,
+        denied_name,
+    ) = _legacy_migration_fixture(tmp_path, "migration-target-marker-race")
+    original_write_exact = MODULE._write_exact
+    raced = False
+
+    def mutate_during_marker_publication(
+        path: Path,
+        content: bytes,
+        mode: int,
+        *,
+        ambient_identities: set[tuple[int, int]] | None = None,
+    ) -> None:
+        nonlocal raced
+        if path.name == "incarnation-home.json":
+            (path.parent / "codex-home" / denied_name).write_bytes(
+                b"raced-during-marker-publication"
+            )
+            raced = True
+        original_write_exact(
+            path,
+            content,
+            mode,
+            ambient_identities=ambient_identities,
+        )
+
+    monkeypatch.setattr(MODULE, "_write_exact", mutate_during_marker_publication)
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="legacy migration state changed during post-publication validation",
+    ):
+        MODULE.migrate_legacy_home(
+            legacy_manifest_path=legacy_manifest_path,
+            binding_context=context,
+        )
+
+    assert raced
+    target_markers = [
+        path
+        for path in _runtime_root.rglob("incarnation-home.json")
+        if path != legacy_manifest_path
+    ]
+    assert target_markers == []
 
 
 def test_legacy_migration_rejects_child_inserted_after_directory_listing(

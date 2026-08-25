@@ -935,8 +935,10 @@ retained no-follow directory descriptors, never through a mutable pathname.
 The v3 `denied_state_provenance` field is required for current typed homes. It
 records only the current denied projection: each name has the ambient entry's
 current device/inode identity, when present, and a digest of the admitted local
-tree. After an ambient unlink/replace, the loader permits the existing local
-tree only when its digest is unchanged; a new or altered local tree is denied.
+tree. A row created by legacy migration also carries a content digest of the
+copied local tree, and the loader revalidates those bytes. After an ambient
+unlink/replace, the loader permits the existing local tree only when its
+recorded digest is unchanged; a new or altered local tree is denied.
 When an ambient name disappears after preparation, a previously recorded
 denied row is retained only after its exact typed row is revalidated; shared
 rows are never retained this way. The bounded provenance check then admits

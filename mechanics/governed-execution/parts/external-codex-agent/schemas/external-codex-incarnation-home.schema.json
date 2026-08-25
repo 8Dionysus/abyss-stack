@@ -121,6 +121,12 @@
             {"type": "null"},
             {"$ref": "#/$defs/digest"}
           ]
+        },
+        "local_tree_content_digest": {
+          "anyOf": [
+            {"type": "null"},
+            {"$ref": "#/$defs/digest"}
+          ]
         }
       }
     },

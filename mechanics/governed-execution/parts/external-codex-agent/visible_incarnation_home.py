@@ -1590,12 +1590,80 @@ def _local_tree_content_digest(
     return sha256_bytes(canonical_bytes(rows))
 
 
+def _legacy_migration_content_snapshot(
+    *,
+    home: Path,
+    names: Sequence[str],
+    ambient_identities: set[tuple[int, int]],
+    include_source_version: bool,
+) -> dict[str, str | None]:
+    """Capture migration state through stable content reads, not topology only."""
+
+    return {
+        name: _local_tree_content_digest(
+            home / name,
+            name,
+            ambient_identities=ambient_identities,
+            include_source_version=include_source_version,
+        )
+        for name in names
+        if name != "config.toml"
+    }
+
+
+def _validate_legacy_migration_content_snapshot(
+    *,
+    home: Path,
+    expected: dict[str, str | None],
+    ambient_identities: set[tuple[int, int]],
+    include_source_version: bool,
+    stage: str,
+) -> None:
+    current = _legacy_migration_content_snapshot(
+        home=home,
+        names=sorted(expected),
+        ambient_identities=ambient_identities,
+        include_source_version=include_source_version,
+    )
+    if current != expected:
+        raise IncarnationHomeError(
+            f"legacy migration state changed during {stage}"
+        )
+
+
+def _revalidate_legacy_migration_source_root(
+    *,
+    source_home: Path,
+    source_root_descriptor: int,
+    source_root_version: tuple[int, ...],
+    stage: str,
+) -> None:
+    """Keep the migration source pathname bound to its retained root inode."""
+
+    try:
+        retained = os.fstat(source_root_descriptor)
+        observed = os.lstat(source_home)
+    except OSError as exc:
+        raise IncarnationHomeError(
+            f"legacy migration source home changed during migration: {stage}"
+        ) from exc
+    if (
+        _actor_local_source_version(retained) != source_root_version
+        or _actor_local_source_version(observed)
+        != _actor_local_source_version(retained)
+    ):
+        raise IncarnationHomeError(
+            f"legacy migration source home changed during migration: {stage}"
+        )
+
+
 def _denied_state_provenance(
     *,
     codex_home: Path,
     ambient_home: Path,
     names: Sequence[str],
     initially_ambient_identities: set[tuple[int, int]] | None = None,
+    local_tree_content_digests: dict[str, str | None] | None = None,
 ) -> dict[str, dict[str, object]]:
     """Record one current identity and one admitted local-tree digest per name."""
 
@@ -1611,12 +1679,15 @@ def _denied_state_provenance(
                 name,
                 ambient_identities=ambient_identities,
             )
-        provenance[name] = {
+        record: dict[str, object] = {
             "ambient_entry": _identity_record(
                 _entry_identity(ambient_home / name, f"ambient denied entry {name}")
             ),
             "local_tree_digest": _local_tree_digest(target, name),
         }
+        if local_tree_content_digests is not None:
+            record["local_tree_content_digest"] = local_tree_content_digests.get(name)
+        provenance[name] = record
     return provenance
 
 
@@ -1655,10 +1726,11 @@ def _validate_denied_state_provenance(
         record = raw.get(name)
         if record is None and allow_projection_expansion:
             continue
-        if not isinstance(record, dict) or set(record) != {
+        if not isinstance(record, dict) or not set(record) <= {
             "ambient_entry",
             "local_tree_digest",
-        }:
+            "local_tree_content_digest",
+        } or set(record) < {"ambient_entry", "local_tree_digest"}:
             raise IncarnationHomeError(
                 f"denied-state provenance is invalid for {name}"
             )
@@ -1673,10 +1745,28 @@ def _validate_denied_state_provenance(
             raise IncarnationHomeError(
                 f"denied-state local provenance is invalid for {name}"
             )
+        previous_content = record.get("local_tree_content_digest")
+        if previous_content is not None and (
+            not isinstance(previous_content, str)
+            or SHA256_DIGEST_PATTERN.fullmatch(previous_content) is None
+        ):
+            raise IncarnationHomeError(
+                f"denied-state local content provenance is invalid for {name}"
+            )
         current_ambient = _entry_identity(
             ambient_home / name, f"ambient denied entry {name}"
         )
         current_local = _local_tree_digest(codex_home / name, name)
+        if previous_content is not None:
+            current_content = _local_tree_content_digest(
+                codex_home / name,
+                name,
+                include_source_version=False,
+            )
+            if current_content != previous_content:
+                raise IncarnationHomeError(
+                    f"denied-state local content changed: {name}"
+                )
         if current_ambient != previous_ambient and current_local != previous_local:
             raise IncarnationHomeError(
                 f"denied-state provenance changed across ambient replacement: {name}"
@@ -2311,6 +2401,30 @@ def _remove_retained_regular_file_at(
             )
 
 
+def _remove_retained_regular_file(
+    path: Path,
+    *,
+    ambient_identities: set[tuple[int, int]],
+    label: str,
+) -> None:
+    """Remove one published regular file through its retained inode."""
+
+    parent_fd = _open_pinned_parent_directory(path, label)
+    descriptor: int | None = None
+    try:
+        descriptor, _opened = _open_stable_regular_file_at(
+            parent_fd,
+            path.name,
+            label=label,
+            ambient_identities=ambient_identities,
+        )
+        _remove_retained_regular_file_at(parent_fd, descriptor, label)
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+        os.close(parent_fd)
+
+
 def _recover_abandoned_staged_files(
     codex_home: Path,
     *,
@@ -2914,27 +3028,23 @@ def _copy_legacy_actor_local_state_impl(
     ambient_identities: set[tuple[int, int]],
     source_root_descriptor: int,
     source_root_opened: os.stat_result,
-) -> None:
+) -> tuple[dict[str, str | None], dict[str, str | None]]:
     """Copy validated legacy local state into an unpublished typed home."""
 
     source_root_version = _actor_local_source_version(source_root_opened)
 
     def revalidate_source_root(stage: str) -> None:
         try:
-            retained = os.fstat(source_root_descriptor)
-            observed = os.lstat(source_home)
-        except OSError as exc:
+            _revalidate_legacy_migration_source_root(
+                source_home=source_home,
+                source_root_descriptor=source_root_descriptor,
+                source_root_version=source_root_version,
+                stage=stage,
+            )
+        except IncarnationHomeError as exc:
             raise IncarnationHomeError(
                 f"legacy actor-local source home changed during migration: {stage}"
             ) from exc
-        if (
-            _actor_local_source_version(retained) != source_root_version
-            or _actor_local_source_version(observed)
-            != _actor_local_source_version(retained)
-        ):
-            raise IncarnationHomeError(
-                f"legacy actor-local source home changed during migration: {stage}"
-            )
 
     revalidate_source_root("before validation")
     _validate_actor_local_top_level_names(source_home, source_expected_names)
@@ -2946,16 +3056,23 @@ def _copy_legacy_actor_local_state_impl(
         initially_ambient_identities=ambient_identities,
     )
     allowed_target_names = set(target_actor_local_names) | LOCAL_NAMES
-    source_content_digests = {
-        name: _local_tree_content_digest(
-            source_home / name,
-            name,
+    try:
+        source_content_digests = _legacy_migration_content_snapshot(
+            home=source_home,
+            names=source_names,
+            ambient_identities=ambient_identities,
+            include_source_version=False,
+        )
+        source_content_versions = _legacy_migration_content_snapshot(
+            home=source_home,
+            names=source_names,
             ambient_identities=ambient_identities,
             include_source_version=True,
         )
-        for name in source_names
-        if name != "config.toml"
-    }
+    except IncarnationHomeError as exc:
+        raise IncarnationHomeError(
+            "legacy actor-local state directory changed during migration"
+        ) from exc
     revalidate_source_root("after initial snapshot")
     visited_directories: set[tuple[int, int]] = set()
 
@@ -3254,21 +3371,27 @@ def _copy_legacy_actor_local_state_impl(
             os.close(descriptor)
         revalidate_source_root(f"after source entry {name}")
     revalidate_source_root("before final snapshot")
-    final_source_content_digests = {
-        name: _local_tree_content_digest(
-            source_home / name,
-            name,
-            ambient_identities=ambient_identities,
-            include_source_version=True,
-        )
-        for name in source_names
-        if name != "config.toml"
-    }
+    final_source_content_digests = _legacy_migration_content_snapshot(
+        home=source_home,
+        names=source_names,
+        ambient_identities=ambient_identities,
+        include_source_version=False,
+    )
+    final_source_content_versions = _legacy_migration_content_snapshot(
+        home=source_home,
+        names=source_names,
+        ambient_identities=ambient_identities,
+        include_source_version=True,
+    )
     revalidate_source_root("after final snapshot")
-    if final_source_content_digests != source_content_digests:
+    if (
+        final_source_content_digests != source_content_digests
+        or final_source_content_versions != source_content_versions
+    ):
         raise IncarnationHomeError(
             "legacy actor-local state changed during migration"
         )
+    return source_content_digests, source_content_versions
 
 
 def _copy_legacy_actor_local_state(
@@ -3280,7 +3403,7 @@ def _copy_legacy_actor_local_state(
     target_actor_local_names: set[str],
     ambient_home: Path,
     ambient_identities: set[tuple[int, int]],
-) -> None:
+) -> tuple[dict[str, str | None], dict[str, str | None]]:
     """Copy legacy local state while retaining the source-home fence."""
 
     source_root_descriptor, _source_root_initial, source_root_opened = (
@@ -3289,7 +3412,7 @@ def _copy_legacy_actor_local_state(
         )
     )
     try:
-        _copy_legacy_actor_local_state_impl(
+        return _copy_legacy_actor_local_state_impl(
             source_home=source_home,
             target_home=target_home,
             source_expected_names=source_expected_names,
@@ -9470,10 +9593,15 @@ def _prepare_home_impl(
                 f"obsolete capability projection link drift: {target}"
             )
 
+    migration_source_content_digests: dict[str, str | None] | None = None
+    migration_source_content_versions: dict[str, str | None] | None = None
     if _migration_source_home is not None:
         if _migration_source_expected_names is None:
             raise IncarnationHomeError("legacy migration source declaration is missing")
-        _copy_legacy_actor_local_state(
+        (
+            migration_source_content_digests,
+            migration_source_content_versions,
+        ) = _copy_legacy_actor_local_state(
             source_home=_migration_source_home,
             target_home=codex_home,
             source_expected_names=_migration_source_expected_names,
@@ -9494,12 +9622,51 @@ def _prepare_home_impl(
         ambient_home,
         initially_ambient_identities=ambient_identities,
     )
+    if (
+        _migration_source_home is not None
+        and migration_source_content_digests is not None
+        and migration_source_content_versions is not None
+    ):
+        _validate_legacy_migration_content_snapshot(
+            home=codex_home,
+            expected=migration_source_content_digests,
+            ambient_identities=ambient_identities,
+            include_source_version=False,
+            stage="target validation",
+        )
+        _validate_legacy_migration_content_snapshot(
+            home=_migration_source_home,
+            expected=migration_source_content_versions,
+            ambient_identities=ambient_identities,
+            include_source_version=True,
+            stage="source validation",
+        )
     denied_provenance = _denied_state_provenance(
         codex_home=codex_home,
         ambient_home=ambient_home,
         names=actor_local_state_names,
         initially_ambient_identities=ambient_identities,
+        local_tree_content_digests=migration_source_content_digests,
     )
+    if (
+        _migration_source_home is not None
+        and migration_source_content_digests is not None
+        and migration_source_content_versions is not None
+    ):
+        _validate_legacy_migration_content_snapshot(
+            home=codex_home,
+            expected=migration_source_content_digests,
+            ambient_identities=ambient_identities,
+            include_source_version=False,
+            stage="publication validation",
+        )
+        _validate_legacy_migration_content_snapshot(
+            home=_migration_source_home,
+            expected=migration_source_content_versions,
+            ambient_identities=ambient_identities,
+            include_source_version=True,
+            stage="publication source validation",
+        )
 
     manifest = {
         "$schema": "schemas/external-codex-incarnation-home.schema.json",
@@ -9538,13 +9705,51 @@ def _prepare_home_impl(
             manifest["migration_source_manifest_digest"] = (
                 _migration_source_manifest_digest
             )
+    manifest_path = incarnation_root / "incarnation-home.json"
+    manifest_bytes = (
+        json.dumps(manifest, ensure_ascii=False, sort_keys=True, indent=2).encode(
+            "utf-8"
+        )
+        + b"\n"
+    )
     _write_exact(
-        incarnation_root / "incarnation-home.json",
-        json.dumps(manifest, ensure_ascii=False, sort_keys=True, indent=2).encode("utf-8")
-        + b"\n",
+        manifest_path,
+        manifest_bytes,
         0o600,
         ambient_identities=ambient_identities,
     )
+    if (
+        _migration_source_home is not None
+        and migration_source_content_digests is not None
+        and migration_source_content_versions is not None
+    ):
+        try:
+            _validate_legacy_migration_content_snapshot(
+                home=codex_home,
+                expected=migration_source_content_digests,
+                ambient_identities=ambient_identities,
+                include_source_version=False,
+                stage="post-publication validation",
+            )
+            _validate_legacy_migration_content_snapshot(
+                home=_migration_source_home,
+                expected=migration_source_content_versions,
+                ambient_identities=ambient_identities,
+                include_source_version=True,
+                stage="post-publication source validation",
+            )
+        except IncarnationHomeError as exc:
+            try:
+                _remove_retained_regular_file(
+                    manifest_path,
+                    ambient_identities=ambient_identities,
+                    label="failed legacy migration manifest",
+                )
+            except IncarnationHomeError as cleanup_exc:
+                raise cleanup_exc from exc
+            if active_owner is not None:
+                _rollback_unpublished_home(owner_token=active_owner)
+            raise
     _finish_preparation_owner(active_owner)
     return manifest
 
@@ -10055,21 +10260,76 @@ def _validate_idempotent_legacy_migration_target(
         raise IncarnationHomeError(
             "legacy migration source state is not admitted by the target projection"
         )
-    for name in sorted(set(source_actor_local_names) | (LOCAL_NAMES - {"config.toml"})):
-        source_digest = _local_tree_content_digest(
-            source_home / name,
-            name,
-            ambient_identities=ambient_identities,
+    source_names = sorted(set(source_actor_local_names) | LOCAL_NAMES)
+    source_root_descriptor, _source_root_initial, source_root_opened = (
+        _open_stable_actor_local_path_descriptor(
+            source_home, "legacy migration source home"
         )
-        target_digest = _local_tree_content_digest(
-            target_home / name,
-            name,
-            ambient_identities=ambient_identities,
+    )
+    source_root_version = _actor_local_source_version(source_root_opened)
+    try:
+        _revalidate_legacy_migration_source_root(
+            source_home=source_home,
+            source_root_descriptor=source_root_descriptor,
+            source_root_version=source_root_version,
+            stage="before idempotent snapshot",
         )
-        if source_digest != target_digest:
+        source_content_digests = _legacy_migration_content_snapshot(
+            home=source_home,
+            names=source_names,
+            ambient_identities=ambient_identities,
+            include_source_version=False,
+        )
+        source_content_versions = _legacy_migration_content_snapshot(
+            home=source_home,
+            names=source_names,
+            ambient_identities=ambient_identities,
+            include_source_version=True,
+        )
+        _revalidate_legacy_migration_source_root(
+            source_home=source_home,
+            source_root_descriptor=source_root_descriptor,
+            source_root_version=source_root_version,
+            stage="after source snapshot",
+        )
+        target_content_digests = _legacy_migration_content_snapshot(
+            home=target_home,
+            names=source_names,
+            ambient_identities=ambient_identities,
+            include_source_version=False,
+        )
+        if target_content_digests != source_content_digests:
             raise IncarnationHomeError(
                 "legacy migration target is not an exact idempotent match"
             )
+        final_source_content_versions = _legacy_migration_content_snapshot(
+            home=source_home,
+            names=source_names,
+            ambient_identities=ambient_identities,
+            include_source_version=True,
+        )
+        _revalidate_legacy_migration_source_root(
+            source_home=source_home,
+            source_root_descriptor=source_root_descriptor,
+            source_root_version=source_root_version,
+            stage="after source version snapshot",
+        )
+        if final_source_content_versions != source_content_versions:
+            raise IncarnationHomeError(
+                "legacy migration source state changed during migration"
+            )
+        final_target_content_digests = _legacy_migration_content_snapshot(
+            home=target_home,
+            names=source_names,
+            ambient_identities=ambient_identities,
+            include_source_version=False,
+        )
+        if final_target_content_digests != source_content_digests:
+            raise IncarnationHomeError(
+                "legacy migration target is not an exact idempotent match"
+            )
+    finally:
+        os.close(source_root_descriptor)
     for name in expected_shared_names:
         source = ambient_home / name
         target = target_home / name
@@ -10204,12 +10464,21 @@ def migrate_legacy_home(
                     raise IncarnationHomeError(
                         "legacy migration target marker is not a regular file"
                     )
-                target_manifest, _target_bytes, _target_digest = _load_manifest_snapshot(
-                    target_marker,
-                    binding_context=context,
-                    binding_context_digest=context_digest,
-                    require_holder_binding=True,
-                )
+                try:
+                    target_manifest, _target_bytes, _target_digest = (
+                        _load_manifest_snapshot(
+                            target_marker,
+                            binding_context=context,
+                            binding_context_digest=context_digest,
+                            require_holder_binding=True,
+                        )
+                    )
+                except IncarnationHomeError as exc:
+                    if "denied-state local content changed" not in str(exc):
+                        raise
+                    raise IncarnationHomeError(
+                        "legacy migration target is not an exact idempotent match"
+                    ) from exc
                 _validate_idempotent_legacy_migration_target(
                     target_manifest=target_manifest,
                     target_home=target_home,
