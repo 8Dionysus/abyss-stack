@@ -232,6 +232,10 @@
 
 - [ABYSS-STACK-D-0103 Compose Independent Codex Hook Fragments](../ABYSS-STACK-D-0103-compose-independent-codex-hook-fragments.md) (`docs/decisions/ABYSS-STACK-D-0103-compose-independent-codex-hook-fragments.md`)
 
+## atomic switch
+
+- [ABYSS-STACK-D-0138 Owner-source Atomic Deployment Route](../ABYSS-STACK-D-0138-owner-source-atomic-deployment-route.md) (`docs/decisions/ABYSS-STACK-D-0138-owner-source-atomic-deployment-route.md`)
+
 ## attempt isolation
 
 - [ABYSS-STACK-D-0122 Attempt-Local Python Cache Routing](../ABYSS-STACK-D-0122-attempt-local-python-cache-routing.md) (`docs/decisions/ABYSS-STACK-D-0122-attempt-local-python-cache-routing.md`)
@@ -293,6 +297,10 @@
 
 - [ABYSS-STACK-D-0135 Typed Incarnation Capability Projection](../ABYSS-STACK-D-0135-typed-incarnation-capability-projection.md) (`docs/decisions/ABYSS-STACK-D-0135-typed-incarnation-capability-projection.md`)
 
+## clean source identity
+
+- [ABYSS-STACK-D-0138 Owner-source Atomic Deployment Route](../ABYSS-STACK-D-0138-owner-source-atomic-deployment-route.md) (`docs/decisions/ABYSS-STACK-D-0138-owner-source-atomic-deployment-route.md`)
+
 ## closure authorization
 
 - [ABYSS-STACK-D-0126 Typed Visible Holder Closure Authorization](../ABYSS-STACK-D-0126-typed-visible-holder-closure-authorization.md) (`docs/decisions/ABYSS-STACK-D-0126-typed-visible-holder-closure-authorization.md`)
@@ -330,6 +338,10 @@
 ## consumer-zero
 
 - [ABYSS-STACK-D-0094 Wave 6 Access-Form and Retirement Classification](../ABYSS-STACK-D-0094-wave6-access-form-and-retirement-classification.md) (`docs/decisions/ABYSS-STACK-D-0094-wave6-access-form-and-retirement-classification.md`)
+
+## content manifest
+
+- [ABYSS-STACK-D-0138 Owner-source Atomic Deployment Route](../ABYSS-STACK-D-0138-owner-source-atomic-deployment-route.md) (`docs/decisions/ABYSS-STACK-D-0138-owner-source-atomic-deployment-route.md`)
 
 ## content minimization
 
@@ -373,6 +385,10 @@
 
 - [ABYSS-STACK-D-0097 Codex Consumer Handoff Remains Owner-Composed](../ABYSS-STACK-D-0097-codex-consumer-handoff-remains-owner-composed.md) (`docs/decisions/ABYSS-STACK-D-0097-codex-consumer-handoff-remains-owner-composed.md`)
 
+## deployment lock
+
+- [ABYSS-STACK-D-0138 Owner-source Atomic Deployment Route](../ABYSS-STACK-D-0138-owner-source-atomic-deployment-route.md) (`docs/decisions/ABYSS-STACK-D-0138-owner-source-atomic-deployment-route.md`)
+
 ## design surface
 
 - [ABYSS-STACK-D-0055 Root Routes Validator Module](../ABYSS-STACK-D-0055-root-routes-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0055-root-routes-validator-module.md`)
@@ -396,6 +412,10 @@
 ## dual support
 
 - [ABYSS-STACK-D-0096 Fail-Closed MCP Protocol Migration Lab](../ABYSS-STACK-D-0096-fail-closed-mcp-protocol-migration-lab.md) (`docs/decisions/ABYSS-STACK-D-0096-fail-closed-mcp-protocol-migration-lab.md`)
+
+## durable activation recovery
+
+- [ABYSS-STACK-D-0138 Owner-source Atomic Deployment Route](../ABYSS-STACK-D-0138-owner-source-atomic-deployment-route.md) (`docs/decisions/ABYSS-STACK-D-0138-owner-source-atomic-deployment-route.md`)
 
 ## durable lifecycle
 
@@ -423,6 +443,10 @@
 - [ABYSS-STACK-D-0091 Session Memory and ToS Read Contour Isolation](../ABYSS-STACK-D-0091-session-and-tos-read-contour-isolation.md) (`docs/decisions/ABYSS-STACK-D-0091-session-and-tos-read-contour-isolation.md`)
 - [ABYSS-STACK-D-0092 Memo and Evals Candidate Contour Isolation](../ABYSS-STACK-D-0092-memo-and-evals-candidate-contour-isolation.md) (`docs/decisions/ABYSS-STACK-D-0092-memo-and-evals-candidate-contour-isolation.md`)
 - [ABYSS-STACK-D-0093 Connector Read Contour Isolation](../ABYSS-STACK-D-0093-connector-read-contour-isolation.md) (`docs/decisions/ABYSS-STACK-D-0093-connector-read-contour-isolation.md`)
+
+## effect-bound destination ownership
+
+- [ABYSS-STACK-D-0138 Owner-source Atomic Deployment Route](../ABYSS-STACK-D-0138-owner-source-atomic-deployment-route.md) (`docs/decisions/ABYSS-STACK-D-0138-owner-source-atomic-deployment-route.md`)
 
 ## entry contract
 
@@ -502,6 +526,10 @@
 ## explicit approval
 
 - [ABYSS-STACK-D-0106 Admit One Exact Stack MCP Read Restart Pilot](../ABYSS-STACK-D-0106-admit-one-exact-stack-mcp-read-restart-pilot.md) (`docs/decisions/ABYSS-STACK-D-0106-admit-one-exact-stack-mcp-read-restart-pilot.md`)
+
+## explicit claim ceiling
+
+- [ABYSS-STACK-D-0138 Owner-source Atomic Deployment Route](../ABYSS-STACK-D-0138-owner-source-atomic-deployment-route.md) (`docs/decisions/ABYSS-STACK-D-0138-owner-source-atomic-deployment-route.md`)
 
 ## explicit teardown
 
@@ -599,6 +627,10 @@
 - [ABYSS-STACK-D-0124 Visible Holder Terminal Lifecycle Identity](../ABYSS-STACK-D-0124-visible-holder-terminal-lifecycle-identity.md) (`docs/decisions/ABYSS-STACK-D-0124-visible-holder-terminal-lifecycle-identity.md`)
 - [ABYSS-STACK-D-0129 Canonical External Actor Return Leaf](../ABYSS-STACK-D-0129-canonical-external-actor-return-leaf.md) (`docs/decisions/ABYSS-STACK-D-0129-canonical-external-actor-return-leaf.md`)
 
+## historical rollback event
+
+- [ABYSS-STACK-D-0138 Owner-source Atomic Deployment Route](../ABYSS-STACK-D-0138-owner-source-atomic-deployment-route.md) (`docs/decisions/ABYSS-STACK-D-0138-owner-source-atomic-deployment-route.md`)
+
 ## holder closure
 
 - [ABYSS-STACK-D-0129 Canonical External Actor Return Leaf](../ABYSS-STACK-D-0129-canonical-external-actor-return-leaf.md) (`docs/decisions/ABYSS-STACK-D-0129-canonical-external-actor-return-leaf.md`)
@@ -618,6 +650,10 @@
 ## host-visible receipt
 
 - [ABYSS-STACK-D-0095 Cross-Organ Orchestration Host Boundary](../ABYSS-STACK-D-0095-cross-organ-orchestration-host-boundary.md) (`docs/decisions/ABYSS-STACK-D-0095-cross-organ-orchestration-host-boundary.md`)
+
+## ignored-cache boundary
+
+- [ABYSS-STACK-D-0138 Owner-source Atomic Deployment Route](../ABYSS-STACK-D-0138-owner-source-atomic-deployment-route.md) (`docs/decisions/ABYSS-STACK-D-0138-owner-source-atomic-deployment-route.md`)
 
 ## immutable evidence
 
@@ -821,9 +857,17 @@
 
 - [ABYSS-STACK-D-0088 Tree of Sophia Human Review Workbench Boundary](../ABYSS-STACK-D-0088-tree-of-sophia-human-review-workbench-boundary.md) (`docs/decisions/ABYSS-STACK-D-0088-tree-of-sophia-human-review-workbench-boundary.md`)
 
+## post-switch rollback
+
+- [ABYSS-STACK-D-0138 Owner-source Atomic Deployment Route](../ABYSS-STACK-D-0138-owner-source-atomic-deployment-route.md) (`docs/decisions/ABYSS-STACK-D-0138-owner-source-atomic-deployment-route.md`)
+
 ## pre-execution routing
 
 - [ABYSS-STACK-D-0131 Codex PreToolUse Agent-Routing Adapter](../ABYSS-STACK-D-0131-codex-pretool-agent-routing-adapter.md) (`docs/decisions/ABYSS-STACK-D-0131-codex-pretool-agent-routing-adapter.md`)
+
+## predecessor rollback
+
+- [ABYSS-STACK-D-0138 Owner-source Atomic Deployment Route](../ABYSS-STACK-D-0138-owner-source-atomic-deployment-route.md) (`docs/decisions/ABYSS-STACK-D-0138-owner-source-atomic-deployment-route.md`)
 
 ## private-Git drift
 
@@ -893,6 +937,10 @@
 ## release governance
 
 - [ABYSS-STACK-D-0054 Branch Policy Validator Module](../ABYSS-STACK-D-0054-branch-policy-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0054-branch-policy-validator-module.md`)
+
+## release-root inode binding
+
+- [ABYSS-STACK-D-0138 Owner-source Atomic Deployment Route](../ABYSS-STACK-D-0138-owner-source-atomic-deployment-route.md) (`docs/decisions/ABYSS-STACK-D-0138-owner-source-atomic-deployment-route.md`)
 
 ## render truth
 

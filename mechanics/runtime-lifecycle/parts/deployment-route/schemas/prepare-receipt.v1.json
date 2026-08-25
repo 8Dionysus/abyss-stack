@@ -1,0 +1,153 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://abyss-stack.invalid/schemas/owner-source-prepare-receipt-v1",
+  "title": "Abyss Stack owner-source prepare receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "$defs": {
+    "hex40": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "hex64": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "absolutePath": {"type": "string", "pattern": "^/"},
+    "releaseSeal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "release_path", "source_ref", "source_tree", "mode", "root_device", "root_inode", "root_mode", "manifest_schema", "manifest_sha256", "manifest_entries", "ignored_policy", "symlink_policy", "special_file_policy"],
+      "properties": {
+        "path": {"$ref": "#/$defs/absolutePath"},
+        "sha256": {"$ref": "#/$defs/hex64"},
+        "release_path": {"$ref": "#/$defs/absolutePath"},
+        "source_ref": {"$ref": "#/$defs/hex40"},
+        "source_tree": {"$ref": "#/$defs/hex40"},
+        "mode": {"const": "read_only"},
+        "root_device": {"type": "integer", "minimum": 0},
+        "root_inode": {"type": "integer", "minimum": 1},
+        "root_mode": {"type": "integer", "minimum": 0, "maximum": 4095},
+        "manifest_schema": {"const": "abyss_stack_owner_source_release_manifest_v1"},
+        "manifest_sha256": {"$ref": "#/$defs/hex64"},
+        "manifest_entries": {"type": "integer", "minimum": 1},
+        "ignored_policy": {"const": "included_in_manifest"},
+        "symlink_policy": {"const": "record_target_no_follow"},
+        "special_file_policy": {"const": "reject"}
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["root", "ref", "tree", "dirty"],
+      "properties": {
+        "root": {"$ref": "#/$defs/absolutePath"},
+        "ref": {"$ref": "#/$defs/hex40"},
+        "tree": {"$ref": "#/$defs/hex40"},
+        "dirty": {"const": false}
+      }
+    },
+    "snapshot": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": {"kind": {"const": "absent"}}
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "link_text", "target", "source_ref", "source_tree", "release_seal"],
+          "properties": {
+            "kind": {"const": "symlink"},
+            "link_text": {"type": "string", "minLength": 1},
+            "target": {"$ref": "#/$defs/absolutePath"},
+            "source_ref": {"$ref": "#/$defs/hex40"},
+            "source_tree": {"$ref": "#/$defs/hex40"},
+            "release_seal": {"$ref": "#/$defs/releaseSeal"}
+          }
+        }
+      ]
+    },
+    "admission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "admission_id", "authority_ceiling"],
+      "properties": {
+        "path": {"$ref": "#/$defs/absolutePath"},
+        "sha256": {"$ref": "#/$defs/hex64"},
+        "admission_id": {"type": "string", "minLength": 1},
+        "authority_ceiling": {
+          "enum": [
+            "disposable-source-package-canary",
+            "installed-source-package-activation"
+          ]
+        }
+      }
+    },
+    "atomicity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["same_filesystem", "staging", "switch", "release_binding"],
+      "properties": {
+        "same_filesystem": {"const": true},
+        "staging": {"const": "self-contained-git-clone"},
+        "switch": {"const": "relative-symlink-os-replace"},
+        "release_binding": {"const": "content-manifest-root-inode-v1"}
+      }
+    }
+  },
+  "required": [
+    "schema_version",
+    "status",
+    "operation_id",
+    "owner_repo",
+    "source",
+    "destination",
+    "release_root",
+    "predecessor",
+    "admission",
+    "atomicity",
+    "dependency_posture",
+    "effects",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {"const": "abyss_stack_owner_source_prepare_receipt_v1"},
+    "status": {"enum": ["prepared", "dry_run"]},
+    "operation_id": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
+    "prepared_at": {"type": "string", "format": "date-time"},
+    "expires_at": {"type": "string", "format": "date-time"},
+    "owner_repo": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"},
+    "source": {"$ref": "#/$defs/source"},
+    "destination": {"$ref": "#/$defs/absolutePath"},
+    "release_root": {"$ref": "#/$defs/absolutePath"},
+    "release_path": {"$ref": "#/$defs/absolutePath"},
+    "release_seal": {"$ref": "#/$defs/releaseSeal"},
+    "predecessor": {"$ref": "#/$defs/snapshot"},
+    "admission": {"$ref": "#/$defs/admission"},
+    "atomicity": {"$ref": "#/$defs/atomicity"},
+    "dependency_posture": {"const": "source_only_no_install"},
+    "effects": {"type": "array", "items": {"type": "string"}},
+    "claim_ceiling": {"enum": ["preflight_only", "prepared_not_activated"]},
+    "receipt_digest": {"$ref": "#/$defs/hex64"}
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": ["status"],
+        "properties": {"status": {"const": "prepared"}}
+      },
+      "then": {
+        "required": ["prepared_at", "expires_at", "release_path", "release_seal", "receipt_digest"],
+        "properties": {"claim_ceiling": {"const": "prepared_not_activated"}}
+      }
+    },
+    {
+      "if": {
+        "required": ["status"],
+        "properties": {"status": {"const": "dry_run"}}
+      },
+      "then": {
+        "required": ["claim_ceiling"],
+        "properties": {"claim_ceiling": {"const": "preflight_only"}},
+        "not": {"required": ["receipt_digest"]}
+      }
+    }
+  ]
+}

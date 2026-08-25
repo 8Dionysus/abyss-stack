@@ -1,19 +1,19 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
-  "decision_count": 137,
-  "edge_count": 3075,
+  "decision_count": 138,
+  "edge_count": 3110,
   "edge_type_counts": {
-    "CITES_SOURCE_SURFACE": 1114,
-    "DATED": 137,
-    "GUARDED_BY": 423,
-    "HAS_STATUS": 137,
-    "HAS_SURFACE_CLASS": 374,
-    "IN_STACK_LANE": 328,
-    "NEXT_DECISION": 136,
-    "OWNED_BY_SURFACE": 143,
-    "OWNS_DECISION": 137,
+    "CITES_SOURCE_SURFACE": 1125,
+    "DATED": 138,
+    "GUARDED_BY": 435,
+    "HAS_STATUS": 138,
+    "HAS_SURFACE_CLASS": 377,
+    "IN_STACK_LANE": 331,
+    "NEXT_DECISION": 137,
+    "OWNED_BY_SURFACE": 144,
+    "OWNS_DECISION": 138,
     "SUPERSEDED_BY": 3,
-    "UNDER_MECHANIC_PARENT": 143
+    "UNDER_MECHANIC_PARENT": 144
   },
   "edges": [
     {
@@ -14698,12 +14698,182 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0137",
+      "target": "decision:ABYSS-STACK-D-0138",
+      "type": "NEXT_DECISION"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0137",
       "target": "owner_surface:mechanics/governed-execution/parts/external-codex-agent",
       "type": "OWNED_BY_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0137",
       "target": "mechanic_parent:%60mechanics/governed-execution/parts/external-codex-agent%60",
+      "type": "UNDER_MECHANIC_PARENT"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0138",
+      "target": "source_surface:docs/install/DEPLOYMENT.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0138",
+      "target": "source_surface:docs/validation/validation_lanes.json",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0138",
+      "target": "source_surface:mechanics/runtime-lifecycle/AGENTS.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0138",
+      "target": "source_surface:mechanics/runtime-lifecycle/PARTS.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0138",
+      "target": "source_surface:mechanics/runtime-lifecycle/parts/deployment-route/README.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0138",
+      "target": "source_surface:mechanics/runtime-lifecycle/parts/deployment-route/aoa_deploy_owner_package.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0138",
+      "target": "source_surface:mechanics/runtime-lifecycle/parts/deployment-route/schemas/",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0138",
+      "target": "source_surface:mechanics/runtime-lifecycle/parts/deployment-route/schemas/recovery-receipt.v1.json",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0138",
+      "target": "source_surface:mechanics/runtime-lifecycle/parts/deployment-route/tests/test_deployment_route.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0138",
+      "target": "source_surface:scripts/aoa-sync-configs",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0138",
+      "target": "source_surface:scripts/validators/script_surface.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0138",
+      "target": "date:2026-08-25",
+      "type": "DATED"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0138",
+      "target": "guard_family:atomic%20switch",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0138",
+      "target": "guard_family:clean%20source%20identity",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0138",
+      "target": "guard_family:content%20manifest",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0138",
+      "target": "guard_family:deployment%20lock",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0138",
+      "target": "guard_family:durable%20activation%20recovery",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0138",
+      "target": "guard_family:effect-bound%20destination%20ownership",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0138",
+      "target": "guard_family:explicit%20claim%20ceiling",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0138",
+      "target": "guard_family:historical%20rollback%20event",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0138",
+      "target": "guard_family:ignored-cache%20boundary",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0138",
+      "target": "guard_family:post-switch%20rollback",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0138",
+      "target": "guard_family:predecessor%20rollback",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0138",
+      "target": "guard_family:release-root%20inode%20binding",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0138",
+      "target": "status:accepted",
+      "type": "HAS_STATUS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0138",
+      "target": "surface_class:deployment%20route",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0138",
+      "target": "surface_class:runtime%20topology",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0138",
+      "target": "surface_class:source/runtime%20boundary",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0138",
+      "target": "stack_lane:operator%20deployment",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0138",
+      "target": "stack_lane:runtime%20lifecycle",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0138",
+      "target": "stack_lane:source%20checkout",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0138",
+      "target": "owner_surface:mechanics/runtime-lifecycle/parts/deployment-route/",
+      "type": "OWNED_BY_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0138",
+      "target": "mechanic_parent:runtime-lifecycle",
       "type": "UNDER_MECHANIC_PARENT"
     },
     {
@@ -15390,21 +15560,26 @@
       "source": "repo:abyss-stack",
       "target": "decision:ABYSS-STACK-D-0137",
       "type": "OWNS_DECISION"
+    },
+    {
+      "source": "repo:abyss-stack",
+      "target": "decision:ABYSS-STACK-D-0138",
+      "type": "OWNS_DECISION"
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 1331,
+  "node_count": 1354,
   "node_type_counts": {
     "date": 46,
-    "decision": 137,
-    "guard_family": 230,
+    "decision": 138,
+    "guard_family": 242,
     "mechanic_parent": 13,
-    "owner_surface": 68,
+    "owner_surface": 69,
     "repo": 1,
-    "source_surface": 626,
-    "stack_lane": 56,
+    "source_surface": 633,
+    "stack_lane": 57,
     "status": 4,
-    "surface_class": 150
+    "surface_class": 151
   },
   "nodes": [
     {
@@ -17008,6 +17183,16 @@
       "type": "decision"
     },
     {
+      "date": "2026-08-25",
+      "id": "decision:ABYSS-STACK-D-0138",
+      "label": "ABYSS-STACK-D-0138",
+      "path": "docs/decisions/ABYSS-STACK-D-0138-owner-source-atomic-deployment-route.md",
+      "posture": "accepted owner-source deployment rationale",
+      "status": "accepted",
+      "title": "ABYSS-STACK-D-0138 Owner-source Atomic Deployment Route",
+      "type": "decision"
+    },
+    {
       "id": "guard_family:A/B/C%20freeze",
       "label": "A/B/C freeze",
       "type": "guard_family"
@@ -17080,6 +17265,11 @@
     {
       "id": "guard_family:atomic%20projection",
       "label": "atomic projection",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:atomic%20switch",
+      "label": "atomic switch",
       "type": "guard_family"
     },
     {
@@ -17158,6 +17348,11 @@
       "type": "guard_family"
     },
     {
+      "id": "guard_family:clean%20source%20identity",
+      "label": "clean source identity",
+      "type": "guard_family"
+    },
+    {
       "id": "guard_family:closure%20authorization",
       "label": "closure authorization",
       "type": "guard_family"
@@ -17200,6 +17395,11 @@
     {
       "id": "guard_family:consumer-zero",
       "label": "consumer-zero",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:content%20manifest",
+      "label": "content manifest",
       "type": "guard_family"
     },
     {
@@ -17258,6 +17458,11 @@
       "type": "guard_family"
     },
     {
+      "id": "guard_family:deployment%20lock",
+      "label": "deployment lock",
+      "type": "guard_family"
+    },
+    {
       "id": "guard_family:design%20surface",
       "label": "design surface",
       "type": "guard_family"
@@ -17293,6 +17498,11 @@
       "type": "guard_family"
     },
     {
+      "id": "guard_family:durable%20activation%20recovery",
+      "label": "durable activation recovery",
+      "type": "guard_family"
+    },
+    {
       "id": "guard_family:durable%20lifecycle",
       "label": "durable lifecycle",
       "type": "guard_family"
@@ -17315,6 +17525,11 @@
     {
       "id": "guard_family:effect%20isolation",
       "label": "effect isolation",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:effect-bound%20destination%20ownership",
+      "label": "effect-bound destination ownership",
       "type": "guard_family"
     },
     {
@@ -17400,6 +17615,11 @@
     {
       "id": "guard_family:explicit%20approval",
       "label": "explicit approval",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:explicit%20claim%20ceiling",
+      "label": "explicit claim ceiling",
       "type": "guard_family"
     },
     {
@@ -17508,6 +17728,11 @@
       "type": "guard_family"
     },
     {
+      "id": "guard_family:historical%20rollback%20event",
+      "label": "historical rollback event",
+      "type": "guard_family"
+    },
+    {
       "id": "guard_family:holder%20closure",
       "label": "holder closure",
       "type": "guard_family"
@@ -17535,6 +17760,11 @@
     {
       "id": "guard_family:host-visible%20receipt",
       "label": "host-visible receipt",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:ignored-cache%20boundary",
+      "label": "ignored-cache boundary",
       "type": "guard_family"
     },
     {
@@ -17768,8 +17998,18 @@
       "type": "guard_family"
     },
     {
+      "id": "guard_family:post-switch%20rollback",
+      "label": "post-switch rollback",
+      "type": "guard_family"
+    },
+    {
       "id": "guard_family:pre-execution%20routing",
       "label": "pre-execution routing",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:predecessor%20rollback",
+      "label": "predecessor rollback",
       "type": "guard_family"
     },
     {
@@ -17875,6 +18115,11 @@
     {
       "id": "guard_family:release%20governance",
       "label": "release governance",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:release-root%20inode%20binding",
+      "label": "release-root inode binding",
       "type": "guard_family"
     },
     {
@@ -18420,6 +18665,11 @@
     {
       "id": "owner_surface:mechanics/runtime-lifecycle/",
       "label": "mechanics/runtime-lifecycle/",
+      "type": "owner_surface"
+    },
+    {
+      "id": "owner_surface:mechanics/runtime-lifecycle/parts/deployment-route/",
+      "label": "mechanics/runtime-lifecycle/parts/deployment-route/",
       "type": "owner_surface"
     },
     {
@@ -20929,8 +21179,43 @@
       "type": "source_surface"
     },
     {
+      "id": "source_surface:mechanics/runtime-lifecycle/AGENTS.md",
+      "label": "mechanics/runtime-lifecycle/AGENTS.md",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/runtime-lifecycle/PARTS.md",
+      "label": "mechanics/runtime-lifecycle/PARTS.md",
+      "type": "source_surface"
+    },
+    {
       "id": "source_surface:mechanics/runtime-lifecycle/parts/config-sync-boundary/docs/SOURCE_RUNTIME_PARITY_PACKET.md",
       "label": "mechanics/runtime-lifecycle/parts/config-sync-boundary/docs/SOURCE_RUNTIME_PARITY_PACKET.md",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/runtime-lifecycle/parts/deployment-route/README.md",
+      "label": "mechanics/runtime-lifecycle/parts/deployment-route/README.md",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/runtime-lifecycle/parts/deployment-route/aoa_deploy_owner_package.py",
+      "label": "mechanics/runtime-lifecycle/parts/deployment-route/aoa_deploy_owner_package.py",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/runtime-lifecycle/parts/deployment-route/schemas/",
+      "label": "mechanics/runtime-lifecycle/parts/deployment-route/schemas/",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/runtime-lifecycle/parts/deployment-route/schemas/recovery-receipt.v1.json",
+      "label": "mechanics/runtime-lifecycle/parts/deployment-route/schemas/recovery-receipt.v1.json",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/runtime-lifecycle/parts/deployment-route/tests/test_deployment_route.py",
+      "label": "mechanics/runtime-lifecycle/parts/deployment-route/tests/test_deployment_route.py",
       "type": "source_surface"
     },
     {
@@ -21859,6 +22144,11 @@
       "type": "stack_lane"
     },
     {
+      "id": "stack_lane:operator%20deployment",
+      "label": "operator deployment",
+      "type": "stack_lane"
+    },
+    {
       "id": "stack_lane:organ%20access%20fabric",
       "label": "organ access fabric",
       "type": "stack_lane"
@@ -22191,6 +22481,11 @@
     {
       "id": "surface_class:decision%20route",
       "label": "decision route",
+      "type": "surface_class"
+    },
+    {
+      "id": "surface_class:deployment%20route",
+      "label": "deployment route",
       "type": "surface_class"
     },
     {

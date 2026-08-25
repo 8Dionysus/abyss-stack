@@ -301,6 +301,7 @@
           "scripts/aoa-sync-configs",
           "scripts/aoa-bootstrap-configs",
           "scripts/aoa-check-layout",
+          "scripts/aoa-deploy-owner-package",
           "scripts/aoa-install-systemd",
           "scripts/aoa-ovms-admission",
           "scripts/aoa-first-run",

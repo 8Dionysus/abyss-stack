@@ -357,6 +357,11 @@ EXPECTED_ACTIVE_SCHEMA_PATHS = {
     Path(
         "mechanics/runtime-lifecycle/parts/status-readouts/schemas/runtime-usage-snapshot.schema.json"
     ),
+    Path("mechanics/runtime-lifecycle/parts/deployment-route/schemas/admission.v1.json"),
+    Path("mechanics/runtime-lifecycle/parts/deployment-route/schemas/prepare-receipt.v1.json"),
+    Path("mechanics/runtime-lifecycle/parts/deployment-route/schemas/activate-receipt.v1.json"),
+    Path("mechanics/runtime-lifecycle/parts/deployment-route/schemas/rollback-receipt.v1.json"),
+    Path("mechanics/runtime-lifecycle/parts/deployment-route/schemas/recovery-receipt.v1.json"),
     Path(
         "mechanics/runtime-repair/parts/a2a-return-dry-run/schemas/runtime-a2a-return-closeout-dry-run.schema.json"
     ),
