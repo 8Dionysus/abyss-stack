@@ -1428,6 +1428,20 @@ def _prepare_writers(args: argparse.Namespace) -> dict[str, Any]:
         schema_ref="text/x-python",
         schema_version="abyss_stack_external_codex_controller_source_v1",
     )
+    landing_effect_source_path = PART_ROOT / "external_codex_landing_effect.py"
+    landing_effect_source_ref = _file_ref(
+        owner="abyss-stack",
+        artifact_ref=(
+            "mechanics/governed-execution/parts/external-codex-agent/"
+            "external_codex_landing_effect.py"
+        ),
+        path=landing_effect_source_path,
+        source_ref=(
+            "uncommitted-runtime-source@" + _file_digest(landing_effect_source_path)
+        ),
+        schema_ref="text/x-python",
+        schema_version="abyss_stack_external_codex_landing_effect_source_v1",
+    )
     snapshot = load_plan_compilation_snapshot()
     route_policy = _task_route_policy(packet)
     contour = snapshot.contour_for(str(route_policy["scenario_id"]))
@@ -1581,6 +1595,11 @@ def _prepare_writers(args: argparse.Namespace) -> dict[str, Any]:
                     "input_id": "runtime-controller-source",
                     "local_path": str(controller_source_path),
                     "provenance": controller_source_ref.model_dump(mode="json"),
+                },
+                {
+                    "input_id": "runtime-landing-effect-source",
+                    "local_path": str(landing_effect_source_path),
+                    "provenance": landing_effect_source_ref.model_dump(mode="json"),
                 },
                 {
                     "input_id": "summon-request",
@@ -1797,6 +1816,7 @@ def _prepare_writers(args: argparse.Namespace) -> dict[str, Any]:
                     workspace_ref,
                     report_schema_ref,
                     controller_source_ref,
+                    landing_effect_source_ref,
                     model_ref,
                     task_ref,
                     summon_request_ref,
@@ -1921,6 +1941,7 @@ def _prepare_writers(args: argparse.Namespace) -> dict[str, Any]:
                 packet_ref,
                 manifest_ref,
                 controller_source_ref,
+                landing_effect_source_ref,
                 workspace_ref,
                 model_ref,
                 summon_request_ref,
@@ -1935,6 +1956,7 @@ def _prepare_writers(args: argparse.Namespace) -> dict[str, Any]:
             validation_refs=(
                 report_schema_ref,
                 controller_source_ref,
+                landing_effect_source_ref,
                 packet_ref,
                 manifest_ref,
                 summon_request_schema_ref,
