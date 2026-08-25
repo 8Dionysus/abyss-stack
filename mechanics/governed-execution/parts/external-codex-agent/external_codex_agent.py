@@ -80,6 +80,10 @@ RUNTIME_PACKAGE_EXECUTION_ROOT = Path(
     "/var/tmp/aoa-external-actor-runtime-package"
 )
 RUNTIME_PACKAGE_EXECUTABLE = RUNTIME_PACKAGE_EXECUTION_ROOT / "bin/codex"
+RUNTIME_PACKAGE_PERMISSION_PATHS = (
+    RUNTIME_PACKAGE_EXECUTION_ROOT,
+    RUNTIME_PACKAGE_EXECUTABLE,
+)
 SCHEMA_ROOT = PART_ROOT / "schemas"
 LAUNCH_SCHEMA_PATH = SCHEMA_ROOT / "external-codex-launch.schema.json"
 TASK_SCHEMA_PATH = SCHEMA_ROOT / "external-codex-task.schema.json"
@@ -8620,7 +8624,7 @@ class ExternalCodexRuntime:
                 readable_paths=(
                     sanitized_config,
                     executable,
-                    RUNTIME_PACKAGE_EXECUTION_ROOT,
+                    *RUNTIME_PACKAGE_PERMISSION_PATHS,
                 ),
                 writable_paths=(preflight_root,),
             )
@@ -11961,7 +11965,7 @@ Runtime session identity: {state["session_id"]}
             readable_paths=(
                 *readable_paths,
                 Path(executable),
-                RUNTIME_PACKAGE_EXECUTION_ROOT,
+                *RUNTIME_PACKAGE_PERMISSION_PATHS,
             ),
             writable_paths=writable_paths,
             denied_paths=denied_paths,
