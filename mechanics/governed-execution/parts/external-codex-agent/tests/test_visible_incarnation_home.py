@@ -1243,7 +1243,9 @@ def test_load_manifest_rejects_shared_state_link_drift(tmp_path: Path) -> None:
         MODULE._load_manifest(manifest_path)
 
 
-def test_load_manifest_rejects_unexpected_shared_state_entry(tmp_path: Path) -> None:
+def test_load_manifest_accepts_isolated_actor_local_runtime_entry(
+    tmp_path: Path,
+) -> None:
     ambient = tmp_path / "ambient"
     runtime_root = tmp_path / "runtime"
     ambient.mkdir()
@@ -1256,10 +1258,61 @@ def test_load_manifest_rejects_unexpected_shared_state_entry(tmp_path: Path) -> 
     )
     actor_home = Path(manifest["codex_home"])
     manifest_path = actor_home.parent / "incarnation-home.json"
-    (actor_home / "unexpected.json").write_text("{}", encoding="utf-8")
+    runtime_state = actor_home / "goals_1.sqlite"
+    runtime_state.write_bytes(b"actor-local")
+
+    assert MODULE._load_manifest(manifest_path)["codex_home"] == str(actor_home)
+    assert runtime_state.read_bytes() == b"actor-local"
+
+
+def test_prepare_home_preserves_isolated_actor_local_runtime_entry(
+    tmp_path: Path,
+) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    (ambient / "goals_1.sqlite").write_bytes(b"ambient")
+    realization = _realization(tmp_path / "realization.json")
+    manifest = MODULE.prepare_home(
+        ambient_home=ambient,
+        realization_path=realization,
+        runtime_root=runtime_root,
+    )
+    runtime_state = Path(manifest["codex_home"]) / "goals_1.sqlite"
+    runtime_state.write_bytes(b"actor-local")
+
+    repeated = MODULE.prepare_home(
+        ambient_home=ambient,
+        realization_path=realization,
+        runtime_root=runtime_root,
+    )
+
+    assert repeated["codex_home"] == manifest["codex_home"]
+    assert runtime_state.read_bytes() == b"actor-local"
+
+
+def test_load_manifest_rejects_unexpected_incarnation_home_link(
+    tmp_path: Path,
+) -> None:
+    ambient = tmp_path / "ambient"
+    runtime_root = tmp_path / "runtime"
+    ambient.mkdir()
+    runtime_root.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    manifest = MODULE.prepare_home(
+        ambient_home=ambient,
+        realization_path=_realization(tmp_path / "realization.json"),
+        runtime_root=runtime_root,
+    )
+    actor_home = Path(manifest["codex_home"])
+    manifest_path = actor_home.parent / "incarnation-home.json"
+    (actor_home / "unexpected.json").symlink_to(tmp_path / "replacement.json")
+    (tmp_path / "replacement.json").write_text("{}", encoding="utf-8")
 
     with pytest.raises(
-        MODULE.IncarnationHomeError, match="unexpected incarnation-home entry"
+        MODULE.IncarnationHomeError, match="unexpected incarnation-home link"
     ):
         MODULE._load_manifest(manifest_path)
 

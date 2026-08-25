@@ -4942,7 +4942,12 @@ def prepare_home(
         source = ambient_home / name
         if not target.exists() and not target.is_symlink():
             continue
-        if not target.is_symlink() or target.readlink() != source:
+        if not target.is_symlink():
+            # A denied ambient capability may still be created as isolated
+            # actor-local runtime state.  Its presence does not restore an
+            # ambient authority edge and must survive incarnation re-entry.
+            continue
+        if target.readlink() != source:
             raise IncarnationHomeError(
                 f"obsolete capability projection link drift: {target}"
             )
@@ -5102,9 +5107,9 @@ def _load_manifest_snapshot(
         )
     expected_names = set(shared_names) | LOCAL_NAMES
     for entry in codex_home.iterdir():
-        if entry.name not in expected_names:
+        if entry.name not in expected_names and entry.is_symlink():
             raise IncarnationHomeError(
-                f"unexpected incarnation-home entry: {entry.name}"
+                f"unexpected incarnation-home link: {entry.name}"
             )
     for name in shared_names:
         source = ambient_home / name
