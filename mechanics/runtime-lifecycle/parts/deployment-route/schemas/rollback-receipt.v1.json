@@ -116,6 +116,21 @@
         }
       ]
     },
+    "rollbackFinalization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["method", "status", "committed_at", "effect", "current_destination_claim", "destination", "rollback_owner", "restored_predecessor"],
+      "properties": {
+        "method": {"const": "historical-rollback-event-v1"},
+        "status": {"const": "committed"},
+        "committed_at": {"type": "string", "format": "date-time"},
+        "effect": {"const": "rollback-predecessor-rename-noreplace"},
+        "current_destination_claim": {"const": false},
+        "destination": {"$ref": "#/$defs/absolutePath"},
+        "rollback_owner": {"$ref": "#/$defs/rollbackOwner"},
+        "restored_predecessor": {"$ref": "#/$defs/snapshot"}
+      }
+    },
     "finalization": {
       "type": "object",
       "additionalProperties": false,
@@ -214,7 +229,8 @@
         "admission": {"$ref": "#/$defs/admission"},
         "finalization": {"$ref": "#/$defs/finalization"},
         "rollback_displacement": {"$ref": "#/$defs/rollbackDisplacement"},
-        "rollback_owner": {"$ref": "#/$defs/rollbackOwner"}
+        "rollback_owner": {"$ref": "#/$defs/rollbackOwner"},
+        "rollback_finalization": {"$ref": "#/$defs/rollbackFinalization"}
       }
     },
     "recoveryReference": {
@@ -271,7 +287,7 @@
         "predecessor_identity_checked": {"const": true},
         "release_binding": {"const": "content-manifest-root-inode-v1"},
         "destination_cas": {"const": "rename-noreplace-durable-displacement-sequence-v2"},
-        "final_current_state_fence": {"const": "before-receipt-before-final-journal-and-after-publication"}
+        "final_current_state_fence": {"const": "before-receipt-before-historical-event-publication"}
       }
     }
   },
@@ -293,6 +309,7 @@
     "destination_owner",
     "rollback_displacement",
     "rollback_owner",
+    "rollback_finalization",
     "admission",
     "restored_predecessor",
     "restored_target",
@@ -325,6 +342,7 @@
     },
     "rollback_displacement": {"$ref": "#/$defs/rollbackDisplacement"},
     "rollback_owner": {"$ref": "#/$defs/rollbackOwner"},
+    "rollback_finalization": {"$ref": "#/$defs/rollbackFinalization"},
     "admission": {"$ref": "#/$defs/admission"},
     "restored_predecessor": {"$ref": "#/$defs/snapshot"},
     "restored_target": {

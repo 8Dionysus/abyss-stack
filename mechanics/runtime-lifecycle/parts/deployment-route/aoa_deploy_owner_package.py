@@ -58,7 +58,9 @@ POST_SWITCH_ROLLBACK = "durable-predecessor-restore"
 FINALIZATION_METHOD = "atomic-destination-effect-v1"
 DESTINATION_CAS_METHOD = "rename-noreplace-durable-displacement-sequence-v2"
 ROLLBACK_DISPLACEMENT_METHOD = "durable-displacement-sequence-v3"
-ROLLBACK_FINALIZATION_FENCE = "before-receipt-before-final-journal-and-after-publication"
+ROLLBACK_FINALIZATION_FENCE = "before-receipt-before-historical-event-publication"
+ROLLBACK_FINALIZATION_METHOD = "historical-rollback-event-v1"
+ROLLBACK_FINALIZATION_EFFECT = "rollback-predecessor-rename-noreplace"
 ROLLBACK_PUBLICATION_METHOD = "post-journal-current-state-verification-v1"
 ROLLBACK_DISPLACEMENT_STATES = {
     "planned",
@@ -968,6 +970,17 @@ def _receipt_binding(payload: dict[str, Any]) -> dict[str, Any]:
         binding["rollback_owner"] = _validate_rollback_owner(
             rollback_owner, "receipt rollback owner"
         )
+    rollback_finalization = payload.get("rollback_finalization")
+    if rollback_finalization is not None:
+        _validate_rollback_finalization(
+            rollback_finalization,
+            destination=_absolute_path(str(payload.get("destination", "")), "receipt destination"),
+            release_root=_absolute_path(str(payload.get("release_root", "")), "receipt release root"),
+            predecessor=predecessor,
+            rollback_owner=rollback_owner,
+            label="receipt rollback finalization",
+        )
+        binding["rollback_finalization"] = rollback_finalization
     return binding
 
 
@@ -992,6 +1005,7 @@ def _recovery_binding_payload(payload: dict[str, Any]) -> dict[str, Any]:
         "finalization": payload.get("finalization"),
         "rollback_displacement": payload.get("rollback_displacement"),
         "rollback_owner": payload.get("rollback_owner"),
+        "rollback_finalization": payload.get("rollback_finalization"),
     }
 
 
@@ -1106,6 +1120,7 @@ def _validate_historical_activation_reference(
     historical["finalization"] = finalization
     historical.pop("rollback_displacement", None)
     historical.pop("rollback_owner", None)
+    historical.pop("rollback_finalization", None)
     historical["binding_sha256"] = _recovery_binding_digest(historical)
     if reference["binding_sha256"] != historical["binding_sha256"]:
         raise DeploymentError("recovery_record_invalid", "activation recovery journal historical binding digest is invalid")
@@ -1367,6 +1382,55 @@ def _validate_finalization_binding(
         raise DeploymentError("recovery_record_invalid", f"{label} release is unmanaged") from exc
 
 
+def _rollback_finalization_event(
+    *,
+    destination: Path,
+    predecessor: dict[str, Any],
+    rollback_owner: dict[str, Any],
+) -> dict[str, Any]:
+    """Record the rollback effect without claiming the mutable path remains current."""
+
+    return {
+        "method": ROLLBACK_FINALIZATION_METHOD,
+        "status": "committed",
+        "committed_at": _iso(_utc_now()),
+        "effect": ROLLBACK_FINALIZATION_EFFECT,
+        "current_destination_claim": False,
+        "destination": os.fspath(destination),
+        "rollback_owner": rollback_owner,
+        "restored_predecessor": predecessor,
+    }
+
+
+def _validate_rollback_finalization(
+    event: Any,
+    *,
+    destination: Path,
+    release_root: Path,
+    predecessor: dict[str, Any],
+    rollback_owner: dict[str, Any] | None,
+    label: str,
+) -> None:
+    if not isinstance(event, dict):
+        raise DeploymentError("recovery_record_invalid", f"{label} is not an object")
+    if (
+        event.get("method") != ROLLBACK_FINALIZATION_METHOD
+        or event.get("status") != "committed"
+        or event.get("effect") != ROLLBACK_FINALIZATION_EFFECT
+        or event.get("current_destination_claim") is not False
+    ):
+        raise DeploymentError("recovery_record_invalid", f"{label} method or claim is invalid")
+    _timestamp(str(event.get("committed_at", "")), f"{label}.committed_at")
+    if event.get("destination") != os.fspath(destination):
+        raise DeploymentError("recovery_record_invalid", f"{label} destination is not bound")
+    if rollback_owner is None or event.get("rollback_owner") != rollback_owner:
+        raise DeploymentError("recovery_record_invalid", f"{label} rollback owner is not bound")
+    if event.get("restored_predecessor") != predecessor:
+        raise DeploymentError("recovery_record_invalid", f"{label} predecessor is not bound")
+    _validate_rollback_owner(event["rollback_owner"], f"{label} rollback owner")
+    _validate_recorded_snapshot(predecessor, release_root, label=f"{label} predecessor")
+
+
 def _validate_activation_receipt_payload(payload: dict[str, Any], path: Path) -> None:
     _verify_receipt_digest(payload, "activation receipt")
     if payload.get("schema_version") != ACTIVATE_SCHEMA or payload.get("status") != "activated":
@@ -1498,6 +1562,14 @@ def _validate_rollback_receipt_payload(payload: dict[str, Any], path: Path) -> N
     if not isinstance(predecessor, dict):
         raise DeploymentError("rollback_receipt_invalid", "rollback receipt lacks predecessor snapshot")
     _validate_recorded_snapshot(predecessor, release_root, label="restored_predecessor")
+    _validate_rollback_finalization(
+        payload.get("rollback_finalization"),
+        destination=destination,
+        release_root=release_root,
+        predecessor=predecessor,
+        rollback_owner=rollback_owner,
+        label="rollback finalization",
+    )
     if rollback_owner.get("kind") == "symlink":
         expected_link_text = _rollback_canonical_link_text(
             predecessor=predecessor,
@@ -1590,6 +1662,7 @@ def _validate_activation_against_journal(
         activation_binding.pop("finalization", None)
         journal_binding.pop("rollback_displacement", None)
         journal_binding.pop("rollback_owner", None)
+        journal_binding.pop("rollback_finalization", None)
     if activation_binding != journal_binding:
         raise DeploymentError("recovery_record_invalid", "activation receipt identity does not match journal")
     if journal.get("status") in {"rollback_intent", "rollback_switch_complete", "rolled_back"}:
@@ -1652,6 +1725,8 @@ def _validate_rollback_against_journal(
         raise DeploymentError("recovery_record_invalid", "rollback displacement does not match journal")
     if rollback.get("rollback_owner") != journal.get("rollback_owner"):
         raise DeploymentError("recovery_record_invalid", "rollback owner does not match journal")
+    if rollback.get("rollback_finalization") != journal.get("rollback_finalization"):
+        raise DeploymentError("recovery_record_invalid", "rollback finalization event does not match journal")
     _validate_journal_reference(
         rollback["recovery_journal"],
         journal,
@@ -1878,9 +1953,17 @@ def _validate_recovery_payload(payload: dict[str, Any], path: Path) -> None:
     if status == "rolled_back":
         if not rollback_keys or activation_keys:
             raise DeploymentError("recovery_record_invalid", "rolled-back journal has an incompatible receipt state")
+        _validate_rollback_finalization(
+            payload.get("rollback_finalization"),
+            destination=destination,
+            release_root=release_root,
+            predecessor=predecessor,
+            rollback_owner=rollback_owner,
+            label="recovery rollback finalization",
+        )
         rollback_payload = _load_rollback_receipt(rollback_path)
         _validate_completed_receipt_reference(payload["rollback_receipt"], rollback_path, rollback_payload, label="rollback receipt")
-        _validate_rollback_against_journal(rollback_payload, rollback_path, payload, require_current=True)
+        _validate_rollback_against_journal(rollback_payload, rollback_path, payload, require_current=False)
 
 
 def _load_recovery_journal(path: Path) -> dict[str, Any]:
@@ -3268,6 +3351,7 @@ def _rollback_payload(
         "destination_owner": journal.get("destination_owner"),
         "rollback_displacement": journal["rollback_displacement"],
         "rollback_owner": journal["rollback_owner"],
+        "rollback_finalization": journal["rollback_finalization"],
         "restored_predecessor": predecessor,
         "restored_target": restored_target,
         "admission": journal["admission"],
@@ -3353,7 +3437,7 @@ def _finish_rollback(
     destination: Path,
     release_root: Path,
 ) -> dict[str, Any]:
-    """Publish rollback only across pre- and post-publication current-state fences."""
+    """Publish a rollback event whose current-destination claim is explicitly false."""
 
     journal = _write_json(
         recovery_path,
@@ -3387,6 +3471,20 @@ def _finish_rollback(
             ),
         )
 
+    journal["rollback_finalization"] = _rollback_finalization_event(
+        destination=destination,
+        predecessor=journal["predecessor"],
+        rollback_owner=rollback_owner,
+    )
+    journal["binding_sha256"] = _recovery_binding_digest(journal)
+    journal["switch_complete_sha256"] = _recovery_state_digest(
+        journal,
+        "switch_complete",
+    )
+    journal["rollback_switch_complete_sha256"] = _recovery_state_digest(
+        journal,
+        "rollback_switch_complete",
+    )
     rollback_payload = _rollback_payload(
         journal=journal,
         recovery_path=recovery_path,
@@ -3436,36 +3534,11 @@ def _finish_rollback(
         _remove_unpublished_rollback_receipt(receipt_path)
         raise _recovery_required(recovery_path, exc) from exc
 
-    # Journal publication is itself a race boundary.  A later writer can
-    # replace the destination after the final pre-publication fence but before
-    # the journal rename is complete.  Never leave a rolled_back journal and
-    # receipt behind in that case: remove the unadmitted receipt and publish a
-    # truthful recovery-required state that preserves the later writer.
-    if not _rollback_current_state_matches(
-        destination=destination,
-        release_root=release_root,
-        predecessor=journal["predecessor"],
-        rollback_owner=rollback_owner,
-        activated_release=_absolute_path(journal["activated_release"], "rollback activated release"),
-    ):
-        receipt_cleanup = "durable" if _remove_unpublished_rollback_receipt(receipt_path) else "failed"
-        recovery_required = _rollback_publication_recovery_payload(
-            journal,
-            receipt_path=receipt_path,
-            receipt=receipt,
-            receipt_cleanup=receipt_cleanup,
-        )
-        try:
-            _write_json(recovery_path, recovery_required)
-        except DeploymentError as exc:
-            raise _recovery_required(recovery_path, exc) from exc
-        raise _recovery_required(
-            recovery_path,
-            DeploymentError(
-                "rollback_publication_uncertain",
-                "destination changed after rollback final journal publication",
-            ),
-        )
+    # The event is historical, not a current-destination claim.  A writer may
+    # replace the destination after the last pre-publication fence and before
+    # return; the receipt and journal remain truthful because they describe
+    # the route-owned predecessor effect, while reload observes the later
+    # writer as current state rather than rejecting the historical event.
     return {"receipt_path": os.fspath(receipt_path), **receipt}
 
 

@@ -1060,41 +1060,58 @@ def test_rb_cleanup_preserves_replacement_at_route_owned_path(
     assert not Path(journal["rollback_receipt_path"]).exists()
 
 
-def test_rb_post_publication_writer_transitions_to_truthful_recovery_state(
+def test_rb_post_final_fence_writer_returns_historical_event_and_reload_converges(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     fixture, first_release, second_activate = two_release_fixture(tmp_path)
     destination = Path(fixture["destination"])
-    original_write = ROUTE._write_json
+    original_matches = ROUTE._rollback_current_state_matches
     writer: dict[str, object] = {}
-    fired = False
+    true_calls = 0
 
-    def install_writer_after_final_journal(path: Path, payload: dict[str, object]) -> dict[str, object]:
-        nonlocal fired
-        result = original_write(path, payload)
-        if not fired and path.name.endswith(".recovery.json") and payload.get("status") == "rolled_back":
-            fired = True
-            writer.update(install_same_target_writer(destination, first_release, "rb-post-publication-writer"))
+    def install_writer_after_last_prior_fence(
+        *,
+        destination: Path,
+        release_root: Path,
+        predecessor: dict[str, object],
+        rollback_owner: dict[str, object],
+        activated_release: Path | None = None,
+    ) -> bool:
+        nonlocal true_calls
+        true_calls += 1
+        result = original_matches(
+            destination=destination,
+            release_root=release_root,
+            predecessor=predecessor,
+            rollback_owner=rollback_owner,
+            activated_release=activated_release,
+        )
+        if result and true_calls == 2:
+            writer.update(install_same_target_writer(destination, first_release, "rb-post-final-fence-writer"))
         return result
 
-    monkeypatch.setattr(ROUTE, "_write_json", install_writer_after_final_journal)
-    with pytest.raises(ROUTE.DeploymentError) as raised:
-        ROUTE.rollback(argparse.Namespace(activation_receipt=second_activate["receipt_path"], receipt_dir=None))
-
-    assert raised.value.code == "activation_recovery_required"
-    assert fired is True
+    monkeypatch.setattr(ROUTE, "_rollback_current_state_matches", install_writer_after_last_prior_fence)
+    result = ROUTE.rollback(
+        argparse.Namespace(activation_receipt=second_activate["receipt_path"], receipt_dir=None)
+    )
+    assert result["status"] == "rolled_back"
+    assert true_calls == 2
+    assert writer
     journal_path = Path(second_activate["recovery_journal"]["path"])
     journal = validate_instance(journal_path, "recovery-receipt.v1.json")
-    assert journal["status"] == "rollback_recovery_required"
-    assert journal["rollback_publication"]["status"] == "recovery_required"
-    assert journal["rollback_publication"]["receipt_cleanup"] == "durable"
-    assert not Path(journal["rollback_receipt_path"]).exists()
+    receipt = validate_instance(Path(result["receipt_path"]), "rollback-receipt.v1.json")
+    event = receipt["rollback_finalization"]
+    assert journal["status"] == "rolled_back"
+    assert event["current_destination_claim"] is False
+    assert event == journal["rollback_finalization"]
+    assert event["rollback_owner"]["inode"] != writer["inode"]
+    assert event["rollback_owner"]["link_text"] != writer["link_text"]
     assert ROUTE._destination_identity(destination)["inode"] == writer["inode"]
 
-    retry = invoke("recover", "--recovery-journal", str(journal_path), "--action", "rollback")
-    assert retry.returncode == 2
-    assert json.loads(retry.stderr)["error"]["code"] == "activation_recovery_required"
-    validate_instance(journal_path, "recovery-receipt.v1.json")
+    reloaded = ROUTE._load_recovery_journal(journal_path)
+    assert reloaded["status"] == "rolled_back"
+    recovered = ROUTE.recover(argparse.Namespace(recovery_journal=str(journal_path), action="rollback"))
+    assert recovered["status"] == "rolled_back"
 
 
 def test_activation_rejects_same_ref_replacement_with_ignored_poison_after_final_verification(

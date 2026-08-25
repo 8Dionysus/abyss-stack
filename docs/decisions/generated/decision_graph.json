@@ -1,11 +1,11 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
   "decision_count": 76,
-  "edge_count": 1663,
+  "edge_count": 1664,
   "edge_type_counts": {
     "CITES_SOURCE_SURFACE": 662,
     "DATED": 76,
-    "GUARDED_BY": 204,
+    "GUARDED_BY": 205,
     "HAS_STATUS": 76,
     "HAS_SURFACE_CLASS": 185,
     "IN_STACK_LANE": 151,
@@ -7888,6 +7888,11 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0076",
+      "target": "guard_family:historical%20rollback%20event",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
       "target": "guard_family:ignored-cache%20boundary",
       "type": "GUARDED_BY"
     },
@@ -8333,11 +8338,11 @@
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 708,
+  "node_count": 709,
   "node_type_counts": {
     "date": 19,
     "decision": 76,
-    "guard_family": 84,
+    "guard_family": 85,
     "mechanic_parent": 10,
     "owner_surface": 38,
     "repo": 1,
@@ -9340,6 +9345,11 @@
     {
       "id": "guard_family:governed%20policy%20envelope",
       "label": "governed policy envelope",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:historical%20rollback%20event",
+      "label": "historical rollback event",
       "type": "guard_family"
     },
     {

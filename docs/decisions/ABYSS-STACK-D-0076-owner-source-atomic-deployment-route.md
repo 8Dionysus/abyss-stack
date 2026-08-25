@@ -11,7 +11,7 @@
 - Surface classes: runtime topology, source/runtime boundary, deployment route
 - Stack lanes: runtime lifecycle, source checkout, operator deployment
 - Mechanic parents: runtime-lifecycle
-- Guard families: clean source identity, ignored-cache boundary, content manifest, release-root inode binding, effect-bound destination ownership, explicit claim ceiling, post-switch rollback, atomic switch, durable activation recovery, predecessor rollback, deployment lock
+- Guard families: clean source identity, ignored-cache boundary, content manifest, release-root inode binding, effect-bound destination ownership, explicit claim ceiling, post-switch rollback, historical rollback event, atomic switch, durable activation recovery, predecessor rollback, deployment lock
 - Posture: accepted owner-source deployment rationale
 
 ## Context
@@ -33,8 +33,9 @@ owner are different responsibilities. A source commit/tree check, artifact
 admission, and live runtime health therefore cannot be collapsed into one
 green result. The first rollback implementation review further found three
 independent gaps: displacement was random and unjournaled, device/inode/link
-tuples could be reused by a later writer, and receipt publication had no final
-current-state fence.
+tuples could be reused by a later writer, and rollback finalization did not
+publish a typed historical event that remained valid when a later writer
+replaced the destination after the last current-state observation.
 
 ## Options considered
 
@@ -96,10 +97,12 @@ cleanup unlinks only an exact recorded object, fsyncing after each deletion.
 The state machine explicitly covers B1 after displacement, B2 after predecessor
 install/cleanup, B3 after the rollback-switch marker, B4 during receipt
 publication, and B5 after inode reuse. Current-state fences run before the
-rollback receipt, before the final journal, and again after final-journal
-publication. A later writer at the publication boundary removes the unadmitted
-receipt and leaves a typed `rollback_recovery_required` journal state; it is
-preserved and never overwritten.
+rollback receipt and again before historical event publication. Rollback then
+emits a typed `rollback_finalization` event using
+`historical-rollback-event-v1`, with `current_destination_claim: false`; a later
+writer after that last observation remains current without invalidating the
+historical receipt or journal, and fresh reload validates the event and
+converges. No post-publication finite fence is used as ownership proof.
 
 The route admission is an input contract, not an `abyss-machine` artifact
 signature. Artifact classes, signatures, SBOM/provenance, registry selection,
@@ -132,14 +135,15 @@ exchange without a cross-file receipt transaction cannot establish that
 ownership. The durable intent/switch/receipt sequence makes an active
 destination explicit instead of allowing a plain rejection with an unjournaled
 new target. Rollback has its own `rollback_intent`,
-`rollback_switch_complete`, and `rollback_recovery_required` states, a durable
+`rollback_switch_complete`, and typed historical-finalization states, a durable
 displacement record, and a canonical rollback owner. It carries those records
 through retries; changed inode/link identity, even with the same target and
-seal, is preserved and remains recovery-required. The rollback receipt is
-written only after the predecessor effect and cleanup state are journaled and
-the pre-publication current-state fences pass; a post-publication mismatch
-removes the unadmitted receipt and records the recovery-required state. Typed
-receipts bind
+seal, is preserved in the historical event rather than misclaimed as current.
+The rollback receipt is written only after the predecessor effect and cleanup
+state are journaled and the pre-publication current-state fences pass; the
+following event publication records that the route's destination claim has
+ended, so a later writer does not invalidate the receipt or require a second
+finite fence. Typed receipts bind
 every finalized activation/rollback reference to the journal state digest and
 immutable operation/source/destination/release/predecessor/admission identity.
 Directory-open/fsync and receipt-write failures therefore return a

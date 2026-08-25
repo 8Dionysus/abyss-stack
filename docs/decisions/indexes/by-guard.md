@@ -273,6 +273,10 @@
 
 - [ABYSS-STACK-D-0059 Runtime Route Contracts Validator Module](../ABYSS-STACK-D-0059-runtime-route-contracts-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0059-runtime-route-contracts-validator-module.md`)
 
+## historical rollback event
+
+- [ABYSS-STACK-D-0076 Owner-source Atomic Deployment Route](../ABYSS-STACK-D-0076-owner-source-atomic-deployment-route.md) (`docs/decisions/ABYSS-STACK-D-0076-owner-source-atomic-deployment-route.md`)
+
 ## host evidence posture
 
 - [ABYSS-STACK-D-0052 Machine Fit Validator Module](../ABYSS-STACK-D-0052-machine-fit-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0052-machine-fit-validator-module.md`)

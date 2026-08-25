@@ -12,10 +12,12 @@ Tracking starts with the community-docs baseline for this repository.
 - Owner-source rollback now binds one durable route record to the prepared
   operation, displacement sequence, exact route-created path identities, and
   canonical predecessor spelling; it fsyncs the destination parent before
-  advancing state, cleans only exact objects, and transitions a post-final-
-  journal later-writer race to truthful `rollback_recovery_required` instead
-  of publishing a false receipt. New causal probes cover replay, wrong-kind
-  paths, fsync ordering/failure, cleanup replacement, and final publication.
+  advancing state, cleans only exact objects, and publishes a typed historical
+  finalization event with `current_destination_claim: false` after the last
+  current-state observation. A later writer therefore remains current without
+  forcing another finite fence or invalidating the truthful rollback receipt.
+  New causal probes cover replay, wrong-kind paths, fsync ordering/failure,
+  cleanup replacement, and post-final-fence reload convergence.
 - `aoa-session-memory-mcp` now exposes a read-only transport preflight route
   and CLI command, so agents can distinguish stale/missing Codex MCP transport
   from broken `.aoa` indexes when direct tool calls return `Transport closed`.

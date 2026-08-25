@@ -129,6 +129,21 @@
         }
       ]
     },
+    "rollbackFinalization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["method", "status", "committed_at", "effect", "current_destination_claim", "destination", "rollback_owner", "restored_predecessor"],
+      "properties": {
+        "method": {"const": "historical-rollback-event-v1"},
+        "status": {"const": "committed"},
+        "committed_at": {"type": "string", "format": "date-time"},
+        "effect": {"const": "rollback-predecessor-rename-noreplace"},
+        "current_destination_claim": {"const": false},
+        "destination": {"$ref": "#/$defs/absolutePath"},
+        "rollback_owner": {"$ref": "#/$defs/rollbackOwner"},
+        "restored_predecessor": {"$ref": "#/$defs/snapshot"}
+      }
+    },
     "finalization": {
       "type": "object",
       "additionalProperties": false,
@@ -195,7 +210,8 @@
         "admission": {"$ref": "#/$defs/admission"},
         "finalization": {"$ref": "#/$defs/finalization"},
         "rollback_displacement": {"$ref": "#/$defs/rollbackDisplacement"},
-        "rollback_owner": {"$ref": "#/$defs/rollbackOwner"}
+        "rollback_owner": {"$ref": "#/$defs/rollbackOwner"},
+        "rollback_finalization": {"$ref": "#/$defs/rollbackFinalization"}
       }
     },
     "completedReference": {
@@ -289,6 +305,7 @@
     "destination_owner": {"$ref": "#/$defs/destinationOwner"},
     "rollback_displacement": {"$ref": "#/$defs/rollbackDisplacement"},
     "rollback_owner": {"$ref": "#/$defs/rollbackOwner"},
+    "rollback_finalization": {"$ref": "#/$defs/rollbackFinalization"},
     "rollback_publication": {"$ref": "#/$defs/rollbackPublication"},
     "predecessor": {"$ref": "#/$defs/snapshot"},
     "admission": {"$ref": "#/$defs/admission"},
@@ -364,7 +381,7 @@
         "properties": {"status": {"const": "rolled_back"}}
       },
       "then": {
-        "required": ["rollback_receipt"],
+        "required": ["rollback_receipt", "rollback_finalization"],
         "not": {"required": ["activation_receipt"]}
       }
     },

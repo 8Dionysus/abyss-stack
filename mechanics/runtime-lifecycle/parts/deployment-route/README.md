@@ -114,12 +114,15 @@ never require a fresh pathname inference. The destination parent is fsynced
 after every destructive rename before durable state advances. Cleanup checks
 the recorded exact object identity/kind before each unlink and fsyncs after
 each deletion. B3 and B4 place a later writer after the rollback-switch marker
-and during receipt publication; fences run before the receipt, before the final
-journal, and again after final-journal publication. A later writer at that
-final boundary removes the unadmitted receipt and transitions the journal to
-`rollback_recovery_required`, preserving the writer; it is never unlinked or
-overwritten. Any directory-open/fsync or receipt persistence failure is a
-typed `activation_recovery_required` result with the journal path; no completed
+and during receipt publication; fences run before the receipt and again before
+historical event publication. The second is the last current-state observation:
+no post-publication finite fence is treated as ownership proof. Rollback then
+emits `rollback_finalization` with method `historical-rollback-event-v1` and
+`current_destination_claim: false`. A later writer can replace the destination
+before return; the receipt and journal remain truthful historical records,
+fresh reload accepts the typed event, and the later writer remains current. Any
+directory-open/fsync or receipt persistence failure is a typed
+`activation_recovery_required` result with the journal path; no completed
 receipt is claimed. Rollback never deletes a release; it restores the
 predecessor's logical target/identity (or the exact absent state) through a
 unique owner spelling, rechecking its recorded ref, tree, clean mutable state,
@@ -159,11 +162,12 @@ marker, after the switch marker, during receipt publication, and after forced
 inode reuse. They also cover same-target writers after ordinary and recovery
 finalization event capture, owner replacement immediately after rollback
 observation, pre-created predecessor paths, wrong-kind/path identity replay,
-cleanup replacement, post-publication final-journal interleaving, mutation
+cleanup replacement, post-final-fence historical-event interleaving, mutation
 after the shared post-switch verifier, and mutation during recovery
 finalization; they assert seal/inode policy, owner-token non-reuse, exact
-canonical spelling, fsync-before-journal ordering, no current-destination
-claim, no receipt on ambiguous rollback, and the durable journal state.
+canonical spelling, fsync-before-journal ordering, historical events with no
+current-destination claim, reload convergence, no receipt on ambiguous
+rollback, and the durable journal state.
 No live `/srv/AbyssOS` root is used by the tests.
 
 ```bash
