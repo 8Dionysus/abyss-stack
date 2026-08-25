@@ -32,6 +32,7 @@ SCHEMA_VERSION = "abyss_stack_external_codex_governed_landing_effect_grant_v1"
 CAPABILITY_ID = "governed_git_landing_v1"
 ZERO_DIGEST = "sha256:" + "0" * 64
 MAX_GRANT_BYTES = 256 * 1024
+GIT_EXECUTABLE = "/usr/bin/git"
 LANDING_EFFECTS = frozenset({"commit", "push", "pull_request", "merge"})
 RUNTIME_WIDE_FORBIDDEN_EFFECTS = frozenset(
     {
@@ -166,7 +167,7 @@ def _is_valid_git_ref(value: object) -> bool:
         return False
     try:
         result = subprocess.run(
-            ["git", "check-ref-format", value],
+            [GIT_EXECUTABLE, "check-ref-format", value],
             check=False,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
@@ -418,6 +419,11 @@ def admit_landing_effect_grant(
         raise LandingEffectGrantError(
             "landing_effect_grant_artifact_unbound",
             "exact grant admission requires the owner artifact bytes",
+        )
+    if len(grant_raw) > MAX_GRANT_BYTES:
+        raise LandingEffectGrantError(
+            "landing_effect_grant_too_large",
+            "grant artifact exceeds the bounded admission size",
         )
     try:
         parsed = _parse_json_bytes(grant_raw)

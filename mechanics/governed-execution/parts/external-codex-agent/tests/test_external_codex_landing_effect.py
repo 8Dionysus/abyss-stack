@@ -320,6 +320,37 @@ def test_loader_rejects_oversized_artifacts_before_json_parse(tmp_path: Path) ->
     assert exc.value.code == "landing_effect_grant_too_large"
 
 
+def test_direct_admission_rejects_oversized_artifact_before_json_parse() -> None:
+    grant = _grant()
+    base_raw = _raw(grant)
+    raw = base_raw + (b" " * (MAX_GRANT_BYTES + 1 - len(base_raw)))
+
+    with pytest.raises(LandingEffectGrantError) as exc:
+        admit_landing_effect_grant(
+            grant,
+            _request(grant),
+            grant_raw=raw,
+            expected_artifact_digest=_raw_digest(raw),
+            at=AT,
+        )
+    assert exc.value.code == "landing_effect_grant_too_large"
+
+
+def test_git_ref_validation_ignores_ambient_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    fake_git = tmp_path / "git"
+    fake_git.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    fake_git.chmod(0o755)
+    monkeypatch.setenv("PATH", str(tmp_path))
+
+    grant = _grant(target_kind="branch", effects=["commit"])
+    grant["target"]["branch"] = "refs/heads/main..backup"
+    _refresh_semantic_digest(grant)
+
+    with pytest.raises(LandingEffectGrantError) as exc:
+        validate_landing_effect_grant(grant)
+    assert exc.value.code == "landing_effect_grant_target_invalid"
+
+
 def test_absent_grant_is_default_denied() -> None:
     grant = _grant()
     request = _request(grant)
