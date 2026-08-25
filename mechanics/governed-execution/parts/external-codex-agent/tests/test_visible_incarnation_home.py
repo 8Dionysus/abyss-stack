@@ -597,7 +597,7 @@ def test_initial_denied_inode_is_rejected_if_moved_during_materialization(
     assert not list(runtime_root.glob("sha256-*/holder-sha256-*/incarnation-home.json"))
 
 
-def test_initial_dirent_inode_is_retained_if_ambient_stat_races(
+def test_ambient_directory_version_rejects_dirent_replacement_race(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     ambient = tmp_path / "ambient"
@@ -611,7 +611,6 @@ def test_initial_dirent_inode_is_retained_if_ambient_stat_races(
     realization = _realization(tmp_path / "realization.json")
     ambient_identity = (ambient.stat().st_dev, ambient.stat().st_ino)
     original_scandir = MODULE.os.scandir
-    original_write_exact = MODULE._write_exact
     scan_count = 0
     moved = False
     moved_target: Path | None = None
@@ -665,27 +664,10 @@ def test_initial_dirent_inode_is_retained_if_ambient_stat_races(
                 return ScannerProxy(original_scandir(path), scan_count == 2)
         return original_scandir(path)
 
-    def move_retained_inode_into_holder(
-        path: Path,
-        content: bytes,
-        mode: int,
-        *,
-        ambient_identities: set[tuple[int, int]] | None = None,
-    ) -> None:
-        original_write_exact(
-            path,
-            content,
-            mode,
-            ambient_identities=ambient_identities,
-        )
-        if path.name == "config.toml" and moved_target is not None:
-            moved_target.rename(path.parent / denied_name)
-
     monkeypatch.setattr(MODULE.os, "scandir", racing_scandir)
-    monkeypatch.setattr(MODULE, "_write_exact", move_retained_inode_into_holder)
     with pytest.raises(
         MODULE.IncarnationHomeError,
-        match="actor-local capability entry aliases ambient state",
+        match="ambient capability directory changed during enumeration",
     ):
         _ORIGINAL_PREPARE_HOME(
             ambient_home=ambient,
@@ -698,8 +680,62 @@ def test_initial_dirent_inode_is_retained_if_ambient_stat_races(
     assert scan_count >= 2
     assert ambient_entry.read_bytes() == b"ambient-path-replacement"
     assert moved_target is not None
-    assert not moved_target.exists()
+    assert moved_target.read_bytes() == b"ambient-secret-before-dirent-race"
     assert not list(runtime_root.glob("sha256-*/holder-sha256-*/incarnation-home.json"))
+
+
+def test_ambient_entry_inserted_after_listing_and_relocated_is_rejected(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ambient = tmp_path / "ambient"
+    holder_home = tmp_path / "holder-home"
+    ambient.mkdir()
+    holder_home.mkdir()
+    (ambient / "config.toml").write_text('model = "sol"\n', encoding="utf-8")
+    inserted_name = _unknown_fixture_name(tmp_path)
+    inserted = ambient / inserted_name
+    relocated = holder_home / inserted_name
+    ambient_identity = (ambient.stat().st_dev, ambient.stat().st_ino)
+    original_scandir = MODULE.os.scandir
+    raced = False
+
+    class ScannerProxy:
+        def __init__(self, iterator: object) -> None:
+            self._iterator = iterator
+
+        def __enter__(self) -> "ScannerProxy":
+            self._iterator.__enter__()  # type: ignore[attr-defined]
+            return self
+
+        def __exit__(self, *args: object) -> object:
+            nonlocal raced
+            result = self._iterator.__exit__(*args)  # type: ignore[attr-defined]
+            if not raced:
+                raced = True
+                inserted.write_bytes(b"late-ambient-state")
+                inserted.rename(relocated)
+            return result
+
+        def __iter__(self) -> object:
+            return iter(self._iterator)  # type: ignore[arg-type]
+
+    def racing_scandir(path: object) -> object:
+        if isinstance(path, int):
+            opened = os.fstat(path)
+            if (opened.st_dev, opened.st_ino) == ambient_identity:
+                return ScannerProxy(original_scandir(path))
+        return original_scandir(path)
+
+    monkeypatch.setattr(MODULE.os, "scandir", racing_scandir)
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="ambient capability directory changed during enumeration",
+    ):
+        MODULE._ambient_inode_identities(ambient)
+
+    assert raced
+    assert relocated.read_bytes() == b"late-ambient-state"
+    assert not inserted.exists()
 
 
 def test_ambient_directory_rename_race_is_rejected_before_descendant_loss(
@@ -2065,6 +2101,55 @@ def test_legacy_migration_rejects_target_bytes_changed_during_publication(
     target_markers = [
         path
         for path in _runtime_root.rglob("incarnation-home.json")
+        if path != legacy_manifest_path
+    ]
+    assert target_markers == []
+
+
+def test_legacy_migration_rejects_target_bytes_changed_after_first_final_check(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (
+        _ambient,
+        runtime_root,
+        _realization_path,
+        legacy_manifest_path,
+        context,
+        denied_name,
+    ) = _legacy_migration_fixture(tmp_path, "migration-target-final-check-race")
+    original_snapshot_validation = MODULE._validate_legacy_migration_content_snapshot
+    target_home: Path | None = None
+    raced = False
+
+    def mutate_after_first_publication_pass(**kwargs: object) -> None:
+        nonlocal raced, target_home
+        stage = str(kwargs["stage"])
+        if stage == "post-publication validation":
+            target_home = Path(str(kwargs["home"]))
+        original_snapshot_validation(**kwargs)
+        if stage == "post-publication source validation" and not raced:
+            assert target_home is not None
+            (target_home / denied_name).write_bytes(b"raced-after-final-check")
+            raced = True
+
+    monkeypatch.setattr(
+        MODULE,
+        "_validate_legacy_migration_content_snapshot",
+        mutate_after_first_publication_pass,
+    )
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="legacy migration state changed during final publication validation",
+    ):
+        MODULE.migrate_legacy_home(
+            legacy_manifest_path=legacy_manifest_path,
+            binding_context=context,
+        )
+
+    assert raced
+    target_markers = [
+        path
+        for path in runtime_root.rglob("incarnation-home.json")
         if path != legacy_manifest_path
     ]
     assert target_markers == []
@@ -4430,12 +4515,22 @@ def test_rebind_receipt_binds_holder_environment_and_manifest_snapshot(
 
 
 @pytest.mark.parametrize(
-    ("publish_receipt_before_failure", "move_claim_outside_parent"),
-    [(False, False), (False, True), (True, True)],
+    (
+        "publish_receipt_before_failure",
+        "move_claim_outside_parent",
+        "race_after_first_publication_boundary",
+    ),
+    [
+        (False, False, False),
+        (False, True, False),
+        (True, True, False),
+        (True, True, True),
+    ],
     ids=[
         "receipt-fails-before-publication",
         "receipt-fails-after-sibling-relocation",
         "claim-replaced-after-publication",
+        "claim-replaced-after-first-publication-boundary",
     ],
 )
 def test_rebind_receipt_failure_removes_renamed_claim_and_preserves_replacement(
@@ -4443,6 +4538,7 @@ def test_rebind_receipt_failure_removes_renamed_claim_and_preserves_replacement(
     monkeypatch: pytest.MonkeyPatch,
     publish_receipt_before_failure: bool,
     move_claim_outside_parent: bool,
+    race_after_first_publication_boundary: bool,
 ) -> None:
     reentry_path, reentry, context = _holder_loss_reentry_fixture(tmp_path)
     holder_pid = os.getpid()
@@ -4512,6 +4608,8 @@ def test_rebind_receipt_failure_removes_renamed_claim_and_preserves_replacement(
     )
     replacement_bytes = b"replacement-at-claim-path\n"
     original_write_new_json = MODULE._write_new_json
+    original_revalidate_regular_file_at = MODULE._revalidate_regular_file_at
+    publication_boundary_checks = 0
 
     def fail_replacement_receipt(
         path: Path,
@@ -4522,6 +4620,14 @@ def test_rebind_receipt_failure_removes_renamed_claim_and_preserves_replacement(
     ) -> None:
         nonlocal original_claim_inode
         if label == "replacement holder terminal receipt":
+            if race_after_first_publication_boundary:
+                original_write_new_json(
+                    path,
+                    value,
+                    label,
+                    ambient_identities=ambient_identities,
+                )
+                return
             original_claim_inode = claim_path.stat().st_ino
             claim_path.rename(moved_claim_path)
             claim_path.write_bytes(replacement_bytes)
@@ -4545,6 +4651,42 @@ def test_rebind_receipt_failure_removes_renamed_claim_and_preserves_replacement(
         )
 
     monkeypatch.setattr(MODULE, "_write_new_json", fail_replacement_receipt)
+    if race_after_first_publication_boundary:
+
+        def replace_claim_after_first_boundary_observation(
+            parent_fd: int,
+            name: str,
+            descriptor: int,
+            initial: os.stat_result,
+            *,
+            label: str,
+            ambient_identities: set[tuple[int, int]],
+        ) -> None:
+            nonlocal original_claim_inode, publication_boundary_checks
+            if label == "holder claim changed after receipt publication":
+                publication_boundary_checks += 1
+            original_revalidate_regular_file_at(
+                parent_fd,
+                name,
+                descriptor,
+                initial,
+                label=label,
+                ambient_identities=ambient_identities,
+            )
+            if (
+                label == "holder claim changed after receipt publication"
+                and publication_boundary_checks == 1
+            ):
+                original_claim_inode = claim_path.stat().st_ino
+                claim_path.rename(moved_claim_path)
+                claim_path.write_bytes(replacement_bytes)
+                claim_path.chmod(0o640)
+
+        monkeypatch.setattr(
+            MODULE,
+            "_revalidate_regular_file_at",
+            replace_claim_after_first_boundary_observation,
+        )
     with pytest.raises(
         MODULE.IncarnationHomeError,
         match=(
@@ -4562,6 +4704,8 @@ def test_rebind_receipt_failure_removes_renamed_claim_and_preserves_replacement(
         )
 
     assert original_claim_inode is not None
+    if race_after_first_publication_boundary:
+        assert publication_boundary_checks == 1
     assert claim_path.read_bytes() == replacement_bytes
     assert stat.S_IMODE(claim_path.stat().st_mode) == 0o640
     assert not moved_claim_path.exists()

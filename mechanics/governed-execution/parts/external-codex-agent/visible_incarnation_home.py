@@ -137,6 +137,10 @@ SAFE_PROJECTION_FORBIDDEN_KEYS = frozenset(
 LOCAL_NAMES = frozenset(
     {"config.toml", "cache", "log", "tmp", DESCENDANT_BIN_NAME}
 )
+# A publication boundary is admitted only after two unchanged observations.
+# The count is deliberately generic: it is not tied to any pathname, digest,
+# version, or observed process state.
+STABLE_PUBLICATION_OBSERVATION_COUNT = 2
 
 
 def _is_declared_staging_recovery_name(name: str) -> bool:
@@ -860,6 +864,8 @@ def _ambient_inode_identities(ambient_home: Path) -> set[tuple[int, int]]:
                         opened_directory.st_ino,
                         opened_directory.st_mode,
                     )
+                    or _actor_local_source_version(after_listing)
+                    != _actor_local_source_version(opened_directory)
                 ):
                     raise IncarnationHomeError(
                         "ambient capability directory changed during enumeration"
@@ -956,6 +962,19 @@ def _ambient_inode_identities(ambient_home: Path) -> set[tuple[int, int]]:
                     visited_directories.add(child_identity)
                     identities.add(child_identity)
                     pending.append((child_fd, child_opened))
+                try:
+                    after_entries = os.fstat(descriptor)
+                except OSError as exc:
+                    raise IncarnationHomeError(
+                        "ambient capability directory cannot be revalidated"
+                    ) from exc
+                if (
+                    _actor_local_source_version(after_entries)
+                    != _actor_local_source_version(after_listing)
+                ):
+                    raise IncarnationHomeError(
+                        "ambient capability directory changed during enumeration"
+                    )
             finally:
                 os.close(descriptor)
         try:
@@ -967,6 +986,8 @@ def _ambient_inode_identities(ambient_home: Path) -> set[tuple[int, int]]:
         if (
             (current_root.st_dev, current_root.st_ino, current_root.st_mode)
             != (initial.st_dev, initial.st_ino, initial.st_mode)
+            or _actor_local_source_version(current_root)
+            != _actor_local_source_version(initial)
         ):
             raise IncarnationHomeError(
                 f"ambient capability directory changed during enumeration: {ambient_home}"
@@ -2061,6 +2082,37 @@ def _revalidate_regular_file_at(
         or (opened.st_dev, opened.st_ino) in ambient_identities
     ):
         raise IncarnationHomeError(f"{label} changed before mutation")
+
+
+def _revalidate_regular_file_publication_boundary(
+    parent_fd: int,
+    name: str,
+    descriptor: int,
+    initial: os.stat_result,
+    expected_digest: str,
+    *,
+    label: str,
+    ambient_identities: set[tuple[int, int]],
+) -> None:
+    """Hold one descriptor through a stable, content-bound publication edge."""
+
+    for _observation in range(STABLE_PUBLICATION_OBSERVATION_COUNT):
+        _revalidate_regular_file_at(
+            parent_fd,
+            name,
+            descriptor,
+            initial,
+            label=label,
+            ambient_identities=ambient_identities,
+        )
+        try:
+            observed = os.fstat(descriptor)
+        except OSError as exc:
+            raise IncarnationHomeError(f"{label} changed before mutation") from exc
+        if _actor_local_source_version(observed) != _actor_local_source_version(initial):
+            raise IncarnationHomeError(f"{label} changed before mutation")
+        if sha256_bytes(_read_descriptor_bytes(descriptor, name)) != expected_digest:
+            raise IncarnationHomeError(f"{label} changed before mutation")
 
 
 def _revalidate_writable_regular_file_at(
@@ -6289,20 +6341,15 @@ def _rebind_replacement_holder_receipt(
                 "replacement holder terminal receipt",
                 ambient_identities=ambient_identities,
             )
-            _revalidate_regular_file_at(
+            _revalidate_regular_file_publication_boundary(
                 claim_parent_fd,
                 claim_path.name,
                 claim_descriptor,
                 claim_initial,
+                after_claim_digest,
                 label="holder claim changed after receipt publication",
                 ambient_identities=ambient_identities,
             )
-            if sha256_bytes(
-                _read_descriptor_bytes(claim_descriptor, str(claim_path))
-            ) != after_claim_digest:
-                raise IncarnationHomeError(
-                    "holder claim changed after receipt publication"
-                )
         except BaseException:
             try:
                 _restore_holder_claim_snapshot(
@@ -9640,6 +9687,7 @@ def _prepare_home_impl(
 
     migration_source_content_digests: dict[str, str | None] | None = None
     migration_source_content_versions: dict[str, str | None] | None = None
+    migration_target_content_versions: dict[str, str | None] | None = None
     if _migration_source_home is not None:
         if _migration_source_expected_names is None:
             raise IncarnationHomeError("legacy migration source declaration is missing")
@@ -9654,6 +9702,12 @@ def _prepare_home_impl(
             target_actor_local_names=set(actor_local_state_names),
             ambient_home=ambient_home,
             ambient_identities=ambient_identities,
+        )
+        migration_target_content_versions = _legacy_migration_content_snapshot(
+            home=codex_home,
+            names=sorted(migration_source_content_digests),
+            ambient_identities=ambient_identities,
+            include_source_version=True,
         )
 
     for entry in codex_home.iterdir():
@@ -9671,6 +9725,7 @@ def _prepare_home_impl(
         _migration_source_home is not None
         and migration_source_content_digests is not None
         and migration_source_content_versions is not None
+        and migration_target_content_versions is not None
     ):
         _validate_legacy_migration_content_snapshot(
             home=codex_home,
@@ -9678,6 +9733,13 @@ def _prepare_home_impl(
             ambient_identities=ambient_identities,
             include_source_version=False,
             stage="target validation",
+        )
+        _validate_legacy_migration_content_snapshot(
+            home=codex_home,
+            expected=migration_target_content_versions,
+            ambient_identities=ambient_identities,
+            include_source_version=True,
+            stage="target source-version validation",
         )
         _validate_legacy_migration_content_snapshot(
             home=_migration_source_home,
@@ -9697,6 +9759,7 @@ def _prepare_home_impl(
         _migration_source_home is not None
         and migration_source_content_digests is not None
         and migration_source_content_versions is not None
+        and migration_target_content_versions is not None
     ):
         _validate_legacy_migration_content_snapshot(
             home=codex_home,
@@ -9704,6 +9767,13 @@ def _prepare_home_impl(
             ambient_identities=ambient_identities,
             include_source_version=False,
             stage="publication validation",
+        )
+        _validate_legacy_migration_content_snapshot(
+            home=codex_home,
+            expected=migration_target_content_versions,
+            ambient_identities=ambient_identities,
+            include_source_version=True,
+            stage="publication target source-version validation",
         )
         _validate_legacy_migration_content_snapshot(
             home=_migration_source_home,
@@ -9767,22 +9837,46 @@ def _prepare_home_impl(
         _migration_source_home is not None
         and migration_source_content_digests is not None
         and migration_source_content_versions is not None
+        and migration_target_content_versions is not None
     ):
         try:
-            _validate_legacy_migration_content_snapshot(
-                home=codex_home,
-                expected=migration_source_content_digests,
-                ambient_identities=ambient_identities,
-                include_source_version=False,
-                stage="post-publication validation",
-            )
-            _validate_legacy_migration_content_snapshot(
-                home=_migration_source_home,
-                expected=migration_source_content_versions,
-                ambient_identities=ambient_identities,
-                include_source_version=True,
-                stage="post-publication source validation",
-            )
+            for (
+                target_stage,
+                target_version_stage,
+                source_stage,
+            ) in (
+                (
+                    "post-publication validation",
+                    "post-publication target source-version validation",
+                    "post-publication source validation",
+                ),
+                (
+                    "final publication validation",
+                    "final publication target source-version validation",
+                    "final publication source validation",
+                ),
+            ):
+                _validate_legacy_migration_content_snapshot(
+                    home=codex_home,
+                    expected=migration_source_content_digests,
+                    ambient_identities=ambient_identities,
+                    include_source_version=False,
+                    stage=target_stage,
+                )
+                _validate_legacy_migration_content_snapshot(
+                    home=codex_home,
+                    expected=migration_target_content_versions,
+                    ambient_identities=ambient_identities,
+                    include_source_version=True,
+                    stage=target_version_stage,
+                )
+                _validate_legacy_migration_content_snapshot(
+                    home=_migration_source_home,
+                    expected=migration_source_content_versions,
+                    ambient_identities=ambient_identities,
+                    include_source_version=True,
+                    stage=source_stage,
+                )
         except IncarnationHomeError as exc:
             try:
                 _remove_retained_regular_file(
