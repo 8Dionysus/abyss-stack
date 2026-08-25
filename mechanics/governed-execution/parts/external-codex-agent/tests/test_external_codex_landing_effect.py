@@ -63,6 +63,7 @@ def _grant(
             "base_branch": "refs/heads/main",
             "head_branch": "refs/heads/feature",
             "base_revision": "e" * 40,
+            "head_revision": "f" * 40,
         }
     grant: dict[str, Any] = {
         "$schema": "schemas/external-codex-governed-landing-effect-grant.schema.json",
@@ -201,6 +202,7 @@ def test_exact_grant_can_bind_a_pull_request_target() -> None:
         "base_branch": "refs/heads/main",
         "head_branch": "refs/heads/feature",
         "base_revision": "e" * 40,
+        "head_revision": "f" * 40,
     }
     _refresh_semantic_digest(grant)
 
@@ -214,6 +216,45 @@ def test_exact_grant_can_bind_a_pull_request_target() -> None:
 
     assert admitted["target"]["kind"] == "pull_request"
     assert admitted["target"]["pull_request_id"] == "pr:43"
+    assert admitted["target"]["head_revision"] == "f" * 40
+
+
+@pytest.mark.parametrize("repository_id", ["../..", "./.git", "owner/.."])
+def test_repository_id_rejects_traversal_components(repository_id: str) -> None:
+    grant = _grant()
+    grant["repository"]["repository_id"] = repository_id
+    _refresh_semantic_digest(grant)
+
+    with pytest.raises(LandingEffectGrantError) as exc:
+        validate_landing_effect_grant(grant)
+    assert exc.value.code == "landing_effect_grant_schema_invalid"
+
+
+def test_pull_request_target_requires_immutable_head_revision() -> None:
+    grant = _grant()
+    del grant["target"]["head_revision"]
+    _refresh_semantic_digest(grant)
+
+    with pytest.raises(LandingEffectGrantError) as exc:
+        validate_landing_effect_grant(grant)
+    assert exc.value.code == "landing_effect_grant_schema_invalid"
+
+
+def test_pull_request_head_revision_is_exactly_request_bound() -> None:
+    grant = _grant()
+    raw = _raw(grant)
+    request = _request(grant)
+    request["target"]["head_revision"] = "a" * 40
+
+    with pytest.raises(LandingEffectGrantError) as exc:
+        admit_landing_effect_grant(
+            grant,
+            request,
+            grant_raw=raw,
+            expected_artifact_digest=_raw_digest(raw),
+            at=AT,
+        )
+    assert exc.value.code == "landing_effect_grant_binding_mismatch"
 
 
 def test_admission_requires_an_independent_artifact_digest() -> None:

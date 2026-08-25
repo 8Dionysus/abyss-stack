@@ -36,7 +36,10 @@
       "properties": {
         "repository_id": {
           "type": "string",
-          "pattern": "^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$"
+          "pattern": "^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$",
+          "not": {
+            "pattern": "^(?:\\.{1,2}/.*|[^/]+/\\.{1,2})$"
+          }
         },
         "revision": {
           "type": "string",
@@ -64,14 +67,16 @@
             "pull_request_id",
             "base_branch",
             "head_branch",
-            "base_revision"
+            "base_revision",
+            "head_revision"
           ],
           "properties": {
             "kind": {"const": "pull_request"},
             "pull_request_id": {"type": "string", "minLength": 1},
             "base_branch": {"$ref": "#/$defs/branch"},
             "head_branch": {"$ref": "#/$defs/branch"},
-            "base_revision": {"$ref": "#/$defs/revision"}
+            "base_revision": {"$ref": "#/$defs/revision"},
+            "head_revision": {"$ref": "#/$defs/revision"}
           }
         }
       ]

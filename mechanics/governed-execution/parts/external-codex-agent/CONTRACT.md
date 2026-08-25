@@ -725,12 +725,14 @@ is a separate owner artifact, not a model or provider identity. It binds all of
 these exact relations in one document:
 
 - `goal_ref` and `holder_ref`, including the holder's exact incarnation;
-- `repository.repository_id` and its exact `revision`;
+- `repository.repository_id` and its exact `revision`; repository coordinates
+  reject path-traversal components;
 - either one exact branch target (which may bind only `commit` and `push`) or
-  one exact pull-request target (which may bind the full landing effect set);
+  one exact pull-request target (which may bind the full landing effect set),
+  including the immutable reviewed head revision;
 - an exact set drawn only from `commit`, `push`, `pull_request`, and `merge`,
   with pull-request and merge effects requiring the pull-request target
-  coordinates;
+  coordinates and the immutable reviewed head revision;
 - an independent-review binding whose status is approved and whose reviewer
   identity differs from the holder identity; and
 - a `return_posture` with the exact return owner, route, review-required status,
@@ -746,9 +748,11 @@ Git ref grammar before admission. Boundary timestamp overflows are normalized
 to typed time denials.
 
 `admit_landing_effect_grant` is fail-closed: absent, malformed, stale,
-future-dated, review-pending, artifact-drifted, contradictory, narrower, or
-wider grants are rejected. The request passed to it must repeat the exact
-Goal, holder, repository, target, review, return, and effect-set relations;
+future-dated, review-pending, artifact-drifted, contradictory, narrower, wider,
+or path-traversal grants are rejected. The request passed to it must repeat the
+exact Goal, holder, repository, target, review, return, and effect-set
+relations; a pull-request target's reviewed head revision is therefore
+immutable at admission;
 there is no wildcard or subset match. `landing_effect_grant_allows` is only a
 boolean read of that admission result.
 
