@@ -63,7 +63,14 @@ def _canonical_bytes(value: object) -> bytes:
             sort_keys=True,
             separators=(",", ":"),
         ).encode("utf-8")
-    except (RecursionError, TypeError, UnicodeError, ValueError, OverflowError) as exc:
+    except (
+        MemoryError,
+        RecursionError,
+        TypeError,
+        UnicodeError,
+        ValueError,
+        OverflowError,
+    ) as exc:
         raise LandingEffectGrantError(
             "landing_effect_grant_not_json", "grant is not canonical JSON data"
         ) from exc
@@ -97,7 +104,14 @@ def _bounded_canonical_bytes(value: object, *, limit: int) -> bytes:
             total += len(encoded)
     except LandingEffectGrantError:
         raise
-    except (RecursionError, TypeError, UnicodeError, ValueError, OverflowError) as exc:
+    except (
+        MemoryError,
+        RecursionError,
+        TypeError,
+        UnicodeError,
+        ValueError,
+        OverflowError,
+    ) as exc:
         raise LandingEffectGrantError(
             "landing_effect_grant_not_json", "grant is not canonical JSON data"
         ) from exc
@@ -132,7 +146,14 @@ def _parse_json_bytes(raw: bytes) -> object:
 def _copy_json(value: Mapping[str, Any]) -> dict[str, Any]:
     try:
         copied = json.loads(json.dumps(value, ensure_ascii=False))
-    except (RecursionError, TypeError, UnicodeError, ValueError, OverflowError) as exc:
+    except (
+        MemoryError,
+        RecursionError,
+        TypeError,
+        UnicodeError,
+        ValueError,
+        OverflowError,
+    ) as exc:
         raise LandingEffectGrantError(
             "landing_effect_grant_not_json", "grant is not canonical JSON data"
         ) from exc
@@ -460,6 +481,28 @@ def admit_landing_effect_grant(
         raise LandingEffectGrantError(
             "landing_effect_request_invalid", "request must be a JSON object"
         )
+    try:
+        request_raw = _bounded_canonical_bytes(request, limit=MAX_GRANT_BYTES)
+    except LandingEffectGrantError as exc:
+        code = (
+            "landing_effect_request_too_large"
+            if exc.code == "landing_effect_grant_too_large"
+            else "landing_effect_request_invalid"
+        )
+        raise LandingEffectGrantError(
+            code, "request is not bounded canonical JSON"
+        ) from exc
+    try:
+        normalized_request = _parse_json_bytes(request_raw)
+    except (UnicodeDecodeError, json.JSONDecodeError, RecursionError) as exc:
+        raise LandingEffectGrantError(
+            "landing_effect_request_invalid", "request is not bounded canonical JSON"
+        ) from exc
+    if not isinstance(normalized_request, Mapping):
+        raise LandingEffectGrantError(
+            "landing_effect_request_invalid", "request must be a JSON object"
+        )
+    request = normalized_request
     allowed_request_keys = {
         "goal_ref",
         "holder_ref",
@@ -607,7 +650,7 @@ def landing_effect_grant_allows(
         )
     except LandingEffectGrantError:
         return False
-    except (RecursionError, TypeError, ValueError, OverflowError):
+    except (MemoryError, RecursionError, TypeError, ValueError, OverflowError):
         # A malformed Mapping is still a denied boolean admission result.
         return False
     return True

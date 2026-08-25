@@ -436,6 +436,15 @@ def test_direct_admission_bounds_untrusted_mapping_after_artifact_validation() -
     assert exc.value.code == "landing_effect_grant_too_large"
 
 
+def test_request_mapping_is_bounded_before_absent_grant_denial() -> None:
+    request = {"untrusted": "x" * (MAX_GRANT_BYTES + 1)}
+
+    assert not landing_effect_grant_allows(None, request)
+    with pytest.raises(LandingEffectGrantError) as exc:
+        admit_landing_effect_grant(None, request)
+    assert exc.value.code == "landing_effect_request_too_large"
+
+
 def test_git_ref_validation_ignores_ambient_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     fake_git = tmp_path / "git"
     fake_git.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
