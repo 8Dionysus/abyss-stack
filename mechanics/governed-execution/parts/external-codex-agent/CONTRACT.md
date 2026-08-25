@@ -741,7 +741,9 @@ with that one self-referential digest field set to the zero digest. Admission
 also requires the exact grant artifact bytes and an independently supplied
 digest of those exact bytes; the semantic digest alone cannot authorize an
 artifact. Loading uses one bounded `O_NOFOLLOW` descriptor, rejects duplicate
-JSON members, and validates the complete Git ref grammar before admission.
+JSON members, rejects blocking special-file paths, and validates the complete
+Git ref grammar before admission. Boundary timestamp overflows are normalized
+to typed time denials.
 
 `admit_landing_effect_grant` is fail-closed: absent, malformed, stale,
 future-dated, review-pending, artifact-drifted, contradictory, narrower, or

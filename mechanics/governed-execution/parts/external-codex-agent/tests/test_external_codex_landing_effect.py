@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import sys
 from copy import deepcopy
 from datetime import UTC, datetime
@@ -325,6 +326,17 @@ def test_loader_uses_bounded_no_follow_descriptor_and_byte_digest(tmp_path: Path
     assert link_exc.value.code == "landing_effect_grant_unavailable"
 
 
+def test_loader_rejects_fifo_without_blocking(tmp_path: Path) -> None:
+    if not hasattr(os, "mkfifo"):
+        pytest.skip("FIFO fixtures are unavailable on this platform")
+    fifo = tmp_path / "grant.fifo"
+    os.mkfifo(fifo)
+
+    with pytest.raises(LandingEffectGrantError) as exc:
+        load_landing_effect_grant(fifo, expected_digest="sha256:" + "0" * 64)
+    assert exc.value.code == "landing_effect_grant_unavailable"
+
+
 def test_loader_rejects_oversized_artifacts_before_json_parse(tmp_path: Path) -> None:
     path = tmp_path / "oversized-grant.json"
     path.write_bytes(b"{" + (b" " * MAX_GRANT_BYTES))
@@ -432,6 +444,16 @@ def test_deeply_nested_mapping_is_default_denied_with_schema_invalid_error() -> 
     with pytest.raises(LandingEffectGrantError) as exc:
         admit_landing_effect_grant(deeply_nested, {})
     assert exc.value.code == "landing_effect_grant_schema_invalid"
+
+
+def test_boundary_timestamp_overflow_is_a_typed_time_denial() -> None:
+    grant = _grant()
+    grant["issued_at"] = "0001-01-01T00:00:00+14:00"
+    _refresh_semantic_digest(grant)
+
+    with pytest.raises(LandingEffectGrantError) as exc:
+        validate_landing_effect_grant(grant)
+    assert exc.value.code == "landing_effect_grant_time_invalid"
 
 
 def test_stale_grant_is_default_denied() -> None:

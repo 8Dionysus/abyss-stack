@@ -12,7 +12,8 @@ Tracking starts with the community-docs baseline for this repository.
 - Harden governed landing-effect admission with an independent artifact-byte
   digest, descriptor-bound bounded no-follow reads, duplicate-member rejection,
   complete Git ref validation, effect-specific target constraints, and a
-  reviewer identity distinct from the holder.
+  reviewer identity distinct from the holder; special-file opens are
+  nonblocking and boundary-time overflows are normalized.
 - Bind the canonical `aoa-kag` MCP adapter to an authored absolute
   `AOA_KAG_ARTIFACT_ROOT` seam for v4 cold-CAS reads, preserving fail-closed
   loader behavior and separate artifact-admission verdicts.

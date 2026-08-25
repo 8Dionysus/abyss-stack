@@ -135,7 +135,12 @@ def _parse_time(value: object, *, label: str) -> datetime:
         raise LandingEffectGrantError(
             "landing_effect_grant_time_invalid", f"{label} has no timezone"
         )
-    return parsed.astimezone(UTC)
+    try:
+        return parsed.astimezone(UTC)
+    except OverflowError as exc:
+        raise LandingEffectGrantError(
+            "landing_effect_grant_time_invalid", f"{label} is outside the UTC datetime range"
+        ) from exc
 
 
 def _now(value: datetime | None) -> datetime:
@@ -195,7 +200,12 @@ def _validate_target_refs(grant: Mapping[str, Any]) -> None:
 
 
 def _read_grant_bytes(grant_path: Path) -> bytes:
-    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    flags = (
+        os.O_RDONLY
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_NONBLOCK", 0)
+    )
     try:
         descriptor = os.open(grant_path, flags)
     except OSError as exc:
