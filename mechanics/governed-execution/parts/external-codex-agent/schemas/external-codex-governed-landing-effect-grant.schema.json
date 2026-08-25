@@ -43,7 +43,7 @@
         },
         "revision": {
           "type": "string",
-          "pattern": "^(?:[0-9a-f]{40}|sha256:[0-9a-f]{64})$"
+          "pattern": "^(?:[0-9a-f]{40}|sha256:[0-9a-f]{64})$(?![\\s\\S])"
         }
       }
     },
@@ -131,6 +131,25 @@
           }
         }
       }
+    },
+    {
+      "if": {
+        "required": ["allowed_effects"],
+        "properties": {
+          "allowed_effects": {
+            "contains": {"const": "commit"}
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "allowed_effects": {
+            "not": {
+              "contains": {"enum": ["push", "merge"]}
+            }
+          }
+        }
+      }
     }
   ],
   "$defs": {
@@ -191,7 +210,7 @@
     },
     "revision": {
       "type": "string",
-      "pattern": "^(?:[0-9a-f]{40}|sha256:[0-9a-f]{64})$"
+      "pattern": "^(?:[0-9a-f]{40}|sha256:[0-9a-f]{64})$(?![\\s\\S])"
     }
   }
 }

@@ -86,7 +86,7 @@ def _grant(
             "revision": "e" * 40,
         },
         "target": target,
-        "allowed_effects": effects or ["commit", "push", "pull_request", "merge"],
+        "allowed_effects": effects or ["push", "pull_request", "merge"],
         "review": {
             "required": True,
             "posture": "independent_review",
@@ -190,7 +190,7 @@ def test_exact_grant_binds_goal_holder_repository_target_review_and_return() -> 
     )
 
     assert admitted["admission"]["status"] == "admitted"
-    assert admitted["admission"]["effects"] == sorted(LANDING_EFFECTS)
+    assert admitted["admission"]["effects"] == sorted(grant["allowed_effects"])
     assert admitted["holder_ref"]["incarnation_id"] == "incarnation:fixture"
     assert admitted["return_posture"]["status"] == "review_required"
 
@@ -252,6 +252,33 @@ def test_owner_references_reject_zero_digest(ref_path: tuple[str, ...]) -> None:
     with pytest.raises(LandingEffectGrantError) as exc:
         validate_landing_effect_grant(grant)
     assert exc.value.code == "landing_effect_grant_schema_invalid"
+
+
+def test_revision_coordinates_reject_trailing_newlines() -> None:
+    for ref_path in (
+        ("repository", "revision"),
+        ("target", "base_revision"),
+        ("target", "head_revision"),
+    ):
+        grant = _grant()
+        reference: dict[str, Any] = grant
+        for key in ref_path[:-1]:
+            reference = reference[key]
+        field = ref_path[-1]
+        reference[field] += "\n"
+        _refresh_semantic_digest(grant)
+
+        with pytest.raises(LandingEffectGrantError) as exc:
+            validate_landing_effect_grant(grant)
+        assert exc.value.code == "landing_effect_grant_schema_invalid"
+
+
+def test_commit_cannot_share_a_grant_with_push_or_merge() -> None:
+    for downstream_effect in ("push", "merge"):
+        grant = _grant(effects=["commit", downstream_effect])
+        with pytest.raises(LandingEffectGrantError) as exc:
+            validate_landing_effect_grant(grant)
+        assert exc.value.code == "landing_effect_grant_schema_invalid"
 
 
 def test_pull_request_target_requires_immutable_head_revision() -> None:
@@ -350,18 +377,19 @@ def test_duplicate_artifact_members_are_rejected() -> None:
     assert exc.value.code == "landing_effect_grant_duplicate_key"
 
 
-def test_branch_target_only_allows_commit_and_push() -> None:
-    grant = _grant(target_kind="branch", effects=["commit", "push"])
-    raw = _raw(grant)
+def test_branch_target_allows_only_single_commit_or_push_effects() -> None:
+    for effect in ("commit", "push"):
+        grant = _grant(target_kind="branch", effects=[effect])
+        raw = _raw(grant)
 
-    admitted = admit_landing_effect_grant(
-        grant,
-        _request(grant),
-        grant_raw=raw,
-        expected_artifact_digest=_raw_digest(raw),
-        at=AT,
-    )
-    assert admitted["target"]["kind"] == "branch"
+        admitted = admit_landing_effect_grant(
+            grant,
+            _request(grant),
+            grant_raw=raw,
+            expected_artifact_digest=_raw_digest(raw),
+            at=AT,
+        )
+        assert admitted["target"]["kind"] == "branch"
 
     invalid = _grant(target_kind="branch", effects=["merge"])
     with pytest.raises(LandingEffectGrantError) as exc:
@@ -641,7 +669,7 @@ def test_stale_grant_is_default_denied() -> None:
 
 
 def test_wider_grant_is_rejected_for_single_effect_request() -> None:
-    grant = _grant(effects=["commit", "push"])
+    grant = _grant(effects=["push", "merge"])
     raw = _raw(grant)
 
     assert not landing_effect_grant_allows(
