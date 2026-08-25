@@ -10,10 +10,13 @@ review-required return posture. Repository coordinates reject traversal
 components, and special-file, duplicate-member, digest, ref, size, and boundary
 time cases remain typed denials.
 
-The focused landing-effect suite passed 35 tests; the canonical repository-local
-KAG gate passed incremental drift, full parity, family contract, and
-compatibility assembly; and hosted Repo Validation passed on the synchronized
-branch. This is source/CI evidence only: the current runtime profile retains
+The focused landing-effect suite (`test_external_codex_landing_effect.py`)
+collected and passed 44 tests on source repair commit `eaca7e02741888b85eb1dc232cd3c5c168635b95`
+(33 test functions, three existing three-case parametrizations, and one
+five-case owner-reference parametrization). The canonical repository-local KAG
+gate passed incremental drift, full parity, family contract, and compatibility
+assembly; and hosted Repo Validation passed on the synchronized branch. This is
+source/CI evidence only: the current runtime profile retains
 `external_effects=false` and the complete ten-effect forbidden closure, so no
 runtime activation, landing-effect execution, deployment, semantic/Goal verdict,
 or owner acceptance is claimed.
