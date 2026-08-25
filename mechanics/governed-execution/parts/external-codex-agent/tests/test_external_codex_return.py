@@ -1188,8 +1188,21 @@ def test_discovery_skips_stale_socket_candidate(
 
     monkeypatch.setattr(MODULE, "_socket_is_connectable", probe)
 
+    owner_value = owner(goal="goal-stale", thread="thread-stale")
+    fake = FakeRpc(
+        current,
+        active_turn=None,
+        goal_id=str(owner_value["goal_id"]),
+        thread_id=str(owner_value["thread_id"]),
+    )
+
     resolved, posture = MODULE.discover_app_server_socket(
-        {"transport_posture": "resolve-current-local-codex-app-server"}
+        {
+            "transport_posture": "resolve-current-local-codex-app-server",
+            "goal_id": owner_value["goal_id"],
+            "thread_id": owner_value["thread_id"],
+        },
+        rpc_factory=lambda path: fake,
     )
 
     assert resolved == current
@@ -1219,8 +1232,21 @@ def test_discovery_retries_current_socket_across_bounded_restart_gap(
     monkeypatch.setattr(MODULE, "_socket_is_connectable", probe)
     monkeypatch.setattr(MODULE.time, "sleep", lambda delay: sleeps.append(delay))
 
+    owner_value = owner(goal="goal-restart", thread="thread-restart")
+    fake = FakeRpc(
+        current,
+        active_turn=None,
+        goal_id=str(owner_value["goal_id"]),
+        thread_id=str(owner_value["thread_id"]),
+    )
+
     resolved, posture = MODULE.discover_app_server_socket(
-        {"transport_posture": "resolve-current-local-codex-app-server"}
+        {
+            "transport_posture": "resolve-current-local-codex-app-server",
+            "goal_id": owner_value["goal_id"],
+            "thread_id": owner_value["thread_id"],
+        },
+        rpc_factory=lambda path: fake,
     )
 
     assert resolved == current
