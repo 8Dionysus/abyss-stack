@@ -82,17 +82,24 @@ without deleting releases. If the switch owner was not durably recorded,
 recovery refuses to infer it from target or seal.
 
 Rollback uses a portable protocol boundary rather than a kernel handle: the
-intent journal allocates a deterministic displacement path and fresh sequence
-before any rename; `RENAME_NOREPLACE` moves the owner there and the path is
-retained through the durable rollback-switch marker. The predecessor effect
-uses a link spelling bound to that sequence and the prepared activation token,
-so an inode-reusing later writer with the same target cannot satisfy the CAS.
-The state machine explicitly covers B1 after displacement, B2 after
-predecessor install/cleanup, B3 after the rollback-switch marker, B4 during
-receipt publication, and B5 after inode reuse. A final current-state fence is
-performed immediately before the rollback receipt and again immediately
-before the final journal; either mismatch suppresses the receipt and leaves
-the journal recovery-required.
+intent journal allocates a deterministic displacement path, fresh sequence,
+and prepared-operation token before any rename. `RENAME_NOREPLACE` moves the
+owner there and the path is retained through the durable rollback-switch
+marker. Every route-created displacement/predecessor path records exact
+symlink/device/inode/mode/link identity; a pre-existing, replaced, or
+wrong-kind path is rejected. The predecessor effect uses a canonical link
+spelling derived from the activated release, release root, predecessor target,
+and destination, bound to the prepared token, so a token/spelling replay or
+inode-reusing later writer cannot satisfy the CAS. The destination parent is
+fsynced after every destructive rename before its journal state advances, and
+cleanup unlinks only an exact recorded object, fsyncing after each deletion.
+The state machine explicitly covers B1 after displacement, B2 after predecessor
+install/cleanup, B3 after the rollback-switch marker, B4 during receipt
+publication, and B5 after inode reuse. Current-state fences run before the
+rollback receipt, before the final journal, and again after final-journal
+publication. A later writer at the publication boundary removes the unadmitted
+receipt and leaves a typed `rollback_recovery_required` journal state; it is
+preserved and never overwritten.
 
 The route admission is an input contract, not an `abyss-machine` artifact
 signature. Artifact classes, signatures, SBOM/provenance, registry selection,
@@ -124,13 +131,15 @@ effect itself. A finite recheck, cooperative lock, or descriptor/rename
 exchange without a cross-file receipt transaction cannot establish that
 ownership. The durable intent/switch/receipt sequence makes an active
 destination explicit instead of allowing a plain rejection with an unjournaled
-new target. Rollback has its own `rollback_intent` and
-`rollback_switch_complete` states, a durable displacement record, and a
-sequence-bound rollback owner. It carries those records through retries;
-changed inode/link identity, even with the same target and seal, is preserved
-and remains recovery-required. The rollback receipt is written only after the
-predecessor effect and cleanup state are journaled and both final current-state
-fences pass. Typed receipts bind
+new target. Rollback has its own `rollback_intent`,
+`rollback_switch_complete`, and `rollback_recovery_required` states, a durable
+displacement record, and a canonical rollback owner. It carries those records
+through retries; changed inode/link identity, even with the same target and
+seal, is preserved and remains recovery-required. The rollback receipt is
+written only after the predecessor effect and cleanup state are journaled and
+the pre-publication current-state fences pass; a post-publication mismatch
+removes the unadmitted receipt and records the recovery-required state. Typed
+receipts bind
 every finalized activation/rollback reference to the journal state digest and
 immutable operation/source/destination/release/predecessor/admission identity.
 Directory-open/fsync and receipt-write failures therefore return a
@@ -155,9 +164,10 @@ explicit so source preparation cannot be mistaken for runtime proof.
   explicitly do not claim that the mutable destination is still current;
   rollback requires the durable destination owner token, displacement sequence,
   and rollback owner.
-- Rollback keeps a discoverable displaced path through each pre-receipt state;
-  B1-B5 later-writer and inode-reuse interleavings fail closed without object
-  loss, overwrite, or a false rollback receipt.
+- Rollback keeps exact route-created displacement/predecessor identities through
+  each pre-receipt state; B1-B5, path replay, cleanup replacement, fsync
+  failure, and final-journal interleavings fail closed without object loss,
+  overwrite, or a false rollback receipt.
 - Configs sync remains the source/runtime mirror route for ordinary stack
   changes; this route is not a replacement for it.
 

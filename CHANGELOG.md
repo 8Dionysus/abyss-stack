@@ -9,11 +9,13 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
-- Owner-source activation and rollback now bind receipts to the exact
-  pre-`os.replace` effect, carry explicit no-current-destination and
-  sequence-bound owner claims, and persist deterministic displacement across
-  every rollback boundary; the B1-B5 same-target/later-writer and inode-reuse
-  matrix fails closed without object loss, overwrite, or a false receipt.
+- Owner-source rollback now binds one durable route record to the prepared
+  operation, displacement sequence, exact route-created path identities, and
+  canonical predecessor spelling; it fsyncs the destination parent before
+  advancing state, cleans only exact objects, and transitions a post-final-
+  journal later-writer race to truthful `rollback_recovery_required` instead
+  of publishing a false receipt. New causal probes cover replay, wrong-kind
+  paths, fsync ordering/failure, cleanup replacement, and final publication.
 - `aoa-session-memory-mcp` now exposes a read-only transport preflight route
   and CLI command, so agents can distinguish stale/missing Codex MCP transport
   from broken `.aoa` indexes when direct tool calls return `Transport closed`.

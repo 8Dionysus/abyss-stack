@@ -88,9 +88,12 @@ the atomic destination effect plus the pre-effect owner token, durable
 `switch_complete` event, and explicit claim narrowing. Rollback adds a
 pre-written deterministic displacement path and sequence, retains that path
 through `rollback_switch_complete`, and restores a predecessor with a
-sequence-bound link spelling. The owner and displacement records are carried
-through every retry; claim narrowing without those recovery identities is not
-sufficient.
+sequence-bound link spelling. Both route-created paths carry exact
+symlink/device/inode/mode/link identities in the durable displacement record;
+pre-existing or replaced paths, including wrong-kind objects, are rejected.
+The predecessor is restored only with its exact canonical sequence/token link
+spelling. The owner and displacement records are carried through every retry;
+claim narrowing without those recovery identities is not sufficient.
 
 The durable journal records intent before the switch and permits deterministic
 `recover --action finalize|rollback` after switch or receipt-write interruption.
@@ -107,13 +110,16 @@ deterministic, pre-journaled displacement path with
 installs a predecessor only with another no-replace rename. The displacement
 path is retained through the rollback-switch marker, so B1 (after
 displacement), B2 (after predecessor install/cleanup), and B5 (inode reuse)
-never require a fresh pathname inference. B3 and B4 place a later writer after
-the rollback-switch marker and during receipt publication; an immediate
-current-state fence before the receipt and again before the final journal
-suppresses both false-success paths. A same-UID writer is preserved and the
-route fails closed with recovery required; it is never unlinked or overwritten.
-Any directory-open/fsync or receipt persistence failure is a typed
-`activation_recovery_required` result with the journal path; no completed
+never require a fresh pathname inference. The destination parent is fsynced
+after every destructive rename before durable state advances. Cleanup checks
+the recorded exact object identity/kind before each unlink and fsyncs after
+each deletion. B3 and B4 place a later writer after the rollback-switch marker
+and during receipt publication; fences run before the receipt, before the final
+journal, and again after final-journal publication. A later writer at that
+final boundary removes the unadmitted receipt and transitions the journal to
+`rollback_recovery_required`, preserving the writer; it is never unlinked or
+overwritten. Any directory-open/fsync or receipt persistence failure is a
+typed `activation_recovery_required` result with the journal path; no completed
 receipt is claimed. Rollback never deletes a release; it restores the
 predecessor's logical target/identity (or the exact absent state) through a
 unique owner spelling, rechecking its recorded ref, tree, clean mutable state,
@@ -145,17 +151,19 @@ TOCTOU, tracked mutation after final verification, same-ref/tree replacement
 with ignored poison after final verification, predecessor and activated release
 ref/tree/clean tamper, ignored-cache packaging, manifest/symlink policy,
 nested emitted schema instances, cross-state journal references,
-directory-fsync failure, rollback receipt persistence failure, and
+directory-fsync ordering/failure, rollback receipt persistence failure, and
 interruption/retry recovery at each activation boundary. Dedicated
 interleavings cover the B1-B5 rollback crash matrix: a same-target writer after
 durable displacement, after predecessor install/cleanup before the switch
 marker, after the switch marker, during receipt publication, and after forced
 inode reuse. They also cover same-target writers after ordinary and recovery
 finalization event capture, owner replacement immediately after rollback
-observation, mutation after the shared post-switch verifier, and mutation
-during recovery finalization; they assert seal/inode policy, owner-token
-non-reuse, no current-destination claim, no receipt on ambiguous rollback, and
-the durable journal state.
+observation, pre-created predecessor paths, wrong-kind/path identity replay,
+cleanup replacement, post-publication final-journal interleaving, mutation
+after the shared post-switch verifier, and mutation during recovery
+finalization; they assert seal/inode policy, owner-token non-reuse, exact
+canonical spelling, fsync-before-journal ordering, no current-destination
+claim, no receipt on ambiguous rollback, and the durable journal state.
 No live `/srv/AbyssOS` root is used by the tests.
 
 ```bash

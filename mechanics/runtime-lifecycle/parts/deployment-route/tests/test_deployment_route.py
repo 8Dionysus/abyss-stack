@@ -904,6 +904,199 @@ def test_rb_b5_inode_reuse_cannot_satisfy_sequence_owner(
     assert original_identity(destination)["link_text"] == reused["link_text"]
 
 
+@pytest.mark.parametrize("precreated_kind", ["symlink", "directory"])
+def test_rb_owner_rejects_precreated_predecessor_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    precreated_kind: str,
+) -> None:
+    fixture, first_release, second_activate = two_release_fixture(tmp_path)
+    original_new = ROUTE._new_rollback_displacement
+    precreated: dict[str, Path] = {}
+
+    def allocate_precreated_path(path: Path, prepare_operation_id: str) -> dict[str, object]:
+        displacement = original_new(path, prepare_operation_id)
+        predecessor_path = Path(displacement["predecessor_path"])
+        precreated["path"] = predecessor_path
+        if precreated_kind == "directory":
+            predecessor_path.mkdir()
+        else:
+            predecessor_path.symlink_to(first_release)
+        return displacement
+
+    monkeypatch.setattr(ROUTE, "_new_rollback_displacement", allocate_precreated_path)
+    with pytest.raises(ROUTE.DeploymentError) as raised:
+        ROUTE.rollback(argparse.Namespace(activation_receipt=second_activate["receipt_path"], receipt_dir=None))
+
+    assert raised.value.code == "activation_recovery_required"
+    journal_path = Path(second_activate["recovery_journal"]["path"])
+    journal = validate_instance(journal_path, "recovery-receipt.v1.json")
+    assert journal["status"] == "rollback_intent"
+    assert journal["rollback_displacement"]["state"] == "planned"
+    assert journal["rollback_displacement"]["predecessor_identity"] is None
+    assert precreated["path"].exists() or os.path.lexists(precreated["path"])
+    assert not Path(journal["rollback_receipt_path"]).exists()
+
+
+def test_rb_displacement_fsync_precedes_durable_state_advance(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fixture, _, second_activate = two_release_fixture(tmp_path)
+    destination = Path(fixture["destination"])
+    original_rename = ROUTE._rename_noreplace
+    original_fsync = ROUTE._fsync_directory
+    original_write = ROUTE._write_json
+    events: list[str] = []
+
+    def record_rename(source: Path, target: Path) -> None:
+        original_rename(source, target)
+        if Path(target).name.endswith(".rollback-displaced"):
+            events.append("displacement_rename")
+
+    def record_fsync(directory: Path) -> None:
+        if directory == destination.parent:
+            events.append("destination_fsync")
+        original_fsync(directory)
+
+    def record_write(path: Path, payload: dict[str, object]) -> dict[str, object]:
+        if (
+            path.name.endswith(".recovery.json")
+            and payload.get("status") == "rollback_intent"
+            and isinstance(payload.get("rollback_displacement"), dict)
+            and payload["rollback_displacement"].get("state") == "displaced"
+        ):
+            events.append("displaced_journal")
+        return original_write(path, payload)
+
+    monkeypatch.setattr(ROUTE, "_rename_noreplace", record_rename)
+    monkeypatch.setattr(ROUTE, "_fsync_directory", record_fsync)
+    monkeypatch.setattr(ROUTE, "_write_json", record_write)
+    result = ROUTE.rollback(
+        argparse.Namespace(activation_receipt=second_activate["receipt_path"], receipt_dir=None)
+    )
+
+    assert result["status"] == "rolled_back"
+    rename_index = events.index("displacement_rename")
+    fsync_index = next(index for index, event in enumerate(events) if event == "destination_fsync" and index > rename_index)
+    journal_index = events.index("displaced_journal")
+    assert rename_index < fsync_index < journal_index
+
+
+def test_rb_displacement_fsync_failure_leaves_unadvanced_identity(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fixture, _, second_activate = two_release_fixture(tmp_path)
+    destination = Path(fixture["destination"])
+    original_rename = ROUTE._rename_noreplace
+    original_fsync = ROUTE._fsync_directory
+    displaced = False
+    failed = False
+
+    def mark_displacement(source: Path, target: Path) -> None:
+        nonlocal displaced
+        original_rename(source, target)
+        if Path(target).name.endswith(".rollback-displaced"):
+            displaced = True
+
+    def fail_after_displacement(directory: Path) -> None:
+        nonlocal failed
+        if displaced and not failed and directory == destination.parent:
+            failed = True
+            raise OSError("injected rollback displacement fsync failure")
+        original_fsync(directory)
+
+    monkeypatch.setattr(ROUTE, "_rename_noreplace", mark_displacement)
+    monkeypatch.setattr(ROUTE, "_fsync_directory", fail_after_displacement)
+    with pytest.raises(ROUTE.DeploymentError) as raised:
+        ROUTE.rollback(argparse.Namespace(activation_receipt=second_activate["receipt_path"], receipt_dir=None))
+
+    assert raised.value.code == "activation_recovery_required"
+    assert failed is True
+    journal_path = Path(second_activate["recovery_journal"]["path"])
+    journal = validate_instance(journal_path, "recovery-receipt.v1.json")
+    assert journal["status"] == "rollback_intent"
+    assert journal["rollback_displacement"]["state"] == "planned"
+    assert journal["rollback_displacement"]["displaced_identity"] is None
+    assert Path(journal["rollback_displacement"]["displaced_path"]).is_symlink()
+    assert not Path(journal["rollback_receipt_path"]).exists()
+
+
+def test_rb_cleanup_preserves_replacement_at_route_owned_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fixture, first_release, second_activate = two_release_fixture(tmp_path)
+    destination = Path(fixture["destination"])
+    original_write = ROUTE._write_json
+    replacement: dict[str, object] = {}
+    fired = False
+
+    def replace_displaced_after_switch(path: Path, payload: dict[str, object]) -> dict[str, object]:
+        nonlocal fired
+        result = original_write(path, payload)
+        if not fired and path.name.endswith(".recovery.json") and payload.get("status") == "rollback_switch_complete":
+            fired = True
+            displacement = payload["rollback_displacement"]
+            displaced_path = Path(displacement["displaced_path"])
+            displaced_path.unlink()
+            replacement_path = destination.parent / f".{destination.name}.cleanup-replacement"
+            replacement_path.unlink(missing_ok=True)
+            replacement_path.symlink_to(first_release)
+            os.replace(replacement_path, displaced_path)
+            replacement.update(ROUTE._destination_identity(displaced_path))
+        return result
+
+    monkeypatch.setattr(ROUTE, "_write_json", replace_displaced_after_switch)
+    with pytest.raises(ROUTE.DeploymentError) as raised:
+        ROUTE.rollback(argparse.Namespace(activation_receipt=second_activate["receipt_path"], receipt_dir=None))
+
+    assert raised.value.code == "activation_recovery_required"
+    assert fired is True
+    journal_path = Path(second_activate["recovery_journal"]["path"])
+    journal = validate_instance(journal_path, "recovery-receipt.v1.json")
+    assert journal["status"] == "rollback_switch_complete"
+    assert replacement["target"] == str(first_release.resolve())
+    assert replacement["link_text"] != journal["rollback_displacement"]["displaced_identity"]["link_text"]
+    assert Path(journal["rollback_displacement"]["displaced_path"]).is_symlink()
+    assert not Path(journal["rollback_receipt_path"]).exists()
+
+
+def test_rb_post_publication_writer_transitions_to_truthful_recovery_state(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fixture, first_release, second_activate = two_release_fixture(tmp_path)
+    destination = Path(fixture["destination"])
+    original_write = ROUTE._write_json
+    writer: dict[str, object] = {}
+    fired = False
+
+    def install_writer_after_final_journal(path: Path, payload: dict[str, object]) -> dict[str, object]:
+        nonlocal fired
+        result = original_write(path, payload)
+        if not fired and path.name.endswith(".recovery.json") and payload.get("status") == "rolled_back":
+            fired = True
+            writer.update(install_same_target_writer(destination, first_release, "rb-post-publication-writer"))
+        return result
+
+    monkeypatch.setattr(ROUTE, "_write_json", install_writer_after_final_journal)
+    with pytest.raises(ROUTE.DeploymentError) as raised:
+        ROUTE.rollback(argparse.Namespace(activation_receipt=second_activate["receipt_path"], receipt_dir=None))
+
+    assert raised.value.code == "activation_recovery_required"
+    assert fired is True
+    journal_path = Path(second_activate["recovery_journal"]["path"])
+    journal = validate_instance(journal_path, "recovery-receipt.v1.json")
+    assert journal["status"] == "rollback_recovery_required"
+    assert journal["rollback_publication"]["status"] == "recovery_required"
+    assert journal["rollback_publication"]["receipt_cleanup"] == "durable"
+    assert not Path(journal["rollback_receipt_path"]).exists()
+    assert ROUTE._destination_identity(destination)["inode"] == writer["inode"]
+
+    retry = invoke("recover", "--recovery-journal", str(journal_path), "--action", "rollback")
+    assert retry.returncode == 2
+    assert json.loads(retry.stderr)["error"]["code"] == "activation_recovery_required"
+    validate_instance(journal_path, "recovery-receipt.v1.json")
+
+
 def test_activation_rejects_same_ref_replacement_with_ignored_poison_after_final_verification(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -1380,15 +1573,10 @@ def test_rollback_switch_complete_cannot_repair_activated_target(tmp_path: Path)
         "sequence": malformed_rollback["rollback_displacement"]["sequence"],
         "owner_token": journal["destination_owner"]["owner_token"],
     }
-    ROUTE._write_json(
-        journal_path,
-        ROUTE._rollback_switch_complete_payload(malformed_rollback),
-    )
+    with pytest.raises(ROUTE.DeploymentError) as raised:
+        ROUTE._rollback_switch_complete_payload(malformed_rollback)
 
-    result = invoke("recover", "--recovery-journal", str(journal_path), "--action", "rollback")
-
-    assert result.returncode == 2
-    assert json.loads(result.stderr)["error"]["code"] == "activation_recovery_required"
+    assert raised.value.code == "recovery_record_invalid"
     assert Path(fixture["destination"]).resolve() == Path(activated["activated_release"])
 
 

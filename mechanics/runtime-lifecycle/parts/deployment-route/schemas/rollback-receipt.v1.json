@@ -57,14 +57,36 @@
     "rollbackDisplacement": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["method", "sequence", "displaced_path", "predecessor_path", "state"],
+      "required": ["method", "sequence", "prepare_operation_id", "displaced_path", "predecessor_path", "displaced_identity", "predecessor_identity", "state"],
       "properties": {
-        "method": {"const": "durable-displacement-sequence-v2"},
+        "method": {"const": "durable-displacement-sequence-v3"},
         "sequence": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
+        "prepare_operation_id": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
         "displaced_path": {"$ref": "#/$defs/absolutePath"},
         "predecessor_path": {"$ref": "#/$defs/absolutePath"},
+        "displaced_identity": {"$ref": "#/$defs/pathIdentityOrNull"},
+        "predecessor_identity": {"$ref": "#/$defs/pathIdentityOrNull"},
         "state": {"enum": ["planned", "displaced", "predecessor_installed", "cleanup_started", "cleaned"]}
       }
+    },
+    "pathIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "target", "link_text", "device", "inode", "mode"],
+      "properties": {
+        "kind": {"const": "symlink"},
+        "target": {"$ref": "#/$defs/absolutePath"},
+        "link_text": {"type": "string", "minLength": 1},
+        "device": {"type": "integer", "minimum": 0},
+        "inode": {"type": "integer", "minimum": 1},
+        "mode": {"type": "integer", "minimum": 0}
+      }
+    },
+    "pathIdentityOrNull": {
+      "oneOf": [
+        {"$ref": "#/$defs/pathIdentity"},
+        {"type": "null"}
+      ]
     },
     "rollbackOwner": {
       "oneOf": [
@@ -249,7 +271,7 @@
         "predecessor_identity_checked": {"const": true},
         "release_binding": {"const": "content-manifest-root-inode-v1"},
         "destination_cas": {"const": "rename-noreplace-durable-displacement-sequence-v2"},
-        "final_current_state_fence": {"const": "immediately-before-receipt-and-journal"}
+        "final_current_state_fence": {"const": "before-receipt-before-final-journal-and-after-publication"}
       }
     }
   },
