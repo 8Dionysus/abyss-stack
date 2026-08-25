@@ -145,7 +145,7 @@
         "properties": {
           "allowed_effects": {
             "not": {
-              "contains": {"enum": ["push", "merge"]}
+              "contains": {"enum": ["push", "pull_request", "merge"]}
             }
           }
         }

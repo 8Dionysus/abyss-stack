@@ -728,8 +728,9 @@ these exact relations in one document:
 - `repository.repository_id` and its exact `revision`; repository coordinates
   reject path-traversal components;
 - either one exact branch target (which may bind only `commit` and `push`) or
-  one exact pull-request target (which may bind the full landing effect set),
-  including the immutable reviewed head revision;
+  one exact pull-request target (which may bind `push`, `pull_request`, and
+  `merge`, or a standalone `commit`), including the immutable reviewed head
+  revision;
 - an exact set drawn only from `commit`, `push`, `pull_request`, and `merge`,
   with pull-request and merge effects requiring the pull-request target
   coordinates and the immutable reviewed head revision;

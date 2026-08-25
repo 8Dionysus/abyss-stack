@@ -273,8 +273,8 @@ def test_revision_coordinates_reject_trailing_newlines() -> None:
         assert exc.value.code == "landing_effect_grant_schema_invalid"
 
 
-def test_commit_cannot_share_a_grant_with_push_or_merge() -> None:
-    for downstream_effect in ("push", "merge"):
+def test_commit_cannot_share_a_grant_with_downstream_effects() -> None:
+    for downstream_effect in ("push", "pull_request", "merge"):
         grant = _grant(effects=["commit", downstream_effect])
         with pytest.raises(LandingEffectGrantError) as exc:
             validate_landing_effect_grant(grant)
