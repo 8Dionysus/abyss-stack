@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 16260876,
+  "allowed_tracked_bytes": 38240939,
+  "approved_by": "repository-owner",
+  "base_ref": "3ad477deeb7164b00be371896264d92071176197",
+  "changed_generated_bytes": 16260876,
+  "changed_generated_files": 148,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "f4b336cfbebeb21bc82f874b09fa6b12ca432b8c8fb7f42ab3178ee5b6eb73f5",
+  "reason": "Refresh the admitted portable family after the generic actor-local isolation and verified holder ancestry repair; arbitrary local runtime state remains supported while link-based authority edges are rejected.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 38240939,
+  "tracked_bytes_max": 24117248
+}
