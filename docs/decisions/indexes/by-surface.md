@@ -34,6 +34,7 @@
 
 - [ABYSS-STACK-D-0001 Runtime Root Under AbyssOS](../ABYSS-STACK-D-0001-runtime-root-under-abyssos.md) (`docs/decisions/ABYSS-STACK-D-0001-runtime-root-under-abyssos.md`)
 - [ABYSS-STACK-D-0043 Service Selection Validator Module](../ABYSS-STACK-D-0043-service-selection-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0043-service-selection-validator-module.md`)
+- [ABYSS-STACK-D-0138 Owner-source Atomic Deployment Route](../ABYSS-STACK-D-0138-owner-source-atomic-deployment-route.md) (`docs/decisions/ABYSS-STACK-D-0138-owner-source-atomic-deployment-route.md`)
 
 ## runtime profile
 
@@ -78,6 +79,7 @@
 - [ABYSS-STACK-D-0135 Typed Incarnation Capability Projection](../ABYSS-STACK-D-0135-typed-incarnation-capability-projection.md) (`docs/decisions/ABYSS-STACK-D-0135-typed-incarnation-capability-projection.md`)
 - [ABYSS-STACK-D-0136 Canonical KAG Cold-CAS Binding](../ABYSS-STACK-D-0136-canonical-kag-cold-cas-binding.md) (`docs/decisions/ABYSS-STACK-D-0136-canonical-kag-cold-cas-binding.md`)
 - [ABYSS-STACK-D-0137 Canonical Codex 0.149.1 Runtime Subject Admission](../ABYSS-STACK-D-0137-canonical-codex-0-149-1-runtime-subject-admission.md) (`docs/decisions/ABYSS-STACK-D-0137-canonical-codex-0-149-1-runtime-subject-admission.md`)
+- [ABYSS-STACK-D-0138 Owner-source Atomic Deployment Route](../ABYSS-STACK-D-0138-owner-source-atomic-deployment-route.md) (`docs/decisions/ABYSS-STACK-D-0138-owner-source-atomic-deployment-route.md`)
 
 ## mechanic package
 
@@ -373,6 +375,10 @@
 ## decision route
 
 - [ABYSS-STACK-D-0056 Decision Surface Validator Module](../ABYSS-STACK-D-0056-decision-surface-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0056-decision-surface-validator-module.md`)
+
+## deployment route
+
+- [ABYSS-STACK-D-0138 Owner-source Atomic Deployment Route](../ABYSS-STACK-D-0138-owner-source-atomic-deployment-route.md) (`docs/decisions/ABYSS-STACK-D-0138-owner-source-atomic-deployment-route.md`)
 
 ## diagnostic surface
 

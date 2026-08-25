@@ -1,0 +1,234 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://abyss-stack.invalid/schemas/owner-source-activate-receipt-v1",
+  "title": "Abyss Stack owner-source activation receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "$defs": {
+    "hex40": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "hex64": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "absolutePath": {"type": "string", "pattern": "^/"},
+    "releaseSeal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "release_path", "source_ref", "source_tree", "mode", "root_device", "root_inode", "root_mode", "manifest_schema", "manifest_sha256", "manifest_entries", "ignored_policy", "symlink_policy", "special_file_policy"],
+      "properties": {
+        "path": {"$ref": "#/$defs/absolutePath"},
+        "sha256": {"$ref": "#/$defs/hex64"},
+        "release_path": {"$ref": "#/$defs/absolutePath"},
+        "source_ref": {"$ref": "#/$defs/hex40"},
+        "source_tree": {"$ref": "#/$defs/hex40"},
+        "mode": {"const": "read_only"},
+        "root_device": {"type": "integer", "minimum": 0},
+        "root_inode": {"type": "integer", "minimum": 1},
+        "root_mode": {"type": "integer", "minimum": 0, "maximum": 4095},
+        "manifest_schema": {"const": "abyss_stack_owner_source_release_manifest_v1"},
+        "manifest_sha256": {"$ref": "#/$defs/hex64"},
+        "manifest_entries": {"type": "integer", "minimum": 1},
+        "ignored_policy": {"const": "included_in_manifest"},
+        "symlink_policy": {"const": "record_target_no_follow"},
+        "special_file_policy": {"const": "reject"}
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["root", "ref", "tree", "dirty"],
+      "properties": {
+        "root": {"$ref": "#/$defs/absolutePath"},
+        "ref": {"$ref": "#/$defs/hex40"},
+        "tree": {"$ref": "#/$defs/hex40"},
+        "dirty": {"const": false}
+      }
+    },
+    "destinationOwner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["target", "link_text", "device", "inode", "mode", "owner_token"],
+      "properties": {
+        "target": {"$ref": "#/$defs/absolutePath"},
+        "link_text": {"type": "string", "minLength": 1},
+        "device": {"type": "integer", "minimum": 0},
+        "inode": {"type": "integer", "minimum": 1},
+        "mode": {"type": "integer", "minimum": 0},
+        "owner_token": {"type": "string", "pattern": "^[0-9a-f]{32}$"}
+      }
+    },
+    "finalization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["method", "status", "committed_at", "effect", "current_destination_claim", "destination", "release"],
+      "properties": {
+        "method": {"const": "atomic-destination-effect-v1"},
+        "status": {"const": "committed"},
+        "committed_at": {"type": "string", "format": "date-time"},
+        "effect": {"const": "relative-symlink-os-replace"},
+        "current_destination_claim": {"const": false},
+        "destination": {"$ref": "#/$defs/destinationOwner"},
+        "release": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "root_device", "root_inode", "manifest_sha256", "seal_sha256"],
+          "properties": {
+            "path": {"$ref": "#/$defs/absolutePath"},
+            "root_device": {"type": "integer", "minimum": 0},
+            "root_inode": {"type": "integer", "minimum": 1},
+            "manifest_sha256": {"$ref": "#/$defs/hex64"},
+            "seal_sha256": {"$ref": "#/$defs/hex64"}
+          }
+        }
+      }
+    },
+    "snapshot": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": {"kind": {"const": "absent"}}
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "link_text", "target", "source_ref", "source_tree", "release_seal"],
+          "properties": {
+            "kind": {"const": "symlink"},
+            "link_text": {"type": "string", "minLength": 1},
+            "target": {"$ref": "#/$defs/absolutePath"},
+            "source_ref": {"$ref": "#/$defs/hex40"},
+            "source_tree": {"$ref": "#/$defs/hex40"},
+            "release_seal": {"$ref": "#/$defs/releaseSeal"}
+          }
+        }
+      ]
+    },
+    "receiptReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"$ref": "#/$defs/absolutePath"},
+        "sha256": {"$ref": "#/$defs/hex64"}
+      }
+    },
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operation_id", "prepare_operation_id", "owner_repo", "source", "destination", "release_root", "activated_release", "release_seal", "destination_owner", "predecessor", "admission", "finalization"],
+      "properties": {
+        "operation_id": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
+        "prepare_operation_id": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
+        "owner_repo": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"},
+        "source": {"$ref": "#/$defs/source"},
+        "destination": {"$ref": "#/$defs/absolutePath"},
+        "release_root": {"$ref": "#/$defs/absolutePath"},
+        "activated_release": {"$ref": "#/$defs/absolutePath"},
+        "release_seal": {"$ref": "#/$defs/releaseSeal"},
+        "destination_owner": {"$ref": "#/$defs/destinationOwner"},
+        "predecessor": {"$ref": "#/$defs/snapshot"},
+        "admission": {"$ref": "#/$defs/admission"},
+        "finalization": {"$ref": "#/$defs/finalization"}
+      }
+    },
+    "recoveryReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "binding_sha256", "status", "binding"],
+      "properties": {
+        "path": {"$ref": "#/$defs/absolutePath"},
+        "sha256": {"$ref": "#/$defs/hex64"},
+        "binding_sha256": {"$ref": "#/$defs/hex64"},
+        "status": {"const": "switch_complete"},
+        "binding": {"$ref": "#/$defs/binding"}
+      }
+    },
+    "admission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "admission_id", "authority_ceiling"],
+      "properties": {
+        "path": {"$ref": "#/$defs/absolutePath"},
+        "sha256": {"$ref": "#/$defs/hex64"},
+        "admission_id": {"type": "string", "minLength": 1},
+        "authority_ceiling": {
+          "enum": [
+            "disposable-source-package-canary",
+            "installed-source-package-activation"
+          ]
+        }
+      }
+    },
+    "atomicity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "same_filesystem",
+        "switch",
+        "destination_identity_checked",
+        "journal",
+        "release_binding",
+        "post_switch_verification",
+        "post_switch_rollback",
+        "finalization"
+      ],
+      "properties": {
+        "same_filesystem": {"const": true},
+        "switch": {"const": "relative-symlink-os-replace"},
+        "destination_identity_checked": {"const": true},
+        "journal": {"const": "durable-before-switch"},
+        "release_binding": {"const": "content-manifest-root-inode-v1"},
+        "post_switch_verification": {"const": "required_before_activation_receipt"},
+        "post_switch_rollback": {"const": "durable-predecessor-restore"},
+        "finalization": {"const": "atomic-destination-effect-v1"}
+      }
+    }
+  },
+  "required": [
+    "schema_version",
+    "status",
+    "operation_id",
+    "prepare_operation_id",
+    "activated_at",
+    "owner_repo",
+    "prepare_receipt",
+    "source",
+    "destination",
+    "release_root",
+    "activated_release",
+    "release_seal",
+    "destination_owner",
+    "predecessor",
+    "admission",
+    "finalization",
+    "recovery_journal",
+    "atomicity",
+    "dependency_posture",
+    "effects",
+    "claim_ceiling",
+    "receipt_digest"
+  ],
+  "properties": {
+    "schema_version": {"const": "abyss_stack_owner_source_activate_receipt_v1"},
+    "status": {"const": "activated"},
+    "operation_id": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
+    "prepare_operation_id": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
+    "activated_at": {"type": "string", "format": "date-time"},
+    "owner_repo": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"},
+    "prepare_receipt": {"$ref": "#/$defs/receiptReference"},
+    "source": {"$ref": "#/$defs/source"},
+    "destination": {"$ref": "#/$defs/absolutePath"},
+    "release_root": {"$ref": "#/$defs/absolutePath"},
+    "activated_release": {"$ref": "#/$defs/absolutePath"},
+    "release_seal": {"$ref": "#/$defs/releaseSeal"},
+    "destination_owner": {"$ref": "#/$defs/destinationOwner"},
+    "predecessor": {"$ref": "#/$defs/snapshot"},
+    "admission": {"$ref": "#/$defs/admission"},
+    "finalization": {"$ref": "#/$defs/finalization"},
+    "recovery_journal": {"$ref": "#/$defs/recoveryReference"},
+    "atomicity": {"$ref": "#/$defs/atomicity"},
+    "dependency_posture": {"const": "source_only_no_install"},
+    "effects": {"type": "array", "items": {"type": "string"}},
+    "claim_ceiling": {"const": "source_activation_event_only_no_current_destination_claim"},
+    "receipt_digest": {"$ref": "#/$defs/hex64"}
+  }
+}

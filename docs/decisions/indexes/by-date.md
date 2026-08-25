@@ -276,3 +276,4 @@
 ## 2026-08-25
 
 - [ABYSS-STACK-D-0137 Canonical Codex 0.149.1 Runtime Subject Admission](../ABYSS-STACK-D-0137-canonical-codex-0-149-1-runtime-subject-admission.md) (`docs/decisions/ABYSS-STACK-D-0137-canonical-codex-0-149-1-runtime-subject-admission.md`)
+- [ABYSS-STACK-D-0138 Owner-source Atomic Deployment Route](../ABYSS-STACK-D-0138-owner-source-atomic-deployment-route.md) (`docs/decisions/ABYSS-STACK-D-0138-owner-source-atomic-deployment-route.md`)

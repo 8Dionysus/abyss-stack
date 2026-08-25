@@ -71,6 +71,7 @@
 - [ABYSS-STACK-D-0080 Diagnostic Skill Owner Home](../ABYSS-STACK-D-0080-diagnostic-skill-owner-home.md) (`docs/decisions/ABYSS-STACK-D-0080-diagnostic-skill-owner-home.md`)
 - [ABYSS-STACK-D-0084 Routing Mirror Provenance Readiness](../ABYSS-STACK-D-0084-routing-mirror-provenance-readiness.md) (`docs/decisions/ABYSS-STACK-D-0084-routing-mirror-provenance-readiness.md`)
 - [ABYSS-STACK-D-0085 SDK Routing Canary Intake](../ABYSS-STACK-D-0085-sdk-routing-canary-intake.md) (`docs/decisions/ABYSS-STACK-D-0085-sdk-routing-canary-intake.md`)
+- [ABYSS-STACK-D-0138 Owner-source Atomic Deployment Route](../ABYSS-STACK-D-0138-owner-source-atomic-deployment-route.md) (`docs/decisions/ABYSS-STACK-D-0138-owner-source-atomic-deployment-route.md`)
 
 ## config projection
 
@@ -99,6 +100,7 @@
 - [ABYSS-STACK-D-0108 Modern-Only MCP Organ Runtime](../ABYSS-STACK-D-0108-modern-only-mcp-organ-runtime.md) (`docs/decisions/ABYSS-STACK-D-0108-modern-only-mcp-organ-runtime.md`)
 - [ABYSS-STACK-D-0109 Recover Expired Modern MCP Read Admission](../ABYSS-STACK-D-0109-recover-expired-modern-mcp-read-admission.md) (`docs/decisions/ABYSS-STACK-D-0109-recover-expired-modern-mcp-read-admission.md`)
 - [ABYSS-STACK-D-0125 Decouple Codex Availability From MCP Recovery](../ABYSS-STACK-D-0125-decouple-codex-availability-from-mcp-recovery.md) (`docs/decisions/ABYSS-STACK-D-0125-decouple-codex-availability-from-mcp-recovery.md`)
+- [ABYSS-STACK-D-0138 Owner-source Atomic Deployment Route](../ABYSS-STACK-D-0138-owner-source-atomic-deployment-route.md) (`docs/decisions/ABYSS-STACK-D-0138-owner-source-atomic-deployment-route.md`)
 
 ## machine fit
 
@@ -348,6 +350,10 @@
 
 - [ABYSS-STACK-D-0085 SDK Routing Canary Intake](../ABYSS-STACK-D-0085-sdk-routing-canary-intake.md) (`docs/decisions/ABYSS-STACK-D-0085-sdk-routing-canary-intake.md`)
 - [ABYSS-STACK-D-0086 Receipt-Bound SDK Routing Cutover](../ABYSS-STACK-D-0086-receipt-bound-sdk-routing-cutover.md) (`docs/decisions/ABYSS-STACK-D-0086-receipt-bound-sdk-routing-cutover.md`)
+
+## operator deployment
+
+- [ABYSS-STACK-D-0138 Owner-source Atomic Deployment Route](../ABYSS-STACK-D-0138-owner-source-atomic-deployment-route.md) (`docs/decisions/ABYSS-STACK-D-0138-owner-source-atomic-deployment-route.md`)
 
 ## organ access fabric
 

@@ -1,0 +1,408 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://abyss-stack.invalid/schemas/owner-source-activation-recovery-v1",
+  "title": "Abyss Stack owner-source activation recovery journal v1",
+  "type": "object",
+  "additionalProperties": false,
+  "$defs": {
+    "hex40": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "hex64": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "absolutePath": {"type": "string", "pattern": "^/"},
+    "releaseSeal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "release_path", "source_ref", "source_tree", "mode", "root_device", "root_inode", "root_mode", "manifest_schema", "manifest_sha256", "manifest_entries", "ignored_policy", "symlink_policy", "special_file_policy"],
+      "properties": {
+        "path": {"$ref": "#/$defs/absolutePath"},
+        "sha256": {"$ref": "#/$defs/hex64"},
+        "release_path": {"$ref": "#/$defs/absolutePath"},
+        "source_ref": {"$ref": "#/$defs/hex40"},
+        "source_tree": {"$ref": "#/$defs/hex40"},
+        "mode": {"const": "read_only"},
+        "root_device": {"type": "integer", "minimum": 0},
+        "root_inode": {"type": "integer", "minimum": 1},
+        "root_mode": {"type": "integer", "minimum": 0, "maximum": 4095},
+        "manifest_schema": {"const": "abyss_stack_owner_source_release_manifest_v1"},
+        "manifest_sha256": {"$ref": "#/$defs/hex64"},
+        "manifest_entries": {"type": "integer", "minimum": 1},
+        "ignored_policy": {"const": "included_in_manifest"},
+        "symlink_policy": {"const": "record_target_no_follow"},
+        "special_file_policy": {"const": "reject"}
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["root", "ref", "tree", "dirty"],
+      "properties": {
+        "root": {"$ref": "#/$defs/absolutePath"},
+        "ref": {"$ref": "#/$defs/hex40"},
+        "tree": {"$ref": "#/$defs/hex40"},
+        "dirty": {"const": false}
+      }
+    },
+    "destinationOwner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["target", "link_text", "device", "inode", "mode", "owner_token"],
+      "properties": {
+        "target": {"$ref": "#/$defs/absolutePath"},
+        "link_text": {"type": "string", "minLength": 1},
+        "device": {"type": "integer", "minimum": 0},
+        "inode": {"type": "integer", "minimum": 1},
+        "mode": {"type": "integer", "minimum": 0},
+        "owner_token": {"type": "string", "pattern": "^[0-9a-f]{32}$"}
+      }
+    },
+    "rollbackDisplacement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["method", "sequence", "prepare_operation_id", "displaced_path", "predecessor_path", "displaced_identity", "predecessor_identity", "state"],
+      "properties": {
+        "method": {"const": "durable-displacement-sequence-v3"},
+        "sequence": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
+        "prepare_operation_id": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
+        "displaced_path": {"$ref": "#/$defs/absolutePath"},
+        "predecessor_path": {"$ref": "#/$defs/absolutePath"},
+        "displaced_identity": {"$ref": "#/$defs/pathIdentityOrNull"},
+        "predecessor_identity": {"$ref": "#/$defs/pathIdentityOrNull"},
+        "state": {"enum": ["planned", "displaced", "predecessor_installed", "cleanup_started", "cleaned"]}
+      }
+    },
+    "pathIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "target", "link_text", "device", "inode", "mode"],
+      "properties": {
+        "kind": {"const": "symlink"},
+        "target": {"$ref": "#/$defs/absolutePath"},
+        "link_text": {"type": "string", "minLength": 1},
+        "device": {"type": "integer", "minimum": 0},
+        "inode": {"type": "integer", "minimum": 1},
+        "mode": {"type": "integer", "minimum": 0}
+      }
+    },
+    "pathIdentityOrNull": {
+      "oneOf": [
+        {"$ref": "#/$defs/pathIdentity"},
+        {"type": "null"}
+      ]
+    },
+    "rollbackPublication": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["method", "status", "reason", "receipt_path", "receipt_sha256", "receipt_cleanup"],
+      "properties": {
+        "method": {"const": "post-journal-current-state-verification-v1"},
+        "status": {"const": "recovery_required"},
+        "reason": {"const": "destination_changed_after_final_journal_publication"},
+        "receipt_path": {"$ref": "#/$defs/absolutePath"},
+        "receipt_sha256": {"$ref": "#/$defs/hex64"},
+        "receipt_cleanup": {"enum": ["durable", "failed"]}
+      }
+    },
+    "rollbackOwner": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "sequence"],
+          "properties": {
+            "kind": {"const": "absent"},
+            "sequence": {"type": "string", "pattern": "^[0-9a-f]{32}$"}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "sequence", "target", "link_text", "device", "inode", "mode", "owner_token"],
+          "properties": {
+            "kind": {"const": "symlink"},
+            "sequence": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
+            "target": {"$ref": "#/$defs/absolutePath"},
+            "link_text": {"type": "string", "minLength": 1},
+            "device": {"type": "integer", "minimum": 0},
+            "inode": {"type": "integer", "minimum": 1},
+            "mode": {"type": "integer", "minimum": 0},
+            "owner_token": {"type": "string", "pattern": "^[0-9a-f]{32}$"}
+          }
+        }
+      ]
+    },
+    "rollbackFinalization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["method", "status", "committed_at", "effect", "current_destination_claim", "destination", "rollback_owner", "restored_predecessor"],
+      "properties": {
+        "method": {"const": "historical-rollback-event-v1"},
+        "status": {"const": "committed"},
+        "committed_at": {"type": "string", "format": "date-time"},
+        "effect": {"const": "rollback-predecessor-rename-noreplace"},
+        "current_destination_claim": {"const": false},
+        "destination": {"$ref": "#/$defs/absolutePath"},
+        "rollback_owner": {"$ref": "#/$defs/rollbackOwner"},
+        "restored_predecessor": {"$ref": "#/$defs/snapshot"}
+      }
+    },
+    "finalization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["method", "status", "committed_at", "effect", "current_destination_claim", "destination", "release"],
+      "properties": {
+        "method": {"const": "atomic-destination-effect-v1"},
+        "status": {"const": "committed"},
+        "committed_at": {"type": "string", "format": "date-time"},
+        "effect": {"const": "relative-symlink-os-replace"},
+        "current_destination_claim": {"const": false},
+        "destination": {"$ref": "#/$defs/destinationOwner"},
+        "release": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "root_device", "root_inode", "manifest_sha256", "seal_sha256"],
+          "properties": {
+            "path": {"$ref": "#/$defs/absolutePath"},
+            "root_device": {"type": "integer", "minimum": 0},
+            "root_inode": {"type": "integer", "minimum": 1},
+            "manifest_sha256": {"$ref": "#/$defs/hex64"},
+            "seal_sha256": {"$ref": "#/$defs/hex64"}
+          }
+        }
+      }
+    },
+    "snapshot": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": {"kind": {"const": "absent"}}
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "link_text", "target", "source_ref", "source_tree", "release_seal"],
+          "properties": {
+            "kind": {"const": "symlink"},
+            "link_text": {"type": "string", "minLength": 1},
+            "target": {"$ref": "#/$defs/absolutePath"},
+            "source_ref": {"$ref": "#/$defs/hex40"},
+            "source_tree": {"$ref": "#/$defs/hex40"},
+            "release_seal": {"$ref": "#/$defs/releaseSeal"}
+          }
+        }
+      ]
+    },
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operation_id", "prepare_operation_id", "owner_repo", "source", "destination", "release_root", "activated_release", "release_seal", "predecessor", "admission"],
+      "properties": {
+        "operation_id": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
+        "prepare_operation_id": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
+        "owner_repo": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"},
+        "source": {"$ref": "#/$defs/source"},
+        "destination": {"$ref": "#/$defs/absolutePath"},
+        "release_root": {"$ref": "#/$defs/absolutePath"},
+        "activated_release": {"$ref": "#/$defs/absolutePath"},
+        "release_seal": {"$ref": "#/$defs/releaseSeal"},
+        "destination_owner": {"$ref": "#/$defs/destinationOwner"},
+        "predecessor": {"$ref": "#/$defs/snapshot"},
+        "admission": {"$ref": "#/$defs/admission"},
+        "finalization": {"$ref": "#/$defs/finalization"},
+        "rollback_displacement": {"$ref": "#/$defs/rollbackDisplacement"},
+        "rollback_owner": {"$ref": "#/$defs/rollbackOwner"},
+        "rollback_finalization": {"$ref": "#/$defs/rollbackFinalization"}
+      }
+    },
+    "completedReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "status", "binding"],
+      "properties": {
+        "path": {"$ref": "#/$defs/absolutePath"},
+        "sha256": {"$ref": "#/$defs/hex64"},
+        "status": {"const": "complete"},
+        "binding": {"$ref": "#/$defs/binding"}
+      }
+    },
+    "admission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "admission_id", "authority_ceiling"],
+      "properties": {
+        "path": {"$ref": "#/$defs/absolutePath"},
+        "sha256": {"$ref": "#/$defs/hex64"},
+        "admission_id": {"type": "string", "minLength": 1},
+        "authority_ceiling": {
+          "enum": [
+            "disposable-source-package-canary",
+            "installed-source-package-activation"
+          ]
+        }
+      }
+    },
+    "atomicity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["same_filesystem", "switch", "journal", "release_binding", "finalization"],
+      "properties": {
+        "same_filesystem": {"const": true},
+        "switch": {"const": "relative-symlink-os-replace"},
+        "journal": {"const": "durable-before-switch"},
+        "release_binding": {"const": "content-manifest-root-inode-v1"},
+        "finalization": {"const": "atomic-destination-effect-v1"}
+      }
+    }
+  },
+  "required": [
+    "schema_version",
+    "status",
+    "operation_id",
+    "prepare_operation_id",
+    "created_at",
+    "updated_at",
+    "owner_repo",
+    "prepare_receipt",
+    "source",
+    "destination",
+    "release_root",
+    "activated_release",
+    "release_seal",
+    "predecessor",
+    "admission",
+    "activation_receipt_path",
+    "rollback_receipt_path",
+    "atomicity",
+    "claim_ceiling",
+    "binding_sha256",
+    "receipt_digest"
+  ],
+  "properties": {
+    "schema_version": {"const": "abyss_stack_owner_source_activation_recovery_v1"},
+    "status": {"enum": ["intent_written", "switch_complete", "finalized", "rollback_intent", "rollback_switch_complete", "rollback_recovery_required", "rolled_back"]},
+    "operation_id": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
+    "prepare_operation_id": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
+    "created_at": {"type": "string", "format": "date-time"},
+    "updated_at": {"type": "string", "format": "date-time"},
+    "switched_at": {"type": "string", "format": "date-time"},
+    "rollback_started_at": {"type": "string", "format": "date-time"},
+    "rollback_switched_at": {"type": "string", "format": "date-time"},
+    "owner_repo": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"},
+    "prepare_receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"$ref": "#/$defs/absolutePath"},
+        "sha256": {"$ref": "#/$defs/hex64"}
+      }
+    },
+    "source": {"$ref": "#/$defs/source"},
+    "destination": {"$ref": "#/$defs/absolutePath"},
+    "release_root": {"$ref": "#/$defs/absolutePath"},
+    "activated_release": {"$ref": "#/$defs/absolutePath"},
+    "release_seal": {"$ref": "#/$defs/releaseSeal"},
+    "destination_owner": {"$ref": "#/$defs/destinationOwner"},
+    "rollback_displacement": {"$ref": "#/$defs/rollbackDisplacement"},
+    "rollback_owner": {"$ref": "#/$defs/rollbackOwner"},
+    "rollback_finalization": {"$ref": "#/$defs/rollbackFinalization"},
+    "rollback_publication": {"$ref": "#/$defs/rollbackPublication"},
+    "predecessor": {"$ref": "#/$defs/snapshot"},
+    "admission": {"$ref": "#/$defs/admission"},
+    "activation_receipt_path": {"$ref": "#/$defs/absolutePath"},
+    "rollback_receipt_path": {"$ref": "#/$defs/absolutePath"},
+    "finalization": {"$ref": "#/$defs/finalization"},
+    "activation_receipt": {"$ref": "#/$defs/completedReference"},
+    "rollback_receipt": {"$ref": "#/$defs/completedReference"},
+    "atomicity": {"$ref": "#/$defs/atomicity"},
+    "claim_ceiling": {"const": "source_activation_event_recovery_only_no_current_destination_claim"},
+    "binding_sha256": {"$ref": "#/$defs/hex64"},
+    "switch_complete_sha256": {"$ref": "#/$defs/hex64"},
+    "rollback_switch_complete_sha256": {"$ref": "#/$defs/hex64"},
+    "rollback_recovery_required_sha256": {"$ref": "#/$defs/hex64"},
+    "receipt_digest": {"$ref": "#/$defs/hex64"}
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": ["status"],
+        "properties": {"status": {"enum": ["switch_complete", "finalized"]}}
+      },
+      "then": {"required": ["destination_owner"]}
+    },
+    {
+      "if": {
+        "required": ["status"],
+        "properties": {"status": {"enum": ["switch_complete", "finalized"]}}
+      },
+      "then": {"required": ["switched_at", "switch_complete_sha256", "finalization"]}
+    },
+    {
+      "if": {
+        "required": ["status"],
+        "properties": {"status": {"enum": ["rollback_intent", "rollback_switch_complete", "rollback_recovery_required", "rolled_back"]}}
+      },
+      "then": {"required": ["switch_complete_sha256", "rollback_displacement"]}
+    },
+    {
+      "if": {
+        "required": ["status"],
+        "properties": {"status": {"enum": ["rollback_intent", "rollback_switch_complete", "rolled_back"]}}
+      },
+      "then": {"required": ["rollback_started_at"]}
+    },
+    {
+      "if": {
+        "required": ["status"],
+        "properties": {"status": {"enum": ["rollback_switch_complete", "rollback_recovery_required", "rolled_back"]}}
+      },
+      "then": {"required": ["rollback_switched_at", "rollback_switch_complete_sha256", "rollback_owner"]}
+    },
+    {
+      "if": {
+        "required": ["status"],
+        "properties": {"status": {"const": "finalized"}}
+      },
+      "then": {
+        "required": ["activation_receipt", "finalization"],
+        "not": {"required": ["rollback_receipt"]}
+      }
+    },
+    {
+      "if": {
+        "required": ["status"],
+        "properties": {"status": {"enum": ["rollback_intent", "rollback_switch_complete", "rollback_recovery_required", "rolled_back"]}}
+      },
+      "then": {"not": {"required": ["finalization"]}}
+    },
+    {
+      "if": {
+        "required": ["status"],
+        "properties": {"status": {"const": "rolled_back"}}
+      },
+      "then": {
+        "required": ["rollback_receipt", "rollback_finalization"],
+        "not": {"required": ["activation_receipt"]}
+      }
+    },
+    {
+      "if": {
+        "required": ["status"],
+        "properties": {"status": {"const": "rollback_recovery_required"}}
+      },
+      "then": {
+        "required": ["rollback_publication", "rollback_recovery_required_sha256"],
+        "not": {"anyOf": [{"required": ["activation_receipt"]}, {"required": ["rollback_receipt"]}]}
+      }
+    },
+    {
+      "if": {
+        "required": ["status"],
+        "properties": {"status": {"enum": ["intent_written", "switch_complete", "rollback_intent", "rollback_switch_complete", "rollback_recovery_required"]}}
+      },
+      "then": {
+        "not": {"anyOf": [{"required": ["activation_receipt"]}, {"required": ["rollback_receipt"]}]}
+      }
+    }
+  ]
+}

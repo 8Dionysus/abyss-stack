@@ -152,6 +152,7 @@
 - [ABYSS-STACK-D-0108 Modern-Only MCP Organ Runtime](../ABYSS-STACK-D-0108-modern-only-mcp-organ-runtime.md) (`docs/decisions/ABYSS-STACK-D-0108-modern-only-mcp-organ-runtime.md`)
 - [ABYSS-STACK-D-0109 Recover Expired Modern MCP Read Admission](../ABYSS-STACK-D-0109-recover-expired-modern-mcp-read-admission.md) (`docs/decisions/ABYSS-STACK-D-0109-recover-expired-modern-mcp-read-admission.md`)
 - [ABYSS-STACK-D-0125 Decouple Codex Availability From MCP Recovery](../ABYSS-STACK-D-0125-decouple-codex-availability-from-mcp-recovery.md) (`docs/decisions/ABYSS-STACK-D-0125-decouple-codex-availability-from-mcp-recovery.md`)
+- [ABYSS-STACK-D-0138 Owner-source Atomic Deployment Route](../ABYSS-STACK-D-0138-owner-source-atomic-deployment-route.md) (`docs/decisions/ABYSS-STACK-D-0138-owner-source-atomic-deployment-route.md`)
 
 ## cross-mechanic
 
