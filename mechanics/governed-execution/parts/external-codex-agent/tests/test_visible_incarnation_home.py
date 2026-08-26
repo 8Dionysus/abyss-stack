@@ -1210,24 +1210,236 @@ def test_exact_writer_rejects_parent_replacement_before_ambient_mutation(
     before_ambient_bytes = ambient_config.read_bytes()
     before_ambient_mode = stat.S_IMODE(ambient_config.stat().st_mode)
     original_open = MODULE.os.open
+    actor_moved = tmp_path / "actor-moved"
+    parent_identity = (tmp_path.stat().st_dev, tmp_path.stat().st_ino)
+    replaced = False
 
     def redirect_replaced_parent(
-        path: object, flags: int, *args: object, **kwargs: object
+        path: object,
+        flags: int,
+        mode: int = 0o777,
+        *,
+        dir_fd: int | None = None,
     ) -> int:
-        if kwargs.get("dir_fd") is None and os.fspath(path) == str(actor):
-            return original_open(ambient, flags, *args, **kwargs)
-        return original_open(path, flags, *args, **kwargs)
+        nonlocal replaced
+        if (
+            not replaced
+            and path == actor.name
+            and dir_fd is not None
+            and (os.fstat(dir_fd).st_dev, os.fstat(dir_fd).st_ino)
+            == parent_identity
+        ):
+            actor.rename(actor_moved)
+            actor.symlink_to(ambient, target_is_directory=True)
+            replaced = True
+        return original_open(path, flags, mode, dir_fd=dir_fd)
 
     monkeypatch.setattr(MODULE.os, "open", redirect_replaced_parent)
     with pytest.raises(
         MODULE.IncarnationHomeError,
-        match="exact file parent changed during safe open",
+        match="exact file parent cannot be opened safely",
     ):
         MODULE._write_exact(actor_config, b'actor = "new"\n', 0o600)
 
+    assert replaced
     assert ambient_config.read_bytes() == before_ambient_bytes
     assert stat.S_IMODE(ambient_config.stat().st_mode) == before_ambient_mode
-    assert actor_config.read_bytes() == b'actor = "old"\n'
+    assert actor.is_symlink()
+    assert (actor_moved / "config.toml").read_bytes() == b'actor = "old"\n'
+
+
+def test_pinned_parent_directory_accepts_nested_and_root_paths(tmp_path: Path) -> None:
+    first = tmp_path / "first"
+    second = first / "second"
+    second.mkdir(parents=True)
+    target = second / "target.bin"
+
+    parent_fd = MODULE._open_pinned_parent_directory(target, "nested target")
+    try:
+        opened = os.fstat(parent_fd)
+        expected = second.stat()
+        assert (opened.st_dev, opened.st_ino, opened.st_mode) == (
+            expected.st_dev,
+            expected.st_ino,
+            expected.st_mode,
+        )
+        moved = tmp_path / "first-moved"
+        replacement = tmp_path / "first"
+        first.rename(moved)
+        (replacement / "second").mkdir(parents=True)
+        os.mkdir("created-after-pin", dir_fd=parent_fd)
+        assert (moved / "second" / "created-after-pin").is_dir()
+        assert not (replacement / "second" / "created-after-pin").exists()
+    finally:
+        os.close(parent_fd)
+
+    root_fd = MODULE._open_pinned_parent_directory(
+        Path(os.sep) / "not-an-existing-target", "root target"
+    )
+    try:
+        opened_root = os.fstat(root_fd)
+        expected_root = os.stat(os.sep)
+        assert (opened_root.st_dev, opened_root.st_ino) == (
+            expected_root.st_dev,
+            expected_root.st_ino,
+        )
+    finally:
+        os.close(root_fd)
+
+
+def test_pinned_parent_directory_rejects_missing_and_symlink_components(
+    tmp_path: Path,
+) -> None:
+    missing_target = tmp_path / "missing" / "nested" / "target.bin"
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="parent cannot be inspected",
+    ):
+        MODULE._open_pinned_parent_directory(missing_target, "missing target")
+
+    real_parent = tmp_path / "real-parent"
+    real_parent.mkdir()
+    symlink_parent = tmp_path / "symlink-parent"
+    symlink_parent.symlink_to(real_parent, target_is_directory=True)
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="parent must be a real directory",
+    ):
+        MODULE._open_pinned_parent_directory(
+            symlink_parent / "target.bin", "symlink target"
+        )
+
+
+def test_pinned_parent_directory_rejects_intermediate_replacement(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    base = tmp_path / "base"
+    first = base / "first"
+    second = first / "second"
+    second.mkdir(parents=True)
+    target = second / "target.bin"
+    moved = base / "first-moved"
+    replacement = base / "first"
+    base_identity = (base.stat().st_dev, base.stat().st_ino)
+    original_open = MODULE.os.open
+    replaced = False
+
+    def replace_before_component_open(
+        path: object,
+        flags: int,
+        mode: int = 0o777,
+        *,
+        dir_fd: int | None = None,
+    ) -> int:
+        nonlocal replaced
+        if (
+            not replaced
+            and path == first.name
+            and dir_fd is not None
+            and (os.fstat(dir_fd).st_dev, os.fstat(dir_fd).st_ino)
+            == base_identity
+        ):
+            first.rename(moved)
+            replacement.mkdir()
+            replaced = True
+        return original_open(path, flags, mode, dir_fd=dir_fd)
+
+    monkeypatch.setattr(MODULE.os, "open", replace_before_component_open)
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="ancestor parent changed during safe open",
+    ):
+        MODULE._open_pinned_parent_directory(target, "ancestor")
+
+    assert replaced
+    assert moved.is_dir()
+    assert replacement.is_dir()
+
+
+def test_descriptor_comparison_rejects_mutation_between_chunks(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    size = MODULE._DESCRIPTOR_READ_CHUNK_SIZE * 3 + 17
+    unit = b"0123456789abcdef"
+    payload = (unit * ((size + len(unit) - 1) // len(unit)))[:size]
+    path = tmp_path / "large.bin"
+    path.write_bytes(payload)
+    expected = path.read_bytes()
+    descriptor = os.open(path, os.O_RDONLY)
+    original_read = MODULE.os.read
+    mutated = False
+    requests: list[int] = []
+
+    def mutate_after_first_chunk(fd: int, count: int) -> bytes:
+        nonlocal mutated
+        requests.append(count)
+        chunk = original_read(fd, count)
+        if fd == descriptor and chunk and not mutated:
+            with path.open("r+b") as writer:
+                writer.seek(len(chunk))
+                writer.write(b"!")
+            mutated = True
+        return chunk
+
+    monkeypatch.setattr(MODULE.os, "read", mutate_after_first_chunk)
+    try:
+        assert not MODULE._descriptor_matches_bytes(
+            descriptor, expected, "large file comparison"
+        )
+    finally:
+        os.close(descriptor)
+
+    assert mutated
+    assert requests
+    assert max(requests) == MODULE._DESCRIPTOR_READ_CHUNK_SIZE
+
+
+def test_legacy_migration_large_file_comparison_keeps_one_output_buffer(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ambient, _runtime_root, _realization, legacy_manifest_path, _context, denied = (
+        _legacy_migration_fixture(tmp_path, "migration-bounded-comparison")
+    )
+    source_home = legacy_manifest_path.parent / "codex-home"
+    target_home = tmp_path / "typed-home"
+    target_home.mkdir()
+    size = MODULE._DESCRIPTOR_READ_CHUNK_SIZE * 3 + 17
+    unit = b"legacy-content-"
+    payload = (unit * ((size + len(unit) - 1) // len(unit)))[:size]
+    source_file = source_home / "cache" / "large.bin"
+    source_file.write_bytes(payload)
+
+    class TrackedBytes(bytes):
+        live = 0
+        peak = 0
+
+        def __new__(cls, value: bytes) -> "TrackedBytes":
+            instance = super().__new__(cls, value)
+            cls.live += 1
+            cls.peak = max(cls.peak, cls.live)
+            return instance
+
+        def __del__(self) -> None:
+            type(self).live -= 1
+
+    original_read = MODULE._read_descriptor_bytes
+
+    def tracked_read(descriptor: int, label: str) -> bytes:
+        return TrackedBytes(original_read(descriptor, label))
+
+    monkeypatch.setattr(MODULE, "_read_descriptor_bytes", tracked_read)
+    MODULE._copy_legacy_actor_local_state(
+        source_home=source_home,
+        target_home=target_home,
+        source_expected_names=set(MODULE.LOCAL_NAMES) | {denied},
+        source_actor_local_names=(denied,),
+        target_actor_local_names={denied},
+        ambient_home=ambient,
+        ambient_identities=MODULE._ambient_inode_identities(ambient),
+    )
+
+    assert TrackedBytes.peak == 1
+    assert (target_home / "cache" / "large.bin").read_bytes() == payload
 
 
 def test_exact_writer_publishes_from_unnameable_descriptor(

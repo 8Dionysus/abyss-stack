@@ -156,6 +156,12 @@ and replay only through their matching legacy wake reservation. A retry after a 
   descendants, and every visited child name is revalidated after its complete
   descriptor-relative walk; a stat-to-open replacement of any denied directory
   also fails closed before its descendants can be omitted from provenance;
+  every absolute parent-bound file effect uses the shared pinned-parent
+  resolver: each
+  component from the filesystem root is opened relative to the retained
+  descriptor with no-follow flags, every component edge is revalidated before
+  the final parent descriptor is transferred, and missing, non-directory,
+  symlink, permission, or replacement failures remain fail-closed;
 - validates the complete top-level name set of an existing home before claiming
   or mutating it, so undeclared state cannot leave partial config, mode, or
   projection effects behind;
@@ -185,10 +191,13 @@ bound config, and leaves the v2 source untouched. The resulting v3 manifest
 records the exact legacy manifest digest; a retry may return that target only
 after revalidating its bytes, modes, projection, and source state as an exact
 idempotent match. Each copied legacy file and directory is also bound to its
-retained inode's kernel-owned source version, including size, mtime, and ctime;
-version drift is rejected before publication, so an A-B-A write cannot pass
-the endpoint snapshot checks. A pre-existing typed target with any other state is rejected
-before copy or mutation. Every first preparation is
+  retained inode's kernel-owned source version, including size, mtime, and ctime;
+  version drift is rejected before publication, so an A-B-A write cannot pass
+  the endpoint snapshot checks. A stable file's first pass is the one returned
+  migration buffer; its comparison pass streams fixed-size chunks against that
+  buffer, so comparison memory does not scale with a second complete source
+  buffer. A pre-existing typed target with any other state is rejected before
+  copy or mutation. Every first preparation is
 serialized by
   the runtime-owned preparation lock and claims an unpublished root with an
   exact owner token; owner-token retirement retains and revalidates that
@@ -199,8 +208,8 @@ serialized by
   outer launcher has exec'd into bubblewrap; immediately
   before rollback it rechecks whether the exact canonical receipt was already
   published, and a published receipt keeps the claim frozen. The exact writer
-  pins the target
-  parent descriptor, publishes new files from an unnameable descriptor, and
+  pins the complete target parent chain and transfers only its final
+  descriptor, publishes new files from an unnameable descriptor, and
   stages every existing-file replacement through a separate fully written
   unnameable descriptor before an atomic exchange that verifies the displaced
   target inode. Deterministic parent, target, and temporary-name replacement

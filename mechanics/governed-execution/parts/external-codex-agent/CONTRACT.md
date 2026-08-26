@@ -918,6 +918,11 @@ Migration copies every legacy actor-local directory mode, including the
 top-level cache/log/tmp/descendant-bin roots, through a retained no-follow
 target descriptor and verifies the mode before publishing the typed manifest;
 the exact mode is part of idempotent retry validation.
+The stable read of each copied regular file retains the one byte buffer required
+by the migration contract and compares a second pass incrementally through
+fixed-size descriptor reads. It never retains a second complete returned source
+buffer, while the source-version checks before and after the read still reject
+same-inode mutation, including an A-B-A write.
 The first typed target also receives the locked, validated legacy capability
 projection, so a denied row remains bounded and explicit when its ambient entry
 disappears before migration; absent and unchanged local shadows are handled by
@@ -966,9 +971,14 @@ and losing its descendants. Before the preparation owner claims or mutates an
 existing home, the complete top-level name set is enumerated through a stable
 descriptor and rejected if it contains an undeclared entry. The snapshot
 is bounded to that preparation and is not a filename/history denylist.
-Every file writer pins and revalidates the target parent descriptor before
-creating, replacing, or mode-updating a file, so a parent rename or symlink
-replacement cannot redirect an effect into ambient state. New files are
+Every file writer pins and revalidates the complete target parent chain before
+creating, replacing, or mode-updating a file. The shared resolver opens each
+absolute component relative to a retained no-follow directory descriptor,
+revalidates every component edge while the chain is retained, closes all
+intermediate descriptors, and transfers only the final parent descriptor. A
+missing, non-directory, symlink, permission, or concurrent component
+replacement therefore fails closed, while a replacement after transfer cannot
+redirect the descriptor-relative effect. New files are
 published directly from an unnameable `O_TMPFILE` descriptor rather than a
 replaceable temporary pathname; existing admitted regular files are opened
 read-only for identity admission, written completely through a separate

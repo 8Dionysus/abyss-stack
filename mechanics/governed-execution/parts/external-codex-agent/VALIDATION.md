@@ -70,8 +70,9 @@ Same-filesystem hard links to ambient denied state, severed ambient aliases,
 denied inodes moved during materialization, multiply linked regular files,
 device/inode aliases, a directory-entry rename/stat race that could lose
 descendants, replacement during no-follow validation, a stat-to-open directory
-replacement, and a child swap after its complete descriptor-relative walk fail
-closed before manifest admission or
+replacement, a nested parent-chain symlink or missing component, an intermediate
+parent replacement, and a child swap after its complete descriptor-relative
+walk fail closed before manifest admission or
 launch;
 the complete top-level name set is also rejected before an existing home is
 claimed or mutated, and the adversarial fixtures verify that ambient bytes and
@@ -102,6 +103,9 @@ target with divergent state is rejected before copy or mutation.
 Migration also binds each copied source tree row to the retained inode's
 kernel-owned version (including size, mtime, and ctime) and rejects version
 drift before publication, including a deterministic A-B-A source write.
+The large-file migration adversary proves that the stable comparison retains
+only one returned source buffer while the second pass is chunked, and a
+mutation injected between comparison chunks is rejected before publication.
 The final publication lease retains the ambient and target roots through the
 owner-token handoff, and migration retains its source and target roots while
 walking descendants relative to owned parents; descendant descriptors close

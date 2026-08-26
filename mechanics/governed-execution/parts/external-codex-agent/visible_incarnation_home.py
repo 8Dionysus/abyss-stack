@@ -1580,8 +1580,7 @@ def _local_tree_content_digest(
                 raise IncarnationHomeError(
                     f"actor-local capability entry changed while reading: {label}"
                 )
-            repeated_content = _read_descriptor_bytes(read_descriptor, label)
-            if repeated_content != content:
+            if not _descriptor_matches_bytes(read_descriptor, content, label):
                 raise IncarnationHomeError(
                     f"actor-local capability entry changed while reading: {label}"
                 )
@@ -1592,7 +1591,7 @@ def _local_tree_content_digest(
                 raise IncarnationHomeError(
                     f"actor-local capability entry changed while reading: {label}"
                 )
-            return repeated_content
+            return content
         finally:
             if read_descriptor is not None:
                 os.close(read_descriptor)
@@ -2630,46 +2629,145 @@ def _bound_config(ambient_config: bytes, model_slug: str, effort: str) -> bytes:
 
 
 def _open_pinned_parent_directory(path: Path, label: str) -> int:
-    """Open and pin one target parent before any file mutation."""
+    """Pin every parent component with descriptor-relative no-follow opens.
 
-    if not path.is_absolute() or not path.name:
+    The returned descriptor is the only descriptor transferred to the caller.
+    Every earlier component remains open until the complete chain has been
+    revalidated, then is closed before the transfer. This keeps a later rename
+    or replacement of an ancestor from redirecting operations that use the
+    returned parent descriptor.
+    """
+
+    if not path.is_absolute() or not path.name or path.name in {".", ".."}:
         raise IncarnationHomeError(f"{label} must be an absolute file path: {path}")
     parent = path.parent
-    try:
-        observed = os.lstat(parent)
-    except OSError as exc:
+    parts = parent.parts
+    if not parts or not os.path.isabs(os.fspath(parent)):
+        raise IncarnationHomeError(f"{label} parent must be absolute: {parent}")
+    if any(component in {".", ".."} for component in parts[1:]):
         raise IncarnationHomeError(
-            f"{label} parent cannot be inspected: {parent}"
-        ) from exc
-    if stat.S_ISLNK(observed.st_mode) or not stat.S_ISDIR(observed.st_mode):
-        raise IncarnationHomeError(f"{label} parent must be a real directory: {parent}")
-    flags = os.O_RDONLY
-    flags |= getattr(os, "O_DIRECTORY", 0)
-    flags |= getattr(os, "O_NOFOLLOW", 0)
-    flags |= getattr(os, "O_CLOEXEC", 0)
+            f"{label} parent contains an unsafe path component: {parent}"
+        )
+
+    flags = (
+        os.O_RDONLY
+        | getattr(os, "O_DIRECTORY", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_CLOEXEC", 0)
+    )
+    owned_fds: list[int] = []
+
+    def close_owned(keep: int | None = None) -> None:
+        for index in range(len(owned_fds) - 1, -1, -1):
+            descriptor = owned_fds[index]
+            if descriptor == keep:
+                continue
+            try:
+                os.close(descriptor)
+            except OSError as exc:
+                raise IncarnationHomeError(
+                    f"{label} parent descriptor cannot be closed safely: {parent}"
+                ) from exc
+            owned_fds.pop(index)
+
     try:
-        parent_fd = os.open(parent, flags)
-    except OSError as exc:
-        raise IncarnationHomeError(
-            f"{label} parent cannot be opened safely: {parent}"
-        ) from exc
-    try:
-        opened = os.fstat(parent_fd)
-        if (
-            (opened.st_dev, opened.st_ino, opened.st_mode)
-            != (observed.st_dev, observed.st_ino, observed.st_mode)
+        root_path = parts[0]
+        try:
+            root_initial = os.lstat(root_path)
+            root_fd = os.open(root_path, flags)
+        except OSError as exc:
+            raise IncarnationHomeError(
+                f"{label} parent cannot be opened safely: {parent}"
+            ) from exc
+        owned_fds.append(root_fd)
+        try:
+            root_opened = os.fstat(root_fd)
+        except OSError as exc:
+            raise IncarnationHomeError(
+                f"{label} parent cannot be inspected after safe open: {parent}"
+            ) from exc
+        if _actor_local_identity_mode(root_opened) != _actor_local_identity_mode(
+            root_initial
         ):
             raise IncarnationHomeError(
                 f"{label} parent changed during safe open: {parent}"
             )
-        return parent_fd
+
+        current_fd = root_fd
+        components: list[tuple[int, str, os.stat_result, int]] = []
+        for component in parts[1:]:
+            try:
+                initial = os.lstat(component, dir_fd=current_fd)
+            except OSError as exc:
+                raise IncarnationHomeError(
+                    f"{label} parent cannot be inspected: {parent}"
+                ) from exc
+            if stat.S_ISLNK(initial.st_mode) or not stat.S_ISDIR(initial.st_mode):
+                raise IncarnationHomeError(
+                    f"{label} parent must be a real directory: {parent}"
+                )
+            try:
+                child_fd = os.open(component, flags, dir_fd=current_fd)
+            except OSError as exc:
+                raise IncarnationHomeError(
+                    f"{label} parent cannot be opened safely: {parent}"
+                ) from exc
+            owned_fds.append(child_fd)
+            try:
+                opened = os.fstat(child_fd)
+                observed = os.lstat(component, dir_fd=current_fd)
+            except OSError as exc:
+                raise IncarnationHomeError(
+                    f"{label} parent cannot be inspected after safe open: {parent}"
+                ) from exc
+            if (
+                _actor_local_identity_mode(opened)
+                != _actor_local_identity_mode(initial)
+                or _actor_local_identity_mode(opened)
+                != _actor_local_identity_mode(observed)
+            ):
+                raise IncarnationHomeError(
+                    f"{label} parent changed during safe open: {parent}"
+                )
+            components.append((current_fd, component, initial, child_fd))
+            current_fd = child_fd
+
+        # Recheck each named edge while both ends of that edge are retained.
+        # A deterministic replacement fails closed; a later replacement still
+        # cannot redirect operations because the returned fd is pinned.
+        for component_parent_fd, component, initial, child_fd in components:
+            try:
+                observed = os.lstat(component, dir_fd=component_parent_fd)
+                opened = os.fstat(child_fd)
+            except OSError as exc:
+                raise IncarnationHomeError(
+                    f"{label} parent cannot be inspected after safe open: {parent}"
+                ) from exc
+            if (
+                _actor_local_identity_mode(opened)
+                != _actor_local_identity_mode(initial)
+                or _actor_local_identity_mode(opened)
+                != _actor_local_identity_mode(observed)
+            ):
+                raise IncarnationHomeError(
+                    f"{label} parent changed during safe open: {parent}"
+                )
+
+        close_owned(keep=current_fd)
+        return current_fd
     except IncarnationHomeError:
-        os.close(parent_fd)
+        try:
+            close_owned()
+        except IncarnationHomeError:
+            pass
         raise
-    except OSError as exc:
-        os.close(parent_fd)
+    except (OSError, ValueError) as exc:
+        try:
+            close_owned()
+        except IncarnationHomeError:
+            pass
         raise IncarnationHomeError(
-            f"{label} parent cannot be inspected after safe open: {parent}"
+            f"{label} parent cannot be inspected safely: {parent}"
         ) from exc
 
 
@@ -2782,12 +2880,38 @@ def _open_stable_regular_file_at(
         raise IncarnationHomeError(f"{label} cannot be revalidated safely") from exc
 
 
+_DESCRIPTOR_READ_CHUNK_SIZE = 1024 * 1024
+
+
+def _descriptor_matches_bytes(
+    descriptor: int, expected: bytes, label: str
+) -> bool:
+    """Compare a descriptor with one retained buffer using bounded chunks."""
+
+    expected_view = memoryview(expected)
+    offset = 0
+    try:
+        os.lseek(descriptor, 0, os.SEEK_SET)
+        while True:
+            chunk = os.read(descriptor, _DESCRIPTOR_READ_CHUNK_SIZE)
+            if not chunk:
+                return offset == len(expected)
+            end = offset + len(chunk)
+            if end > len(expected) or chunk != expected_view[offset:end]:
+                return False
+            offset = end
+    except OSError as exc:
+        raise IncarnationHomeError(f"{label} cannot be read safely") from exc
+    finally:
+        expected_view.release()
+
+
 def _read_descriptor_bytes(descriptor: int, label: str) -> bytes:
     try:
         os.lseek(descriptor, 0, os.SEEK_SET)
         chunks: list[bytes] = []
         while True:
-            chunk = os.read(descriptor, 1024 * 1024)
+            chunk = os.read(descriptor, _DESCRIPTOR_READ_CHUNK_SIZE)
             if not chunk:
                 return b"".join(chunks)
             chunks.append(chunk)
@@ -4307,12 +4431,10 @@ def _copy_legacy_actor_local_state_impl(
                     raise IncarnationHomeError(
                         f"legacy actor-local state changed while reading: {label}"
                     )
-                repeated_content = _read_descriptor_bytes(read_descriptor, label)
-                if repeated_content != content:
+                if not _descriptor_matches_bytes(read_descriptor, content, label):
                     raise IncarnationHomeError(
                         f"legacy actor-local state changed while reading: {label}"
                     )
-                content = repeated_content
                 after_read = os.fstat(read_descriptor)
                 if _actor_local_source_version(after_read) != source_version:
                     raise IncarnationHomeError(

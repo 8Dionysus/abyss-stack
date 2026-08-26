@@ -9,6 +9,10 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Make the external Codex incarnation filesystem boundary component-relative:
+  all pinned parent consumers traverse and revalidate the complete absolute
+  directory chain without following symlinks, while legacy migration compares
+  stable regular-file passes incrementally against one retained output buffer.
 - Bind supplied holder-claim receipt snapshots to stable bytes from the
   canonical durable claim path through the existing bounded ambient-identity
   reader, and derive claim requiredness from the decoded manifest schema so

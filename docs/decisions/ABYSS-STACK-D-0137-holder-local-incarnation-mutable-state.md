@@ -79,6 +79,16 @@ revalidating its retained inode; interrupted quarantine directories are also
 recovered through descriptor validation. A legitimate denied entry that merely
 resembles a stage, or an aliased/replaced stage, fails closed without deleting
 the foreign inode.
+The same filesystem boundary applies to every absolute parent-bound file
+effect: the shared parent resolver walks from the filesystem root through
+retained directory descriptors with no-follow opens, revalidates every
+component edge, closes intermediate descriptors, and transfers only the final
+parent descriptor.
+Missing, symlink, non-directory, permission, and component-replacement races
+fail closed without a path-layout exception. Legacy migration retains one
+returned file buffer and compares its second descriptor pass incrementally in
+bounded chunks; its source-version checks remain the authority for same-inode
+mutation and A-B-A writes.
 
 New homes require the exact bytes of a typed holder/task/run responsibility
 context. The digest of that context selects a holder-local directory below the
