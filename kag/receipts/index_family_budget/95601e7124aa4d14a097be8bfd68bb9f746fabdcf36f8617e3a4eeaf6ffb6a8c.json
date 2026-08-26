@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 3883923,
+  "allowed_tracked_bytes": 38867560,
+  "approved_by": "repository-owner",
+  "base_ref": "8591730ffe5708b785055488e902fad1a7e63c5a",
+  "changed_generated_bytes": 3883923,
+  "changed_generated_files": 38,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "95601e7124aa4d14a097be8bfd68bb9f746fabdcf36f8617e3a4eeaf6ffb6a8c",
+  "reason": "Refresh the follow-up stack owner family against merged PR #441 base 8591730ffe5708b785055488e902fad1a7e63c5a after landing the adapter uncertainty normalization.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 38867560,
+  "tracked_bytes_max": 24117248
+}

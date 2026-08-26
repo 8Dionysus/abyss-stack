@@ -16,8 +16,11 @@
   missingness before invoking the observation sink.
 - A bound adapter exception, including a provider-raised runtime boundary error,
   is reported as the stable `adapter_execution_failed` error and carries no
-  observation; it is not reclassified as malformed evidence. The runtime's
-  own pre-invocation errors remain distinct.
+  observation; it is not reclassified as malformed evidence. Once adapter
+  execution begins, completion is unknown unless a returned observation proves
+  otherwise. Only the selected built-in adapter's own pre-invocation rejection
+  remains distinct; nested or custom-adapter rejection is adapter execution
+  failure with unknown completion.
 - If an adapter returns an invalid observation, the runtime keeps it out of the
   sink and reports `invalid_observation` as a post-execution or indeterminate
   error: a returned non-null typed observation is attached with
