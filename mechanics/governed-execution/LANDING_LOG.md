@@ -11,15 +11,16 @@ components, and special-file, duplicate-member, digest, ref, size, and boundary
 time cases remain typed denials.
 
 The focused landing-effect suite (`test_external_codex_landing_effect.py`)
-collected and passed 46 tests on source repair commit `bc1316d3f4f1b38cf28b3e283d57fe558049f64d`
+collected and passed 46 tests on source repair commit `78514a98b758443a44cd17907e8f85bc8bc63168`
 (35 test functions, three existing three-case parametrizations, and one
 five-case owner-reference parametrization). Commit grants are standalone when
 the target is a pull request: a revision-producing commit cannot be combined
 with a downstream push, pull-request, or merge effect. The full external-agent
 suite also passed, and the exported validator bounds caller mappings before
-copying and schema validation. The canonical repository-local KAG gate and
-hosted Repo Validation are rerun on the synchronized final branch. This is
-source/CI evidence only: the current runtime profile retains
+copying and schema validation. Repository IDs and revisions use true
+full-string validation. The canonical repository-local KAG gate and hosted
+Repo Validation are rerun on the synchronized final branch. This is source/CI
+evidence only: the current runtime profile retains
 `external_effects=false` and the complete ten-effect forbidden closure, so no
 runtime activation, landing-effect execution, deployment, semantic/Goal verdict,
 or owner acceptance is claimed.
