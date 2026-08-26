@@ -13,12 +13,13 @@ denials.
 
 The focused landing-effect suite (`test_external_codex_landing_effect.py`)
 collected and passed 49 tests on source repair commit
-`7368f4b40b57d3df6f06224fa8125423fd2ed0af`. Commit grants are standalone when
+`a3324f9077f6cd9ee5a27666f3eeda1e4db20adc`. Commit grants are standalone when
 the target is a pull request: a revision-producing commit cannot be combined
-with a downstream push, pull-request, or merge effect, and it must carry an
-exact workspace-manifest digest that admission compares with an independently
-observed digest. The full external-agent suite also passed, and the exported
-validator bounds caller mappings before copying and schema validation.
+with a downstream push, pull-request, or merge effect, and it must carry exact
+workspace-manifest bytes plus a digest that admission bounds, schema-validates,
+and recomputes before accepting. The full external-agent suite also passed, and
+the exported validator bounds caller mappings before copying and schema
+validation.
 Repository IDs and revisions use true full-string validation. The canonical
 repository-local KAG gate and hosted Repo Validation are rerun on the
 synchronized final branch. This is source/CI evidence only: the current runtime
