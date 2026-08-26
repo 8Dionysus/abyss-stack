@@ -11302,6 +11302,60 @@ def test_workspace_manifest_binds_partially_staged_index_bytes(
     ]
 
 
+def test_workspace_manifest_rejects_staged_index_change_during_capture(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    _git(workspace, "init", "-b", "main")
+    _git(workspace, "config", "user.email", "fixture@example.invalid")
+    _git(workspace, "config", "user.name", "Fixture")
+    tracked = workspace / "tracked.txt"
+    tracked.write_text("baseline\n", encoding="utf-8")
+    _git(workspace, "add", "tracked.txt")
+    _git(workspace, "commit", "-m", "fixture")
+
+    tracked.write_text("staged-a\n", encoding="utf-8")
+    _git(workspace, "add", "tracked.txt")
+    tracked.write_text("worktree\n", encoding="utf-8")
+
+    original_git_bytes = RUNTIME._git_bytes
+    cached_diff_args = (
+        "diff",
+        "--cached",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--binary",
+        "--full-index",
+        "HEAD",
+        "--",
+    )
+    cached_diff_calls = 0
+
+    def raced_git_bytes(
+        workspace_arg: Path,
+        *arguments: str,
+        **kwargs: object,
+    ) -> bytes:
+        nonlocal cached_diff_calls
+        result = original_git_bytes(workspace_arg, *arguments, **kwargs)
+        if workspace_arg == workspace and arguments == cached_diff_args:
+            cached_diff_calls += 1
+            if cached_diff_calls == 1:
+                tracked.write_text("staged-b\n", encoding="utf-8")
+                _git(workspace, "add", "tracked.txt")
+                tracked.write_text("worktree\n", encoding="utf-8")
+        return result
+
+    monkeypatch.setattr(RUNTIME, "_git_bytes", raced_git_bytes)
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        RUNTIME.build_workspace_manifest(workspace)
+
+    assert exc_info.value.code == "workspace_index_race"
+    assert cached_diff_calls == 2
+
+
 def test_workspace_manifest_disables_promisor_lazy_fetch_helpers(
     tmp_path: Path,
 ) -> None:

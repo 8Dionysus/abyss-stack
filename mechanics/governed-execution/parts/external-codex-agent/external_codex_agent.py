@@ -5986,6 +5986,28 @@ def _git_bytes(
     return completed.stdout
 
 
+def _git_cached_diff_bytes(
+    workspace: Path,
+    *,
+    git_env: Mapping[str, str],
+) -> bytes:
+    """Read the exact staged diff used by a workspace-manifest binding."""
+
+    return _git_bytes(
+        workspace,
+        "diff",
+        "--cached",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--binary",
+        "--full-index",
+        "HEAD",
+        "--",
+        timeout=60,
+        git_env=git_env,
+    )
+
+
 def _legacy_git_diff_binary_sha256(
     workspace: Path,
     *,
@@ -6230,19 +6252,7 @@ def build_workspace_manifest(workspace: str | Path) -> dict[str, Any]:
         timeout=60,
         git_env=git_env,
     )
-    cached_diff_raw = _git_bytes(
-        location,
-        "diff",
-        "--cached",
-        "--no-ext-diff",
-        "--no-textconv",
-        "--binary",
-        "--full-index",
-        "HEAD",
-        "--",
-        timeout=60,
-        git_env=git_env,
-    )
+    cached_diff_raw = _git_cached_diff_bytes(location, git_env=git_env)
     changed = _nul_paths(
         _git_bytes(
             location,
@@ -6378,6 +6388,12 @@ def build_workspace_manifest(workspace: str | Path) -> dict[str, Any]:
     git_head = _git_head(location, git_env=git_env)
     git_shallow = read_source_shallow_boundary(location)
     _assert_no_in_progress_merge(location)
+    cached_diff_final_raw = _git_cached_diff_bytes(location, git_env=git_env)
+    if cached_diff_final_raw != cached_diff_raw:
+        raise ExternalCodexRuntimeError(
+            "workspace_index_race",
+            "staged index changed while building the workspace manifest",
+        )
     return {
         "$schema": "schemas/external-codex-workspace-manifest.schema.json",
         "schema_version": "abyss_stack_external_codex_workspace_manifest_v1",
