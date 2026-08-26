@@ -51,6 +51,12 @@ WORKSPACE_MANIFEST_RAW = (
             "git_status_porcelain_sha256": "sha256:" + "3" * 64,
             "git_diff_binary_sha256": "sha256:" + "4" * 64,
             "git_diff_cached_binary_sha256": "sha256:" + "5" * 64,
+            "git_shallow": {
+                "present": False,
+                "sha256": None,
+                "entries": [],
+                "identity": None,
+            },
             "status_entries": [],
             "content_entries": [],
         },
