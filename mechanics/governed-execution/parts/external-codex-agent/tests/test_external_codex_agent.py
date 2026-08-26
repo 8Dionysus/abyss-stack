@@ -11877,6 +11877,63 @@ def test_workspace_write_resume_continues_from_exact_prior_actor_tree(
     assert first_delta_ref in preserved_sources
 
 
+def test_review_seed_envelopes_follow_each_terminal_attempt(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(
+        tmp_path,
+        objective_marker="FAKE_WRITE_ALLOWED FAKE_ARTIFACT_PRODUCED",
+        role_id="coder",
+        task_family="landing_preparation",
+        workspace_write=True,
+        exact_baseline=True,
+        review_required=True,
+        identity_suffix="review-seed-resume",
+    )
+    runtime = fixture["runtime"]
+    runtime.start(fixture["launch_path"])
+    first_terminal = _wait_terminal(runtime, fixture["session_id"])
+    assert first_terminal["status"] == "review_required"
+
+    first_seed = runtime.issue_review_seed(fixture["session_id"])
+    first_seed_path = Path(first_seed["artifact_ref"])
+    assert first_seed_path == (
+        runtime._session_dir(fixture["session_id"])
+        / "review-seed-envelope.json"
+    )
+    first_seed_digest = _digest_path(first_seed_path)
+    result_path = runtime._session_dir(fixture["session_id"]) / "result.json"
+    resume_path = tmp_path / "review-seed-resume.json"
+    _write_json(
+        resume_path,
+        {
+            "schema_version": "abyss_stack_external_codex_resume_v1",
+            "session_id": fixture["session_id"],
+            "thread_id": first_terminal["thread_id"],
+            "after_event_sequence": first_terminal["last_event_sequence"],
+            "reason": "review_followup",
+            "instruction": "Continue the exact bounded writer obligation.",
+            "previous_result_digest": _digest_path(result_path),
+        },
+    )
+
+    assert runtime.resume(fixture["session_id"], resume_path)["status"] == "running"
+    second_terminal = _wait_terminal(runtime, fixture["session_id"])
+    assert second_terminal["status"] == "review_required"
+    second_seed = runtime.issue_review_seed(fixture["session_id"])
+    second_seed_path = Path(second_seed["artifact_ref"])
+
+    assert second_seed_path == (
+        runtime._session_dir(fixture["session_id"])
+        / "attempts"
+        / "002"
+        / "review-seed-envelope.json"
+    )
+    assert second_seed_path != first_seed_path
+    assert _digest_path(first_seed_path) == first_seed_digest
+    assert second_seed["artifact_digest"] != first_seed["artifact_digest"]
+
+
 def test_workspace_write_resume_loads_prior_manifest_before_replacement(
     tmp_path: Path,
 ) -> None:

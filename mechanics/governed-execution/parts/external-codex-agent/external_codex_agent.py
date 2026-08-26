@@ -9869,9 +9869,28 @@ class ExternalCodexRuntime:
                 REVIEW_SEED_ENVELOPE_SCHEMA_PATH,
                 label="external Codex review seed envelope",
             )
-            envelope_path = (
-                self._session_dir(writer_session_id) / "review-seed-envelope.json"
-            )
+            attempts = state.get("attempts")
+            if not isinstance(attempts, list) or not attempts:
+                raise ExternalCodexRuntimeError(
+                    "review_seed_writer_attempt_missing",
+                    "terminal writer has no exact attempt for its review seed envelope",
+                )
+            terminal_attempt = attempts[-1]
+            if not isinstance(terminal_attempt, Mapping) or not isinstance(
+                terminal_attempt.get("attempt_number"), int
+            ):
+                raise ExternalCodexRuntimeError(
+                    "review_seed_writer_attempt_missing",
+                    "terminal writer attempt identity is malformed",
+                )
+            attempt_number = int(terminal_attempt["attempt_number"])
+            envelope_path = self._session_dir(writer_session_id)
+            if attempt_number == 1:
+                envelope_path /= "review-seed-envelope.json"
+            else:
+                envelope_path /= "attempts"
+                envelope_path /= f"{attempt_number:03d}"
+                envelope_path /= "review-seed-envelope.json"
             if envelope_path.exists() or envelope_path.is_symlink():
                 if envelope_path.is_symlink():
                     raise ExternalCodexRuntimeError(
@@ -9930,16 +9949,35 @@ class ExternalCodexRuntime:
                 "review_seed_session_reuse",
                 "reviewer must have a distinct session identity",
             )
-        expected_path = (
-            self._session_dir(writer_session_id) / "review-seed-envelope.json"
-        )
-        if envelope_path != expected_path:
-            raise ExternalCodexRuntimeError(
-                "review_seed_envelope_unowned",
-                "review seed envelope is outside its exact writer session",
-            )
         with self._lock(writer_session_id):
             writer_state = self._load_state(writer_session_id)
+            attempts = writer_state.get("attempts")
+            if not isinstance(attempts, list) or not attempts:
+                raise ExternalCodexRuntimeError(
+                    "review_seed_writer_attempt_missing",
+                    "seeded writer has no exact attempt for its review seed envelope",
+                )
+            terminal_attempt = attempts[-1]
+            if not isinstance(terminal_attempt, Mapping) or not isinstance(
+                terminal_attempt.get("attempt_number"), int
+            ):
+                raise ExternalCodexRuntimeError(
+                    "review_seed_writer_attempt_missing",
+                    "seeded writer attempt identity is malformed",
+                )
+            attempt_number = int(terminal_attempt["attempt_number"])
+            expected_path = self._session_dir(writer_session_id)
+            if attempt_number == 1:
+                expected_path /= "review-seed-envelope.json"
+            else:
+                expected_path /= "attempts"
+                expected_path /= f"{attempt_number:03d}"
+                expected_path /= "review-seed-envelope.json"
+            if envelope_path != expected_path:
+                raise ExternalCodexRuntimeError(
+                    "review_seed_envelope_unowned",
+                    "review seed envelope is outside its exact writer attempt",
+                )
             writer_task_family = str(writer_state.get("task_family") or "")
             expected_reviewer_family = (
                 "landing_review"
