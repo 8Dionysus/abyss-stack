@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 19852939,
+  "allowed_tracked_bytes": 38342979,
+  "approved_by": "repository-owner",
+  "base_ref": "75b3d734ab96503a34cb1e2bd70ee87867ce558f",
+  "changed_generated_bytes": 19852939,
+  "changed_generated_files": 197,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "f9851d4c6087a1f046d7091f09a229f5d33243f7ed07f88c9c3f1a150a95f8c1",
+  "reason": "Refresh the exact abyss-stack portable owner family for the generic Goal lifecycle runtime adapter; generated KAG only, preserving authored runtime semantics and source-owner authority.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 38342979,
+  "tracked_bytes_max": 24117248
+}
