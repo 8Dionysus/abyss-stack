@@ -369,6 +369,32 @@ def test_nested_preinvocation_error_is_indeterminate_after_outer_invocation() ->
     assert raised.value.execution_completed is None
 
 
+def test_custom_adapter_nested_preinvocation_error_is_indeterminate() -> None:
+    class DelegatingAdapter:
+        @property
+        def adapter_id(self) -> str:
+            return "custom-adapter"
+
+        def execute(
+            self, request: ProgrammaticExecutionRequest
+        ) -> ProgrammaticExecutionObservation:
+            del request
+            nested = RUNTIME.LocalModelSubstrateAdapter(route_ref=_ref("nested-route"))
+            return nested.execute(_request(nested.adapter_id))
+
+    adapter = DelegatingAdapter()
+    runtime = RUNTIME.ProgrammaticExecutionRuntime(
+        {adapter.adapter_id: adapter}, enabled=True
+    )
+
+    with pytest.raises(RUNTIME.ProgrammaticAdapterError) as raised:
+        runtime.execute(_request(adapter.adapter_id))
+
+    assert raised.value.code == "adapter_execution_failed"
+    assert raised.value.observation is None
+    assert raised.value.execution_completed is None
+
+
 def test_invalid_observation_is_not_sent_to_sink() -> None:
     recorded: list[ProgrammaticExecutionObservation] = []
 

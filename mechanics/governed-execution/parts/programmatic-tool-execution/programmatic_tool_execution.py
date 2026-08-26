@@ -65,6 +65,14 @@ class _AdapterPreInvocationError(ProgrammaticAdapterError):
     """An adapter rejected the request before its bound invoker ran."""
 
 
+class _SelectedAdapterPreInvocationError(ProgrammaticAdapterError):
+    """A selected built-in adapter rejected its own request preflight."""
+
+    def __init__(self, code: str, message: str, *, adapter: object) -> None:
+        super().__init__(code, message)
+        self.adapter = adapter
+
+
 @runtime_checkable
 class ProgrammaticExecutionAdapter(Protocol):
     """Runtime-owned adapter ABI for one provider-neutral execution."""
@@ -119,11 +127,16 @@ class CodexCodeModeHostAdapter:
     def execute(
         self, request: ProgrammaticExecutionRequest
     ) -> ProgrammaticExecutionObservation:
-        return _invoke(
-            adapter_id=self.adapter_id,
-            invoker=self.invoker,
-            request=request,
-        )
+        try:
+            return _invoke(
+                adapter_id=self.adapter_id,
+                invoker=self.invoker,
+                request=request,
+            )
+        except _AdapterPreInvocationError as exc:
+            raise _SelectedAdapterPreInvocationError(
+                exc.code, str(exc), adapter=self
+            ) from exc
 
 
 @dataclass(frozen=True)
@@ -141,11 +154,16 @@ class LocalModelSubstrateAdapter:
     def execute(
         self, request: ProgrammaticExecutionRequest
     ) -> ProgrammaticExecutionObservation:
-        return _invoke(
-            adapter_id=self.adapter_id,
-            invoker=self.invoker,
-            request=request,
-        )
+        try:
+            return _invoke(
+                adapter_id=self.adapter_id,
+                invoker=self.invoker,
+                request=request,
+            )
+        except _AdapterPreInvocationError as exc:
+            raise _SelectedAdapterPreInvocationError(
+                exc.code, str(exc), adapter=self
+            ) from exc
 
 
 @dataclass(frozen=True)
@@ -197,8 +215,15 @@ class ProgrammaticExecutionRuntime:
             )
         try:
             observation = adapter.execute(request)
-        except _AdapterPreInvocationError:
-            raise
+        except _SelectedAdapterPreInvocationError as exc:
+            if exc.adapter is adapter:
+                raise
+            raise ProgrammaticAdapterError(
+                "adapter_execution_failed",
+                "the selected adapter failed without returning an observation; "
+                "execution completion is unknown",
+                execution_completed=None,
+            ) from exc
         except Exception as exc:
             raise ProgrammaticAdapterError(
                 "adapter_execution_failed",
