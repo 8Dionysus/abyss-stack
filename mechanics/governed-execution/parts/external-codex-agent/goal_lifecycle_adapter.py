@@ -513,6 +513,22 @@ def _resolve_owner_endpoint(
     return runtime._socket_path(str(resolved))
 
 
+def _validate_request_owner_scope(request: Any, owner: dict[str, Any]) -> None:
+    """Bind the typed request's qualified references to the selected owner."""
+
+    runtime = _runtime()
+    if request.goal_ref.model_dump(mode="json") != owner.get("goal_ref"):
+        raise runtime.ExternalCodexReturnError(
+            "Goal lifecycle request and transport owner Goal reference mismatch"
+        )
+    if request.return_owner_ref.model_dump(mode="json") != owner.get(
+        "return_owner_ref"
+    ):
+        raise runtime.ExternalCodexReturnError(
+            "Goal lifecycle request and transport owner return-owner reference mismatch"
+        )
+
+
 def _execution_projection(
     *,
     request: Any,
@@ -669,16 +685,7 @@ def execute_goal_transition(
             "Goal lifecycle owner artifact does not match the supplied owner"
         )
     _load_schema(owner, _goal_owner_schema_path(), "Goal lifecycle owner")
-    if request.goal_ref.model_dump(mode="json") != owner.get("goal_ref"):
-        raise runtime.ExternalCodexReturnError(
-            "Goal lifecycle request and transport owner Goal reference mismatch"
-        )
-    if request.return_owner_ref.model_dump(mode="json") != owner.get(
-        "return_owner_ref"
-    ):
-        raise runtime.ExternalCodexReturnError(
-            "Goal lifecycle request and transport owner return-owner reference mismatch"
-        )
+    _validate_request_owner_scope(request, owner)
 
     endpoint = _resolve_owner_endpoint(
         owner,
@@ -1182,6 +1189,79 @@ def _validate_authoritative_result_response(
         )
 
 
+def _validate_receipt_attempt_binding(
+    value: dict[str, Any],
+    *,
+    attempt: dict[str, Any],
+    request: Any,
+    owner: dict[str, Any],
+) -> None:
+    """Bind an executed receipt's transition evidence to its attempt sidecar."""
+
+    if value.get("status") != "executed":
+        return
+    runtime = _runtime()
+    if attempt.get("state") != "proof_recorded":
+        raise runtime.ExternalCodexReturnError(
+            "existing executed Goal lifecycle receipt requires a proof-recorded attempt"
+        )
+    precondition = attempt.get("precondition")
+    mutation_response = attempt.get("goal_response")
+    transition_request = attempt.get("transition_request")
+    transition_proof = attempt.get("transition_proof")
+    if (
+        not isinstance(precondition, dict)
+        or not isinstance(mutation_response, dict)
+        or not isinstance(transition_request, dict)
+        or not isinstance(transition_proof, dict)
+    ):
+        raise runtime.ExternalCodexReturnError(
+            "existing executed Goal lifecycle attempt lacks complete transition evidence"
+        )
+    precondition_response = precondition.get("goal_get_response")
+    precondition_summary = precondition.get("goal_get")
+    precondition_digest = precondition.get("goal_response_sha256")
+    if (
+        not isinstance(precondition_response, dict)
+        or not isinstance(precondition_summary, dict)
+        or not runtime._is_sha256_digest(precondition_digest)
+        or runtime._sha256_bytes(runtime._canonical_bytes(precondition_response))
+        != precondition_digest
+        or runtime._safe_response_summary(precondition_response)
+        != precondition_summary
+        or precondition.get("goal_get_summary_sha256")
+        != runtime._sha256_bytes(runtime._canonical_bytes(precondition_summary))
+    ):
+        raise runtime.ExternalCodexReturnError(
+            "existing executed Goal lifecycle attempt precondition evidence is not bound"
+        )
+    _validated_transition_proof(
+        transition_proof,
+        owner=owner,
+        precondition=precondition,
+        mutation_response=mutation_response,
+        request_frame=transition_request,
+        from_state=request.expected_state,
+        to_state=request.desired_state,
+    )
+    lifecycle = value.get("lifecycle")
+    if not isinstance(lifecycle, dict):
+        raise runtime.ExternalCodexReturnError(
+            "existing executed Goal lifecycle receipt lacks transition evidence"
+        )
+    if (
+        lifecycle.get("before_response_sha256") != precondition_digest
+        or lifecycle.get("before") != precondition_summary
+        or lifecycle.get("mutation_response_sha256")
+        != runtime._sha256_bytes(runtime._canonical_bytes(mutation_response))
+        or lifecycle.get("transition_request") != transition_request
+        or lifecycle.get("transition_proof") != transition_proof
+    ):
+        raise runtime.ExternalCodexReturnError(
+            "existing Goal lifecycle receipt transition evidence does not match its attempt"
+        )
+
+
 def _validate_existing_receipt(
     value: dict[str, Any],
     request: Any,
@@ -1290,6 +1370,12 @@ def _validate_existing_receipt(
             endpoint=Path(value["transport"]["endpoint"]),
             attempt_path=attempt_path,
         )
+        _validate_receipt_attempt_binding(
+            value,
+            attempt=attempt_value,
+            request=request,
+            owner=owner,
+        )
     if (
         value.get("owner_ref") != str(owner_path.resolve())
         or value.get("owner_sha256") != runtime._sha256_bytes(owner_path.read_bytes())
@@ -1383,6 +1469,8 @@ def run_goal_transition(args: Any) -> dict[str, Any]:
     decision = _model(decision_value, _decision_type, "Goal lifecycle decision")
     assert_scope(request, decision)
     owner = runtime.validate_goal_lifecycle_owner(owner_value)
+    _load_schema(owner, _goal_owner_schema_path(), "Goal lifecycle owner")
+    _validate_request_owner_scope(request, owner)
     input_paths = {
         request_path.resolve(),
         decision_path.resolve(),

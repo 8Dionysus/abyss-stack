@@ -265,6 +265,29 @@ def _cli_fixture(
     return args, request_path, decision_path, receipt_path, rpc
 
 
+def test_generic_adapter_cli_validates_owner_scope_before_discovery(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    args, _request_path, _decision_path, _receipt_path, rpc = _cli_fixture(
+        tmp_path, monkeypatch, request_id="request:owner-before-discovery"
+    )
+    owner_path = Path(args.owner)
+    owner = json.loads(owner_path.read_text(encoding="utf-8"))
+    owner["goal_ref"]["digest"] = _digest("different-goal-authority")
+    owner_path.write_bytes(RUNTIME._canonical_bytes(owner) + b"\n")
+
+    def fail_discovery(_owner: dict[str, Any], **_kwargs: object) -> tuple[Path, str]:
+        raise AssertionError("transport opened")
+
+    monkeypatch.setattr(RUNTIME, "discover_app_server_socket", fail_discovery)
+    with pytest.raises(
+        RUNTIME.ExternalCodexReturnError,
+        match="Goal reference mismatch",
+    ):
+        ADAPTER.run_goal_transition(args)
+    assert rpc.calls == []
+
+
 def test_generic_adapter_executes_pause_and_confirms_authoritative_goal_read(tmp_path: Path) -> None:
     receipt, rpc = _run_transition(
         tmp_path, initial="active", desired="paused", kind="delegation_yield"
@@ -305,6 +328,33 @@ def test_generic_adapter_replays_an_already_desired_state_read_only(tmp_path: Pa
     assert receipt["transport"]["method"] == "thread/goal/get"
     assert [method for method, _params in rpc.calls].count("thread/goal/get") == 1
     assert not any(method == "thread/goal/set" for method, _params in rpc.calls)
+
+
+def test_generic_adapter_binds_receipt_transition_evidence_to_attempt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    args, _request_path, _decision_path, receipt_path, rpc = _cli_fixture(
+        tmp_path, monkeypatch, request_id="request:receipt-attempt-binding"
+    )
+    ADAPTER.run_goal_transition(args)
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    lifecycle = receipt["lifecycle"]
+    tampered_request = dict(lifecycle["transition_request"])
+    tampered_request["id"] += 1
+    tampered_proof = dict(lifecycle["transition_proof"])
+    tampered_proof["request_id"] = tampered_request["id"]
+    tampered_proof["request_sha256"] = _digest(tampered_request)
+    lifecycle["transition_request"] = tampered_request
+    lifecycle["transition_proof"] = tampered_proof
+    receipt_path.write_bytes(RUNTIME._canonical_bytes(receipt) + b"\n")
+    before_calls = list(rpc.calls)
+
+    with pytest.raises(
+        RUNTIME.ExternalCodexReturnError,
+        match="does not match its attempt",
+    ):
+        ADAPTER.run_goal_transition(args)
+    assert rpc.calls == before_calls
 
 
 def test_generic_adapter_cli_route_replays_canonical_receipt(
