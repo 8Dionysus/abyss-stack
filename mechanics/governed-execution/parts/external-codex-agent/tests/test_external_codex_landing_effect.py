@@ -143,6 +143,8 @@ def _grant(
         "issued_at": "2026-08-23T00:00:00Z",
         "expires_at": expires_at,
     }
+    if target_kind != "branch":
+        grant["repository"]["revision"] = target["head_revision"]
     if "commit" in granted_effects:
         grant["commit_content"] = {
             "kind": "workspace_manifest",
@@ -665,6 +667,26 @@ def test_commit_admission_binds_repository_revision_to_target_revision(
 ) -> None:
     grant = _grant(target_kind=target_kind, effects=["commit"])
     grant["target"][target_revision_field] = "a" * 40
+    _refresh_semantic_digest(grant)
+    raw = _raw(grant)
+
+    with pytest.raises(LandingEffectGrantError) as exc:
+        admit_landing_effect_grant(
+            grant,
+            _request(grant),
+            grant_raw=raw,
+            expected_artifact_digest=_raw_digest(raw),
+            at=AT,
+        )
+    assert exc.value.code == "landing_effect_grant_target_mismatch"
+
+
+@pytest.mark.parametrize("effect", ["push", "pull_request", "merge"])
+def test_non_commit_admission_binds_repository_revision_to_target_revision(
+    effect: str,
+) -> None:
+    grant = _grant(effects=[effect])
+    grant["target"]["head_revision"] = "a" * 40
     _refresh_semantic_digest(grant)
     raw = _raw(grant)
 

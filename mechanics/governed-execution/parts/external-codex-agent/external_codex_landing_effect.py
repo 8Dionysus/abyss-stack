@@ -1168,18 +1168,17 @@ def admit_landing_effect_grant(
         raise LandingEffectGrantError(
             code, "grant allowed_effects is not the exact requested effect set"
         )
-    if "commit" in granted_effects:
-        target = admitted["target"]
-        target_revision = (
-            target["base_revision"]
-            if target["kind"] == "branch"
-            else target["head_revision"]
+    target = admitted["target"]
+    target_revision = (
+        target["base_revision"]
+        if target["kind"] == "branch"
+        else target["head_revision"]
+    )
+    if target_revision != admitted["repository"]["revision"]:
+        raise LandingEffectGrantError(
+            "landing_effect_grant_target_mismatch",
+            "repository revision differs from the immutable target revision",
         )
-        if target_revision != admitted["repository"]["revision"]:
-            raise LandingEffectGrantError(
-                "landing_effect_grant_target_mismatch",
-                "commit repository revision differs from the immutable target revision",
-            )
     if "commit" in granted_effects:
         commit_content = admitted.get("commit_content")
         requested_commit_content = request.get("commit_content")
