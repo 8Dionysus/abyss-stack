@@ -760,9 +760,11 @@ exact Goal, holder, repository, target, review, return, and effect-set
 relations. A commit request must also repeat the exact `commit_content`
 binding, and the effect executor must supply the exact bounded
 workspace-manifest bytes plus an independently observed digest that admission
-recomputes and matches; a pull-request target's reviewed head revision is
-therefore immutable at admission and a commit cannot use post-review workspace
-bytes;
+recomputes and matches. The manifest `git_head` must equal the exact authorized
+repository revision, and every status/content path must be canonical and
+unique within its array; schema validation stops after the first error. A
+pull-request target's reviewed head revision is therefore immutable at
+admission and a commit cannot use post-review workspace bytes;
 there is no wildcard or subset match. `landing_effect_grant_allows` is only a
 boolean read of that admission result.
 

@@ -15,6 +15,8 @@ Tracking starts with the community-docs baseline for this repository.
   reviewer identity distinct from the holder; repository IDs reject traversal
   components, pull-request targets bind an immutable head revision,
   standalone commit grants bind exact workspace-manifest bytes and digest,
+  require the manifest head to equal the authorized repository revision, and
+  reject non-canonical or duplicate manifest paths,
   special-file opens are nonblocking, and boundary-time overflows are
   normalized.
 - Bind the canonical `aoa-kag` MCP adapter to an authored absolute
