@@ -58,11 +58,12 @@
     },
     "lifecycle": {
       "type": "object", "additionalProperties": false,
-      "required": ["initialize", "before", "result", "before_response_sha256", "result_response_sha256", "mutation_response_sha256", "transition_request", "transition_proof"],
+      "required": ["initialize", "before", "result", "result_response", "before_response_sha256", "result_response_sha256", "mutation_response_sha256", "transition_request", "transition_proof"],
       "properties": {
         "initialize": {"type": "object"},
         "before": {"type": "object"},
         "result": {"type": "object"},
+        "result_response": {"type": "object"},
         "before_response_sha256": {"$ref": "#/$defs/digest"},
         "result_response_sha256": {"$ref": "#/$defs/digest"},
         "mutation_response_sha256": {"type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$"},

@@ -220,6 +220,47 @@ def _run_transition(tmp_path: Path, *, initial: str, desired: str, kind: str) ->
     return receipt, rpc
 
 
+def _cli_fixture(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    request_id: str,
+) -> tuple[SimpleNamespace, Path, Path, Path, FakeGoalRpc]:
+    owner = _owner()
+    owner_path = tmp_path / "owner.json"
+    request_path = tmp_path / "request.json"
+    decision_path = tmp_path / "decision.json"
+    receipt_path = tmp_path / "receipt.json"
+    owner_path.write_bytes(RUNTIME._canonical_bytes(owner) + b"\n")
+    request = _request(
+        observed="active",
+        desired="paused",
+        kind="delegation_yield",
+        request_id=request_id,
+    )
+    decision = _decision(request)
+    request_path.write_bytes(
+        RUNTIME._canonical_bytes(request.model_dump(mode="json")) + b"\n"
+    )
+    decision_path.write_bytes(
+        RUNTIME._canonical_bytes(decision.model_dump(mode="json")) + b"\n"
+    )
+    rpc = FakeGoalRpc(tmp_path / "cli.sock", status="active")
+    monkeypatch.setattr(
+        RUNTIME,
+        "discover_app_server_socket",
+        lambda _owner: (rpc.endpoint, "test-fixture"),
+    )
+    monkeypatch.setattr(RUNTIME, "UnixWebSocketRpc", lambda _endpoint: rpc)
+    args = SimpleNamespace(
+        request=str(request_path),
+        decision=str(decision_path),
+        owner=str(owner_path),
+        receipt=str(receipt_path),
+    )
+    return args, request_path, decision_path, receipt_path, rpc
+
+
 def test_generic_adapter_executes_pause_and_confirms_authoritative_goal_read(tmp_path: Path) -> None:
     receipt, rpc = _run_transition(
         tmp_path, initial="active", desired="paused", kind="delegation_yield"
@@ -265,39 +306,10 @@ def test_generic_adapter_replays_an_already_desired_state_read_only(tmp_path: Pa
 def test_generic_adapter_cli_route_replays_canonical_receipt(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    owner = _owner()
-    owner_path = tmp_path / "owner.json"
-    request_path = tmp_path / "request.json"
-    decision_path = tmp_path / "decision.json"
-    receipt_path = tmp_path / "receipt.json"
-    owner_path.write_bytes(RUNTIME._canonical_bytes(owner) + b"\n")
-    request = _request(
-        observed="active",
-        desired="paused",
-        kind="delegation_yield",
-        request_id="request:cli",
+    args, _request_path, _decision_path, receipt_path, rpc = _cli_fixture(
+        tmp_path, monkeypatch, request_id="request:cli"
     )
-    decision = _decision(request)
-    request_path.write_bytes(
-        RUNTIME._canonical_bytes(request.model_dump(mode="json")) + b"\n"
-    )
-    decision_path.write_bytes(
-        RUNTIME._canonical_bytes(decision.model_dump(mode="json")) + b"\n"
-    )
-    rpc = FakeGoalRpc(tmp_path / "cli.sock", status="active")
     rpc.mutation_response_extra = {"set_response_only": True}
-    monkeypatch.setattr(
-        RUNTIME,
-        "discover_app_server_socket",
-        lambda _owner: (rpc.endpoint, "test-fixture"),
-    )
-    monkeypatch.setattr(RUNTIME, "UnixWebSocketRpc", lambda _endpoint: rpc)
-    args = SimpleNamespace(
-        request=str(request_path),
-        decision=str(decision_path),
-        owner=str(owner_path),
-        receipt=str(receipt_path),
-    )
 
     first = ADAPTER.run_goal_transition(args)
     second = ADAPTER.run_goal_transition(args)
@@ -317,11 +329,67 @@ def test_generic_adapter_cli_route_replays_canonical_receipt(
     assert first["lifecycle"]["result_response_sha256"] == _digest(
         {"goal": {"threadId": "thread:test", "status": "paused"}}
     )
+    assert first["lifecycle"]["result_response"] == {
+        "goal": {"threadId": "thread:test", "status": "paused"}
+    }
     assert (
         first["lifecycle"]["mutation_response_sha256"]
         != first["lifecycle"]["result_response_sha256"]
     )
     assert [method for method, _params in rpc.calls].count("thread/goal/set") == 1
+
+
+def test_generic_adapter_requires_attempt_artifact_on_executed_receipt_replay(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    args, _request_path, _decision_path, receipt_path, _rpc = _cli_fixture(
+        tmp_path, monkeypatch, request_id="request:attempt-required"
+    )
+    ADAPTER.run_goal_transition(args)
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    receipt.pop("attempt_artifact")
+    receipt_path.write_bytes(RUNTIME._canonical_bytes(receipt) + b"\n")
+
+    with pytest.raises(
+        RUNTIME.ExternalCodexReturnError,
+        match="requires a mutation attempt artifact",
+    ):
+        ADAPTER.run_goal_transition(args)
+
+
+def test_generic_adapter_binds_authoritative_result_on_receipt_replay(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    args, _request_path, _decision_path, receipt_path, _rpc = _cli_fixture(
+        tmp_path, monkeypatch, request_id="request:result-evidence"
+    )
+    ADAPTER.run_goal_transition(args)
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    receipt["lifecycle"]["result"]["goal"]["status"] = "active"
+    receipt_path.write_bytes(RUNTIME._canonical_bytes(receipt) + b"\n")
+
+    with pytest.raises(
+        RUNTIME.ExternalCodexReturnError,
+        match="authoritative result evidence is not bound",
+    ):
+        ADAPTER.run_goal_transition(args)
+
+
+def test_generic_adapter_requires_canonical_receipt_path_on_replay(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    args, _request_path, _decision_path, receipt_path, _rpc = _cli_fixture(
+        tmp_path, monkeypatch, request_id="request:receipt-path"
+    )
+    ADAPTER.run_goal_transition(args)
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    receipt.pop("receipt_ref")
+    receipt_path.write_bytes(RUNTIME._canonical_bytes(receipt) + b"\n")
+
+    with pytest.raises(
+        RUNTIME.ExternalCodexReturnError, match="receipt path identity mismatch"
+    ):
+        ADAPTER.run_goal_transition(args)
 
 
 def test_generic_adapter_rejects_attempt_sidecar_input_before_transport(

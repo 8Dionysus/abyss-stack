@@ -441,6 +441,7 @@ def _execution_projection(
             "initialize": runtime._safe_response_summary(initialize),
             "before": runtime._safe_response_summary(before_response),
             "result": runtime._safe_response_summary(resulting_response),
+            "result_response": resulting_response,
             "before_response_sha256": runtime._sha256_bytes(
                 runtime._canonical_bytes(before_response)
             ),
@@ -865,7 +866,8 @@ def _validate_stored_transition_evidence(
 ) -> None:
     """Revalidate mutation and response digests before accepting a replay."""
 
-    if value.get("status") != "executed":
+    status = value.get("status")
+    if status not in {"executed", "replayed"}:
         return
     runtime = _runtime()
     lifecycle = value.get("lifecycle")
@@ -873,8 +875,23 @@ def _validate_stored_transition_evidence(
         raise runtime.ExternalCodexReturnError(
             "existing Goal lifecycle receipt lacks mutation evidence"
         )
-    before_digest = lifecycle.get("before_response_sha256")
     result_digest = lifecycle.get("result_response_sha256")
+    result_response = lifecycle.get("result_response")
+    result_summary = lifecycle.get("result")
+    if (
+        not runtime._is_sha256_digest(result_digest)
+        or not isinstance(result_response, dict)
+        or not isinstance(result_summary, dict)
+        or runtime._sha256_bytes(runtime._canonical_bytes(result_response))
+        != result_digest
+        or runtime._safe_response_summary(result_response) != result_summary
+    ):
+        raise runtime.ExternalCodexReturnError(
+            "existing Goal lifecycle receipt authoritative result evidence is not bound"
+        )
+    if status != "executed":
+        return
+    before_digest = lifecycle.get("before_response_sha256")
     mutation_digest = lifecycle.get("mutation_response_sha256")
     request_frame = lifecycle.get("transition_request")
     proof = lifecycle.get("transition_proof")
@@ -944,6 +961,39 @@ def _validate_stored_transition_evidence(
         )
 
 
+def _validate_authoritative_result_response(
+    value: dict[str, Any],
+    *,
+    response: dict[str, Any],
+    owner: dict[str, Any],
+) -> None:
+    """Bind a replayed receipt to a fresh authoritative Goal read."""
+
+    if value.get("status") not in {"executed", "replayed"}:
+        return
+    runtime = _runtime()
+    lifecycle = value.get("lifecycle")
+    if not isinstance(lifecycle, dict):
+        raise runtime.ExternalCodexReturnError(
+            "existing Goal lifecycle receipt lacks authoritative result evidence"
+        )
+    result_digest = lifecycle.get("result_response_sha256")
+    if (
+        not runtime._is_sha256_digest(result_digest)
+        or runtime._sha256_bytes(runtime._canonical_bytes(response)) != result_digest
+    ):
+        raise runtime.ExternalCodexReturnError(
+            "existing Goal lifecycle receipt authoritative result does not match the fresh Goal read"
+        )
+    goal = runtime._goal_object(response, "thread/goal/get")
+    runtime._validate_goal_binding(goal, owner)
+    state = runtime._string_at(goal, ("status",))
+    if state != value.get("desired_state"):
+        raise runtime.ExternalCodexReturnError(
+            "existing Goal lifecycle receipt authoritative Goal state no longer matches"
+        )
+
+
 def _validate_existing_receipt(
     value: dict[str, Any],
     request: Any,
@@ -953,6 +1003,7 @@ def _validate_existing_receipt(
     owner_path: Path,
     request_path: Path,
     decision_path: Path,
+    authoritative_response: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     runtime = _runtime()
     (
@@ -968,7 +1019,7 @@ def _validate_existing_receipt(
     expected_decision_ref = _decision_ref(
         decision, content_ref_type, _digest
     )
-    if value.get("receipt_ref") not in {None, str(path.resolve())}:
+    if value.get("receipt_ref") != str(path.resolve()):
         raise runtime.ExternalCodexReturnError(
             "Goal lifecycle receipt path identity mismatch"
         )
@@ -1015,6 +1066,10 @@ def _validate_existing_receipt(
         )
     _validate_stored_transition_evidence(value, request=request, owner=owner)
     attempt_artifact = value.get("attempt_artifact")
+    if value.get("status") == "executed" and attempt_artifact is None:
+        raise runtime.ExternalCodexReturnError(
+            "existing executed Goal lifecycle receipt requires a mutation attempt artifact"
+        )
     if attempt_artifact is not None:
         if (
             not isinstance(attempt_artifact, dict)
@@ -1070,6 +1125,12 @@ def _validate_existing_receipt(
                 f"existing Goal lifecycle receipt does not match the {label} artifact"
             )
     _load_schema(value, _goal_receipt_schema_path(), "Goal lifecycle receipt")
+    if authoritative_response is not None:
+        _validate_authoritative_result_response(
+            value,
+            response=authoritative_response,
+            owner=owner,
+        )
     return value
 
 
@@ -1152,7 +1213,7 @@ def run_goal_transition(args: Any) -> dict[str, Any]:
                 raise runtime.ExternalCodexReturnError(
                     "existing Goal lifecycle receipt is not canonically encoded"
                 )
-            return _validate_existing_receipt(
+            validated = _validate_existing_receipt(
                 existing,
                 request,
                 decision,
@@ -1161,6 +1222,30 @@ def run_goal_transition(args: Any) -> dict[str, Any]:
                 owner_path,
                 request_path,
                 decision_path,
+            )
+            if validated.get("status") not in {"executed", "replayed"}:
+                return validated
+            endpoint, _resolution = runtime.discover_app_server_socket(owner)
+            with runtime.UnixWebSocketRpc(endpoint) as rpc:
+                runtime._initialize_rpc(rpc)
+                authoritative_response = rpc.call(
+                    "thread/goal/get",
+                    {"threadId": owner["thread_id"]},
+                )
+            if not isinstance(authoritative_response, dict):
+                raise runtime.ExternalCodexReturnError(
+                    "Codex app-server Goal replay read returned a non-object"
+                )
+            return _validate_existing_receipt(
+                validated,
+                request,
+                decision,
+                receipt_path,
+                owner,
+                owner_path,
+                request_path,
+                decision_path,
+                authoritative_response=authoritative_response,
             )
         attempt: dict[str, Any] | None = None
         if attempt_path.exists():
