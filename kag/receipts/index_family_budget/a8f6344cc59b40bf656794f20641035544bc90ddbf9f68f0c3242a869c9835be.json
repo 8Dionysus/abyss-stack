@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 29890402,
+  "allowed_tracked_bytes": 38729848,
+  "approved_by": "repository-owner",
+  "base_ref": "23251264476333e54dbfe59c863871f58ba1608e",
+  "changed_generated_bytes": 29890402,
+  "changed_generated_files": 313,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "a8f6344cc59b40bf656794f20641035544bc90ddbf9f68f0c3242a869c9835be",
+  "reason": "Refresh exact owner portable family for PR #429 all-effect target-revision admission repair.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 38729848,
+  "tracked_bytes_max": 24117248
+}
