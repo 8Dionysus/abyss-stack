@@ -361,6 +361,10 @@ def validate_goal_lifecycle_owner(owner: dict[str, Any]) -> dict[str, Any]:
             raise ExternalCodexReturnError(
                 f"Goal lifecycle owner {label} reference object_id must match {id_key}"
             )
+        if reference.get("owner_repo") != validated["owner_repo"]:
+            raise ExternalCodexReturnError(
+                f"Goal lifecycle owner {label} reference owner_repo must match owner_repo"
+            )
     return validated
 
 

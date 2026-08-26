@@ -486,6 +486,22 @@ def test_generic_owner_binds_reference_object_ids_to_owner_ids(
         RUNTIME.validate_goal_lifecycle_owner(owner)
 
 
+@pytest.mark.parametrize("reference_key", ("goal_ref", "return_owner_ref"))
+def test_generic_owner_binds_reference_repositories_to_owner_repository(
+    reference_key: str,
+) -> None:
+    owner = _owner()
+    reference = owner[reference_key].copy()
+    reference["owner_repo"] = "unrelated-owner"
+    owner[reference_key] = reference
+
+    with pytest.raises(
+        RUNTIME.ExternalCodexReturnError,
+        match="reference owner_repo must match owner_repo",
+    ):
+        RUNTIME.validate_goal_lifecycle_owner(owner)
+
+
 def test_generic_adapter_rejects_recovery_under_a_different_decision(
     tmp_path: Path,
 ) -> None:
