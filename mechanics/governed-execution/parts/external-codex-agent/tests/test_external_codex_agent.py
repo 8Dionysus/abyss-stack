@@ -6525,6 +6525,51 @@ def test_workspace_manifest_rechecks_merge_state_after_capture(
     assert exc_info.value.code == "workspace_merge_in_progress"
 
 
+def test_workspace_manifest_rechecks_merge_state_after_cached_diff(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workspace = tmp_path / "merge-after-cached-diff-workspace"
+    workspace.mkdir()
+    _git(workspace, "init", "-q")
+    _git(workspace, "config", "user.email", "fixture@example.invalid")
+    _git(workspace, "config", "user.name", "Fixture")
+    (workspace / "README.md").write_text(
+        "merge state after cached diff\n", encoding="utf-8"
+    )
+    _git(workspace, "add", "README.md")
+    _git(workspace, "commit", "-m", "fixture")
+
+    original_cached_diff = RUNTIME._git_cached_diff_bytes
+    cached_diff_calls = 0
+
+    def cached_diff_then_start_merge(
+        path: Path,
+        *,
+        git_env: Mapping[str, str],
+    ) -> bytes:
+        nonlocal cached_diff_calls
+        result = original_cached_diff(path, git_env=git_env)
+        cached_diff_calls += 1
+        if cached_diff_calls == 2:
+            merge_head = path / _git(path, "rev-parse", "--git-path", "MERGE_HEAD")
+            merge_head.write_text(
+                _git(path, "rev-parse", "HEAD") + "\n", encoding="ascii"
+            )
+        return result
+
+    monkeypatch.setattr(
+        RUNTIME,
+        "_git_cached_diff_bytes",
+        cached_diff_then_start_merge,
+    )
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        RUNTIME.build_workspace_manifest(workspace)
+
+    assert exc_info.value.code == "workspace_merge_in_progress"
+    assert cached_diff_calls == 2
+
+
 @pytest.mark.skipif(
     not OWNER_EXECUTION_REQUEST_SCHEMA_PATH.is_file()
     or not TASK_LOCAL_DAG_SCHEMA_PATH.is_file(),

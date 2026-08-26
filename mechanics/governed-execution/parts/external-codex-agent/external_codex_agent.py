@@ -6387,13 +6387,13 @@ def build_workspace_manifest(workspace: str | Path) -> dict[str, Any]:
     workspace_identity = _workspace_identity(location)
     git_head = _git_head(location, git_env=git_env)
     git_shallow = read_source_shallow_boundary(location)
-    _assert_no_in_progress_merge(location)
     cached_diff_final_raw = _git_cached_diff_bytes(location, git_env=git_env)
     if cached_diff_final_raw != cached_diff_raw:
         raise ExternalCodexRuntimeError(
             "workspace_index_race",
             "staged index changed while building the workspace manifest",
         )
+    _assert_no_in_progress_merge(location)
     return {
         "$schema": "schemas/external-codex-workspace-manifest.schema.json",
         "schema_version": "abyss_stack_external_codex_workspace_manifest_v1",
