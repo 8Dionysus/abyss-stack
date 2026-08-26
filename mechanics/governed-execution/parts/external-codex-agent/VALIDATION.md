@@ -91,7 +91,9 @@ precondition and dispatch marker before transport, records the server proof
 before receipt publication, and reconciles a proof-recorded ambiguous retry
 through `thread/goal/get` without a second `thread/goal/set`. Receipt replay
 revalidates the exact decision reference, transition frame, proof, and
-response digests.
+response digests; executed receipt replay also requires the mutation attempt
+sidecar, binds the authoritative result response to its digest and safe
+summary, and rejects a receipt whose path identity is missing or changed.
 
 The legacy external-return tests also cover the separate Goal pause contour:
 an exact active owner-bound Goal is refused before `thread/goal/set` when the

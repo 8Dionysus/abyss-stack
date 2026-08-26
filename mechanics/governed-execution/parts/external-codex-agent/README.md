@@ -155,7 +155,9 @@ and replay only through their matching legacy wake reservation. A retry after a 
   or starts a turn. A mutating execution first persists a content-addressed
   precondition/dispatch reservation and records the server proof before the
   final receipt; a proof-backed retry reconciles through a fresh Goal read
-  without issuing a second lifecycle set;
+  without issuing a second lifecycle set. Executed receipts retain and
+  revalidate the authoritative result response, require the mutation attempt
+  sidecar, and bind the file-backed receipt to its canonical path;
 - keeps `aoa-external-codex-return pause` only as a legacy pause projection for
   existing evidence. The current public `ThreadGoalSetParams` surface lacks a
   server-side compare-and-set proof, so the generic mutating adapter fails
