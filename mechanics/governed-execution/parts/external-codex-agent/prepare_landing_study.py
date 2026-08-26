@@ -130,6 +130,16 @@ LEGACY_WORKSPACE_MANIFEST_OWNER_RECEIPT_SCHEMA_PATH = (
 LEGACY_WORKSPACE_MANIFEST_OWNER_RECEIPT_SCHEMA_VERSION = (
     "abyss_stack_external_codex_workspace_manifest_legacy_owner_receipt_v1"
 )
+LEGACY_OWNER_MIGRATION_CATALOG_SCHEMA_REF = (
+    "mechanics/governed-execution/parts/external-codex-agent/"
+    "schemas/external-codex-legacy-owner-migration-catalog.schema.json"
+)
+LEGACY_OWNER_MIGRATION_CATALOG_SCHEMA_PATH = (
+    PART_ROOT / "schemas/external-codex-legacy-owner-migration-catalog.schema.json"
+)
+LEGACY_OWNER_MIGRATION_CATALOG_SCHEMA_VERSION = (
+    "abyss_stack_external_codex_legacy_owner_migration_catalog_v1"
+)
 LANDING_EFFECT_GRANT_SCHEMA_REF = (
     "mechanics/governed-execution/parts/external-codex-agent/"
     "schemas/external-codex-governed-landing-effect-grant.schema.json"
@@ -454,9 +464,9 @@ def _file_ref(
 
 
 def _landing_effect_schema_refs() -> tuple[
-    ProvenanceRef, ProvenanceRef, ProvenanceRef, ProvenanceRef
+    ProvenanceRef, ProvenanceRef, ProvenanceRef, ProvenanceRef, ProvenanceRef
 ]:
-    """Bind the exact landing, migration-evidence, and owner-receipt schemas."""
+    """Bind the exact landing, migration, receipt, and owner-catalog schemas."""
 
     grant_ref = _file_ref(
         owner="abyss-stack",
@@ -502,7 +512,24 @@ def _landing_effect_schema_refs() -> tuple[
         schema_ref="https://json-schema.org/draft/2020-12/schema",
         schema_version=LEGACY_WORKSPACE_MANIFEST_OWNER_RECEIPT_SCHEMA_VERSION,
     )
-    return grant_ref, workspace_ref, legacy_evidence_ref, legacy_owner_receipt_ref
+    legacy_owner_catalog_ref = _file_ref(
+        owner="abyss-stack",
+        artifact_ref=LEGACY_OWNER_MIGRATION_CATALOG_SCHEMA_REF,
+        path=LEGACY_OWNER_MIGRATION_CATALOG_SCHEMA_PATH,
+        source_ref=(
+            "uncommitted-runtime-source@"
+            + _file_digest(LEGACY_OWNER_MIGRATION_CATALOG_SCHEMA_PATH)
+        ),
+        schema_ref="https://json-schema.org/draft/2020-12/schema",
+        schema_version=LEGACY_OWNER_MIGRATION_CATALOG_SCHEMA_VERSION,
+    )
+    return (
+        grant_ref,
+        workspace_ref,
+        legacy_evidence_ref,
+        legacy_owner_receipt_ref,
+        legacy_owner_catalog_ref,
+    )
 
 
 def _generated_ref(
@@ -1545,6 +1572,7 @@ def _prepare_writers(args: argparse.Namespace) -> dict[str, Any]:
         workspace_manifest_schema_ref,
         legacy_workspace_manifest_evidence_schema_ref,
         legacy_workspace_manifest_owner_receipt_schema_ref,
+        legacy_owner_migration_catalog_schema_ref,
     ) = _landing_effect_schema_refs()
     snapshot = load_plan_compilation_snapshot()
     route_policy = _task_route_policy(packet)
@@ -1736,6 +1764,13 @@ def _prepare_writers(args: argparse.Namespace) -> dict[str, Any]:
                     ),
                 },
                 {
+                    "input_id": "runtime-legacy-owner-migration-catalog-schema",
+                    "local_path": str(LEGACY_OWNER_MIGRATION_CATALOG_SCHEMA_PATH),
+                    "provenance": legacy_owner_migration_catalog_schema_ref.model_dump(
+                        mode="json"
+                    ),
+                },
+                {
                     "input_id": "summon-request",
                     "local_path": str(summon_request_path),
                     "provenance": summon_request_ref.model_dump(mode="json"),
@@ -1912,6 +1947,7 @@ def _prepare_writers(args: argparse.Namespace) -> dict[str, Any]:
                 workspace_manifest_schema_ref,
                 legacy_workspace_manifest_evidence_schema_ref,
                 legacy_workspace_manifest_owner_receipt_schema_ref,
+                legacy_owner_migration_catalog_schema_ref,
             )
             scenario_artifact_bindings = ()
         scenario = ScenarioBinding(
@@ -1959,6 +1995,7 @@ def _prepare_writers(args: argparse.Namespace) -> dict[str, Any]:
                     workspace_manifest_schema_ref,
                     legacy_workspace_manifest_evidence_schema_ref,
                     legacy_workspace_manifest_owner_receipt_schema_ref,
+                    legacy_owner_migration_catalog_schema_ref,
                     model_ref,
                     task_ref,
                     summon_request_ref,
@@ -2088,6 +2125,7 @@ def _prepare_writers(args: argparse.Namespace) -> dict[str, Any]:
                 workspace_manifest_schema_ref,
                 legacy_workspace_manifest_evidence_schema_ref,
                 legacy_workspace_manifest_owner_receipt_schema_ref,
+                legacy_owner_migration_catalog_schema_ref,
                 workspace_ref,
                 model_ref,
                 summon_request_ref,
@@ -2107,6 +2145,7 @@ def _prepare_writers(args: argparse.Namespace) -> dict[str, Any]:
                 workspace_manifest_schema_ref,
                 legacy_workspace_manifest_evidence_schema_ref,
                 legacy_workspace_manifest_owner_receipt_schema_ref,
+                legacy_owner_migration_catalog_schema_ref,
                 packet_ref,
                 manifest_ref,
                 summon_request_schema_ref,

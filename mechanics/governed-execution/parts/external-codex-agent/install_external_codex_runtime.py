@@ -86,6 +86,20 @@ LEGACY_OWNER_MIGRATION_CATALOG_NAME = "legacy-owner-admission-migrations.v1.json
 LEGACY_OWNER_MIGRATION_CATALOG_SCHEMA_VERSION = (
     "abyss_stack_external_codex_legacy_owner_migration_catalog_v1"
 )
+LEGACY_OWNER_MIGRATION_CATALOG_ARTIFACT_REF = (
+    "legacy-owner-admission-migrations.v1.json"
+)
+LEGACY_OWNER_MIGRATION_CATALOG_SOURCE_REF = "release-bound-owner-catalog"
+LEGACY_OWNER_RECEIPT_ARTIFACT_REF_PREFIX = (
+    "legacy-owner-admission-migrations.v1.json#landing-effect:"
+)
+LEGACY_OWNER_RECEIPT_SCHEMA_REF = (
+    "schemas/external-codex-workspace-manifest-legacy-owner-receipt.schema.json"
+)
+LEGACY_OWNER_RECEIPT_SCHEMA_VERSION = (
+    "abyss_stack_external_codex_workspace_manifest_legacy_owner_receipt_v1"
+)
+MAX_LEGACY_OWNER_MIGRATION_CATALOG_BYTES = 16 * 1024 * 1024
 WRAPPER_SPECS = {
     "aoa-external-codex-agent": "agent-entrypoint.py",
     "aoa-external-actor-bind": "bind-entrypoint.py",
@@ -435,16 +449,35 @@ def require_legacy_owner_migration_catalog(path: Path) -> Path:
         raise InstallError("legacy owner migration catalog must be absolute")
     require_regular_file(path, "legacy owner migration catalog")
     candidate = require_regular_file(path.resolve(), "legacy owner migration catalog")
+
+    def reject_duplicate_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
+        parsed: dict[str, object] = {}
+        for key, item in pairs:
+            if key in parsed:
+                raise ValueError(f"duplicate catalog member: {key}")
+            parsed[key] = item
+        return parsed
+
     try:
         raw = candidate.read_bytes()
-        value = json.loads(raw)
-    except (OSError, json.JSONDecodeError) as exc:
+        if len(raw) > MAX_LEGACY_OWNER_MIGRATION_CATALOG_BYTES:
+            raise InstallError("legacy owner migration catalog exceeds the bounded size")
+        value = json.loads(raw, object_pairs_hook=reject_duplicate_keys)
+    except InstallError:
+        raise
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
         raise InstallError("legacy owner migration catalog is not valid JSON") from exc
-    if not isinstance(value, dict) or set(value) != {
+    if not isinstance(value, dict) or not {
         "schema_version",
         "catalog_id",
         "captured_at",
         "entries",
+    }.issubset(value) or set(value) - {
+        "schema_version",
+        "catalog_id",
+        "captured_at",
+        "entries",
+        "landing_effect_entries",
     }:
         raise InstallError("legacy owner migration catalog envelope is invalid")
     if value.get("schema_version") != LEGACY_OWNER_MIGRATION_CATALOG_SCHEMA_VERSION:
@@ -491,6 +524,7 @@ def require_legacy_owner_migration_catalog(path: Path) -> Path:
             if (
                 not isinstance(digest, str)
                 or re.fullmatch(r"sha256:[0-9a-f]{64}", digest) is None
+                or digest == "sha256:" + "0" * 64
             ):
                 raise InstallError(f"legacy owner migration catalog {key} is invalid")
         session_id = entry["session_id"]
@@ -499,6 +533,139 @@ def require_legacy_owner_migration_catalog(path: Path) -> Path:
                 "legacy owner migration catalog session identities must be unique"
             )
         sessions.add(session_id)
+    landing_entries = value.get("landing_effect_entries", [])
+    if not isinstance(landing_entries, list):
+        raise InstallError("legacy owner migration catalog landing entries are invalid")
+    landing_ids: set[str] = set()
+    landing_entry_keys = {
+        "evidence_id",
+        "grant_id",
+        "repository_id",
+        "repository_revision",
+        "workspace_manifest_schema_version",
+        "workspace_manifest_digest",
+        "evidence_digest",
+        "owner_receipt_digest",
+        "owner_receipt",
+    }
+    receipt_keys = {
+        "$schema",
+        "schema_version",
+        "kind",
+        "receipt_id",
+        "owner_repo",
+        "artifact_ref",
+        "source_ref",
+        "schema_ref",
+        "authorization",
+        "evidence_id",
+        "grant_id",
+        "repository_id",
+        "repository_revision",
+        "workspace_manifest_schema_version",
+        "workspace_manifest_digest",
+    }
+    identifier_pattern = re.compile(r"^[a-z][a-z0-9._:-]{2,127}$")
+    coordinate_pattern = re.compile(
+        r"^[^\x00-\x20\x7f-\xa0\u1680\u2000-\u200a\u2028-\u2029\u202f\u205f\u3000]+$"
+    )
+    repository_pattern = re.compile(r"^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$")
+    revision_pattern = re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
+    digest_pattern = re.compile(r"^sha256:[0-9a-f]{64}$")
+
+    def valid_identifier(value: object) -> bool:
+        return isinstance(value, str) and identifier_pattern.fullmatch(value) is not None
+
+    def valid_coordinate(value: object) -> bool:
+        return (
+            isinstance(value, str)
+            and len(value) <= 4096
+            and coordinate_pattern.fullmatch(value) is not None
+        )
+
+    def valid_digest(value: object) -> bool:
+        return isinstance(value, str) and digest_pattern.fullmatch(value) is not None and value != "sha256:" + "0" * 64
+
+    for entry in landing_entries:
+        if not isinstance(entry, dict) or set(entry) != landing_entry_keys:
+            raise InstallError("legacy owner migration catalog landing entry is invalid")
+        for key in ("evidence_id", "grant_id"):
+            if not valid_identifier(entry.get(key)):
+                raise InstallError(f"legacy owner migration catalog {key} is invalid")
+        if entry["evidence_id"] in landing_ids:
+            raise InstallError(
+                "legacy owner migration catalog landing evidence identities must be unique"
+            )
+        landing_ids.add(entry["evidence_id"])
+        if (
+            not isinstance(entry.get("repository_id"), str)
+            or repository_pattern.fullmatch(entry["repository_id"]) is None
+            or entry["repository_id"].startswith(("./", "../"))
+            or "/../" in entry["repository_id"]
+            or entry["repository_id"].endswith(("/.", "/.."))
+        ):
+            raise InstallError("legacy owner migration catalog repository_id is invalid")
+        if (
+            not isinstance(entry.get("repository_revision"), str)
+            or revision_pattern.fullmatch(entry["repository_revision"]) is None
+        ):
+            raise InstallError(
+                "legacy owner migration catalog repository_revision is invalid"
+            )
+        if entry.get("workspace_manifest_schema_version") != (
+            "abyss_stack_external_codex_workspace_manifest_v1"
+        ):
+            raise InstallError(
+                "legacy owner migration catalog workspace manifest schema version is invalid"
+            )
+        for key in (
+            "workspace_manifest_digest",
+            "evidence_digest",
+            "owner_receipt_digest",
+        ):
+            if not valid_digest(entry.get(key)):
+                raise InstallError(f"legacy owner migration catalog {key} is invalid")
+        owner_receipt = entry.get("owner_receipt")
+        if not isinstance(owner_receipt, dict) or set(owner_receipt) != receipt_keys:
+            raise InstallError("legacy owner migration catalog owner receipt is invalid")
+        if (
+            owner_receipt.get("$schema")
+            != LEGACY_OWNER_RECEIPT_SCHEMA_REF
+            or owner_receipt.get("schema_version")
+            != LEGACY_OWNER_RECEIPT_SCHEMA_VERSION
+            or owner_receipt.get("kind") != "workspace_manifest_legacy_owner_receipt"
+            or owner_receipt.get("owner_repo") != "abyss-stack"
+            or owner_receipt.get("artifact_ref")
+            != LEGACY_OWNER_RECEIPT_ARTIFACT_REF_PREFIX + entry["evidence_id"]
+            or owner_receipt.get("source_ref")
+            != LEGACY_OWNER_MIGRATION_CATALOG_SOURCE_REF
+            or owner_receipt.get("schema_ref") != LEGACY_OWNER_RECEIPT_SCHEMA_REF
+            or owner_receipt.get("authorization")
+            != "owner_authenticated_legacy_manifest_migration"
+        ):
+            raise InstallError("legacy owner migration catalog owner receipt identity is invalid")
+        if not valid_identifier(owner_receipt.get("receipt_id")):
+            raise InstallError("legacy owner migration catalog receipt_id is invalid")
+        for key in ("artifact_ref", "source_ref", "schema_ref"):
+            if not valid_coordinate(owner_receipt.get(key)):
+                raise InstallError(f"legacy owner migration catalog receipt {key} is invalid")
+        if (
+            not valid_identifier(owner_receipt.get("evidence_id"))
+            or not valid_identifier(owner_receipt.get("grant_id"))
+            or owner_receipt.get("repository_id") != entry["repository_id"]
+            or owner_receipt.get("repository_revision") != entry["repository_revision"]
+            or owner_receipt.get("workspace_manifest_schema_version")
+            != entry["workspace_manifest_schema_version"]
+            or owner_receipt.get("workspace_manifest_digest")
+            != entry["workspace_manifest_digest"]
+            or owner_receipt.get("evidence_id") != entry["evidence_id"]
+            or owner_receipt.get("grant_id") != entry["grant_id"]
+        ):
+            raise InstallError("legacy owner migration catalog owner receipt binding is invalid")
+        if sha256_bytes(canonical_bytes(owner_receipt)) != entry["owner_receipt_digest"]:
+            raise InstallError(
+                "legacy owner migration catalog owner receipt digest is invalid"
+            )
     return candidate
 
 
@@ -513,6 +680,7 @@ def legacy_owner_migration_catalog_summary(
         "catalog_id": payload["catalog_id"],
         "digest": sha256_file(candidate),
         "entry_count": len(payload["entries"]),
+        "landing_effect_entry_count": len(payload.get("landing_effect_entries", [])),
         "source_kind": source_kind,
     }
 
@@ -2131,6 +2299,8 @@ def install(
     if (
         not isinstance(legacy_owner_migration_catalog_summary, dict)
         or legacy_owner_migration_catalog_summary.get("entry_count") != 0
+        or legacy_owner_migration_catalog_summary.get("landing_effect_entry_count", 0)
+        != 0
     ):
         raise InstallError(
             "ordinary install refuses a catalog-bearing release; use stage then "
@@ -2483,10 +2653,19 @@ def activate(
     )
     if isinstance(staged_catalog, dict) and any(
         catalog_summary.get(key) != staged_catalog.get(key)
-        for key in ("catalog_id", "digest", "entry_count", "source_kind")
+        for key in (
+            "catalog_id",
+            "digest",
+            "entry_count",
+            "landing_effect_entry_count",
+            "source_kind",
+        )
     ):
         raise InstallError("staged legacy owner migration catalog differs from release")
-    if catalog_summary["entry_count"] != 0 and (
+    if (
+        catalog_summary["entry_count"] != 0
+        or catalog_summary["landing_effect_entry_count"] != 0
+    ) and (
         artifact_admission is None or staged is None
     ):
         raise InstallError(

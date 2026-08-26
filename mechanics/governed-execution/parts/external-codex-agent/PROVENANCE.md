@@ -123,9 +123,11 @@ request and requires an independently supplied digest of the exact artifact
 bytes. A commit grant also carries an exact workspace-manifest binding mode:
 new grants require the cached-index digest, and only an
 `authenticated_legacy_v1` mode with separately supplied, digest-verified
-owner migration evidence and its independently digest-pinned owner receipt may
-bind a historical v1 manifest without it. The evidence and receipt are bound to
-the exact grant, repository revision, and manifest digest;
+owner migration evidence and a matching owner receipt resolved from the
+release-bound owner migration catalog may bind a historical v1 manifest without
+it. The evidence and catalog-resolved receipt are bound to the exact grant,
+repository revision, and manifest digest; caller-supplied receipt bytes are not
+accepted;
 the reviewer identity must differ from the holder identity. Branch
 targets are limited to commit and push; pull-request and merge
 effects require exact pull-request coordinates. Descriptor-bound bounded

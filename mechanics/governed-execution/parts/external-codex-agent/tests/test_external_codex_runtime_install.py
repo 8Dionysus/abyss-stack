@@ -323,6 +323,75 @@ def test_stage_seals_operator_legacy_migration_catalog_into_release(
     ]
 
 
+def test_landing_owner_catalog_entry_is_validated_and_counted(tmp_path: Path) -> None:
+    evidence_id = "evidence:landing-fixture"
+    grant_id = "grant:landing-fixture"
+    revision = "a" * 40
+    manifest_digest = "sha256:" + "1" * 64
+    evidence_digest = "sha256:" + "2" * 64
+    owner_receipt = {
+        "$schema": runtime_install.LEGACY_OWNER_RECEIPT_SCHEMA_REF,
+        "schema_version": runtime_install.LEGACY_OWNER_RECEIPT_SCHEMA_VERSION,
+        "kind": "workspace_manifest_legacy_owner_receipt",
+        "receipt_id": "receipt:landing-fixture",
+        "owner_repo": "abyss-stack",
+        "artifact_ref": (
+            runtime_install.LEGACY_OWNER_RECEIPT_ARTIFACT_REF_PREFIX + evidence_id
+        ),
+        "source_ref": runtime_install.LEGACY_OWNER_MIGRATION_CATALOG_SOURCE_REF,
+        "schema_ref": runtime_install.LEGACY_OWNER_RECEIPT_SCHEMA_REF,
+        "authorization": "owner_authenticated_legacy_manifest_migration",
+        "evidence_id": evidence_id,
+        "grant_id": grant_id,
+        "repository_id": "abyss-stack/abyss-stack",
+        "repository_revision": revision,
+        "workspace_manifest_schema_version": (
+            "abyss_stack_external_codex_workspace_manifest_v1"
+        ),
+        "workspace_manifest_digest": manifest_digest,
+    }
+    catalog = tmp_path / runtime_install.LEGACY_OWNER_MIGRATION_CATALOG_NAME
+    catalog.write_text(
+        json.dumps(
+            {
+                "schema_version": (
+                    runtime_install.LEGACY_OWNER_MIGRATION_CATALOG_SCHEMA_VERSION
+                ),
+                "catalog_id": "landing-fixture",
+                "captured_at": "2026-08-13T12:00:00Z",
+                "entries": [],
+                "landing_effect_entries": [
+                    {
+                        "evidence_id": evidence_id,
+                        "grant_id": grant_id,
+                        "repository_id": "abyss-stack/abyss-stack",
+                        "repository_revision": revision,
+                        "workspace_manifest_schema_version": (
+                            "abyss_stack_external_codex_workspace_manifest_v1"
+                        ),
+                        "workspace_manifest_digest": manifest_digest,
+                        "evidence_digest": evidence_digest,
+                        "owner_receipt_digest": runtime_install.sha256_bytes(
+                            runtime_install.canonical_bytes(owner_receipt)
+                        ),
+                        "owner_receipt": owner_receipt,
+                    }
+                ],
+            },
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    assert runtime_install.require_legacy_owner_migration_catalog(catalog) == catalog
+    summary = runtime_install.legacy_owner_migration_catalog_summary(
+        catalog, source_kind="operator_pre_upgrade_inventory"
+    )
+    assert summary["entry_count"] == 0
+    assert summary["landing_effect_entry_count"] == 1
+
+
 def test_catalog_bearing_release_requires_artifact_admitted_activation(
     tmp_path: Path,
 ) -> None:

@@ -65,7 +65,7 @@ WORKSPACE_MANIFEST_RAW = (
         indent=2,
     )
     + "\n"
-).encode("utf-8")
+    ).encode("utf-8")
 
 
 def _ref(owner: str, artifact: str, schema: str) -> dict[str, str]:
@@ -197,9 +197,9 @@ def _legacy_workspace_manifest_owner_receipt_raw(
                 "receipt_id": "receipt:legacy-manifest-fixture",
                 "owner_repo": "abyss-stack",
                 "artifact_ref": (
-                    "runtime/landing-grants/legacy-owner-receipts/fixture.json"
+                    "legacy-owner-admission-migrations.v1.json#landing-effect:evidence:legacy-manifest-fixture"
                 ),
-                "source_ref": "source-ref:owner-migration",
+                "source_ref": "release-bound-owner-catalog",
                 "schema_ref": (
                     "schemas/external-codex-workspace-manifest-legacy-owner-receipt.schema.json"
                 ),
@@ -245,9 +245,9 @@ def _legacy_workspace_manifest_evidence_raw(
                 "owner_authentication_ref": {
                     "owner_repo": "abyss-stack",
                     "artifact_ref": (
-                        "runtime/landing-grants/legacy-owner-receipts/fixture.json"
+                        "legacy-owner-admission-migrations.v1.json#landing-effect:evidence:legacy-manifest-fixture"
                     ),
-                    "source_ref": "source-ref:owner-migration",
+                    "source_ref": "release-bound-owner-catalog",
                     "artifact_digest": owner_receipt_digest,
                     "schema_ref": (
                         "schemas/external-codex-workspace-manifest-legacy-owner-receipt.schema.json"
@@ -263,6 +263,61 @@ def _legacy_workspace_manifest_evidence_raw(
         )
         + "\n"
     ).encode("utf-8")
+
+
+def _canonical_digest(value: object) -> str:
+    return _raw_digest(
+        json.dumps(
+            value,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    )
+
+
+def _legacy_owner_catalog_raw(
+    grant: dict[str, Any],
+    manifest_digest: str,
+    evidence_raw: bytes,
+    owner_receipt_raw: bytes,
+) -> bytes:
+    owner_receipt = json.loads(owner_receipt_raw)
+    return _workspace_manifest_raw(
+        {
+            "captured_at": "2026-08-24T00:00:00Z",
+            "catalog_id": "fixture-landing-owner-catalog",
+            "entries": [],
+            "landing_effect_entries": [
+                {
+                    "evidence_id": "evidence:legacy-manifest-fixture",
+                    "grant_id": grant["grant_id"],
+                    "repository_id": grant["repository"]["repository_id"],
+                    "repository_revision": grant["repository"]["revision"],
+                    "workspace_manifest_schema_version": (
+                        "abyss_stack_external_codex_workspace_manifest_v1"
+                    ),
+                    "workspace_manifest_digest": manifest_digest,
+                    "evidence_digest": _raw_digest(evidence_raw),
+                    "owner_receipt_digest": _canonical_digest(owner_receipt),
+                    "owner_receipt": owner_receipt,
+                }
+            ],
+            "schema_version": (
+                "abyss_stack_external_codex_legacy_owner_migration_catalog_v1"
+            ),
+        }
+    )
+
+
+def _install_legacy_owner_catalog(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    raw: bytes,
+) -> None:
+    path = tmp_path / "legacy-owner-admission-migrations.v1.json"
+    path.write_bytes(raw)
+    monkeypatch.setattr(landing_effect, "LEGACY_OWNER_MIGRATION_CATALOG_PATH", path)
 
 
 WORKSPACE_MANIFEST_DIGEST = _raw_digest(WORKSPACE_MANIFEST_RAW)
@@ -763,7 +818,9 @@ def test_workspace_manifest_accepts_bare_sha256_git_head() -> None:
     assert admitted["repository"]["revision"] == revision
 
 
-def test_workspace_manifest_accepts_legacy_v1_with_migration_evidence() -> None:
+def test_workspace_manifest_accepts_legacy_v1_with_migration_evidence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     grant = _grant(target_kind="branch", effects=["commit"])
     grant["commit_content"][
         "workspace_manifest_binding_mode"
@@ -776,7 +833,7 @@ def test_workspace_manifest_accepts_legacy_v1_with_migration_evidence() -> None:
     owner_receipt_raw = _legacy_workspace_manifest_owner_receipt_raw(
         grant, _raw_digest(raw_manifest)
     )
-    owner_receipt_digest = _raw_digest(owner_receipt_raw)
+    owner_receipt_digest = _canonical_digest(json.loads(owner_receipt_raw))
     evidence_raw = _legacy_workspace_manifest_evidence_raw(
         grant, _raw_digest(raw_manifest), owner_receipt_digest
     )
@@ -789,6 +846,13 @@ def test_workspace_manifest_accepts_legacy_v1_with_migration_evidence() -> None:
     ] = owner_receipt_digest
     _refresh_semantic_digest(grant)
     raw = _raw(grant)
+    _install_legacy_owner_catalog(
+        monkeypatch,
+        tmp_path,
+        _legacy_owner_catalog_raw(
+            grant, _raw_digest(raw_manifest), evidence_raw, owner_receipt_raw
+        ),
+    )
 
     admitted = admit_landing_effect_grant(
         grant,
@@ -799,8 +863,6 @@ def test_workspace_manifest_accepts_legacy_v1_with_migration_evidence() -> None:
         observed_workspace_manifest_raw=raw_manifest,
         expected_legacy_workspace_manifest_evidence_digest=evidence_digest,
         legacy_workspace_manifest_evidence_raw=evidence_raw,
-        expected_legacy_workspace_manifest_owner_receipt_digest=owner_receipt_digest,
-        legacy_workspace_manifest_owner_receipt_raw=owner_receipt_raw,
         at=AT,
     )
     assert admitted["admission"]["status"] == "admitted"
@@ -848,7 +910,9 @@ def test_legacy_commit_grants_require_independent_migration_evidence() -> None:
     assert exc.value.code == "landing_effect_grant_content_unbound"
 
 
-def test_legacy_commit_grants_require_verified_owner_receipt() -> None:
+def test_legacy_commit_grants_require_release_bound_owner_receipt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     grant = _grant(target_kind="branch", effects=["commit"])
     grant["commit_content"][
         "workspace_manifest_binding_mode"
@@ -861,7 +925,7 @@ def test_legacy_commit_grants_require_verified_owner_receipt() -> None:
     owner_receipt_raw = _legacy_workspace_manifest_owner_receipt_raw(
         grant, manifest_digest
     )
-    owner_receipt_digest = _raw_digest(owner_receipt_raw)
+    owner_receipt_digest = _canonical_digest(json.loads(owner_receipt_raw))
     evidence_raw = _legacy_workspace_manifest_evidence_raw(
         grant, manifest_digest, owner_receipt_digest
     )
@@ -874,39 +938,37 @@ def test_legacy_commit_grants_require_verified_owner_receipt() -> None:
         "legacy_workspace_manifest_owner_receipt_digest"
     ] = owner_receipt_digest
     _refresh_semantic_digest(grant)
-    raw = _raw(grant)
+    _install_legacy_owner_catalog(
+        monkeypatch,
+        tmp_path,
+        _legacy_owner_catalog_raw(
+            grant, manifest_digest, evidence_raw, owner_receipt_raw
+        ),
+    )
+
+    tampered_evidence = json.loads(evidence_raw)
+    tampered_evidence["owner_authentication_ref"]["artifact_digest"] = REF_DIGEST
+    tampered_evidence_raw = _workspace_manifest_raw(tampered_evidence)
+    tampered_evidence_digest = _raw_digest(tampered_evidence_raw)
+    grant["commit_content"]["legacy_workspace_manifest_evidence_digest"] = (
+        tampered_evidence_digest
+    )
+    _refresh_semantic_digest(grant)
+    tampered_grant_raw = _raw(grant)
 
     with pytest.raises(LandingEffectGrantError) as unbound_exc:
         admit_landing_effect_grant(
             grant,
             _request(grant),
-            grant_raw=raw,
-            expected_artifact_digest=_raw_digest(raw),
+            grant_raw=tampered_grant_raw,
+            expected_artifact_digest=_raw_digest(tampered_grant_raw),
             observed_workspace_manifest_digest=manifest_digest,
             observed_workspace_manifest_raw=raw_manifest,
-            expected_legacy_workspace_manifest_evidence_digest=evidence_digest,
-            legacy_workspace_manifest_evidence_raw=evidence_raw,
-            expected_legacy_workspace_manifest_owner_receipt_digest=REF_DIGEST,
-            legacy_workspace_manifest_owner_receipt_raw=owner_receipt_raw,
+            expected_legacy_workspace_manifest_evidence_digest=tampered_evidence_digest,
+            legacy_workspace_manifest_evidence_raw=tampered_evidence_raw,
             at=AT,
         )
     assert unbound_exc.value.code == "landing_effect_grant_content_unbound"
-
-    with pytest.raises(LandingEffectGrantError) as drift_exc:
-        admit_landing_effect_grant(
-            grant,
-            _request(grant),
-            grant_raw=raw,
-            expected_artifact_digest=_raw_digest(raw),
-            observed_workspace_manifest_digest=manifest_digest,
-            observed_workspace_manifest_raw=raw_manifest,
-            expected_legacy_workspace_manifest_evidence_digest=evidence_digest,
-            legacy_workspace_manifest_evidence_raw=evidence_raw,
-            expected_legacy_workspace_manifest_owner_receipt_digest=owner_receipt_digest,
-            legacy_workspace_manifest_owner_receipt_raw=owner_receipt_raw + b" ",
-            at=AT,
-        )
-    assert drift_exc.value.code == "landing_effect_grant_content_drift"
 
 
 def test_legacy_migration_evidence_must_bind_exact_grant_and_manifest() -> None:
@@ -922,7 +984,7 @@ def test_legacy_migration_evidence_must_bind_exact_grant_and_manifest() -> None:
     owner_receipt_raw = _legacy_workspace_manifest_owner_receipt_raw(
         grant, manifest_digest
     )
-    owner_receipt_digest = _raw_digest(owner_receipt_raw)
+    owner_receipt_digest = _canonical_digest(json.loads(owner_receipt_raw))
     evidence_value = json.loads(
         _legacy_workspace_manifest_evidence_raw(
             grant, manifest_digest, owner_receipt_digest
@@ -951,8 +1013,6 @@ def test_legacy_migration_evidence_must_bind_exact_grant_and_manifest() -> None:
             observed_workspace_manifest_raw=raw_manifest,
             expected_legacy_workspace_manifest_evidence_digest=evidence_digest,
             legacy_workspace_manifest_evidence_raw=evidence_raw,
-            expected_legacy_workspace_manifest_owner_receipt_digest=owner_receipt_digest,
-            legacy_workspace_manifest_owner_receipt_raw=owner_receipt_raw,
             at=AT,
         )
     assert exc.value.code == "landing_effect_grant_content_mismatch"

@@ -85,7 +85,7 @@
       "properties": {
         "owner_repo": {"const": "abyss-stack"},
         "artifact_ref": {"$ref": "#/$defs/coordinate"},
-        "source_ref": {"$ref": "#/$defs/coordinate"},
+        "source_ref": {"const": "release-bound-owner-catalog"},
         "artifact_digest": {"$ref": "#/$defs/digest"},
         "schema_ref": {
           "const": "schemas/external-codex-workspace-manifest-legacy-owner-receipt.schema.json"

@@ -7860,6 +7860,7 @@ def test_study_preparer_pins_landing_admission_schemas() -> None:
         workspace_ref,
         legacy_evidence_ref,
         legacy_owner_receipt_ref,
+        legacy_owner_catalog_ref,
     ) = PREPARER._landing_effect_schema_refs()
     expected = (
         (
@@ -7885,6 +7886,12 @@ def test_study_preparer_pins_landing_admission_schemas() -> None:
             PREPARER.LEGACY_WORKSPACE_MANIFEST_OWNER_RECEIPT_SCHEMA_PATH,
             PREPARER.LEGACY_WORKSPACE_MANIFEST_OWNER_RECEIPT_SCHEMA_REF,
             PREPARER.LEGACY_WORKSPACE_MANIFEST_OWNER_RECEIPT_SCHEMA_VERSION,
+        ),
+        (
+            legacy_owner_catalog_ref,
+            PREPARER.LEGACY_OWNER_MIGRATION_CATALOG_SCHEMA_PATH,
+            PREPARER.LEGACY_OWNER_MIGRATION_CATALOG_SCHEMA_REF,
+            PREPARER.LEGACY_OWNER_MIGRATION_CATALOG_SCHEMA_VERSION,
         ),
     )
     for reference, path, artifact_ref, schema_version in expected:

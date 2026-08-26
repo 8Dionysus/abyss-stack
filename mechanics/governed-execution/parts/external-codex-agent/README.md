@@ -179,12 +179,13 @@ and replay only through their matching legacy wake reservation. A retry after a 
   traversal components. Standalone commit grants also bind an explicit
   workspace-manifest mode: newly issued grants require the cached-index digest,
   while only an `authenticated_legacy_v1` grant with separately supplied,
-  digest-verified owner migration evidence and its independently digest-pinned
-  owner receipt permits the historical v1 omission. The evidence and receipt
-  bind the exact grant, repository revision, and manifest digest; admission
-  verifies the receipt bytes against the evidence's owner-authentication ref.
-  The owner must also supply the exact artifact-byte digest independently of the
-  grant's semantic self-digest. Missing, stale, wider, contradictory,
+  digest-verified owner migration evidence and a matching owner receipt resolved
+  from the release-bound `legacy-owner-admission-migrations.v1.json` catalog
+  permits the historical v1 omission. The evidence, catalog entry, and receipt
+  bind the exact grant, repository revision, and manifest digest; caller-supplied
+  receipt bytes are not accepted. Non-empty owner catalogs require the admitted
+  runtime activation path. The owner must also supply the exact artifact-byte
+  digest independently of the grant's semantic self-digest. Missing, stale, wider, contradictory,
   duplicate-member, invalid-ref, oversized, or artifact-drifted grants fail
   closed. This is an owner-qualified admission seam only: current profiles
   keep all external effects disabled and the command observer's ten-effect

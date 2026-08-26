@@ -40,6 +40,12 @@ LEGACY_WORKSPACE_MANIFEST_OWNER_RECEIPT_SCHEMA_PATH = (
     PART_ROOT
     / "schemas/external-codex-workspace-manifest-legacy-owner-receipt.schema.json"
 )
+LEGACY_OWNER_MIGRATION_CATALOG_PATH = (
+    PART_ROOT / "legacy-owner-admission-migrations.v1.json"
+)
+LEGACY_OWNER_MIGRATION_CATALOG_SCHEMA_PATH = (
+    PART_ROOT / "schemas/external-codex-legacy-owner-migration-catalog.schema.json"
+)
 SCHEMA_VERSION = "abyss_stack_external_codex_governed_landing_effect_grant_v1"
 CAPABILITY_ID = "governed_git_landing_v1"
 CURRENT_WORKSPACE_MANIFEST_BINDING_MODE = "cached_index_v1"
@@ -56,6 +62,19 @@ LEGACY_WORKSPACE_MANIFEST_OWNER_RECEIPT_SCHEMA_VERSION = (
 LEGACY_WORKSPACE_MANIFEST_OWNER_RECEIPT_SCHEMA_REF = (
     "schemas/external-codex-workspace-manifest-legacy-owner-receipt.schema.json"
 )
+LEGACY_OWNER_MIGRATION_CATALOG_SCHEMA_VERSION = (
+    "abyss_stack_external_codex_legacy_owner_migration_catalog_v1"
+)
+LEGACY_OWNER_MIGRATION_CATALOG_SCHEMA_REF = (
+    "schemas/external-codex-legacy-owner-migration-catalog.schema.json"
+)
+LEGACY_OWNER_MIGRATION_CATALOG_ARTIFACT_REF = (
+    "legacy-owner-admission-migrations.v1.json"
+)
+LEGACY_OWNER_MIGRATION_CATALOG_SOURCE_REF = "release-bound-owner-catalog"
+LEGACY_OWNER_RECEIPT_ARTIFACT_REF_PREFIX = (
+    "legacy-owner-admission-migrations.v1.json#landing-effect:"
+)
 WORKSPACE_MANIFEST_BINDING_MODES = frozenset(
     {
         CURRENT_WORKSPACE_MANIFEST_BINDING_MODE,
@@ -68,6 +87,7 @@ MAX_GRANT_MAPPING_KEYS = 4096
 MAX_GRANT_SEQUENCE_ITEMS = 65536
 MAX_GRANT_PRECHECK_NODES = 65536
 MAX_WORKSPACE_MANIFEST_BYTES = 16 * 1024 * 1024
+MAX_OWNER_MIGRATION_CATALOG_BYTES = 16 * 1024 * 1024
 GIT_EXECUTABLE = "/usr/bin/git"
 GIT_REF_VALIDATION_ENV = {
     "GIT_CONFIG_GLOBAL": os.devnull,
@@ -391,16 +411,68 @@ def _validate_workspace_manifest_binding_mode(
     return mode
 
 
+def _load_release_bound_legacy_owner_catalog() -> tuple[Mapping[str, Any], str]:
+    """Load the immutable owner catalog shipped with this runtime release."""
+
+    path = LEGACY_OWNER_MIGRATION_CATALOG_PATH
+    if not path.is_absolute():
+        raise LandingEffectGrantError(
+            "landing_effect_grant_owner_state_unavailable",
+            "legacy owner migration catalog must be an absolute release path",
+        )
+    try:
+        raw = _read_bounded_regular_file(
+            path,
+            limit=MAX_OWNER_MIGRATION_CATALOG_BYTES,
+            unavailable_code="landing_effect_grant_owner_state_unavailable",
+            too_large_code="landing_effect_grant_owner_state_too_large",
+            label="legacy owner migration catalog",
+        )
+    except LandingEffectGrantError:
+        raise
+    try:
+        parsed = _parse_json_bytes(raw)
+    except LandingEffectGrantError as exc:
+        if exc.code == "landing_effect_grant_duplicate_key":
+            raise LandingEffectGrantError(
+                "landing_effect_grant_owner_state_invalid",
+                "legacy owner migration catalog contains duplicate JSON members",
+            ) from exc
+        raise
+    except (UnicodeDecodeError, json.JSONDecodeError, RecursionError) as exc:
+        raise LandingEffectGrantError(
+            "landing_effect_grant_owner_state_invalid",
+            "legacy owner migration catalog is not UTF-8 JSON",
+        ) from exc
+    if not isinstance(parsed, Mapping):
+        raise LandingEffectGrantError(
+            "landing_effect_grant_owner_state_invalid",
+            "legacy owner migration catalog is not a JSON object",
+        )
+    errors = _schema_errors(
+        parsed,
+        schema_path=LEGACY_OWNER_MIGRATION_CATALOG_SCHEMA_PATH,
+    )
+    if errors:
+        raise LandingEffectGrantError(
+            "landing_effect_grant_owner_state_invalid", errors[0]
+        )
+    if parsed["schema_version"] != LEGACY_OWNER_MIGRATION_CATALOG_SCHEMA_VERSION:
+        raise LandingEffectGrantError(
+            "landing_effect_grant_owner_state_invalid",
+            "legacy owner migration catalog version is unsupported",
+        )
+    return parsed, _digest_bytes(raw)
+
+
 def _validate_legacy_workspace_manifest_evidence(
     raw: bytes | None,
     expected_digest: object,
     *,
     grant: Mapping[str, Any],
     workspace_manifest_digest: str,
-    expected_owner_receipt_digest: object,
-    owner_receipt_raw: bytes | None,
 ) -> tuple[str, str]:
-    """Verify evidence and its separately authenticated owner receipt."""
+    """Verify evidence against the release-bound owner migration catalog."""
 
     if not isinstance(raw, bytes) or not _is_sha256_digest(expected_digest):
         raise LandingEffectGrantError(
@@ -441,6 +513,9 @@ def _validate_legacy_workspace_manifest_evidence(
     owner_ref = parsed["owner_authentication_ref"]
     if (
         owner_ref["owner_repo"] != "abyss-stack"
+        or owner_ref["artifact_ref"]
+        != LEGACY_OWNER_RECEIPT_ARTIFACT_REF_PREFIX + parsed["evidence_id"]
+        or owner_ref["source_ref"] != LEGACY_OWNER_MIGRATION_CATALOG_SOURCE_REF
         or owner_ref["schema_ref"]
         != LEGACY_WORKSPACE_MANIFEST_OWNER_RECEIPT_SCHEMA_REF
         or owner_ref["schema_version"]
@@ -448,7 +523,7 @@ def _validate_legacy_workspace_manifest_evidence(
     ):
         raise LandingEffectGrantError(
             "landing_effect_grant_content_invalid",
-            "legacy manifest evidence does not name the exact owner receipt schema",
+            "legacy manifest evidence does not name the exact release-bound owner catalog",
         )
     repository = grant["repository"]
     if (
@@ -461,41 +536,61 @@ def _validate_legacy_workspace_manifest_evidence(
             "landing_effect_grant_content_mismatch",
             "legacy manifest evidence is not bound to the exact grant, repository, or manifest",
         )
-    if (
-        not _is_sha256_digest(expected_owner_receipt_digest)
-        or owner_ref["artifact_digest"] != expected_owner_receipt_digest
-    ):
+    catalog, _catalog_digest = _load_release_bound_legacy_owner_catalog()
+    commit_content = grant.get("commit_content")
+    expected_owner_receipt_digest = (
+        commit_content.get("legacy_workspace_manifest_owner_receipt_digest")
+        if isinstance(commit_content, Mapping)
+        else None
+    )
+    if not _is_sha256_digest(expected_owner_receipt_digest):
         raise LandingEffectGrantError(
             "landing_effect_grant_content_unbound",
-            "legacy manifest admission requires the independently expected owner receipt digest",
+            "legacy manifest admission requires the exact owner receipt digest in the grant",
         )
-    if not isinstance(owner_receipt_raw, bytes):
+    entries = catalog.get("landing_effect_entries", [])
+    if not isinstance(entries, list):
+        raise LandingEffectGrantError(
+            "landing_effect_grant_owner_state_invalid",
+            "legacy owner migration catalog landing entries are invalid",
+        )
+    matches = [
+        entry
+        for entry in entries
+        if isinstance(entry, Mapping)
+        and entry.get("evidence_id") == parsed["evidence_id"]
+        and entry.get("grant_id") == grant["grant_id"]
+        and entry.get("repository_id") == repository["repository_id"]
+        and entry.get("repository_revision") == repository["revision"]
+        and entry.get("workspace_manifest_schema_version")
+        == parsed["workspace_manifest_schema_version"]
+        and entry.get("workspace_manifest_digest") == workspace_manifest_digest
+        and entry.get("evidence_digest") == actual_digest
+        and entry.get("owner_receipt_digest") == owner_ref["artifact_digest"]
+        and entry.get("owner_receipt_digest") == expected_owner_receipt_digest
+    ]
+    if not matches:
         raise LandingEffectGrantError(
             "landing_effect_grant_content_unbound",
-            "legacy manifest admission requires the exact owner receipt bytes",
+            "legacy manifest evidence is not authorized by this release's owner catalog",
         )
-    if len(owner_receipt_raw) > MAX_GRANT_BYTES:
+    if len(matches) != 1:
         raise LandingEffectGrantError(
-            "landing_effect_grant_content_too_large",
-            "legacy manifest owner receipt exceeds the bounded admission size",
+            "landing_effect_grant_owner_state_invalid",
+            "legacy owner migration catalog has ambiguous landing entries",
         )
-    actual_owner_receipt_digest = _digest_bytes(owner_receipt_raw)
-    if actual_owner_receipt_digest != expected_owner_receipt_digest:
-        raise LandingEffectGrantError(
-            "landing_effect_grant_content_drift",
-            "legacy manifest owner receipt differs from its independently expected digest",
-        )
-    try:
-        owner_receipt = _parse_json_bytes(owner_receipt_raw)
-    except (UnicodeDecodeError, json.JSONDecodeError, RecursionError) as exc:
-        raise LandingEffectGrantError(
-            "landing_effect_grant_content_invalid",
-            "legacy manifest owner receipt is not UTF-8 JSON",
-        ) from exc
+    entry = matches[0]
+    owner_receipt = entry.get("owner_receipt")
     if not isinstance(owner_receipt, Mapping):
         raise LandingEffectGrantError(
-            "landing_effect_grant_content_invalid",
-            "legacy manifest owner receipt is not a JSON object",
+            "landing_effect_grant_owner_state_invalid",
+            "legacy owner migration catalog owner receipt is invalid",
+        )
+    actual_owner_receipt_digest = _digest_bytes(_canonical_bytes(owner_receipt))
+    if actual_owner_receipt_digest != expected_owner_receipt_digest:
+        raise LandingEffectGrantError(
+            "landing_effect_grant_owner_state_invalid",
+            "legacy owner migration catalog owner receipt digest is invalid",
         )
     errors = _schema_errors(
         owner_receipt,
@@ -507,8 +602,9 @@ def _validate_legacy_workspace_manifest_evidence(
         )
     if (
         owner_receipt["owner_repo"] != "abyss-stack"
-        or owner_receipt["artifact_ref"] != owner_ref["artifact_ref"]
-        or owner_receipt["source_ref"] != owner_ref["source_ref"]
+        or owner_receipt["artifact_ref"]
+        != LEGACY_OWNER_RECEIPT_ARTIFACT_REF_PREFIX + entry["evidence_id"]
+        or owner_receipt["source_ref"] != LEGACY_OWNER_MIGRATION_CATALOG_SOURCE_REF
         or owner_receipt["schema_ref"]
         != LEGACY_WORKSPACE_MANIFEST_OWNER_RECEIPT_SCHEMA_REF
         or owner_receipt["schema_version"]
@@ -664,7 +760,14 @@ def _validate_target_refs(grant: Mapping[str, Any]) -> None:
             )
 
 
-def _read_grant_bytes(grant_path: Path) -> bytes:
+def _read_bounded_regular_file(
+    path: Path,
+    *,
+    limit: int,
+    unavailable_code: str,
+    too_large_code: str,
+    label: str,
+) -> bytes:
     flags = (
         os.O_RDONLY
         | getattr(os, "O_CLOEXEC", 0)
@@ -672,53 +775,63 @@ def _read_grant_bytes(grant_path: Path) -> bytes:
         | getattr(os, "O_NONBLOCK", 0)
     )
     try:
-        descriptor = os.open(grant_path, flags)
+        descriptor = os.open(path, flags)
     except (OSError, ValueError) as exc:
         raise LandingEffectGrantError(
-            "landing_effect_grant_unavailable",
-            "grant path could not be opened as a regular file",
+            unavailable_code,
+            f"{label} path could not be opened as a regular file",
         ) from exc
     try:
         try:
             metadata = os.fstat(descriptor)
         except OSError as exc:
             raise LandingEffectGrantError(
-                "landing_effect_grant_unavailable",
-                "grant descriptor could not be inspected",
+                unavailable_code,
+                f"{label} descriptor could not be inspected",
             ) from exc
         if not stat.S_ISREG(metadata.st_mode):
             raise LandingEffectGrantError(
-                "landing_effect_grant_unavailable",
-                "grant descriptor is not a regular file",
+                unavailable_code,
+                f"{label} descriptor is not a regular file",
             )
-        if metadata.st_size > MAX_GRANT_BYTES:
+        if metadata.st_size > limit:
             raise LandingEffectGrantError(
-                "landing_effect_grant_too_large",
-                "grant artifact exceeds the bounded admission size",
+                too_large_code,
+                f"{label} exceeds the bounded admission size",
             )
         chunks = bytearray()
-        while len(chunks) <= MAX_GRANT_BYTES:
+        while len(chunks) <= limit:
             try:
                 chunk = os.read(
                     descriptor,
-                    min(64 * 1024, MAX_GRANT_BYTES + 1 - len(chunks)),
+                    min(64 * 1024, limit + 1 - len(chunks)),
                 )
             except OSError as exc:
                 raise LandingEffectGrantError(
-                    "landing_effect_grant_unavailable",
-                    "grant bytes could not be read from the opened descriptor",
+                    unavailable_code,
+                    f"{label} bytes could not be read from the opened descriptor",
                 ) from exc
             if not chunk:
                 break
             chunks.extend(chunk)
-            if len(chunks) > MAX_GRANT_BYTES:
+            if len(chunks) > limit:
                 raise LandingEffectGrantError(
-                    "landing_effect_grant_too_large",
-                    "grant artifact exceeds the bounded admission size",
+                    too_large_code,
+                    f"{label} exceeds the bounded admission size",
                 )
         return bytes(chunks)
     finally:
         os.close(descriptor)
+
+
+def _read_grant_bytes(grant_path: Path) -> bytes:
+    return _read_bounded_regular_file(
+        grant_path,
+        limit=MAX_GRANT_BYTES,
+        unavailable_code="landing_effect_grant_unavailable",
+        too_large_code="landing_effect_grant_too_large",
+        label="grant artifact",
+    )
 
 
 def validate_landing_effect_grant(grant: Mapping[str, Any]) -> dict[str, Any]:
@@ -883,8 +996,6 @@ def admit_landing_effect_grant(
     observed_workspace_manifest_raw: bytes | None = None,
     expected_legacy_workspace_manifest_evidence_digest: str | None = None,
     legacy_workspace_manifest_evidence_raw: bytes | None = None,
-    expected_legacy_workspace_manifest_owner_receipt_digest: str | None = None,
-    legacy_workspace_manifest_owner_receipt_raw: bytes | None = None,
     at: datetime | None = None,
 ) -> dict[str, Any]:
     """Admit one exact grant against one exact Goal/holder/target request.
@@ -1099,17 +1210,12 @@ def admit_landing_effect_grant(
                     "landing_effect_grant_content_unbound",
                     "legacy manifest admission requires an independently authenticated evidence digest",
                 )
-            expected_legacy_owner_receipt_digest = commit_content.get(
-                "legacy_workspace_manifest_owner_receipt_digest"
-            )
-            if (
-                not _is_sha256_digest(expected_legacy_owner_receipt_digest)
-                or expected_legacy_workspace_manifest_owner_receipt_digest
-                != expected_legacy_owner_receipt_digest
+            if not _is_sha256_digest(
+                commit_content.get("legacy_workspace_manifest_owner_receipt_digest")
             ):
                 raise LandingEffectGrantError(
                     "landing_effect_grant_content_unbound",
-                    "legacy manifest admission requires an independently authenticated owner receipt digest",
+                    "legacy manifest admission requires an exact owner receipt digest in the grant",
                 )
             (
                 legacy_evidence_digest,
@@ -1119,16 +1225,10 @@ def admit_landing_effect_grant(
                 expected_legacy_workspace_manifest_evidence_digest,
                 grant=admitted,
                 workspace_manifest_digest=actual_workspace_manifest_digest,
-                expected_owner_receipt_digest=(
-                    expected_legacy_workspace_manifest_owner_receipt_digest
-                ),
-                owner_receipt_raw=legacy_workspace_manifest_owner_receipt_raw,
             )
         elif (
             expected_legacy_workspace_manifest_evidence_digest is not None
             or legacy_workspace_manifest_evidence_raw is not None
-            or expected_legacy_workspace_manifest_owner_receipt_digest is not None
-            or legacy_workspace_manifest_owner_receipt_raw is not None
         ):
             raise LandingEffectGrantError(
                 "landing_effect_request_invalid",
@@ -1143,8 +1243,6 @@ def admit_landing_effect_grant(
         or observed_workspace_manifest_raw is not None
         or expected_legacy_workspace_manifest_evidence_digest is not None
         or legacy_workspace_manifest_evidence_raw is not None
-        or expected_legacy_workspace_manifest_owner_receipt_digest is not None
-        or legacy_workspace_manifest_owner_receipt_raw is not None
     ):
         raise LandingEffectGrantError(
             "landing_effect_request_invalid",
@@ -1202,8 +1300,6 @@ def landing_effect_grant_allows(
     observed_workspace_manifest_raw: bytes | None = None,
     expected_legacy_workspace_manifest_evidence_digest: str | None = None,
     legacy_workspace_manifest_evidence_raw: bytes | None = None,
-    expected_legacy_workspace_manifest_owner_receipt_digest: str | None = None,
-    legacy_workspace_manifest_owner_receipt_raw: bytes | None = None,
     at: datetime | None = None,
 ) -> bool:
     """Return whether the exact grant can be admitted; default is False."""
@@ -1220,12 +1316,6 @@ def landing_effect_grant_allows(
                 expected_legacy_workspace_manifest_evidence_digest
             ),
             legacy_workspace_manifest_evidence_raw=legacy_workspace_manifest_evidence_raw,
-            expected_legacy_workspace_manifest_owner_receipt_digest=(
-                expected_legacy_workspace_manifest_owner_receipt_digest
-            ),
-            legacy_workspace_manifest_owner_receipt_raw=(
-                legacy_workspace_manifest_owner_receipt_raw
-            ),
             at=at,
         )
     except LandingEffectGrantError:

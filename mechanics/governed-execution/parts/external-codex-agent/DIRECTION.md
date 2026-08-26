@@ -29,9 +29,11 @@ the exact artifact bytes. Repository coordinates reject traversal components.
 Standalone commit admission also binds an explicit workspace-manifest mode:
 new grants require `cached_index_v1` and its cached staged-diff digest; only an
 `authenticated_legacy_v1` grant accompanied by separately supplied,
-owner-authenticated migration evidence and its independently digest-pinned
-owner receipt can use a historical v1 manifest without that field. Admission
-also rejects absent, stale, wider,
+owner-authenticated migration evidence and a matching owner receipt resolved
+from the release-bound `legacy-owner-admission-migrations.v1.json` catalog can
+use a historical v1 manifest without that field. Caller-supplied receipt bytes
+are not accepted, and non-empty catalogs require admitted runtime activation.
+Admission also rejects absent, stale, wider,
 contradictory, duplicate-member, invalid-ref, oversized, and drifted artifacts. It is intentionally
 declarative: the current runtime profile still has `external_effects=false`,
 and command classification still retains all ten forbidden effects, so this
