@@ -36,6 +36,12 @@ from abyss_stack_mcp.admission_automation import (  # noqa: E402
     AdmissionAutomationStatus,
 )
 from abyss_stack_mcp.system_status import MCPSystemStatus  # noqa: E402
+from abyss_stack_mcp.exposure import (  # noqa: E402
+    ExposureInvocationReceipt,
+    ExposureMaterializationReceipt,
+    StackExposurePlan,
+    StackExposureSnapshot,
+)
 
 
 NOW = datetime(2026, 7, 25, 12, 0, tzinfo=timezone.utc)
@@ -388,6 +394,22 @@ def rendered_outputs() -> dict[Path, str]:
         SERVICE_ROOT / "schemas" / "mcp-system-status.schema.json": schema(
             "mcp-system-status.schema.json",
             MCPSystemStatus,
+        ),
+        SERVICE_ROOT / "schemas" / "progressive-exposure-plan.schema.json": schema(
+            "progressive-exposure-plan.schema.json",
+            StackExposurePlan,
+        ),
+        SERVICE_ROOT / "schemas" / "progressive-exposure-snapshot.schema.json": schema(
+            "progressive-exposure-snapshot.schema.json",
+            StackExposureSnapshot,
+        ),
+        SERVICE_ROOT / "schemas" / "progressive-exposure-materialization-receipt.schema.json": schema(
+            "progressive-exposure-materialization-receipt.schema.json",
+            ExposureMaterializationReceipt,
+        ),
+        SERVICE_ROOT / "schemas" / "progressive-exposure-invocation-receipt.schema.json": schema(
+            "progressive-exposure-invocation-receipt.schema.json",
+            ExposureInvocationReceipt,
         ),
         SERVICE_ROOT / "examples" / "runtime-observation.public.example.json": (
             json.dumps(

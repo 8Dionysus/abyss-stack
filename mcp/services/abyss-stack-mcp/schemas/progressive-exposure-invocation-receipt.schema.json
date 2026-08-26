@@ -1,0 +1,136 @@
+{
+  "$id": "https://8dionysus.github.io/schemas/abyss-stack-mcp/progressive-exposure-invocation-receipt.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "contains_secrets": {
+      "const": false,
+      "default": false,
+      "title": "Contains Secrets",
+      "type": "boolean"
+    },
+    "decision": {
+      "enum": [
+        "allowed",
+        "denied"
+      ],
+      "title": "Decision",
+      "type": "string"
+    },
+    "effect_class": {
+      "enum": [
+        "observe",
+        "derive",
+        "validate",
+        "prepare_candidate"
+      ],
+      "title": "Effect Class",
+      "type": "string"
+    },
+    "input_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Input Digest",
+      "type": "string"
+    },
+    "instruction_authority": {
+      "const": "none",
+      "default": "none",
+      "title": "Instruction Authority",
+      "type": "string"
+    },
+    "invocation_authorized": {
+      "default": false,
+      "title": "Invocation Authorized",
+      "type": "boolean"
+    },
+    "materialization_receipt_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Materialization Receipt Id",
+      "type": "string"
+    },
+    "observed_at": {
+      "format": "date-time",
+      "title": "Observed At",
+      "type": "string"
+    },
+    "output_digest": {
+      "anyOf": [
+        {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Output Digest"
+    },
+    "plan_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Plan Id",
+      "type": "string"
+    },
+    "policy_family": {
+      "enum": [
+        "read",
+        "candidate"
+      ],
+      "title": "Policy Family",
+      "type": "string"
+    },
+    "reason_codes": {
+      "default": [],
+      "items": {
+        "maxLength": 512,
+        "minLength": 1,
+        "type": "string"
+      },
+      "title": "Reason Codes",
+      "type": "array"
+    },
+    "receipt_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Receipt Id",
+      "type": "string"
+    },
+    "request_id": {
+      "maxLength": 512,
+      "minLength": 1,
+      "title": "Request Id",
+      "type": "string"
+    },
+    "runtime_effect_authorized": {
+      "const": false,
+      "default": false,
+      "title": "Runtime Effect Authorized",
+      "type": "boolean"
+    },
+    "schema_version": {
+      "const": "abyss_stack_exposure_invocation_receipt_v1",
+      "default": "abyss_stack_exposure_invocation_receipt_v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "tool_id": {
+      "maxLength": 512,
+      "minLength": 1,
+      "title": "Tool Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "receipt_id",
+    "request_id",
+    "materialization_receipt_id",
+    "plan_id",
+    "tool_id",
+    "policy_family",
+    "effect_class",
+    "decision",
+    "input_digest",
+    "observed_at"
+  ],
+  "title": "ExposureInvocationReceipt",
+  "type": "object"
+}
