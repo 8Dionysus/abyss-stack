@@ -14,6 +14,7 @@ Tracking starts with the community-docs baseline for this repository.
   complete Git ref validation, effect-specific target constraints, and a
   reviewer identity distinct from the holder; repository IDs reject traversal
   components, pull-request targets bind an immutable head revision,
+  standalone commit grants bind an exact workspace-manifest digest,
   special-file opens are nonblocking, and boundary-time overflows are
   normalized.
 - Bind the canonical `aoa-kag` MCP adapter to an authored absolute

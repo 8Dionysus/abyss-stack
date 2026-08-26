@@ -727,6 +727,10 @@ these exact relations in one document:
 - `goal_ref` and `holder_ref`, including the holder's exact incarnation;
 - `repository.repository_id` and its exact `revision`; repository coordinates
   reject path-traversal components;
+- a standalone `commit` effect additionally binds `commit_content.kind` to
+  `workspace_manifest` and carries a non-zero
+  `commit_content.workspace_manifest_digest` for the exact bytes a future
+  executor may commit;
 - either one exact branch target (which may bind only `commit` and `push`) or
   one exact pull-request target (which may bind `push`, `pull_request`, and
   `merge`, or a standalone `commit`), including the immutable reviewed head
@@ -752,8 +756,11 @@ to typed time denials.
 future-dated, review-pending, artifact-drifted, contradictory, narrower, wider,
 or path-traversal grants are rejected. The request passed to it must repeat the
 exact Goal, holder, repository, target, review, return, and effect-set
-relations; a pull-request target's reviewed head revision is therefore
-immutable at admission;
+relations. A commit request must also repeat the exact `commit_content`
+binding, and the effect executor must supply an independently observed
+workspace-manifest digest that matches it; a pull-request target's reviewed
+head revision is therefore immutable at admission and a commit cannot use
+post-review workspace bytes;
 there is no wildcard or subset match. `landing_effect_grant_allows` is only a
 boolean read of that admission result.
 

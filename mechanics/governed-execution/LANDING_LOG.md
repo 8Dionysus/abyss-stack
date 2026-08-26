@@ -5,22 +5,24 @@
 Recorded the source-only landing of the provider-neutral governed landing-effect
 grant ABI. The schema and fail-closed admission path bind exact Goal, holder,
 repository revision, branch or pull-request target, immutable pull-request head
-revision, effect set, independent reviewer identity, artifact bytes, expiry, and
-review-required return posture. Repository coordinates reject traversal
-components, and special-file, duplicate-member, digest, ref, size, and boundary
-time cases remain typed denials.
+revision, standalone-commit workspace-manifest content, effect set, independent
+reviewer identity, artifact bytes, expiry, and review-required return posture.
+Repository coordinates reject traversal components, and special-file,
+duplicate-member, digest, ref, size, and boundary time cases remain typed
+denials.
 
 The focused landing-effect suite (`test_external_codex_landing_effect.py`)
-collected and passed 46 tests on source repair commit `78514a98b758443a44cd17907e8f85bc8bc63168`
-(35 test functions, three existing three-case parametrizations, and one
-five-case owner-reference parametrization). Commit grants are standalone when
+collected and passed 49 tests on source repair commit
+`7368f4b40b57d3df6f06224fa8125423fd2ed0af`. Commit grants are standalone when
 the target is a pull request: a revision-producing commit cannot be combined
-with a downstream push, pull-request, or merge effect. The full external-agent
-suite also passed, and the exported validator bounds caller mappings before
-copying and schema validation. Repository IDs and revisions use true
-full-string validation. The canonical repository-local KAG gate and hosted
-Repo Validation are rerun on the synchronized final branch. This is source/CI
-evidence only: the current runtime profile retains
+with a downstream push, pull-request, or merge effect, and it must carry an
+exact workspace-manifest digest that admission compares with an independently
+observed digest. The full external-agent suite also passed, and the exported
+validator bounds caller mappings before copying and schema validation.
+Repository IDs and revisions use true full-string validation. The canonical
+repository-local KAG gate and hosted Repo Validation are rerun on the
+synchronized final branch. This is source/CI evidence only: the current runtime
+profile retains
 `external_effects=false` and the complete ten-effect forbidden closure, so no
 runtime activation, landing-effect execution, deployment, semantic/Goal verdict,
 or owner acceptance is claimed.
