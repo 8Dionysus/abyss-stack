@@ -31,6 +31,7 @@ from external_codex_landing_effect import (  # noqa: E402
 AT = datetime(2026, 8, 24, 12, tzinfo=UTC)
 ZERO_DIGEST = "sha256:" + "0" * 64
 REF_DIGEST = "sha256:" + "1" * 64
+WORKSPACE_MANIFEST_DIGEST = "sha256:" + "2" * 64
 
 
 def _ref(owner: str, artifact: str, schema: str) -> dict[str, str]:
@@ -51,6 +52,11 @@ def _grant(
     review_status: str = "approved",
     expires_at: str = "2026-08-25T00:00:00Z",
 ) -> dict[str, Any]:
+    granted_effects = (
+        list(effects)
+        if effects is not None
+        else ["push", "pull_request", "merge"]
+    )
     if target_kind == "branch":
         target = {
             "kind": "branch",
@@ -86,7 +92,7 @@ def _grant(
             "revision": "e" * 40,
         },
         "target": target,
-        "allowed_effects": effects or ["push", "pull_request", "merge"],
+        "allowed_effects": granted_effects,
         "review": {
             "required": True,
             "posture": "independent_review",
@@ -103,6 +109,11 @@ def _grant(
         "issued_at": "2026-08-23T00:00:00Z",
         "expires_at": expires_at,
     }
+    if "commit" in granted_effects:
+        grant["commit_content"] = {
+            "kind": "workspace_manifest",
+            "workspace_manifest_digest": WORKSPACE_MANIFEST_DIGEST,
+        }
     grant["grant_ref"][
         "schema_ref"
     ] = "schemas/external-codex-governed-landing-effect-grant.schema.json"
@@ -158,6 +169,8 @@ def _request(grant: dict[str, Any], *, effect: str | None = None) -> dict[str, A
         request["allowed_effects"] = list(grant["allowed_effects"])
     else:
         request["effect"] = effect
+    if "commit_content" in grant:
+        request["commit_content"] = deepcopy(grant["commit_content"])
     return request
 
 
@@ -282,6 +295,69 @@ def test_commit_cannot_share_a_grant_with_downstream_effects() -> None:
         assert exc.value.code == "landing_effect_grant_schema_invalid"
 
 
+def test_commit_grants_require_immutable_workspace_manifest_binding() -> None:
+    grant = _grant(effects=["commit"])
+    del grant["commit_content"]
+    _refresh_semantic_digest(grant)
+
+    with pytest.raises(LandingEffectGrantError) as exc:
+        validate_landing_effect_grant(grant)
+    assert exc.value.code == "landing_effect_grant_schema_invalid"
+
+
+def test_commit_admission_requires_and_verifies_workspace_manifest_digest() -> None:
+    grant = _grant(target_kind="branch", effects=["commit"])
+    raw = _raw(grant)
+    request = _request(grant)
+
+    with pytest.raises(LandingEffectGrantError) as unbound_exc:
+        admit_landing_effect_grant(
+            grant,
+            request,
+            grant_raw=raw,
+            expected_artifact_digest=_raw_digest(raw),
+            at=AT,
+        )
+    assert unbound_exc.value.code == "landing_effect_grant_content_unbound"
+
+    with pytest.raises(LandingEffectGrantError) as drift_exc:
+        admit_landing_effect_grant(
+            grant,
+            request,
+            grant_raw=raw,
+            expected_artifact_digest=_raw_digest(raw),
+            observed_workspace_manifest_digest="sha256:" + "3" * 64,
+            at=AT,
+        )
+    assert drift_exc.value.code == "landing_effect_grant_content_drift"
+
+    admitted = admit_landing_effect_grant(
+        grant,
+        request,
+        grant_raw=raw,
+        expected_artifact_digest=_raw_digest(raw),
+        observed_workspace_manifest_digest=WORKSPACE_MANIFEST_DIGEST,
+        at=AT,
+    )
+    assert (
+        admitted["admission"]["workspace_manifest_digest"]
+        == WORKSPACE_MANIFEST_DIGEST
+    )
+
+
+def test_non_commit_grants_reject_workspace_manifest_binding() -> None:
+    grant = _grant(effects=["push"])
+    grant["commit_content"] = {
+        "kind": "workspace_manifest",
+        "workspace_manifest_digest": WORKSPACE_MANIFEST_DIGEST,
+    }
+    _refresh_semantic_digest(grant)
+
+    with pytest.raises(LandingEffectGrantError) as exc:
+        validate_landing_effect_grant(grant)
+    assert exc.value.code == "landing_effect_grant_schema_invalid"
+
+
 def test_pull_request_target_requires_immutable_head_revision() -> None:
     grant = _grant()
     del grant["target"]["head_revision"]
@@ -388,6 +464,9 @@ def test_branch_target_allows_only_single_commit_or_push_effects() -> None:
             _request(grant),
             grant_raw=raw,
             expected_artifact_digest=_raw_digest(raw),
+            observed_workspace_manifest_digest=(
+                WORKSPACE_MANIFEST_DIGEST if effect == "commit" else None
+            ),
             at=AT,
         )
         assert admitted["target"]["kind"] == "branch"

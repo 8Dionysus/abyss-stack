@@ -131,6 +131,16 @@ def _digest_bytes(raw: bytes) -> str:
     return "sha256:" + hashlib.sha256(raw).hexdigest()
 
 
+def _is_sha256_digest(value: object) -> bool:
+    return (
+        isinstance(value, str)
+        and len(value) == len("sha256:") + 64
+        and value.startswith("sha256:")
+        and all(character in "0123456789abcdef" for character in value[7:])
+        and value != ZERO_DIGEST
+    )
+
+
 def _reject_duplicate_json_keys(
     pairs: list[tuple[str, Any]],
 ) -> dict[str, Any]:
@@ -498,6 +508,7 @@ def admit_landing_effect_grant(
     *,
     grant_raw: bytes | None = None,
     expected_artifact_digest: str | None = None,
+    observed_workspace_manifest_digest: str | None = None,
     at: datetime | None = None,
 ) -> dict[str, Any]:
     """Admit one exact grant against one exact Goal/holder/target request.
@@ -506,7 +517,8 @@ def admit_landing_effect_grant(
     Goal, holder, repository, target, effect, review, or return bindings is
     rejected instead of receiving a wildcard match.  A grant with a broader
     effect set is rejected as wider authority, even when it contains the
-    requested effect.
+    requested effect.  Commit grants additionally bind an exact workspace
+    manifest digest supplied by the effect executor.
     """
 
     if not isinstance(request, Mapping):
@@ -544,6 +556,7 @@ def admit_landing_effect_grant(
         "return_posture",
         "effect",
         "allowed_effects",
+        "commit_content",
     }
     if set(request) - allowed_request_keys:
         raise LandingEffectGrantError(
@@ -635,6 +648,39 @@ def admit_landing_effect_grant(
         raise LandingEffectGrantError(
             code, "grant allowed_effects is not the exact requested effect set"
         )
+    if "commit" in granted_effects:
+        commit_content = admitted.get("commit_content")
+        requested_commit_content = request.get("commit_content")
+        if not isinstance(commit_content, Mapping) or not isinstance(
+            requested_commit_content, Mapping
+        ):
+            raise LandingEffectGrantError(
+                "landing_effect_grant_content_unbound",
+                "commit grants require an exact workspace manifest binding",
+            )
+        if not _same_json(commit_content, requested_commit_content):
+            raise LandingEffectGrantError(
+                "landing_effect_grant_content_mismatch",
+                "commit workspace manifest binding differs from the exact request",
+            )
+        expected_workspace_manifest_digest = commit_content.get(
+            "workspace_manifest_digest"
+        )
+        if not _is_sha256_digest(observed_workspace_manifest_digest):
+            raise LandingEffectGrantError(
+                "landing_effect_grant_content_unbound",
+                "commit admission requires an independent workspace manifest digest",
+            )
+        if observed_workspace_manifest_digest != expected_workspace_manifest_digest:
+            raise LandingEffectGrantError(
+                "landing_effect_grant_content_drift",
+                "workspace bytes differ from the immutable commit content binding",
+            )
+    elif "commit_content" in request or observed_workspace_manifest_digest is not None:
+        raise LandingEffectGrantError(
+            "landing_effect_request_invalid",
+            "workspace manifest content is only valid for commit grants",
+        )
     if admitted["review"]["status"] != "approved":
         raise LandingEffectGrantError(
             "landing_effect_grant_review_pending",
@@ -659,6 +705,10 @@ def admit_landing_effect_grant(
         "evaluated_at": now.isoformat().replace("+00:00", "Z"),
         "effects": sorted(granted_effects),
     }
+    if "commit" in granted_effects:
+        result["admission"]["workspace_manifest_digest"] = (
+            observed_workspace_manifest_digest
+        )
     return result
 
 
@@ -668,6 +718,7 @@ def landing_effect_grant_allows(
     *,
     grant_raw: bytes | None = None,
     expected_artifact_digest: str | None = None,
+    observed_workspace_manifest_digest: str | None = None,
     at: datetime | None = None,
 ) -> bool:
     """Return whether the exact grant can be admitted; default is False."""
@@ -678,6 +729,7 @@ def landing_effect_grant_allows(
             request,
             grant_raw=grant_raw,
             expected_artifact_digest=expected_artifact_digest,
+            observed_workspace_manifest_digest=observed_workspace_manifest_digest,
             at=at,
         )
     except LandingEffectGrantError:

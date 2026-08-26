@@ -47,6 +47,7 @@
         }
       }
     },
+    "commit_content": {"$ref": "#/$defs/commitContent"},
     "target": {
       "oneOf": [
         {
@@ -150,9 +151,39 @@
           }
         }
       }
+    },
+    {
+      "if": {
+        "required": ["allowed_effects"],
+        "properties": {
+          "allowed_effects": {
+            "contains": {"const": "commit"}
+          }
+        }
+      },
+      "then": {
+        "required": ["commit_content"]
+      },
+      "else": {
+        "not": {"required": ["commit_content"]}
+      }
     }
   ],
   "$defs": {
+    "commitContent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "workspace_manifest_digest"],
+      "properties": {
+        "kind": {"const": "workspace_manifest"},
+        "workspace_manifest_digest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "not": {"const": "sha256:0000000000000000000000000000000000000000000000000000000000000000"}
+    },
     "ownerRef": {
       "type": "object",
       "additionalProperties": false,
