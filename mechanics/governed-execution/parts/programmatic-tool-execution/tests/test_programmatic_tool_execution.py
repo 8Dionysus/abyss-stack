@@ -346,6 +346,29 @@ def test_custom_adapter_error_is_normalized_as_adapter_failure() -> None:
     assert raised.value.execution_completed is None
 
 
+def test_nested_preinvocation_error_is_indeterminate_after_outer_invocation() -> None:
+    def outer_invoker(
+        request: ProgrammaticExecutionRequest,
+    ) -> ProgrammaticExecutionObservation:
+        del request
+        nested = RUNTIME.LocalModelSubstrateAdapter(route_ref=_ref("nested-route"))
+        return nested.execute(_request(nested.adapter_id))
+
+    adapter = RUNTIME.CodexCodeModeHostAdapter(
+        host_ref=_ref("codex-host"), invoker=outer_invoker
+    )
+    runtime = RUNTIME.ProgrammaticExecutionRuntime(
+        {adapter.adapter_id: adapter}, enabled=True
+    )
+
+    with pytest.raises(RUNTIME.ProgrammaticAdapterError) as raised:
+        runtime.execute(_request(adapter.adapter_id))
+
+    assert raised.value.code == "adapter_execution_failed"
+    assert raised.value.observation is None
+    assert raised.value.execution_completed is None
+
+
 def test_invalid_observation_is_not_sent_to_sink() -> None:
     recorded: list[ProgrammaticExecutionObservation] = []
 

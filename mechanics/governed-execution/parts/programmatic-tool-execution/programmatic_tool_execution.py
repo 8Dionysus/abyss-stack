@@ -93,7 +93,15 @@ def _invoke(
             f"{adapter_id}_unbound",
             f"{adapter_id} has no bound runtime invoker",
         )
-    return invoker(request)
+    try:
+        return invoker(request)
+    except Exception as exc:
+        raise ProgrammaticAdapterError(
+            "adapter_execution_failed",
+            "the selected adapter failed without returning an observation; "
+            "execution completion is unknown",
+            execution_completed=None,
+        ) from exc
 
 
 @dataclass(frozen=True)
