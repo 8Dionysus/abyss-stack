@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 29088193,
+  "allowed_tracked_bytes": 38399481,
+  "approved_by": "repository-owner",
+  "base_ref": "75b3d734ab96503a34cb1e2bd70ee87867ce558f",
+  "changed_generated_bytes": 29088193,
+  "changed_generated_files": 296,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "08e2a0f6bcaad18bf494b6915beb66ac966ebf7a81cb1ca64638433409673f6a",
+  "reason": "Owner-approved portable-family regeneration for PR #433 after main advanced through the dependent external-Codex package landing; preserve the repaired source snapshot with a digest-bound receipt and require normal CI review.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 38399481,
+  "tracked_bytes_max": 24117248
+}

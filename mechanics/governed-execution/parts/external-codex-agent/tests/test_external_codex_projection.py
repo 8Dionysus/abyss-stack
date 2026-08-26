@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 import shlex
 import subprocess
 import sys
@@ -16,8 +17,11 @@ from external_codex_projection import (  # noqa: E402
     ProjectionError,
     build_actor_delta,
     build_actor_manifest,
+    build_private_git_admission_manifest,
+    create_review_state_seal,
     materialize_actor_projection,
     materialize_actor_projection_from_seed,
+    verify_review_state_seal,
 )
 from external_codex_agent import build_workspace_manifest  # noqa: E402
 
@@ -168,6 +172,109 @@ def test_projection_accepts_exact_pre_full_index_source_manifest(
     )
     assert baseline["source_manifest_digest"] == "sha256:" + "9" * 64
     assert filter_marker.exists() is False
+
+
+def test_projection_rejects_real_intent_to_add_zero_oid_before_private_git_reconstruction(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source, _ = _source_repo(tmp_path)
+    (source / "intent.txt").write_text("intent bytes\n", encoding="utf-8")
+    _git(source, "add", "-N", "intent.txt")
+    source_manifest = build_workspace_manifest(source)
+    original_git = PROJECTION._git
+    calls: list[tuple[str, ...]] = []
+    staged_records: list[bytes] = []
+
+    def traced_git(
+        workspace: Path,
+        *arguments: str,
+        **kwargs: object,
+    ) -> bytes:
+        calls.append(arguments)
+        result = original_git(workspace, *arguments, **kwargs)
+        if arguments == ("ls-files", "--stage", "-z"):
+            staged_records.append(result)
+            # Recent Git versions expose the real intent entry as an empty
+            # blob; exercise the lower-level all-zero sentinel as well.
+            rewritten: list[bytes] = []
+            for record in result.split(b"\0"):
+                if record.endswith(b"\tintent.txt"):
+                    metadata, separator, path = record.partition(b"\t")
+                    assert separator
+                    fields = metadata.split()
+                    assert len(fields) == 3
+                    fields[1] = b"0" * 40
+                    record = b" ".join(fields) + b"\t" + path
+                rewritten.append(record)
+            return b"\0".join(rewritten)
+        return result
+
+    monkeypatch.setattr(PROJECTION, "_git", traced_git)
+    target = tmp_path / "runtime" / "actor-workspace"
+
+    with pytest.raises(
+        ProjectionError,
+        match="malformed or zero object ID",
+    ):
+        materialize_actor_projection(
+            source,
+            target,
+            source_manifest=source_manifest,
+            source_manifest_digest="sha256:" + "a" * 64,
+        )
+
+    assert _git(source, "status", "--porcelain=v1") == "A intent.txt"
+    assert staged_records and b"intent.txt" in staged_records[0]
+    assert calls[-1] == ("ls-files", "--stage", "-z")
+    assert not any(
+        argument in {"pack-objects", "init", "index-pack", "update-index"}
+        for call in calls
+        for argument in call
+    )
+    assert target.exists() is False
+
+
+def test_projection_rejects_malformed_staged_oid_before_intent_to_add_reconstruction(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source, source_manifest = _source_repo(tmp_path)
+    original_git = PROJECTION._git
+    calls: list[tuple[str, ...]] = []
+    malformed_record = b"100644 " + (b"A" * 40) + b" 0\ttracked.txt\0"
+
+    def controlled_git(
+        workspace: Path,
+        *arguments: str,
+        **kwargs: object,
+    ) -> bytes:
+        calls.append(arguments)
+        if arguments == ("ls-files", "--stage", "-z"):
+            return malformed_record
+        return original_git(workspace, *arguments, **kwargs)
+
+    monkeypatch.setattr(PROJECTION, "_git", controlled_git)
+    target = tmp_path / "runtime" / "actor-workspace"
+
+    with pytest.raises(
+        ProjectionError,
+        match="malformed or zero object ID",
+    ):
+        materialize_actor_projection(
+            source,
+            target,
+            source_manifest=source_manifest,
+            source_manifest_digest="sha256:" + "b" * 64,
+        )
+
+    assert calls[-1] == ("ls-files", "--stage", "-z")
+    assert not any(
+        argument in {"pack-objects", "init", "index-pack", "update-index"}
+        for call in calls
+        for argument in call
+    )
+    assert target.exists() is False
 
 
 def test_inventory_distinguishes_disappearing_directory_from_other_scandir_errors(
@@ -522,6 +629,309 @@ def test_projection_reproduces_dirty_git_baseline_and_real_git_validations(
     assert observed["private_git_digest"] == before_git_digest
 
 
+def test_projection_preserves_admitted_shallow_boundary_and_strict_fsck(
+    tmp_path: Path,
+) -> None:
+    full = tmp_path / "full-source"
+    full.mkdir()
+    _git(full, "init", "-q")
+    _git(full, "config", "user.name", "projection-test")
+    _git(full, "config", "user.email", "projection@example.invalid")
+    (full / "tracked.txt").write_text("first\n", encoding="utf-8")
+    _git(full, "add", ".")
+    _git(full, "commit", "-qm", "first")
+    (full / "tracked.txt").write_text("second\n", encoding="utf-8")
+    _git(full, "commit", "-qam", "second")
+    source = tmp_path / "shallow-source"
+    subprocess.run(
+        ["/usr/bin/git", "clone", "--depth", "1", f"file://{full}", str(source)],
+        check=True,
+        capture_output=True,
+    )
+    source_manifest = build_workspace_manifest(source)
+    assert source_manifest["git_shallow"]["present"] is True
+
+    projection, baseline = materialize_actor_projection(
+        source,
+        tmp_path / "runtime" / "actor-workspace",
+        source_manifest=source_manifest,
+        source_manifest_digest="sha256:" + "b" * 64,
+    )
+    assert (projection / ".git" / "shallow").read_bytes() == (
+        source / ".git" / "shallow"
+    ).read_bytes()
+    assert baseline["private_git_digest"].startswith("sha256:")
+    assert subprocess.run(
+        [
+            "/usr/bin/git",
+            "-C",
+            str(projection),
+            "fsck",
+            "--strict",
+            "--full",
+            "--no-reflogs",
+            "--no-dangling",
+        ],
+        check=False,
+        capture_output=True,
+    ).returncode == 0
+
+    (source / ".git" / "shallow").write_text("0" * 40 + "\n", encoding="ascii")
+    with pytest.raises(ProjectionError, match="shallow boundary"):
+        materialize_actor_projection(
+            source,
+            tmp_path / "runtime" / "rejected-shallow",
+            source_manifest=source_manifest,
+            source_manifest_digest="sha256:" + "c" * 64,
+        )
+
+
+def test_shallow_boundary_validation_fails_closed_for_forged_metadata(
+    tmp_path: Path,
+) -> None:
+    full = tmp_path / "full-source"
+    full.mkdir()
+    _git(full, "init", "-q")
+    _git(full, "config", "user.name", "projection-test")
+    _git(full, "config", "user.email", "projection@example.invalid")
+    (full / "tracked.txt").write_text("first\n", encoding="utf-8")
+    _git(full, "add", ".")
+    _git(full, "commit", "-qm", "first")
+    (full / "tracked.txt").write_text("second\n", encoding="utf-8")
+    _git(full, "commit", "-qam", "second")
+    source = tmp_path / "shallow-source"
+    subprocess.run(
+        ["/usr/bin/git", "clone", "--depth", "1", f"file://{full}", str(source)],
+        check=True,
+        capture_output=True,
+    )
+    source_manifest = build_workspace_manifest(source)
+    boundary_path = source / ".git" / "shallow"
+    boundary = str(source_manifest["git_shallow"]["entries"][0])
+
+    boundary_path.write_text("not-an-object-id\n", encoding="ascii")
+    with pytest.raises(ProjectionError, match="malformed"):
+        materialize_actor_projection(
+            source,
+            tmp_path / "runtime" / "malformed",
+            source_manifest=source_manifest,
+            source_manifest_digest="sha256:" + "1" * 64,
+        )
+
+    boundary_path.write_text(f"{boundary}\n{boundary}\n", encoding="ascii")
+    with pytest.raises(ProjectionError, match="duplicate"):
+        materialize_actor_projection(
+            source,
+            tmp_path / "runtime" / "duplicate",
+            source_manifest=source_manifest,
+            source_manifest_digest="sha256:" + "2" * 64,
+        )
+
+    boundary_path.write_text("0" * 40 + "\n", encoding="ascii")
+    foreign_manifest = deepcopy(source_manifest)
+    foreign_manifest["git_shallow"] = PROJECTION.read_source_shallow_boundary(source)
+    with pytest.raises(ProjectionError, match="outside the admitted object set"):
+        materialize_actor_projection(
+            source,
+            tmp_path / "runtime" / "foreign",
+            source_manifest=foreign_manifest,
+            source_manifest_digest="sha256:" + "3" * 64,
+        )
+
+    blob = _git(source, "rev-parse", "HEAD:tracked.txt")
+    boundary_path.write_text(blob + "\n", encoding="ascii")
+    blob_manifest = deepcopy(source_manifest)
+    blob_manifest["git_shallow"] = PROJECTION.read_source_shallow_boundary(source)
+    with pytest.raises(ProjectionError, match="does not name a commit object"):
+        materialize_actor_projection(
+            source,
+            tmp_path / "runtime" / "blob",
+            source_manifest=blob_manifest,
+            source_manifest_digest="sha256:" + "4" * 64,
+        )
+
+    boundary_path.unlink()
+    boundary_path.symlink_to(tmp_path / "outside-shallow")
+    with pytest.raises(ProjectionError, match="not a regular file"):
+        materialize_actor_projection(
+            source,
+            tmp_path / "runtime" / "symlink",
+            source_manifest=source_manifest,
+            source_manifest_digest="sha256:" + "5" * 64,
+        )
+
+
+def test_shallow_root_boundary_is_rejected_as_unnecessary(tmp_path: Path) -> None:
+    full = tmp_path / "single-commit-source"
+    full.mkdir()
+    _git(full, "init", "-q")
+    _git(full, "config", "user.name", "projection-test")
+    _git(full, "config", "user.email", "projection@example.invalid")
+    (full / "tracked.txt").write_text("root\n", encoding="utf-8")
+    _git(full, "add", ".")
+    _git(full, "commit", "-qm", "root")
+    source = tmp_path / "shallow-root"
+    subprocess.run(
+        ["/usr/bin/git", "clone", "--depth", "1", f"file://{full}", str(source)],
+        check=True,
+        capture_output=True,
+    )
+    source_manifest = build_workspace_manifest(source)
+    with pytest.raises(ProjectionError, match="unnecessary"):
+        materialize_actor_projection(
+            source,
+            tmp_path / "runtime" / "unnecessary",
+            source_manifest=source_manifest,
+            source_manifest_digest="sha256:" + "6" * 64,
+        )
+
+
+def test_terminal_review_state_seal_survives_index_refresh_and_rejects_tamper(
+    tmp_path: Path,
+) -> None:
+    source, _ = _source_repo(tmp_path)
+    metadata_named_files = ("review-state-seal.json", ".seal-in-progress.json")
+    for name in metadata_named_files:
+        (source / name).write_text(f"repository file: {name}\n", encoding="utf-8")
+    locked = source / "sealed-locked"
+    locked.mkdir()
+    (locked / "nested.txt").write_text("nested\n", encoding="utf-8")
+    _git(source, "add", *metadata_named_files, "sealed-locked/nested.txt")
+    _git(source, "commit", "-qm", "sealed read-only directory")
+    locked.chmod(0o555)
+    try:
+        source_manifest = build_workspace_manifest(source)
+        projection, baseline = materialize_actor_projection(
+            source,
+            tmp_path / "writer" / "actor-workspace",
+            source_manifest=source_manifest,
+            source_manifest_digest="sha256:" + "d" * 64,
+        )
+        private_git = build_private_git_admission_manifest(
+            projection,
+            expected_source_git_head=str(baseline["source_git_head"]),
+            require_strict_fsck=True,
+        )
+        legacy_reviewer, _ = materialize_actor_projection_from_seed(
+            projection,
+            tmp_path / "legacy-reviewer" / "actor-workspace",
+            expected_manifest=baseline,
+            seed_kind="projection",
+        )
+        for name in metadata_named_files:
+            assert (legacy_reviewer / name).read_text(encoding="utf-8") == (
+                f"repository file: {name}\n"
+            )
+        delta = build_actor_delta(
+            baseline,
+            baseline,
+            baseline_digest="sha256:" + "e" * 64,
+            current_digest=PROJECTION._canonical_digest(baseline),
+            private_git_baseline=private_git,
+        )
+        seal = create_review_state_seal(
+            projection,
+            tmp_path / "writer" / "review-state-seal",
+            session_id="session:writer",
+            incarnation_id="incarnation:writer",
+            writer_status="review_required",
+            final_manifest=baseline,
+            actor_delta=delta,
+        )
+        repeated = create_review_state_seal(
+            projection,
+            tmp_path / "writer" / "review-state-seal",
+            session_id="session:writer",
+            incarnation_id="incarnation:writer",
+            writer_status="review_required",
+            final_manifest=baseline,
+            actor_delta=delta,
+        )
+        assert repeated["manifest_digest"] == seal["manifest_digest"]
+        index = projection / ".git" / "index"
+        index.write_bytes(index.read_bytes() + b"benign post-closeout refresh\n")
+        verify_review_state_seal(
+            tmp_path / "writer" / "review-state-seal",
+            expected_manifest=baseline,
+            expected_delta=delta,
+            expected_session_id="session:writer",
+            expected_incarnation_id="incarnation:writer",
+            expected_status="review_required",
+        )
+        reviewer, reviewer_manifest = materialize_actor_projection_from_seed(
+            tmp_path / "writer" / "review-state-seal",
+            tmp_path / "reviewer" / "actor-workspace",
+            expected_manifest=baseline,
+            seed_kind="seal",
+        )
+        assert reviewer_manifest["private_git_digest"] == baseline["private_git_digest"]
+        assert (reviewer / "sealed-locked").stat().st_mode & 0o777 == 0o555
+        assert (reviewer / "sealed-locked" / "nested.txt").read_text() == "nested\n"
+        for name in metadata_named_files:
+            assert (reviewer / name).read_text(encoding="utf-8") == (
+                f"repository file: {name}\n"
+            )
+        object_path = next(
+            (tmp_path / "writer" / "review-state-seal" / "objects").iterdir()
+        )
+        object_path.chmod(0o600)
+        with pytest.raises(ProjectionError, match="seal"):
+            verify_review_state_seal(tmp_path / "writer" / "review-state-seal")
+    finally:
+        locked.chmod(0o755)
+
+
+def test_review_state_seal_reopens_only_from_its_owned_crash_marker(
+    tmp_path: Path,
+) -> None:
+    source, source_manifest = _source_repo(tmp_path)
+    projection, baseline = materialize_actor_projection(
+        source,
+        tmp_path / "writer" / "actor-workspace",
+        source_manifest=source_manifest,
+        source_manifest_digest="sha256:" + "f" * 64,
+    )
+    delta = build_actor_delta(
+        baseline,
+        baseline,
+        baseline_digest="sha256:" + "1" * 64,
+        current_digest=PROJECTION._canonical_digest(baseline),
+    )
+    seal_root = tmp_path / "writer" / "review-state-seal"
+    create_review_state_seal(
+        projection,
+        seal_root,
+        session_id="session:writer",
+        incarnation_id="incarnation:writer",
+        writer_status="completed",
+        final_manifest=baseline,
+        actor_delta=delta,
+    )
+    (seal_root / "review-state-seal.json").unlink()
+    reopened = create_review_state_seal(
+        projection,
+        seal_root,
+        session_id="session:writer",
+        incarnation_id="incarnation:writer",
+        writer_status="completed",
+        final_manifest=baseline,
+        actor_delta=delta,
+    )
+    assert reopened["writer_status"] == "completed"
+    (seal_root / "review-state-seal.json").unlink()
+    (seal_root / ".seal-in-progress.json").unlink()
+    with pytest.raises(ProjectionError, match="recovery marker"):
+        create_review_state_seal(
+            projection,
+            seal_root,
+            session_id="session:writer",
+            incarnation_id="incarnation:writer",
+            writer_status="completed",
+            final_manifest=baseline,
+            actor_delta=delta,
+        )
+
+
 def test_projection_handles_read_only_directories_and_cleans_failed_staging(
     tmp_path: Path,
 ) -> None:
@@ -616,6 +1026,7 @@ def test_seed_projection_cleans_exact_inode_after_post_rename_failure(
             seed,
             target,
             expected_manifest=seed_manifest,
+            seed_kind="projection",
         )
 
     assert not target.exists()

@@ -67,6 +67,8 @@
     "writer_actor_final_manifest_digest": {"$ref": "#/$defs/digest"},
     "writer_actor_delta_path": {"$ref": "#/$defs/absolutePath"},
     "writer_actor_delta_digest": {"$ref": "#/$defs/digest"},
+    "writer_review_seal_path": {"$ref": "#/$defs/absolutePath"},
+    "writer_review_seal_digest": {"$ref": "#/$defs/digest"},
     "review_seed_envelope_path": {"$ref": "#/$defs/absolutePath"},
     "review_seed_envelope_digest": {"$ref": "#/$defs/digest"},
     "review_workspace_manifest_path": {"$ref": "#/$defs/absolutePath"},

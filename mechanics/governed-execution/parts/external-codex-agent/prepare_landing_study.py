@@ -86,6 +86,7 @@ from external_codex_agent import (  # noqa: E402
     sha256_bytes,
     validate_runtime_package_binding,
     validate_json,
+    verify_review_state_seal,
 )
 
 
@@ -133,6 +134,9 @@ ACTOR_DELTA_SCHEMA_REF = (
 )
 ACTOR_DELTA_SCHEMA_PATH = (
     PART_ROOT / "schemas/external-codex-actor-delta.schema.json"
+)
+REVIEW_STATE_SEAL_SCHEMA_PATH = (
+    PART_ROOT / "schemas/external-codex-review-state-seal.schema.json"
 )
 SDK_SUMMON_REQUEST_SCHEMA_RELATIVE_PATH = Path(
     "mechanics/checkpoint/parts/child-task-reentry/schemas/"
@@ -2472,6 +2476,56 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
         label="writer actor delta",
     )
     validate_json(writer_actor_delta, ACTOR_DELTA_SCHEMA_PATH, label="writer actor delta")
+    writer_review_seal_ref = writer_result.get("review_seal_ref")
+    writer_review_seal: dict[str, Any] | None = None
+    if isinstance(writer_review_seal_ref, dict):
+        writer_review_seal_path = Path(
+            str(writer_review_seal_ref.get("artifact_ref", ""))
+        )
+        if (
+            not writer_review_seal_path.is_absolute()
+            or not writer_review_seal_path.is_file()
+            or writer_review_seal_path.is_symlink()
+            or _file_digest(writer_review_seal_path)
+            != writer_review_seal_ref.get("artifact_digest")
+        ):
+            raise StudyPreparationError(
+                "writer review-state seal bytes are unavailable or changed"
+            )
+        writer_review_seal = load_json(
+            writer_review_seal_path,
+            label="writer review-state seal",
+        )
+        validate_json(
+            writer_review_seal,
+            REVIEW_STATE_SEAL_SCHEMA_PATH,
+            label="writer review-state seal",
+        )
+        if (
+            writer_review_seal_path.name != "review-state-seal.json"
+            or Path(str(writer_actor_final_ref.get("artifact_ref")))
+            != writer_review_seal_path.parent
+            / str(writer_review_seal["manifest_path"])
+            or Path(str(writer_actor_delta_ref.get("artifact_ref")))
+            != writer_review_seal_path.parent
+            / str(writer_review_seal["delta_path"])
+        ):
+            raise StudyPreparationError(
+                "writer actor evidence is not bound into its review-state seal"
+            )
+        try:
+            verify_review_state_seal(
+                writer_review_seal_path.parent,
+                expected_manifest=writer_final_manifest,
+                expected_delta=writer_actor_delta,
+                expected_session_id=str(writer_result["session_id"]),
+                expected_incarnation_id=str(writer_result["incarnation_id"]),
+                expected_status=str(writer_result["status"]),
+            )
+        except Exception as exc:
+            raise StudyPreparationError(
+                "writer review-state seal failed independent verification"
+            ) from exc
     writer_actor_final_provenance = _file_ref(
         owner="abyss-stack",
         artifact_ref=str(writer_workspace_manifest_path),
@@ -2489,11 +2543,21 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
         schema_version="abyss_stack_external_codex_actor_delta_v1",
     )
     writer_projection_path = Path(str(writer_state.get("actor_projection_path", "")))
+    expected_projection_path = (
+        str(writer_review_seal["projection_path"])
+        if writer_review_seal is not None
+        else str(writer_projection_path)
+    )
     if (
         not writer_projection_path.is_absolute()
-        or writer_projection_path.is_symlink()
-        or not writer_projection_path.is_dir()
-        or writer_final_manifest.get("workspace_path") != str(writer_projection_path)
+        or (
+            writer_review_seal is None
+            and (
+                writer_projection_path.is_symlink()
+                or not writer_projection_path.is_dir()
+            )
+        )
+        or writer_final_manifest.get("workspace_path") != expected_projection_path
         or writer_actor_delta.get("final_manifest_digest")
         != sha256_bytes(
             json.dumps(
@@ -2641,6 +2705,7 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
         "writer-model-report",
         "writer-actor-final-manifest",
         "writer-actor-delta",
+        "writer-review-state-seal",
         "writer-source-baseline-manifest",
         "writer-summon-request-schema",
     }
@@ -2961,6 +3026,31 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
         "local_path": str(writer_actor_delta_path),
         "provenance": writer_actor_delta_provenance.model_dump(mode="json"),
     }
+    writer_review_seal_input: dict[str, Any] | None = None
+    writer_review_seal_provenance: ProvenanceRef | None = None
+    if isinstance(writer_review_seal_ref, dict):
+        writer_review_seal_path = Path(str(writer_review_seal_ref["artifact_ref"]))
+        writer_review_seal_provenance = _file_ref(
+            owner="abyss-stack",
+            artifact_ref=str(writer_review_seal_path),
+            path=writer_review_seal_path,
+            source_ref=writer_result_digest,
+            schema_ref=(
+                "mechanics/governed-execution/parts/external-codex-agent/schemas/"
+                "external-codex-review-state-seal.schema.json"
+            ),
+            schema_version="abyss_stack_external_codex_review_state_seal_v1",
+        )
+        writer_review_seal_input = {
+            "input_id": "writer-review-state-seal",
+            "local_path": str(writer_review_seal_path),
+            "provenance": writer_review_seal_provenance.model_dump(mode="json"),
+        }
+    writer_review_seal_refs = (
+        (writer_review_seal_provenance,)
+        if writer_review_seal_provenance is not None
+        else ()
+    )
 
     writer_result_ref = _file_ref(
         owner="abyss-stack",
@@ -3003,6 +3093,11 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
             },
             writer_actor_final_input,
             writer_actor_delta_input,
+            *(
+                (writer_review_seal_input,)
+                if writer_review_seal_input is not None
+                else ()
+            ),
         )
     )
 
@@ -3165,7 +3260,10 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
         writer_actor_final_ref=writer_actor_final_provenance,
         writer_actor_delta_ref=writer_actor_delta_provenance,
         review_manifest_ref=review_manifest_ref,
-        additional_input_refs=tuple(controller_derived_refs),
+        additional_input_refs=(
+            *controller_derived_refs,
+            *writer_review_seal_refs,
+        ),
         identity_token=identity_token,
     )
     plan_path = output_root / "run-plan.json"
@@ -3266,6 +3364,7 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
         review_summon_decision_ref,
         summon_request_schema_ref,
         summon_result_schema_ref,
+        *writer_review_seal_refs,
         *controller_derived_refs,
     )
     continuation = ContinuationObligation(
@@ -3289,6 +3388,7 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
             review_manifest_ref,
             summon_request_schema_ref,
             summon_result_schema_ref,
+            *writer_review_seal_refs,
         ),
         deferred_parent_decisions=(
             "Whether owner/eval evidence admits any model scope.",
@@ -3463,6 +3563,13 @@ def _prepare_reviewer(args: argparse.Namespace) -> dict[str, Any]:
             "No workspace mutation, owner acceptance, model-fit verdict, or external effect is authorized.",
         ],
     }
+    if isinstance(writer_review_seal_ref, dict):
+        preparation["writer_review_seal_path"] = str(
+            writer_review_seal_ref["artifact_ref"]
+        )
+        preparation["writer_review_seal_digest"] = str(
+            writer_review_seal_ref["artifact_digest"]
+        )
     validate_json(
         preparation,
         REVIEW_PREPARATION_SCHEMA_PATH,

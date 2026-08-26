@@ -19,13 +19,18 @@ import re
 import stat
 import subprocess
 from pathlib import Path, PurePosixPath
-from typing import Any, Mapping, MutableMapping
+from typing import Any, Literal, Mapping, MutableMapping
 
 
 PROJECTION_MANIFEST_SCHEMA_VERSION = (
     "abyss_stack_external_codex_actor_workspace_manifest_v2"
 )
 PROJECTION_DELTA_SCHEMA_VERSION = "abyss_stack_external_codex_actor_delta_v1"
+REVIEW_STATE_SEAL_SCHEMA_VERSION = (
+    "abyss_stack_external_codex_review_state_seal_v1"
+)
+REVIEW_STATE_SEAL_MANIFEST = "review-state-seal.json"
+REVIEW_STATE_SEAL_MARKER = ".seal-in-progress.json"
 MAX_GIT_OUTPUT_BYTES = 256 * 1024 * 1024
 LEGACY_GIT_ABBREV_WIDTHS = tuple(range(4, 65))
 PRIVATE_GIT_CONFIG_BYTES = (
@@ -42,6 +47,7 @@ PRIVATE_GIT_CONFIG_BYTES = (
 PRIVATE_GIT_PACK_FILE_PATTERN = re.compile(
     r"objects/pack/pack-[0-9a-f]{40}\.(?:idx|pack|rev)"
 )
+GIT_OBJECT_ID_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 
 
 class ProjectionError(RuntimeError):
@@ -363,6 +369,87 @@ def _read_regular_path(path: Path, *, label: str) -> tuple[bytes, os.stat_result
         os.close(parent_fd)
 
 
+def _source_shallow_path(source: Path) -> Path:
+    """Resolve Git's shallow file without admitting its source coordinate."""
+
+    raw = _git(source, "rev-parse", "--git-path", "shallow")
+    try:
+        value = raw.decode("utf-8").strip()
+    except UnicodeDecodeError as exc:
+        raise ProjectionError("source Git shallow path is not UTF-8") from exc
+    if not value or "\0" in value:
+        raise ProjectionError("source Git shallow path is malformed")
+    candidate = Path(value)
+    return candidate if candidate.is_absolute() else source / candidate
+
+
+def _read_source_shallow_boundary(
+    source_workspace: str | Path,
+) -> tuple[dict[str, Any], bytes | None]:
+    """Read and validate one source-authored Git shallow boundary."""
+
+    source = Path(source_workspace).resolve(strict=True)
+    shallow = _source_shallow_path(source)
+    try:
+        observed = shallow.lstat()
+    except FileNotFoundError:
+        return (
+            {
+                "present": False,
+                "sha256": None,
+                "entries": [],
+                "identity": None,
+            },
+            None,
+        )
+    except OSError as exc:
+        raise ProjectionError("source Git shallow boundary cannot be inspected") from exc
+    if stat.S_ISLNK(observed.st_mode) or not stat.S_ISREG(observed.st_mode):
+        raise ProjectionError("source Git shallow boundary is not a regular file")
+    raw, after = _read_regular_path(shallow, label=".git/shallow")
+    if not _same_inode(observed, after):
+        raise ProjectionError("source Git shallow boundary changed while being read")
+    if len(raw) > MAX_GIT_OUTPUT_BYTES:
+        raise ProjectionError("source Git shallow boundary exceeds its runtime bound")
+    entries: list[str] = []
+    for line in raw.splitlines(keepends=True):
+        if len(line) != 41 or not line.endswith(b"\n"):
+            raise ProjectionError("source Git shallow boundary has malformed lines")
+        try:
+            value = line[:-1].decode("ascii", errors="strict")
+        except UnicodeDecodeError as exc:
+            raise ProjectionError(
+                "source Git shallow boundary contains non-ASCII bytes"
+            ) from exc
+        if GIT_OBJECT_ID_PATTERN.fullmatch(value) is None:
+            raise ProjectionError("source Git shallow boundary has a malformed OID")
+        if value in entries:
+            raise ProjectionError("source Git shallow boundary contains a duplicate OID")
+        entries.append(value)
+    if raw and not raw.endswith(b"\n"):
+        raise ProjectionError("source Git shallow boundary is not newline terminated")
+    return (
+        {
+            "present": True,
+            "sha256": sha256_bytes(raw),
+            "entries": entries,
+            "identity": {
+                "st_dev": int(after.st_dev),
+                "st_ino": int(after.st_ino),
+                "mode": _mode(after),
+            },
+        },
+        raw,
+    )
+
+
+def read_source_shallow_boundary(source_workspace: str | Path) -> dict[str, Any]:
+    """Return the JSON-safe source shallow snapshot for a workspace manifest."""
+
+    snapshot, _ = _read_source_shallow_boundary(source_workspace)
+    return snapshot
+
+
 def _lexical_symlink_is_internal(relative: str, target: str) -> bool:
     if not target or target.startswith("/") or "\0" in target:
         return False
@@ -561,6 +648,8 @@ def build_private_git_admission_manifest(
     expected_source_git_head: str | None = None,
     expected_object_ids: set[str] | frozenset[str] | None = None,
     expected_info_exclude: bytes | None = None,
+    expected_shallow_bytes: bytes | None = None,
+    require_strict_fsck: bool = False,
     semantic_workspace_root: str | Path | None = None,
 ) -> dict[str, Any]:
     """Observe stable private-Git meaning without executing recovered bytes."""
@@ -607,6 +696,8 @@ def build_private_git_admission_manifest(
             "info/exclude",
             "refs/heads/actor-baseline",
         }
+        if expected_shallow_bytes is not None:
+            required_private_files.add("shallow")
         unexpected_private_files = set(private_files) - required_private_files
         pack_files = {
             path
@@ -688,6 +779,7 @@ def build_private_git_admission_manifest(
                 raise ProjectionError(
                     "actor private Git object closure differs from the admitted source"
                 )
+        if require_strict_fsck or expected_object_ids is not None:
             _git(
                 descriptor_root,
                 "-c",
@@ -712,6 +804,21 @@ def build_private_git_admission_manifest(
                 raise ProjectionError(
                     "actor private Git excludes differ from the admitted source"
                 )
+        if expected_shallow_bytes is not None:
+            shallow_entry = private_files.get("shallow")
+            if (
+                shallow_entry is None
+                or shallow_entry.get("kind") != "file"
+                or shallow_entry.get("size_bytes") != len(expected_shallow_bytes)
+                or shallow_entry.get("sha256") != sha256_bytes(expected_shallow_bytes)
+            ):
+                raise ProjectionError(
+                    "actor private Git shallow boundary differs from the admitted source"
+                )
+        elif "shallow" in private_files:
+            raise ProjectionError(
+                "actor private Git topology contains unadmitted metadata"
+            )
         index_raw, _ = _read_regular_path(
             descriptor_root / ".git" / "index",
             label=".git/index",
@@ -912,8 +1019,17 @@ def _construct_private_git(
     source_manifest: Mapping[str, Any],
 ) -> tuple[frozenset[str], bytes]:
     source_head = str(source_manifest["git_head"])
+    shallow_snapshot, shallow_bytes = _read_source_shallow_boundary(source)
+    expected_shallow = source_manifest.get("git_shallow")
+    if expected_shallow is None:
+        if shallow_snapshot["present"]:
+            raise ProjectionError(
+                "source manifest predates or omits an admitted shallow boundary"
+            )
+    elif expected_shallow != shallow_snapshot:
+        raise ProjectionError("source Git shallow boundary drifted from its manifest")
     index_entries = _git(source, "ls-files", "--stage", "-z")
-    object_ids = {source_head}
+    staged_object_ids: list[str] = []
     for record in index_entries.split(b"\0"):
         if not record:
             continue
@@ -928,8 +1044,42 @@ def _construct_private_git(
             raise ProjectionError(
                 "source Git index contains an unsupported path"
             ) from exc
+        if (
+            GIT_OBJECT_ID_PATTERN.fullmatch(object_id) is None
+            or object_id == "0" * 40
+        ):
+            raise ProjectionError(
+                "source Git index contains a malformed or zero object ID"
+            )
         _safe_relative(path)
-        object_ids.add(object_id)
+        staged_object_ids.append(object_id)
+    object_ids = {source_head, *staged_object_ids}
+    if shallow_snapshot["present"]:
+        boundary_types = _git(
+            source,
+            "cat-file",
+            "--batch-check=%(objectname) %(objecttype)",
+            input_bytes=("\n".join(shallow_snapshot["entries"]) + "\n").encode(
+                "ascii"
+            ),
+            environment_overrides={"GIT_NO_REPLACE_OBJECTS": "1"},
+        ).splitlines()
+        if len(boundary_types) != len(shallow_snapshot["entries"]):
+            raise ProjectionError(
+                "source Git shallow boundary object inspection is incomplete"
+            )
+        for boundary, raw_type in zip(
+            shallow_snapshot["entries"], boundary_types, strict=True
+        ):
+            fields = raw_type.split()
+            if fields == [boundary.encode("ascii"), b"missing"]:
+                raise ProjectionError(
+                    "source Git shallow boundary is outside the admitted object set"
+                )
+            if fields != [boundary.encode("ascii"), b"commit"]:
+                raise ProjectionError(
+                    "source Git shallow boundary does not name a commit object"
+                )
     reachable_object_ids = {
         value.decode("ascii")
         for value in _git(
@@ -947,6 +1097,28 @@ def _construct_private_git(
         if value
     }
     object_ids.update(reachable_object_ids)
+    if shallow_snapshot["present"]:
+        for boundary in shallow_snapshot["entries"]:
+            if boundary not in object_ids:
+                raise ProjectionError(
+                    "source Git shallow boundary is outside the admitted object set"
+                )
+            commit_raw = _git(
+                source,
+                "cat-file",
+                "-p",
+                boundary,
+                environment_overrides={"GIT_NO_REPLACE_OBJECTS": "1"},
+            )
+            parents = [
+                line.split()[1].decode("ascii")
+                for line in commit_raw.splitlines()
+                if line.startswith(b"parent ") and len(line.split()) == 2
+            ]
+            if not parents or all(parent in object_ids for parent in parents):
+                raise ProjectionError(
+                    "source Git shallow boundary is unnecessary for the admitted object set"
+                )
     packed = _git(
         source,
         "pack-objects",
@@ -959,6 +1131,8 @@ def _construct_private_git(
     _git(
         staging, "index-pack", "--stdin", "--fix-thin", input_bytes=packed, timeout=300
     )
+    if shallow_bytes is not None:
+        (staging / ".git" / "shallow").write_bytes(shallow_bytes)
     _git(staging, "update-ref", "refs/heads/actor-baseline", source_head)
     _git(staging, "symbolic-ref", "HEAD", "refs/heads/actor-baseline")
     if index_entries:
@@ -1300,6 +1474,7 @@ def materialize_actor_projection(
                 staging,
                 source_manifest=source_manifest,
             )
+            _, expected_shallow_bytes = _read_source_shallow_boundary(source)
             manifest = build_actor_manifest_from_descriptor(
                 staging_fd,
                 workspace_path=target,
@@ -1317,6 +1492,7 @@ def materialize_actor_projection(
                 expected_source_git_head=source_head,
                 expected_object_ids=expected_object_ids,
                 expected_info_exclude=expected_info_exclude,
+                expected_shallow_bytes=expected_shallow_bytes,
             )
             if captured_private_git.get("private_git_digest") != manifest.get(
                 "private_git_digest"
@@ -1363,11 +1539,26 @@ def materialize_actor_projection_from_seed(
     projection_path: str | Path,
     *,
     expected_manifest: Mapping[str, Any],
+    seed_kind: Literal["projection", "seal"],
     private_git_admission: MutableMapping[str, Any] | None = None,
 ) -> tuple[Path, dict[str, Any]]:
-    """Clone one exact terminal writer tree for an independent reviewer."""
+    """Clone one exact terminal writer tree for an independent reviewer.
+
+    The review seed envelope owns whether the coordinate is a sealed terminal
+    snapshot or a legacy mutable projection.  Do not infer that identity from
+    a repository filename that may legitimately share the seal metadata name.
+    """
 
     seed = Path(seed_path)
+    if seed_kind == "seal":
+        return materialize_actor_projection_from_seal(
+            seed,
+            projection_path,
+            expected_manifest=expected_manifest,
+            private_git_admission=private_git_admission,
+        )
+    if seed_kind != "projection":
+        raise ProjectionError("actor projection seed kind is unsupported")
     target = Path(projection_path)
     if (
         not seed.is_absolute()
@@ -1413,11 +1604,20 @@ def materialize_actor_projection_from_seed(
                 raise ProjectionError(
                     "actor projection seed changed before reviewer materialization"
                 )
+            seed_shallow = staging / ".git" / "shallow"
+            expected_shallow_bytes = None
+            if seed_shallow.exists() or seed_shallow.is_symlink():
+                expected_shallow_bytes, _ = _read_regular_path(
+                    seed_shallow,
+                    label=".git/shallow",
+                )
             captured_private_git = build_private_git_admission_manifest(
                 staging,
                 expected_source_git_head=str(
                     expected_manifest.get("source_git_head", "")
                 ),
+                expected_shallow_bytes=expected_shallow_bytes,
+                require_strict_fsck=True,
             )
             if captured_private_git.get("private_git_digest") != observed.get(
                 "private_git_digest"
@@ -1514,3 +1714,670 @@ def build_actor_delta(
         "final_manifest_digest": current_digest,
         "changes": compare_actor_manifest(baseline, current),
     }
+
+
+def _seal_json_bytes(value: Any) -> bytes:
+    return json.dumps(
+        value,
+        ensure_ascii=True,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8") + b"\n"
+
+
+def _seal_write_new(path: Path, raw: bytes, *, mode: int = 0o400) -> None:
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_CLOEXEC
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    try:
+        descriptor = os.open(path, flags, mode)
+    except OSError as exc:
+        raise ProjectionError(f"review state seal cannot create {path.name}") from exc
+    try:
+        offset = 0
+        while offset < len(raw):
+            written = os.write(descriptor, raw[offset:])
+            if written <= 0:
+                raise ProjectionError("review state seal write made no progress")
+            offset += written
+        os.fsync(descriptor)
+    except OSError as exc:
+        raise ProjectionError("review state seal bytes could not be persisted") from exc
+    finally:
+        os.close(descriptor)
+    try:
+        os.chmod(path, mode, follow_symlinks=False)
+    except OSError as exc:
+        raise ProjectionError("review state seal mode could not be fixed") from exc
+
+
+def _seal_read_json(path: Path, *, label: str) -> dict[str, Any]:
+    raw, observed = _read_regular_path(path, label=label)
+    if stat.S_IMODE(observed.st_mode) != 0o400:
+        raise ProjectionError(f"{label} has an unsafe mode")
+    try:
+        value = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ProjectionError(f"{label} is not valid JSON") from exc
+    if not isinstance(value, dict):
+        raise ProjectionError(f"{label} is not a JSON object")
+    return value
+
+
+def _fsync_directory(path: Path) -> None:
+    flags = os.O_RDONLY | os.O_CLOEXEC | os.O_DIRECTORY
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    try:
+        descriptor = os.open(path, flags)
+    except OSError as exc:
+        raise ProjectionError("review state seal directory cannot be reopened") from exc
+    try:
+        os.fsync(descriptor)
+    except OSError as exc:
+        raise ProjectionError("review state seal directory could not be persisted") from exc
+    finally:
+        os.close(descriptor)
+
+
+def _seal_path(root: Path, relative: str) -> Path:
+    _safe_relative(relative)
+    candidate = root.joinpath(*relative.split("/"))
+    try:
+        candidate.relative_to(root)
+    except ValueError as exc:
+        raise ProjectionError("review state seal path escapes its root") from exc
+    return candidate
+
+
+def _seal_object_path(root: Path, digest: str) -> Path:
+    if not re.fullmatch(r"sha256:[0-9a-f]{64}", digest):
+        raise ProjectionError("review state seal object digest is malformed")
+    return _seal_path(root, f"objects/{digest[7:]}")
+
+
+def _seal_projection_entries(root: Path) -> list[dict[str, Any]]:
+    entries: list[dict[str, Any]] = []
+    for raw in _inventory(root, include_git=True):
+        relative = str(raw["path"])
+        if relative == ".git" or relative.startswith(".git/"):
+            if raw.get("kind") == "symlink":
+                raise ProjectionError("private Git seal cannot contain symlinks")
+        if raw["kind"] == "file":
+            data, observed = _read_regular_path(
+                root.joinpath(*relative.split("/")),
+                label=relative,
+            )
+            if (
+                len(data) != raw["size_bytes"]
+                or sha256_bytes(data) != raw["sha256"]
+            ):
+                raise ProjectionError("actor projection changed during seal capture")
+            entries.append(
+                {
+                    "path": relative,
+                    "kind": "file",
+                    "mode": int(raw["mode"]),
+                    "size_bytes": len(data),
+                    "sha256": sha256_bytes(data),
+                    "object_digest": sha256_bytes(data),
+                }
+            )
+            if not _same_inode(observed, root.joinpath(*relative.split("/")).stat(follow_symlinks=False)):
+                raise ProjectionError("actor projection inode changed during seal capture")
+        elif raw["kind"] == "symlink":
+            target = os.readlink(root.joinpath(*relative.split("/")))
+            if relative == ".git" or relative.startswith(".git/"):
+                raise ProjectionError("private Git seal cannot contain symlinks")
+            if not _lexical_symlink_is_internal(relative, target):
+                raise ProjectionError("review state seal symlink target is outside")
+            target_bytes = target.encode("utf-8")
+            entries.append(
+                {
+                    "path": relative,
+                    "kind": "symlink",
+                    "mode": int(raw["mode"]),
+                    "size_bytes": len(target_bytes),
+                    "sha256": sha256_bytes(target_bytes),
+                    "target": target,
+                }
+            )
+        else:
+            entries.append(
+                {
+                    "path": relative,
+                    "kind": "directory",
+                    "mode": int(raw["mode"]),
+                    "size_bytes": 0,
+                    "sha256": None,
+                }
+            )
+    return sorted(entries, key=lambda item: str(item["path"]))
+
+
+def _assert_seal_tree_matches_manifest(
+    tree_entries: list[Mapping[str, Any]],
+    manifest: Mapping[str, Any],
+) -> None:
+    expected_content = manifest.get("content_entries")
+    if not isinstance(expected_content, list):
+        raise ProjectionError("review state seal manifest content is unavailable")
+    observed_content: list[dict[str, Any]] = []
+    private_entries: list[dict[str, Any]] = []
+    for item in tree_entries:
+        relative = str(item.get("path", ""))
+        normalized = {
+            key: item.get(key)
+            for key in ("path", "kind", "mode", "size_bytes", "sha256")
+        }
+        if relative == ".git":
+            continue
+        if relative.startswith(".git/"):
+            normalized["path"] = relative.removeprefix(".git/")
+            private_entries.append(normalized)
+        else:
+            observed_content.append(normalized)
+    if sorted(observed_content, key=lambda item: str(item["path"])) != sorted(
+        [dict(item) for item in expected_content],
+        key=lambda item: str(item.get("path")),
+    ):
+        raise ProjectionError(
+            "review state seal content differs from the terminal manifest"
+        )
+    if manifest.get("private_git_digest") != _canonical_digest(
+        sorted(private_entries, key=lambda item: str(item["path"]))
+    ):
+        raise ProjectionError(
+            "review state seal private Git differs from the terminal manifest"
+        )
+
+
+def _seal_copy_object(root: Path, object_digest: str, data: bytes) -> None:
+    if sha256_bytes(data) != object_digest:
+        raise ProjectionError("review state seal source bytes changed during capture")
+    object_path = _seal_object_path(root, object_digest)
+    if object_path.exists() or object_path.is_symlink():
+        if object_path.is_symlink() or not object_path.is_file():
+            raise ProjectionError("review state seal object path is substituted")
+        existing, observed = _read_regular_path(object_path, label=str(object_path))
+        if (
+            existing != data
+            or sha256_bytes(existing) != object_digest
+            or stat.S_IMODE(observed.st_mode) != 0o400
+        ):
+            raise ProjectionError("review state seal object bytes are substituted")
+        return
+    _seal_write_new(object_path, data, mode=0o400)
+
+
+def _verify_seal_tree(
+    root: Path,
+    metadata: Mapping[str, Any],
+    *,
+    expected_manifest: Mapping[str, Any] | None = None,
+    expected_delta: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    entries = metadata.get("tree_entries")
+    if not isinstance(entries, list) or any(
+        not isinstance(item, Mapping) for item in entries
+    ) or entries != sorted(
+        entries, key=lambda item: str(item.get("path"))
+    ):
+        raise ProjectionError("review state seal tree entries are not canonical")
+    if metadata.get("seal_root") != str(root):
+        raise ProjectionError("review state seal root coordinate changed")
+    if metadata.get("$schema") != "schemas/external-codex-review-state-seal.schema.json":
+        raise ProjectionError("review state seal schema reference is unsupported")
+    if metadata.get("schema_version") != REVIEW_STATE_SEAL_SCHEMA_VERSION:
+        raise ProjectionError("review state seal schema version is unsupported")
+    if metadata.get("seal_kind") != "runtime_owned_external_codex_review_state":
+        raise ProjectionError("review state seal kind is unsupported")
+    if metadata.get("writer_status") not in {"completed", "review_required"}:
+        raise ProjectionError("review state seal terminal status is not reviewable")
+    if not isinstance(metadata.get("session_id"), str) or not metadata["session_id"]:
+        raise ProjectionError("review state seal has no session identity")
+    if not isinstance(metadata.get("incarnation_id"), str) or not metadata["incarnation_id"]:
+        raise ProjectionError("review state seal has no incarnation identity")
+    projection_path = metadata.get("projection_path")
+    if not isinstance(projection_path, str) or not projection_path.startswith("/"):
+        raise ProjectionError("review state seal projection coordinate is invalid")
+    if metadata.get("tree_digest") != _canonical_digest(entries):
+        raise ProjectionError("review state seal tree digest is invalid")
+    for expected_key, expected_value in (
+        ("session_id", metadata.get("session_id")),
+        ("incarnation_id", metadata.get("incarnation_id")),
+    ):
+        if not isinstance(expected_value, str) or not expected_value:
+            raise ProjectionError(f"review state seal {expected_key} is invalid")
+    seen: set[str] = set()
+    file_digests: set[str] = set()
+    for item in entries:
+        if not isinstance(item, Mapping):
+            raise ProjectionError("review state seal tree entry is malformed")
+        relative = str(item.get("path", ""))
+        _safe_relative(relative)
+        if relative in seen:
+            raise ProjectionError("review state seal tree contains duplicate paths")
+        seen.add(relative)
+        kind = item.get("kind")
+        if relative == ".git" or relative.startswith(".git/"):
+            if kind == "symlink":
+                raise ProjectionError("review state seal private Git contains a symlink")
+        if kind == "directory":
+            continue
+        elif kind == "file":
+            digest = item.get("object_digest")
+            if not isinstance(digest, str) or digest != item.get("sha256"):
+                raise ProjectionError("review state seal file object binding is invalid")
+            object_path = _seal_object_path(root, digest)
+            data, observed = _read_regular_path(
+                object_path,
+                label=f"objects/{digest[7:]}",
+            )
+            if (
+                sha256_bytes(data) != digest
+                or len(data) != item.get("size_bytes")
+                or stat.S_IMODE(observed.st_mode) != 0o400
+            ):
+                raise ProjectionError("review state seal file bytes are tampered")
+            file_digests.add(digest)
+        elif kind == "symlink":
+            target = item.get("target")
+            if not isinstance(target, str):
+                raise ProjectionError("review state seal symlink target is malformed")
+            if target != item.get("target") or not _lexical_symlink_is_internal(
+                relative, target
+            ):
+                raise ProjectionError("review state seal symlink target is tampered")
+            target_bytes = target.encode("utf-8")
+            if (
+                item.get("size_bytes") != len(target_bytes)
+                or item.get("sha256") != sha256_bytes(target_bytes)
+            ):
+                raise ProjectionError("review state seal symlink digest is tampered")
+        else:
+            raise ProjectionError("review state seal entry kind is unsupported")
+    objects = root / "objects"
+    if objects.is_symlink() or not objects.is_dir():
+        raise ProjectionError("review state seal object store is unavailable")
+    actual_objects: set[str] = set()
+    for child in os.scandir(objects):
+        if child.is_symlink() or not child.is_file() or not re.fullmatch(
+            r"[0-9a-f]{64}", child.name
+        ):
+            raise ProjectionError("review state seal object store contains unsafe data")
+        raw, observed = _read_regular_path(Path(child.path), label=f"objects/{child.name}")
+        digest = "sha256:" + child.name
+        if sha256_bytes(raw) != digest or stat.S_IMODE(observed.st_mode) != 0o400:
+            raise ProjectionError("review state seal object store is tampered")
+        actual_objects.add(digest)
+    if actual_objects != file_digests:
+        raise ProjectionError("review state seal object closure is not exact")
+    file_sizes = {
+        str(item["object_digest"]): int(item["size_bytes"])
+        for item in entries
+        if item.get("kind") == "file"
+    }
+    if (
+        metadata.get("object_count") != len(file_digests)
+        or metadata.get("projection_bytes")
+        != sum(int(item["size_bytes"]) for item in entries if item.get("kind") == "file")
+        or metadata.get("storage_bytes") != sum(file_sizes.values())
+    ):
+        raise ProjectionError("review state seal storage accounting is invalid")
+    manifest_path = _seal_path(root, str(metadata.get("manifest_path", "")))
+    delta_path = _seal_path(root, str(metadata.get("delta_path", "")))
+    manifest_raw, _ = _read_regular_path(manifest_path, label="sealed actor manifest")
+    delta_raw, _ = _read_regular_path(delta_path, label="sealed actor delta")
+    try:
+        manifest = json.loads(manifest_raw.decode("utf-8"))
+        delta = json.loads(delta_raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ProjectionError("sealed actor evidence is not valid JSON") from exc
+    if not isinstance(manifest, Mapping) or not isinstance(delta, Mapping):
+        raise ProjectionError("sealed actor evidence is malformed")
+    if (
+        metadata.get("manifest_digest") != _canonical_digest(manifest)
+        or metadata.get("manifest_file_digest") != sha256_bytes(manifest_raw)
+        or metadata.get("delta_digest") != _canonical_digest(delta)
+        or metadata.get("delta_file_digest") != sha256_bytes(delta_raw)
+    ):
+        raise ProjectionError("review state seal evidence digest is invalid")
+    _assert_seal_tree_matches_manifest(entries, manifest)
+    if projection_path != manifest.get("workspace_path"):
+        raise ProjectionError("review state seal projection is not bound to its manifest")
+    if expected_manifest is not None and dict(manifest) != dict(expected_manifest):
+        raise ProjectionError("review state seal manifest differs from the expected terminal state")
+    if expected_delta is not None and dict(delta) != dict(expected_delta):
+        raise ProjectionError("review state seal delta differs from the expected terminal state")
+    marker = _seal_path(root, REVIEW_STATE_SEAL_MARKER)
+    marker_value = _seal_read_json(marker, label="review state seal marker")
+    if marker_value != {
+        "session_id": metadata.get("session_id"),
+        "incarnation_id": metadata.get("incarnation_id"),
+    }:
+        raise ProjectionError("review state seal marker is not bound to its session")
+    return dict(metadata) | {
+        "manifest": dict(manifest),
+        "delta": dict(delta),
+        "manifest_path_absolute": str(manifest_path),
+        "delta_path_absolute": str(delta_path),
+    }
+
+
+def verify_review_state_seal(
+    seal_root: str | Path,
+    *,
+    expected_manifest: Mapping[str, Any] | None = None,
+    expected_delta: Mapping[str, Any] | None = None,
+    expected_session_id: str | None = None,
+    expected_incarnation_id: str | None = None,
+    expected_status: str | None = None,
+) -> dict[str, Any]:
+    """Verify one exact, content-addressed terminal projection seal."""
+
+    root = Path(seal_root)
+    if not root.is_absolute() or root.is_symlink() or not root.is_dir():
+        raise ProjectionError("review state seal root is unavailable")
+    metadata_path = root / REVIEW_STATE_SEAL_MANIFEST
+    metadata = _seal_read_json(metadata_path, label=REVIEW_STATE_SEAL_MANIFEST)
+    if expected_session_id is not None and metadata.get("session_id") != expected_session_id:
+        raise ProjectionError("review state seal belongs to another session")
+    if expected_incarnation_id is not None and metadata.get("incarnation_id") != expected_incarnation_id:
+        raise ProjectionError("review state seal belongs to another incarnation")
+    if expected_status is not None and metadata.get("writer_status") != expected_status:
+        raise ProjectionError("review state seal terminal status differs")
+    return _verify_seal_tree(
+        root,
+        metadata,
+        expected_manifest=expected_manifest,
+        expected_delta=expected_delta,
+    )
+
+
+def create_review_state_seal(
+    projection_root: str | Path,
+    seal_root: str | Path,
+    *,
+    session_id: str,
+    incarnation_id: str,
+    writer_status: str,
+    final_manifest: Mapping[str, Any],
+    actor_delta: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Atomically snapshot one terminal actor projection for later review."""
+
+    root = Path(projection_root)
+    target = Path(seal_root)
+    if (
+        not root.is_absolute()
+        or root.is_symlink()
+        or not root.is_dir()
+        or not target.is_absolute()
+        or target.is_symlink()
+        or target == root
+    ):
+        raise ProjectionError("review state seal source or target is unsafe")
+    try:
+        root_coordinate = root.resolve()
+        target_coordinate = target.resolve()
+    except OSError as exc:
+        raise ProjectionError("review state seal containment cannot be checked") from exc
+    if (
+        root_coordinate == target_coordinate
+        or root_coordinate in target_coordinate.parents
+        or target_coordinate in root_coordinate.parents
+    ):
+        raise ProjectionError("review state seal target overlaps its actor projection")
+    if writer_status not in {"completed", "review_required"}:
+        raise ProjectionError("only clean terminal writers may be sealed")
+    if final_manifest.get("projection_kind") != "runtime_owned_actor_workspace":
+        raise ProjectionError("review state seal manifest is not an actor manifest")
+    if actor_delta.get("final_manifest_digest") != _canonical_digest(final_manifest):
+        raise ProjectionError("review state seal delta does not bind the final manifest")
+    if target.exists():
+        if target.is_symlink() or not target.is_dir():
+            raise ProjectionError("review state seal target is not a directory")
+        metadata_path = target / REVIEW_STATE_SEAL_MANIFEST
+        if metadata_path.exists() or metadata_path.is_symlink():
+            return verify_review_state_seal(
+                target,
+                expected_manifest=final_manifest,
+                expected_delta=actor_delta,
+                expected_session_id=session_id,
+                expected_incarnation_id=incarnation_id,
+                expected_status=writer_status,
+            )
+        try:
+            marker = _seal_read_json(
+                target / REVIEW_STATE_SEAL_MARKER,
+                label="incomplete review state seal marker",
+            )
+        except ProjectionError as exc:
+            raise ProjectionError(
+                "incomplete review state seal has no valid recovery marker"
+            ) from exc
+        if marker != {
+            "session_id": session_id,
+            "incarnation_id": incarnation_id,
+        }:
+            raise ProjectionError("incomplete review state seal marker is not owned")
+        _remove_tree(target)
+    observed_manifest = build_actor_manifest(
+        root,
+        source_manifest_digest=str(final_manifest.get("source_manifest_digest", "")),
+        source_git_head=str(final_manifest.get("source_git_head", "")),
+    )
+    if observed_manifest != dict(final_manifest):
+        raise ProjectionError("actor projection changed before terminal seal")
+    parent_fd, parent_identity = _open_publication_parent(target)
+    staging_name = ""
+    staging_fd = -1
+    publication_state = {"committed": False}
+    try:
+        staging_name, staging, staging_fd = _fresh_staging(parent_fd, ".review-seal-")
+        os.chmod(staging, 0o700)
+        objects = staging / "objects"
+        objects.mkdir(mode=0o700)
+        marker_raw = _seal_json_bytes(
+            {"session_id": session_id, "incarnation_id": incarnation_id}
+        )
+        _seal_write_new(staging / REVIEW_STATE_SEAL_MARKER, marker_raw)
+        tree_entries = _seal_projection_entries(root)
+        _assert_seal_tree_matches_manifest(tree_entries, final_manifest)
+        projection_bytes = 0
+        for item in tree_entries:
+            if item["kind"] != "file":
+                continue
+            source_file = root.joinpath(*str(item["path"]).split("/"))
+            data, _ = _read_regular_path(source_file, label=str(item["path"]))
+            _seal_copy_object(staging, str(item["object_digest"]), data)
+            projection_bytes += len(data)
+        _fsync_directory(objects)
+        manifest_raw = _seal_json_bytes(final_manifest)
+        delta_raw = _seal_json_bytes(actor_delta)
+        _seal_write_new(staging / "actor-final-manifest.json", manifest_raw)
+        _seal_write_new(staging / "actor-delta.json", delta_raw)
+        metadata = {
+            "$schema": "schemas/external-codex-review-state-seal.schema.json",
+            "schema_version": REVIEW_STATE_SEAL_SCHEMA_VERSION,
+            "seal_kind": "runtime_owned_external_codex_review_state",
+            "seal_root": str(target),
+            "session_id": session_id,
+            "incarnation_id": incarnation_id,
+            "writer_status": writer_status,
+            "projection_path": str(final_manifest["workspace_path"]),
+            "manifest_path": "actor-final-manifest.json",
+            "manifest_digest": _canonical_digest(final_manifest),
+            "manifest_file_digest": sha256_bytes(manifest_raw),
+            "delta_path": "actor-delta.json",
+            "delta_digest": _canonical_digest(actor_delta),
+            "delta_file_digest": sha256_bytes(delta_raw),
+            "tree_digest": _canonical_digest(tree_entries),
+            "tree_entries": tree_entries,
+            "object_count": len(
+                {str(item["object_digest"]) for item in tree_entries if item["kind"] == "file"}
+            ),
+            "projection_bytes": projection_bytes,
+            "storage_bytes": sum(
+                int(item["size_bytes"])
+                for digest, item in {
+                    str(item["object_digest"]): item
+                    for item in tree_entries
+                    if item["kind"] == "file"
+                }.items()
+            ),
+        }
+        metadata_raw = _seal_json_bytes(metadata)
+        _seal_write_new(staging / REVIEW_STATE_SEAL_MANIFEST, metadata_raw)
+        os.fsync(staging_fd)
+        _publish_staging(
+            parent_fd=parent_fd,
+            parent_identity=parent_identity,
+            staging_name=staging_name,
+            staging_fd=staging_fd,
+            target=target,
+            publication_state=publication_state,
+        )
+        os.fsync(parent_fd)
+        return verify_review_state_seal(
+            target,
+            expected_manifest=final_manifest,
+            expected_delta=actor_delta,
+            expected_session_id=session_id,
+            expected_incarnation_id=incarnation_id,
+            expected_status=writer_status,
+        )
+    except BaseException:
+        if not publication_state["committed"] and staging_name:
+            try:
+                cleanup = Path(f"/proc/self/fd/{parent_fd}/{staging_name}")
+                _remove_tree(cleanup)
+            except OSError:
+                pass
+        raise
+    finally:
+        if staging_fd >= 0:
+            os.close(staging_fd)
+        os.close(parent_fd)
+
+
+def _copy_sealed_tree(seal_root: Path, staging: Path, metadata: Mapping[str, Any]) -> None:
+    entries = metadata["tree_entries"]
+    directories = [item for item in entries if item["kind"] == "directory"]
+    for item in sorted(directories, key=lambda value: str(value["path"])):
+        target = staging.joinpath(*str(item["path"]).split("/"))
+        target.mkdir(mode=0o700, parents=True, exist_ok=True)
+        os.chmod(target, 0o700, follow_symlinks=False)
+    for item in entries:
+        relative = str(item["path"])
+        target = staging.joinpath(*relative.split("/"))
+        if item["kind"] == "file":
+            data, _ = _read_regular_path(
+                _seal_object_path(seal_root, str(item["object_digest"])),
+                label=f"sealed object for {relative}",
+            )
+            _seal_write_new(target, data, mode=int(item["mode"]))
+        elif item["kind"] == "symlink":
+            target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+            os.symlink(str(item["target"]), target)
+    for item in sorted(directories, key=lambda value: len(str(value["path"]).split("/")), reverse=True):
+        os.chmod(
+            staging.joinpath(*str(item["path"]).split("/")),
+            int(item["mode"]),
+            follow_symlinks=False,
+        )
+
+
+def materialize_actor_projection_from_seal(
+    seal_path: str | Path,
+    projection_path: str | Path,
+    *,
+    expected_manifest: Mapping[str, Any],
+    private_git_admission: MutableMapping[str, Any] | None = None,
+) -> tuple[Path, dict[str, Any]]:
+    """Materialize a reviewer projection from the sealed, not writer, bytes."""
+
+    seal = Path(seal_path)
+    target = Path(projection_path)
+    if (
+        not seal.is_absolute()
+        or seal.is_symlink()
+        or not seal.is_dir()
+        or not target.is_absolute()
+        or target.is_symlink()
+        or target.exists()
+    ):
+        raise ProjectionError("review state seal or target is unavailable")
+    try:
+        seal_coordinate = seal.resolve()
+        target_coordinate = target.resolve()
+    except OSError as exc:
+        raise ProjectionError("review projection containment cannot be checked") from exc
+    if (
+        seal_coordinate == target_coordinate
+        or seal_coordinate in target_coordinate.parents
+        or target_coordinate in seal_coordinate.parents
+    ):
+        raise ProjectionError("review projection target overlaps its source seal")
+    metadata = verify_review_state_seal(
+        seal,
+        expected_manifest=expected_manifest,
+    )
+    parent_fd, parent_identity = _open_publication_parent(target)
+    staging_name = ""
+    staging_fd = -1
+    publication_state = {"committed": False}
+    try:
+        staging_name, staging, staging_fd = _fresh_staging(parent_fd, ".review-projection-")
+        os.chmod(staging, 0o700)
+        _copy_sealed_tree(seal, staging, metadata)
+        observed = build_actor_manifest_from_descriptor(
+            staging_fd,
+            workspace_path=target,
+            source_manifest_digest=str(expected_manifest.get("source_manifest_digest", "")),
+            source_git_head=str(expected_manifest.get("source_git_head", "")),
+        )
+        if observed["content_entries"] != expected_manifest.get("content_entries") or observed[
+            "private_git_digest"
+        ] != expected_manifest.get("private_git_digest"):
+            raise ProjectionError("sealed actor projection differs before reviewer materialization")
+        shallow = staging / ".git" / "shallow"
+        expected_shallow_bytes = None
+        if shallow.exists() or shallow.is_symlink():
+            expected_shallow_bytes, _ = _read_regular_path(shallow, label=".git/shallow")
+        captured_private_git = build_private_git_admission_manifest(
+            staging,
+            expected_source_git_head=str(expected_manifest.get("source_git_head", "")),
+            expected_shallow_bytes=expected_shallow_bytes,
+            require_strict_fsck=True,
+        )
+        if captured_private_git.get("private_git_digest") != observed.get("private_git_digest"):
+            raise ProjectionError("sealed reviewer private Git changed before authority capture")
+        _publish_staging(
+            parent_fd=parent_fd,
+            parent_identity=parent_identity,
+            staging_name=staging_name,
+            staging_fd=staging_fd,
+            target=target,
+            publication_state=publication_state,
+        )
+        if private_git_admission is not None:
+            private_git_admission.clear()
+            private_git_admission.update(captured_private_git)
+        return target, observed
+    except BaseException:
+        cleanup_name = target.name if publication_state["committed"] else staging_name
+        cleanup = Path(f"/proc/self/fd/{parent_fd}/{cleanup_name}")
+        try:
+            if staging_fd >= 0:
+                expected = os.fstat(staging_fd)
+                if _same_inode(expected, cleanup.stat(follow_symlinks=False)):
+                    _remove_tree(cleanup)
+        except OSError:
+            pass
+        raise
+    finally:
+        if staging_fd >= 0:
+            os.close(staging_fd)
+        os.close(parent_fd)
