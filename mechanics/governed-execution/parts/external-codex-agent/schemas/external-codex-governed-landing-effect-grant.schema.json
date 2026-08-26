@@ -73,7 +73,12 @@
           ],
           "properties": {
             "kind": {"const": "pull_request"},
-            "pull_request_id": {"type": "string", "minLength": 1},
+            "pull_request_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[^\\x00-\\x20\\x7f]+$(?![\\s\\S])"
+            },
             "base_branch": {"$ref": "#/$defs/branch"},
             "head_branch": {"$ref": "#/$defs/branch"},
             "base_revision": {"$ref": "#/$defs/revision"},

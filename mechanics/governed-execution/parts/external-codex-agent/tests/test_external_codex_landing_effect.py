@@ -901,6 +901,19 @@ def test_invalid_git_refs_are_rejected_by_git_ref_rules(invalid_ref: str) -> Non
     assert exc.value.code == "landing_effect_grant_target_invalid"
 
 
+@pytest.mark.parametrize("invalid_id", ("42\n", " 42", "42 ", "42\t", "42\x00"))
+def test_pull_request_identifier_rejects_whitespace_and_controls(
+    invalid_id: str,
+) -> None:
+    grant = _grant(target_kind="pull_request")
+    grant["target"]["pull_request_id"] = invalid_id
+    _refresh_semantic_digest(grant)
+
+    with pytest.raises(LandingEffectGrantError) as exc:
+        validate_landing_effect_grant(grant)
+    assert exc.value.code == "landing_effect_grant_schema_invalid"
+
+
 def test_loader_uses_bounded_no_follow_descriptor_and_byte_digest(tmp_path: Path) -> None:
     grant = _grant()
     raw = _raw(grant)
