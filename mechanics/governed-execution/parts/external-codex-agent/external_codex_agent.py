@@ -6374,17 +6374,20 @@ def build_workspace_manifest(workspace: str | Path) -> dict[str, Any]:
                 }
             )
     status = _git_status(location, git_env=git_env)
+    workspace_identity = _workspace_identity(location)
+    git_head = _git_head(location, git_env=git_env)
+    git_shallow = read_source_shallow_boundary(location)
     _assert_no_in_progress_merge(location)
     return {
         "$schema": "schemas/external-codex-workspace-manifest.schema.json",
         "schema_version": "abyss_stack_external_codex_workspace_manifest_v1",
         "workspace_path": str(location),
-        "workspace_identity": _workspace_identity(location),
-        "git_head": _git_head(location, git_env=git_env),
+        "workspace_identity": workspace_identity,
+        "git_head": git_head,
         "git_status_porcelain_sha256": sha256_bytes(status_raw),
         "git_diff_binary_sha256": sha256_bytes(diff_raw),
         "git_diff_cached_binary_sha256": sha256_bytes(cached_diff_raw),
-        "git_shallow": read_source_shallow_boundary(location),
+        "git_shallow": git_shallow,
         "status_entries": [
             {"path": path, "status": status[path]} for path in sorted(status)
         ],
