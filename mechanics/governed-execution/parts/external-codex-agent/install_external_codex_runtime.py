@@ -47,6 +47,7 @@ RUNTIME_FILES = (
     "external_codex_mount_launcher.py",
     "external_codex_projection.py",
     "external_codex_return.py",
+    "goal_lifecycle_adapter.py",
     "external_codex_responsibility_movement.py",
     "schema_validation.py",
     "external_codex_static_bootstrap.S",

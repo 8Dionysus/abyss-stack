@@ -41,6 +41,12 @@ PAUSE_RECEIPT_SCHEMA_VERSION = "abyss_stack_external_codex_pause_receipt_v1"
 PAUSE_TRANSITION_PROOF_SCHEMA_VERSION = (
     "abyss_stack_external_codex_atomic_goal_transition_v1"
 )
+GOAL_LIFECYCLE_OWNER_SCHEMA_VERSION = (
+    "abyss_stack_external_codex_goal_lifecycle_owner_v1"
+)
+GOAL_LIFECYCLE_RECEIPT_SCHEMA_VERSION = (
+    "abyss_stack_external_codex_goal_lifecycle_receipt_v1"
+)
 PAUSE_RECEIPT_SCHEMA_PATH = (
     Path(__file__).resolve().parent / "schemas" / "external-codex-pause-receipt.schema.json"
 )
@@ -328,6 +334,16 @@ def validate_pause_owner(owner: dict[str, Any]) -> dict[str, Any]:
         owner,
         accepted_schema_versions={PAUSE_OWNER_SCHEMA_VERSION},
         label="pause owner",
+    )
+
+
+def validate_goal_lifecycle_owner(owner: dict[str, Any]) -> dict[str, Any]:
+    """Validate the transport binding for the generic Goal lifecycle leaf."""
+
+    return _validate_owner_binding(
+        owner,
+        accepted_schema_versions={GOAL_LIFECYCLE_OWNER_SCHEMA_VERSION},
+        label="Goal lifecycle owner",
     )
 
 
@@ -3174,6 +3190,27 @@ def command_pause(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_goal_transition(args: argparse.Namespace) -> int:
+    """Project one typed owner decision onto the current runtime adapter."""
+
+    module_name = "goal_lifecycle_adapter"
+    module = sys.modules.get(module_name)
+    if module is None:
+        path = Path(__file__).with_name("goal_lifecycle_adapter.py")
+        spec = importlib.util.spec_from_file_location(module_name, path)
+        if spec is None or spec.loader is None:
+            raise ExternalCodexReturnError(
+                "cannot load the Goal lifecycle runtime adapter"
+            )
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[module_name] = module
+        spec.loader.exec_module(module)
+
+    response = module.run_goal_transition(args)
+    print(json.dumps(response, ensure_ascii=False, sort_keys=True))
+    return 0
+
+
 def _command_return_detached(
     args: argparse.Namespace, lock: _ReturnAttemptLock
 ) -> int:
@@ -3400,6 +3437,19 @@ def parser() -> argparse.ArgumentParser:
     pause_parser.add_argument("--pause-owner", required=True)
     pause_parser.add_argument("--pause-receipt", required=True)
     pause_parser.set_defaults(handler=command_pause)
+    transition_parser = subcommands.add_parser(
+        "goal-transition",
+        aliases=["transition"],
+        help=(
+            "execute one accepted typed Goal lifecycle request through the "
+            "current runtime adapter"
+        ),
+    )
+    transition_parser.add_argument("--request", required=True)
+    transition_parser.add_argument("--decision", required=True)
+    transition_parser.add_argument("--owner", required=True)
+    transition_parser.add_argument("--receipt", required=True)
+    transition_parser.set_defaults(handler=command_goal_transition)
     route_parser = subcommands.add_parser(
         "return-route",
         help="deliver and close from one exact digest-bound return route",

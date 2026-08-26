@@ -60,6 +60,7 @@ python -m py_compile \
   mechanics/governed-execution/parts/external-codex-agent/external_codex_supervisor.py \
   mechanics/governed-execution/parts/external-codex-agent/install_external_codex_runtime.py \
   mechanics/governed-execution/parts/external-codex-agent/external_codex_return.py \
+  mechanics/governed-execution/parts/external-codex-agent/goal_lifecycle_adapter.py \
   mechanics/governed-execution/parts/external-codex-agent/external_codex_responsibility_movement.py \
   mechanics/governed-execution/parts/external-codex-agent/prepare_landing_study.py \
   mechanics/governed-execution/parts/external-codex-agent/visible_incarnation_home.py
