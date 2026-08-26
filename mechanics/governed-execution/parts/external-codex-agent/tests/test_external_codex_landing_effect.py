@@ -496,6 +496,8 @@ def test_grant_id_rejects_trailing_newlines() -> None:
         "owner\u200erepo",
         "owner\u202erepo",
         "owner\u2028repo",
+        "owner\U00013430repo",
+        "owner\U0001bca0repo",
     ),
 )
 def test_owner_reference_coordinates_reject_controls_and_unicode_whitespace(
@@ -524,6 +526,8 @@ def test_owner_reference_coordinates_reject_controls_and_unicode_whitespace(
         "incarnation\u200eid",
         "incarnation\u202eid",
         "incarnation\u2028id",
+        "incarnation\U00013430id",
+        "incarnation\U0001bca0id",
     ),
 )
 def test_holder_incarnation_id_rejects_controls_and_unicode_whitespace(
@@ -531,6 +535,24 @@ def test_holder_incarnation_id_rejects_controls_and_unicode_whitespace(
 ) -> None:
     grant = _grant()
     grant["holder_ref"]["incarnation_id"] = invalid_coordinate
+    _refresh_semantic_digest(grant)
+
+    with pytest.raises(LandingEffectGrantError) as exc:
+        validate_landing_effect_grant(grant)
+    assert exc.value.code == "landing_effect_grant_schema_invalid"
+
+
+@pytest.mark.parametrize("field", ("route", "wake_condition"))
+@pytest.mark.parametrize(
+    "invalid_value",
+    (" ", "validated-return\n", "validated\u200e-return"),
+)
+def test_return_posture_coordinates_reject_controls_and_whitespace(
+    field: str,
+    invalid_value: str,
+) -> None:
+    grant = _grant()
+    grant["return_posture"][field] = invalid_value
     _refresh_semantic_digest(grant)
 
     with pytest.raises(LandingEffectGrantError) as exc:
