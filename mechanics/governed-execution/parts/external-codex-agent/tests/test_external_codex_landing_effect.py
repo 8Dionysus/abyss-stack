@@ -16,6 +16,7 @@ PART_ROOT = Path(__file__).resolve().parents[1]
 if str(PART_ROOT) not in sys.path:
     sys.path.insert(0, str(PART_ROOT))
 
+import external_codex_landing_effect as landing_effect  # noqa: E402
 from external_codex_landing_effect import (  # noqa: E402
     LANDING_EFFECTS,
     MAX_GRANT_BYTES,
@@ -164,6 +165,12 @@ def _raw(grant: dict[str, Any]) -> bytes:
 
 def _raw_digest(raw: bytes) -> str:
     return "sha256:" + hashlib.sha256(raw).hexdigest()
+
+
+def _workspace_manifest_raw(value: dict[str, Any]) -> bytes:
+    return (
+        json.dumps(value, ensure_ascii=True, sort_keys=True, indent=2) + "\n"
+    ).encode("utf-8")
 
 
 WORKSPACE_MANIFEST_DIGEST = _raw_digest(WORKSPACE_MANIFEST_RAW)
@@ -386,6 +393,98 @@ def test_commit_admission_requires_and_verifies_workspace_manifest_digest() -> N
         admitted["admission"]["workspace_manifest_digest"]
         == WORKSPACE_MANIFEST_DIGEST
     )
+
+
+def test_commit_admission_binds_workspace_manifest_to_repository_revision() -> None:
+    grant = _grant(target_kind="branch", effects=["commit"])
+    raw_manifest_value = json.loads(WORKSPACE_MANIFEST_RAW)
+    raw_manifest_value["git_head"] = "a" * 40
+    raw_manifest = _workspace_manifest_raw(raw_manifest_value)
+    grant["commit_content"]["workspace_manifest_digest"] = _raw_digest(
+        raw_manifest
+    )
+    _refresh_semantic_digest(grant)
+    raw = _raw(grant)
+
+    with pytest.raises(LandingEffectGrantError) as exc:
+        admit_landing_effect_grant(
+            grant,
+            _request(grant),
+            grant_raw=raw,
+            expected_artifact_digest=_raw_digest(raw),
+            observed_workspace_manifest_digest=_raw_digest(raw_manifest),
+            observed_workspace_manifest_raw=raw_manifest,
+            at=AT,
+        )
+    assert exc.value.code == "landing_effect_grant_content_mismatch"
+
+
+@pytest.mark.parametrize(
+    ("field", "entries"),
+    (
+        (
+            "status_entries",
+            [
+                {"path": "src/file", "status": " M"},
+                {"path": "src/file", "status": "??"},
+            ],
+        ),
+        (
+            "content_entries",
+            [
+                {
+                    "path": "src/file",
+                    "kind": "file",
+                    "size_bytes": 0,
+                    "sha256": "sha256:" + "5" * 64,
+                    "index_flags": [],
+                },
+                {
+                    "path": "src/./file",
+                    "kind": "file",
+                    "size_bytes": 0,
+                    "sha256": "sha256:" + "6" * 64,
+                    "index_flags": [],
+                },
+            ],
+        ),
+    ),
+)
+def test_commit_admission_rejects_noncanonical_or_duplicate_manifest_paths(
+    field: str, entries: list[dict[str, Any]]
+) -> None:
+    grant = _grant(target_kind="branch", effects=["commit"])
+    raw_manifest_value = json.loads(WORKSPACE_MANIFEST_RAW)
+    raw_manifest_value[field] = entries
+    raw_manifest = _workspace_manifest_raw(raw_manifest_value)
+    raw = _raw(grant)
+
+    with pytest.raises(LandingEffectGrantError) as exc:
+        admit_landing_effect_grant(
+            grant,
+            _request(grant),
+            grant_raw=raw,
+            expected_artifact_digest=_raw_digest(raw),
+            observed_workspace_manifest_digest=_raw_digest(raw_manifest),
+            observed_workspace_manifest_raw=raw_manifest,
+            at=AT,
+        )
+    assert exc.value.code == "landing_effect_grant_content_invalid"
+
+
+def test_schema_error_collection_stops_after_first_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class GuardedValidator:
+        def __init__(self, *_args: Any, **_kwargs: Any) -> None:
+            pass
+
+        def iter_errors(self, _value: object) -> Any:
+            yield type("Error", (), {"message": "first error"})()
+            raise AssertionError("schema validation consumed more than one error")
+
+    monkeypatch.setattr(landing_effect, "Draft202012Validator", GuardedValidator)
+    assert landing_effect._schema_errors({"invalid": True}) == ["first error"]
 
 
 def test_non_commit_grants_reject_workspace_manifest_binding() -> None:

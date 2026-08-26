@@ -14,6 +14,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import posixpath
 import stat
 import subprocess
 from datetime import UTC, datetime
@@ -178,7 +179,7 @@ def _parse_json_bytes(raw: bytes) -> object:
         raise json.JSONDecodeError("invalid JSON value", text, 0) from exc
 
 
-def _workspace_manifest_digest(raw: bytes) -> str:
+def _validate_workspace_manifest(raw: bytes) -> tuple[Mapping[str, Any], str]:
     """Validate and digest the exact workspace-manifest artifact bytes."""
 
     if len(raw) > MAX_WORKSPACE_MANIFEST_BYTES:
@@ -203,7 +204,31 @@ def _workspace_manifest_digest(raw: bytes) -> str:
         raise LandingEffectGrantError(
             "landing_effect_grant_content_invalid", errors[0]
         )
-    return _digest_bytes(raw)
+    for field in ("status_entries", "content_entries"):
+        entries = parsed[field]
+        seen_paths: set[str] = set()
+        for entry in entries:
+            path = entry["path"]
+            if (
+                path in seen_paths
+                or path != path.strip()
+                or path != posixpath.normpath(path)
+                or "\\" in path
+                or path in {"", "."}
+            ):
+                raise LandingEffectGrantError(
+                    "landing_effect_grant_content_invalid",
+                    f"workspace manifest {field} contains a non-canonical or duplicate path",
+                )
+            seen_paths.add(path)
+    return parsed, _digest_bytes(raw)
+
+
+def _workspace_manifest_digest(raw: bytes) -> str:
+    """Validate and digest the exact workspace-manifest artifact bytes."""
+
+    _, digest = _validate_workspace_manifest(raw)
+    return digest
 
 
 def _copy_json(value: Mapping[str, Any]) -> dict[str, Any]:
@@ -289,9 +314,8 @@ def _schema_errors(
             "landing-effect grant schema cannot be read",
         ) from exc
     validator = Draft202012Validator(schema, format_checker=FormatChecker())
-    return sorted(
-        error.message for error in validator.iter_errors(value)
-    )
+    first_error = next(validator.iter_errors(value), None)
+    return [] if first_error is None else [first_error.message]
 
 
 def _is_valid_git_ref(value: object) -> bool:
@@ -712,7 +736,7 @@ def admit_landing_effect_grant(
                 "landing_effect_grant_content_unbound",
                 "commit admission requires the exact workspace manifest bytes",
             )
-        actual_workspace_manifest_digest = _workspace_manifest_digest(
+        workspace_manifest, actual_workspace_manifest_digest = _validate_workspace_manifest(
             observed_workspace_manifest_raw
         )
         if actual_workspace_manifest_digest != observed_workspace_manifest_digest:
@@ -724,6 +748,11 @@ def admit_landing_effect_grant(
             raise LandingEffectGrantError(
                 "landing_effect_grant_content_drift",
                 "workspace bytes differ from the immutable commit content binding",
+            )
+        if workspace_manifest["git_head"] != admitted["repository"]["revision"]:
+            raise LandingEffectGrantError(
+                "landing_effect_grant_content_mismatch",
+                "workspace manifest git_head differs from the authorized repository revision",
             )
     elif (
         "commit_content" in request
