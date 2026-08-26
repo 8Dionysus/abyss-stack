@@ -9,6 +9,30 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Harden governed landing-effect admission with an independent artifact-byte
+  digest, descriptor-bound bounded no-follow reads, duplicate-member rejection,
+  complete Git ref validation, effect-specific target constraints, and a
+  reviewer identity distinct from the holder; repository IDs reject traversal
+  components, pull-request targets bind an immutable head revision,
+  repository revisions accept bare 40- or 64-hex Git object IDs, and
+  standalone commit grants bind exact workspace-manifest bytes and digest,
+  require the manifest head to equal the authorized repository revision, and
+  require the repository revision to equal the branch base or pull-request
+  head target revision, reject non-canonical or duplicate manifest paths, and
+  enforce exact non-zero file/symlink digests and modes plus directory/missing
+  zero-size/null-digest invariants; workspace manifest heads accept bare
+  SHA-1/SHA-256 object IDs, manifest digests use strict full-string ends,
+  owner-reference digests use true string ends, special-file opens are
+  nonblocking, partially staged index bytes are bound by an exact cached-diff
+  digest, and boundary-time overflows are normalized; fixed-input study
+  preparation pins both landing admission schemas beside the landing source
+  in writer inputs, runtime constraints, and validation refs.
+- Preserve pre-upgrade v1 workspace manifests when the cached-index and
+  shallow-boundary fields are absent, while enforcing the cached digest for
+  upgraded manifests; bound direct JSON string and sequence inputs before
+  encoding, reject Unicode whitespace/control coordinates, accept lowercase
+  RFC 3339 UTC designators, and carry SHA-256 Git heads through runtime,
+  private-projection, binder, and study schemas.
 - Bind the canonical `aoa-kag` MCP adapter to an authored absolute
   `AOA_KAG_ARTIFACT_ROOT` seam for v4 cold-CAS reads, preserving fail-closed
   loader behavior and separate artifact-admission verdicts.

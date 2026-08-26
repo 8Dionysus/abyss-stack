@@ -71,6 +71,15 @@ from external_codex_nested_evidence import (  # noqa: E402
     build_nested_evidence_namespace,
     nested_evidence_namespace_digest,
 )
+from external_codex_landing_effect import (  # noqa: E402
+    LANDING_EFFECTS as _LANDING_EFFECTS,
+    LandingEffectGrantError as _LandingEffectGrantError,
+    admit_landing_effect_grant as _admit_landing_effect_grant,
+    landing_effect_grant_allows as _landing_effect_grant_allows,
+    load_landing_effect_grant as _load_landing_effect_grant,
+    validate_landing_effect_grant as _validate_landing_effect_grant,
+    RUNTIME_WIDE_FORBIDDEN_EFFECTS as _LANDING_RUNTIME_WIDE_FORBIDDEN_EFFECTS,
+)
 
 PROFILE_PATH = PART_ROOT / "runtime-profile.v1.json"
 SUPERVISOR_PATH = PART_ROOT / "external_codex_supervisor.py"
@@ -118,6 +127,10 @@ ACTOR_MANIFEST_SCHEMA_PATH = (
     SCHEMA_ROOT / "external-codex-actor-workspace-manifest.schema.json"
 )
 ACTOR_DELTA_SCHEMA_PATH = SCHEMA_ROOT / "external-codex-actor-delta.schema.json"
+LANDING_EFFECT_GRANT_SCHEMA_PATH = (
+    SCHEMA_ROOT
+    / "external-codex-governed-landing-effect-grant.schema.json"
+)
 REVIEW_SEED_ENVELOPE_SCHEMA_PATH = (
     SCHEMA_ROOT / "external-codex-review-seed-envelope.schema.json"
 )
@@ -717,20 +730,13 @@ SECRET_FILE_TOKEN_RE = re.compile(
     r"password|passwd|secret|secrets|token|tokens)(?:[._-]|$)",
     re.I,
 )
-RUNTIME_WIDE_FORBIDDEN_EFFECTS = frozenset(
-    {
-        "commit",
-        "push",
-        "pull_request",
-        "merge",
-        "tag",
-        "release",
-        "publication",
-        "service_mutation",
-        "secret_access",
-        "global_config_mutation",
-    }
-)
+LANDING_EFFECTS = _LANDING_EFFECTS
+LandingEffectGrantError = _LandingEffectGrantError
+admit_landing_effect_grant = _admit_landing_effect_grant
+landing_effect_grant_allows = _landing_effect_grant_allows
+load_landing_effect_grant = _load_landing_effect_grant
+validate_landing_effect_grant = _validate_landing_effect_grant
+RUNTIME_WIDE_FORBIDDEN_EFFECTS = _LANDING_RUNTIME_WIDE_FORBIDDEN_EFFECTS
 OPAQUE_EFFECT_EXECUTABLES = {
     "awk",
     "deno",
@@ -4720,6 +4726,7 @@ def _base_controller_git_environment() -> dict[str, str]:
         "GIT_CONFIG_VALUE_5": "/usr/bin/false",
         "GIT_CONFIG_VALUE_6": "/usr/bin/false",
         "GIT_NO_LAZY_FETCH": "1",
+        "GIT_NO_REPLACE_OBJECTS": "1",
         "GIT_OPTIONAL_LOCKS": "0",
         "GIT_TERMINAL_PROMPT": "0",
         "HOME": "/nonexistent",
@@ -4904,6 +4911,21 @@ def _repository_config_value(
             f"repository {key} has an empty structural value",
         )
     return value.lower() if normalize_lower else value
+
+
+def _assert_no_in_progress_merge(workspace: Path) -> None:
+    """Require a non-merge Git state before binding a workspace manifest."""
+
+    merge_head = _physical_git_metadata_file(
+        _repository_git_path(workspace, "MERGE_HEAD"),
+        purpose="in-progress merge state",
+        required=False,
+    )
+    if merge_head is not None:
+        raise ExternalCodexRuntimeError(
+            "workspace_merge_in_progress",
+            "workspace manifest cannot bind an in-progress merge",
+        )
 
 
 def _git_config_quoted(value: str) -> str:
@@ -5892,7 +5914,10 @@ def _git_head(
         env=dict(git_env or _controller_git_environment(workspace)),
     )
     value = completed.stdout.strip()
-    if completed.returncode != 0 or re.fullmatch(r"[0-9a-f]{40}", value) is None:
+    if (
+        completed.returncode != 0
+        or re.fullmatch(r"(?:[0-9a-f]{40}|[0-9a-f]{64})", value) is None
+    ):
         raise ExternalCodexRuntimeError(
             "workspace_not_git", "workspace is not an exact Git worktree"
         )
@@ -5959,6 +5984,28 @@ def _git_bytes(
             f"cannot inspect workspace manifest input: git {' '.join(args)}",
         )
     return completed.stdout
+
+
+def _git_cached_diff_bytes(
+    workspace: Path,
+    *,
+    git_env: Mapping[str, str],
+) -> bytes:
+    """Read the exact staged diff used by a workspace-manifest binding."""
+
+    return _git_bytes(
+        workspace,
+        "diff",
+        "--cached",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--binary",
+        "--full-index",
+        "HEAD",
+        "--",
+        timeout=60,
+        git_env=git_env,
+    )
 
 
 def _legacy_git_diff_binary_sha256(
@@ -6183,6 +6230,7 @@ def build_workspace_manifest(workspace: str | Path) -> dict[str, Any]:
         raise ExternalCodexRuntimeError(
             "workspace_unavailable", "workspace manifest target is unavailable"
         )
+    _assert_no_in_progress_merge(location)
     git_env = _controller_git_environment(location)
     status_raw = _git_bytes(
         location,
@@ -6204,6 +6252,7 @@ def build_workspace_manifest(workspace: str | Path) -> dict[str, Any]:
         timeout=60,
         git_env=git_env,
     )
+    cached_diff_raw = _git_cached_diff_bytes(location, git_env=git_env)
     changed = _nul_paths(
         _git_bytes(
             location,
@@ -6335,15 +6384,26 @@ def build_workspace_manifest(workspace: str | Path) -> dict[str, Any]:
                 }
             )
     status = _git_status(location, git_env=git_env)
+    workspace_identity = _workspace_identity(location)
+    git_head = _git_head(location, git_env=git_env)
+    git_shallow = read_source_shallow_boundary(location)
+    cached_diff_final_raw = _git_cached_diff_bytes(location, git_env=git_env)
+    if cached_diff_final_raw != cached_diff_raw:
+        raise ExternalCodexRuntimeError(
+            "workspace_index_race",
+            "staged index changed while building the workspace manifest",
+        )
+    _assert_no_in_progress_merge(location)
     return {
         "$schema": "schemas/external-codex-workspace-manifest.schema.json",
         "schema_version": "abyss_stack_external_codex_workspace_manifest_v1",
         "workspace_path": str(location),
-        "workspace_identity": _workspace_identity(location),
-        "git_head": _git_head(location, git_env=git_env),
+        "workspace_identity": workspace_identity,
+        "git_head": git_head,
         "git_status_porcelain_sha256": sha256_bytes(status_raw),
         "git_diff_binary_sha256": sha256_bytes(diff_raw),
-        "git_shallow": read_source_shallow_boundary(location),
+        "git_diff_cached_binary_sha256": sha256_bytes(cached_diff_raw),
+        "git_shallow": git_shallow,
         "status_entries": [
             {"path": path, "status": status[path]} for path in sorted(status)
         ],
@@ -6385,6 +6445,24 @@ def _workspace_manifests_match(
         return False
     baseline_without_diff = dict(baseline)
     current_without_diff = dict(current)
+    legacy_without_cached_diff = "git_diff_cached_binary_sha256" not in baseline
+    if legacy_without_cached_diff:
+        # A pre-canonical v1 baseline cannot bind arbitrary index bytes.  Keep
+        # compatibility only when its recorded status proves that the index
+        # had no staged edits and the current index is still empty relative to
+        # HEAD; otherwise a partially staged workspace could be re-admitted
+        # with an unbound commit payload.
+        baseline_status_entries = baseline_without_diff.get("status_entries")
+        if not isinstance(baseline_status_entries, list) or any(
+            not isinstance(item, Mapping)
+            or not isinstance(item.get("status"), str)
+            or item["status"][:1] not in {"", " ", "?", "!"}
+            for item in baseline_status_entries
+        ):
+            return False
+        if current.get("git_diff_cached_binary_sha256") != sha256_bytes(b""):
+            return False
+        current_without_diff.pop("git_diff_cached_binary_sha256", None)
     # Older admitted manifests did not carry the shallow-boundary snapshot.
     # Preserve that compatibility only for a currently non-shallow source; a
     # shallow source must be re-admitted with its exact boundary bytes.
@@ -10665,6 +10743,7 @@ class ExternalCodexRuntime:
             if key.startswith("GIT_CONFIG_") or key in {
                 "GIT_ATTR_NOSYSTEM",
                 "GIT_NO_LAZY_FETCH",
+                "GIT_NO_REPLACE_OBJECTS",
                 "GIT_OPTIONAL_LOCKS",
                 "GIT_TERMINAL_PROMPT",
             }:

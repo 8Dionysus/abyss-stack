@@ -2,5 +2,6 @@
   "captured_at": "2026-08-13T00:00:00Z",
   "catalog_id": "authored-empty-default",
   "entries": [],
+  "landing_effect_entries": [],
   "schema_version": "abyss_stack_external_codex_legacy_owner_migration_catalog_v1"
 }

@@ -1,5 +1,81 @@
 # Governed Execution Landing Log
 
+## 2026-08-25 - Review repair for staged-index and loader boundaries
+
+Commit admission now requires a strict non-zero
+`git_diff_cached_binary_sha256` in the workspace manifest. The runtime builder
+captures `git diff --cached --binary --full-index HEAD`, the private actor
+projection verifies the same digest, and admission rejects malformed values, so
+a partially staged index cannot change the future commit while preserving the
+ordinary worktree diff. Bounded grant/request mappings reject excessive key
+cardinality before canonical JSON sorting, and malformed NUL-containing loader
+paths return the typed unavailable denial. The focused and full suites remain
+source-only with `external_effects=false` and the complete ten-effect forbidden
+closure.
+
+## 2026-08-25 - Declarative governed landing-effect grant ABI
+
+Recorded the source-only landing of the provider-neutral governed landing-effect
+grant ABI. The schema and fail-closed admission path bind exact Goal, holder,
+repository revision, branch or pull-request target, immutable pull-request head
+revision, standalone-commit workspace-manifest content, effect set, independent
+reviewer identity, artifact bytes, expiry, and review-required return posture.
+Repository coordinates reject traversal components, and special-file,
+duplicate-member, digest, ref, size, and boundary time cases remain typed
+denials.
+
+The focused landing-effect suite (`test_external_codex_landing_effect.py`)
+collected and passed 55 tests on source repair commit
+`200e8e368871183aca85d41dc7aac455b840497b`. Commit grants are standalone when
+the target is a pull request: a revision-producing commit cannot be combined
+with a downstream push, pull-request, or merge effect, and it must carry exact
+workspace-manifest bytes plus a digest that admission bounds, schema-validates,
+and recomputes before accepting. Admission also requires the manifest `git_head`
+to equal the authorized repository revision, rejects non-canonical or duplicate
+status/content paths, and stops after the first schema error. The full
+external-agent suite also passed. Git revisions accept exact bare 40- or
+64-character object IDs, owner-reference digests use true string ends, and the
+exported validator bounds caller mappings before copying and schema validation.
+Repository IDs and revisions use true full-string validation. The canonical
+repository-local KAG gate and hosted Repo Validation are rerun on the
+synchronized final branch. This is source/CI evidence only: the current runtime
+profile retains
+`external_effects=false` and the complete ten-effect forbidden closure, so no
+runtime activation, landing-effect execution, deployment, semantic/Goal verdict,
+or owner acceptance is claimed.
+
+## 2026-08-25 - Review repair for commit target and manifest content binding
+
+The review repair in `c530640eb756f75361738e8b08544567753f8b7e` closes three
+admission gaps without enabling any effect executor. Commit grants now require
+the repository revision to equal the branch `base_revision` or pull-request
+`head_revision`; workspace-manifest content entries require digests for files
+and symlinks and zero-size/null-digest pairs for directories and missing paths;
+and workspace `git_head` accepts exact bare 40- or 64-hex Git object IDs. The
+focused landing-effect suite passed 63 tests, including positive and negative
+coverage for each invariant. Runtime posture remains source-only with
+`external_effects=false` and the complete ten-effect forbidden closure.
+
+## 2026-08-25 - Review repair for manifest digest and mode binding
+
+The follow-up repair in `c68814df3bca0c0f2021909c4aaeee46fa3cc97f` makes every
+commit workspace digest a strict full-string, non-zero coordinate and requires
+file and symlink content entries to carry a non-null mode. The workspace
+manifest schema and admission checks reject trailing-newline digest values and
+nullable file modes, with focused regression coverage. The focused
+landing-effect suite passed 65 tests; runtime posture remains source-only with
+`external_effects=false` and the complete ten-effect forbidden closure.
+
+## 2026-08-25 - Review repair for landing schema pinning
+
+The fixed-input study preparer now content-addresses the governed landing-effect
+grant schema and workspace-manifest schema beside the landing source. Each
+schema is repeated in writer immutable inputs, non-A2A scenario inputs, runtime
+constraint refs, continuation inputs, and validation refs, so a prepared study
+cannot execute against silently changed admission rules. The change remains
+source-only and preserves `external_effects=false` plus the complete
+ten-effect forbidden closure.
+
 ## 2026-08-13 - Stable external owner-request result identity
 
 Separated the cross-owner identity of an admitted `aoa-agents` execution

@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 29888121,
+  "allowed_tracked_bytes": 38727567,
+  "approved_by": "repository-owner",
+  "base_ref": "23251264476333e54dbfe59c863871f58ba1608e",
+  "changed_generated_bytes": 29888121,
+  "changed_generated_files": 313,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "c3c98b5978999f80a0268d03c7f6cda1d1d4af1826336acd61deea29be536491",
+  "reason": "Refresh exact owner portable family for PR #429 integer and schema-coordinate admission repairs.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 38727567,
+  "tracked_bytes_max": 24117248
+}

@@ -166,6 +166,30 @@ and replay only through their matching legacy wake reservation. A retry after a 
 - requires every task to preserve the complete runtime-wide forbidden-effect
   set, while terminal classification independently applies that set instead of
   trusting a caller-supplied subset;
+- carries the provider-neutral governed landing-effect grant ABI in
+  `external_codex_landing_effect.py` and
+  `schemas/external-codex-governed-landing-effect-grant.schema.json`. Exact
+  admission binds Goal, holder/incarnation, repository revision, branch or
+  pull-request target with an immutable reviewed head revision, an exact
+  landing-effect set, independent review by a reviewer distinct from the
+  holder, and
+  reviewed return posture. Branch targets may bind only commit and push;
+  pull-request and merge effects require exact pull-request coordinates and
+  the immutable reviewed head revision; repository coordinates reject
+  traversal components. Standalone commit grants also bind an explicit
+  workspace-manifest mode: newly issued grants require the cached-index digest,
+  while only an `authenticated_legacy_v1` grant with separately supplied,
+  digest-verified owner migration evidence and a matching owner receipt resolved
+  from the release-bound `legacy-owner-admission-migrations.v1.json` catalog
+  permits the historical v1 omission. The evidence, catalog entry, and receipt
+  bind the exact grant, repository revision, and manifest digest; caller-supplied
+  receipt bytes are not accepted. Non-empty owner catalogs require the admitted
+  runtime activation path. The owner must also supply the exact artifact-byte
+  digest independently of the grant's semantic self-digest. Missing, stale, wider, contradictory,
+  duplicate-member, invalid-ref, oversized, or artifact-drifted grants fail
+  closed. This is an owner-qualified admission seam only: current profiles
+  keep all external effects disabled and the command observer's ten-effect
+  forbidden closure unchanged;
 - keeps the SDK `summon-request-v4` as the typed active
   `AgentIncarnationBinding.task_request_ref`, while binding the richer
   runtime-owner task separately as an exact snapshot/continuation-pinned

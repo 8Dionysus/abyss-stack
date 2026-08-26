@@ -3,6 +3,22 @@
 Run the paired source proof with the exact `aoa-sdk` checkout that owns
 `AgentIncarnationBinding`:
 
+The focused `test_external_codex_landing_effect.py` suite validates the new
+provider-neutral grant schema and admission seam without starting a process or
+performing a landing effect. It covers the exact all-four landing-effect set,
+absent and stale grants, pending review, artifact drift, wider effect scope,
+contradictory target binding, exact Goal/holder/repository/target/review/return
+admission, and preservation of the complete ten-effect runtime-wide forbidden
+closure. Commit cases additionally prove that newly issued
+`cached_index_v1` grants require the cached staged-diff digest, while an
+`authenticated_legacy_v1` grant additionally requires independently
+digest-verified migration evidence and a matching owner receipt resolved from
+the release-bound owner migration catalog, bound to the exact grant,
+repository, and manifest before a historical v1 manifest may omit it. A
+caller-supplied receipt is never authoritative. The grant result is
+admission evidence only; current command classification and profiles remain
+external-effect-free.
+
 ```bash
 AOA_SDK_SOURCE_ROOT=/absolute/path/to/aoa-sdk \
 AOA_AGENTS_SOURCE_ROOT=/absolute/path/to/aoa-agents \
@@ -18,6 +34,7 @@ python -m py_compile \
   scripts/aoa-external-codex-incarnation \
   mechanics/governed-execution/parts/external-codex-agent/bind_external_actor_launch.py \
   mechanics/governed-execution/parts/external-codex-agent/external_codex_agent.py \
+  mechanics/governed-execution/parts/external-codex-agent/external_codex_landing_effect.py \
   mechanics/governed-execution/parts/external-codex-agent/external_codex_nested_evidence.py \
   mechanics/governed-execution/parts/external-codex-agent/external_codex_mount_launcher.py \
   mechanics/governed-execution/parts/external-codex-agent/external_codex_supervisor.py \

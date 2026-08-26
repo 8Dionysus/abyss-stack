@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 25400156,
+  "allowed_tracked_bytes": 38324493,
+  "approved_by": "repository-owner",
+  "base_ref": "3ad477deeb7164b00be371896264d92071176197",
+  "changed_generated_bytes": 25400156,
+  "changed_generated_files": 250,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "38c6decb830a6d8c15a1e036670364229d4000d610ba55dcb57bb434faa43591",
+  "reason": "Refresh the exact CI-pinned repository-local KAG family after the bounded governed landing-effect review repair without raising the standing budget.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 38324493,
+  "tracked_bytes_max": 24117248
+}

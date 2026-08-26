@@ -11,6 +11,7 @@ meaning into `abyss-stack`:
 | task-local DAG | `aoa-skills` | prove the actor node is ready and remains a non-authoritative local projection of the goal |
 | model realization | `aoa-models` | select only the caller-named model/effort/configuration |
 | runtime/tool profile | `abyss-stack` | constrain Codex argv, tools, sandbox, network and effects |
+| governed landing-effect grant | `abyss-stack` owner ABI plus the exact return/review owners | admit one exact Goal, holder, repository revision, target, effect set, review, and return relation without selecting a provider or enabling the current external-effect contour |
 | task and workspace sources | target/request owners | bind objective, transition, mutation/artifact paths, distinct source-evidence paths, and immutable inputs |
 | canonical result schema and session-local identity-bound derivative | `abyss-stack` | constrain the model-authored report shape and mechanically bind exact task/incarnation IDs |
 | runtime state/events/result and final workspace manifest | `abyss-stack` | record what process and thread actually ran, what bytes remained, and what it returned |
@@ -113,6 +114,27 @@ The neutral binder consumes already selected coordinates and writes only the
 runtime launch. Its response explicitly returns to `aoa-agents` to form the
 separate owner execution request; it cannot choose the obligation, role,
 model, domain procedure, or responsibility holder.
+
+The governed landing-effect grant is a separate runtime-owned ABI, not a
+replacement for the stronger Goal, holder, repository, review, or return
+owners. Its semantic self-digest binds the exact grant document, while
+admission compares every scope member structurally against an explicit
+request and requires an independently supplied digest of the exact artifact
+bytes. A commit grant also carries an exact workspace-manifest binding mode:
+new grants require the cached-index digest, and only an
+`authenticated_legacy_v1` mode with separately supplied, digest-verified
+owner migration evidence and a matching owner receipt resolved from the
+release-bound owner migration catalog may bind a historical v1 manifest without
+it. The evidence and catalog-resolved receipt are bound to the exact grant,
+repository revision, and manifest digest; caller-supplied receipt bytes are not
+accepted;
+the reviewer identity must differ from the holder identity. Branch
+targets are limited to commit and push; pull-request and merge
+effects require exact pull-request coordinates. Descriptor-bound bounded
+loading rejects path races, duplicate JSON members, invalid Git refs, and
+oversized artifacts. The runtime keeps the grant path and bytes outside
+model-issued command authority; the current profile and command observer
+remain external-effect-free even after a grant is descriptively admitted.
 
 The live Codex bundled model catalog and executable digest are currentness
 checks, not replacements for `aoa-models`. Runtime receipts are execution

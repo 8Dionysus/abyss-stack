@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 29884528,
+  "allowed_tracked_bytes": 38723974,
+  "approved_by": "repository-owner",
+  "base_ref": "23251264476333e54dbfe59c863871f58ba1608e",
+  "changed_generated_bytes": 29884528,
+  "changed_generated_files": 313,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "df78e5cbb2939a11e1f84041b460f12c7954fe122939fc9795816954043aa207",
+  "reason": "Refresh exact owner portable family for PR #429 repeated-scalar preflight repair.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 38723974,
+  "tracked_bytes_max": 24117248
+}

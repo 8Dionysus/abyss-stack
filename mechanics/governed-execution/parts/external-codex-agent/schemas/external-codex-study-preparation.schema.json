@@ -28,7 +28,10 @@
     "model_study_id": {"type": "string", "pattern": "^model-study:"},
     "admission_class": {"const": "transport_study_fixture"},
     "workspace_path": {"$ref": "#/$defs/absolutePath"},
-    "workspace_head": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "workspace_head": {
+      "type": "string",
+      "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$(?![\\s\\S])"
+    },
     "workspace_manifest_path": {"$ref": "#/$defs/absolutePath"},
     "workspace_manifest_digest": {"$ref": "#/$defs/digest"},
     "study_path": {"$ref": "#/$defs/absolutePath"},

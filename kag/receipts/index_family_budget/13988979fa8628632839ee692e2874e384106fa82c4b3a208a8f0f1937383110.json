@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 29893747,
+  "allowed_tracked_bytes": 38733193,
+  "approved_by": "repository-owner",
+  "base_ref": "23251264476333e54dbfe59c863871f58ba1608e",
+  "changed_generated_bytes": 29893747,
+  "changed_generated_files": 313,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "13988979fa8628632839ee692e2874e384106fa82c4b3a208a8f0f1937383110",
+  "reason": "Refresh the portable owner family after the bounded grant-id and Unicode Cc/Cf coordinate admission repair; this receipt admits only the measured generated delta and does not claim activation, runtime, evaluation, cost reduction, consumer-zero, or owner acceptance.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 38733193,
+  "tracked_bytes_max": 24117248
+}

@@ -108,6 +108,58 @@ WORKSPACE_MANIFEST_SCHEMA_REF = (
 WORKSPACE_MANIFEST_SCHEMA_PATH = (
     PART_ROOT / "schemas/external-codex-workspace-manifest.schema.json"
 )
+LEGACY_WORKSPACE_MANIFEST_EVIDENCE_SCHEMA_REF = (
+    "mechanics/governed-execution/parts/external-codex-agent/"
+    "schemas/external-codex-workspace-manifest-legacy-evidence.schema.json"
+)
+LEGACY_WORKSPACE_MANIFEST_EVIDENCE_SCHEMA_PATH = (
+    PART_ROOT
+    / "schemas/external-codex-workspace-manifest-legacy-evidence.schema.json"
+)
+LEGACY_WORKSPACE_MANIFEST_EVIDENCE_SCHEMA_VERSION = (
+    "abyss_stack_external_codex_workspace_manifest_legacy_evidence_v1"
+)
+LEGACY_WORKSPACE_MANIFEST_OWNER_RECEIPT_SCHEMA_REF = (
+    "mechanics/governed-execution/parts/external-codex-agent/"
+    "schemas/external-codex-workspace-manifest-legacy-owner-receipt.schema.json"
+)
+LEGACY_WORKSPACE_MANIFEST_OWNER_RECEIPT_SCHEMA_PATH = (
+    PART_ROOT
+    / "schemas/external-codex-workspace-manifest-legacy-owner-receipt.schema.json"
+)
+LEGACY_WORKSPACE_MANIFEST_OWNER_RECEIPT_SCHEMA_VERSION = (
+    "abyss_stack_external_codex_workspace_manifest_legacy_owner_receipt_v1"
+)
+LEGACY_OWNER_MIGRATION_CATALOG_SCHEMA_REF = (
+    "mechanics/governed-execution/parts/external-codex-agent/"
+    "schemas/external-codex-legacy-owner-migration-catalog.schema.json"
+)
+LEGACY_OWNER_MIGRATION_CATALOG_SCHEMA_PATH = (
+    PART_ROOT / "schemas/external-codex-legacy-owner-migration-catalog.schema.json"
+)
+LEGACY_OWNER_MIGRATION_CATALOG_SCHEMA_VERSION = (
+    "abyss_stack_external_codex_legacy_owner_migration_catalog_v1"
+)
+LEGACY_OWNER_MIGRATION_CATALOG_ARTIFACT_REF = (
+    "mechanics/governed-execution/parts/external-codex-agent/"
+    "legacy-owner-admission-migrations.v1.json"
+)
+LEGACY_OWNER_MIGRATION_CATALOG_PATH = (
+    PART_ROOT / "legacy-owner-admission-migrations.v1.json"
+)
+LANDING_EFFECT_GRANT_SCHEMA_REF = (
+    "mechanics/governed-execution/parts/external-codex-agent/"
+    "schemas/external-codex-governed-landing-effect-grant.schema.json"
+)
+LANDING_EFFECT_GRANT_SCHEMA_PATH = PART_ROOT / Path(
+    "schemas/external-codex-governed-landing-effect-grant.schema.json"
+)
+LANDING_EFFECT_GRANT_SCHEMA_VERSION = (
+    "abyss_stack_external_codex_governed_landing_effect_grant_v1"
+)
+WORKSPACE_MANIFEST_SCHEMA_VERSION = (
+    "abyss_stack_external_codex_workspace_manifest_v1"
+)
 ACTOR_MANIFEST_SCHEMA_REF = (
     "mechanics/governed-execution/parts/external-codex-agent/"
     "schemas/external-codex-actor-workspace-manifest.schema.json"
@@ -387,7 +439,9 @@ def _git(root: Path, *args: str) -> bytes:
 
 def _git_head(root: Path) -> str:
     value = _git(root, "rev-parse", "HEAD").decode("ascii").strip()
-    if len(value) != 40 or any(char not in "0123456789abcdef" for char in value):
+    if len(value) not in {40, 64} or any(
+        char not in "0123456789abcdef" for char in value
+    ):
         raise StudyPreparationError(f"invalid Git HEAD in {root}")
     return value
 
@@ -413,6 +467,91 @@ def _file_ref(
         artifact_digest=_file_digest(path),
         schema_ref=schema_ref,
         schema_version=schema_version,
+    )
+
+
+def _landing_effect_schema_refs() -> tuple[
+    ProvenanceRef, ProvenanceRef, ProvenanceRef, ProvenanceRef, ProvenanceRef
+]:
+    """Bind the exact landing, migration, receipt, and owner-catalog schemas."""
+
+    grant_ref = _file_ref(
+        owner="abyss-stack",
+        artifact_ref=LANDING_EFFECT_GRANT_SCHEMA_REF,
+        path=LANDING_EFFECT_GRANT_SCHEMA_PATH,
+        source_ref=(
+            "uncommitted-runtime-source@"
+            + _file_digest(LANDING_EFFECT_GRANT_SCHEMA_PATH)
+        ),
+        schema_ref="https://json-schema.org/draft/2020-12/schema",
+        schema_version=LANDING_EFFECT_GRANT_SCHEMA_VERSION,
+    )
+    workspace_ref = _file_ref(
+        owner="abyss-stack",
+        artifact_ref=WORKSPACE_MANIFEST_SCHEMA_REF,
+        path=WORKSPACE_MANIFEST_SCHEMA_PATH,
+        source_ref=(
+            "uncommitted-runtime-source@"
+            + _file_digest(WORKSPACE_MANIFEST_SCHEMA_PATH)
+        ),
+        schema_ref="https://json-schema.org/draft/2020-12/schema",
+        schema_version=WORKSPACE_MANIFEST_SCHEMA_VERSION,
+    )
+    legacy_evidence_ref = _file_ref(
+        owner="abyss-stack",
+        artifact_ref=LEGACY_WORKSPACE_MANIFEST_EVIDENCE_SCHEMA_REF,
+        path=LEGACY_WORKSPACE_MANIFEST_EVIDENCE_SCHEMA_PATH,
+        source_ref=(
+            "uncommitted-runtime-source@"
+            + _file_digest(LEGACY_WORKSPACE_MANIFEST_EVIDENCE_SCHEMA_PATH)
+        ),
+        schema_ref="https://json-schema.org/draft/2020-12/schema",
+        schema_version=LEGACY_WORKSPACE_MANIFEST_EVIDENCE_SCHEMA_VERSION,
+    )
+    legacy_owner_receipt_ref = _file_ref(
+        owner="abyss-stack",
+        artifact_ref=LEGACY_WORKSPACE_MANIFEST_OWNER_RECEIPT_SCHEMA_REF,
+        path=LEGACY_WORKSPACE_MANIFEST_OWNER_RECEIPT_SCHEMA_PATH,
+        source_ref=(
+            "uncommitted-runtime-source@"
+            + _file_digest(LEGACY_WORKSPACE_MANIFEST_OWNER_RECEIPT_SCHEMA_PATH)
+        ),
+        schema_ref="https://json-schema.org/draft/2020-12/schema",
+        schema_version=LEGACY_WORKSPACE_MANIFEST_OWNER_RECEIPT_SCHEMA_VERSION,
+    )
+    legacy_owner_catalog_ref = _file_ref(
+        owner="abyss-stack",
+        artifact_ref=LEGACY_OWNER_MIGRATION_CATALOG_SCHEMA_REF,
+        path=LEGACY_OWNER_MIGRATION_CATALOG_SCHEMA_PATH,
+        source_ref=(
+            "uncommitted-runtime-source@"
+            + _file_digest(LEGACY_OWNER_MIGRATION_CATALOG_SCHEMA_PATH)
+        ),
+        schema_ref="https://json-schema.org/draft/2020-12/schema",
+        schema_version=LEGACY_OWNER_MIGRATION_CATALOG_SCHEMA_VERSION,
+    )
+    return (
+        grant_ref,
+        workspace_ref,
+        legacy_evidence_ref,
+        legacy_owner_receipt_ref,
+        legacy_owner_catalog_ref,
+    )
+
+
+def _legacy_owner_migration_catalog_ref() -> ProvenanceRef:
+    """Bind the exact release-bound owner migration catalog artifact."""
+
+    return _file_ref(
+        owner="abyss-stack",
+        artifact_ref=LEGACY_OWNER_MIGRATION_CATALOG_ARTIFACT_REF,
+        path=LEGACY_OWNER_MIGRATION_CATALOG_PATH,
+        source_ref=(
+            "uncommitted-runtime-source@"
+            + _file_digest(LEGACY_OWNER_MIGRATION_CATALOG_PATH)
+        ),
+        schema_ref=LEGACY_OWNER_MIGRATION_CATALOG_SCHEMA_REF,
+        schema_version=LEGACY_OWNER_MIGRATION_CATALOG_SCHEMA_VERSION,
     )
 
 
@@ -1013,13 +1152,18 @@ def _requirement_refs(
 
 
 def _workspace_ref(workspace: Path, head: str) -> ProvenanceRef:
+    schema_version = {40: "sha1", 64: "sha256"}.get(len(head))
+    if schema_version is None:
+        raise StudyPreparationError(
+            f"invalid Git HEAD width for workspace reference in {workspace}"
+        )
     return _generated_ref(
         owner="abyss-stack",
         artifact_ref=f"workspaces/{workspace.name}/HEAD",
         raw=head.encode("ascii"),
         source_ref=head,
         schema_ref="git:commit",
-        schema_version="sha1",
+        schema_version=schema_version,
     )
 
 
@@ -1432,6 +1576,28 @@ def _prepare_writers(args: argparse.Namespace) -> dict[str, Any]:
         schema_ref="text/x-python",
         schema_version="abyss_stack_external_codex_controller_source_v1",
     )
+    landing_effect_source_path = PART_ROOT / "external_codex_landing_effect.py"
+    landing_effect_source_ref = _file_ref(
+        owner="abyss-stack",
+        artifact_ref=(
+            "mechanics/governed-execution/parts/external-codex-agent/"
+            "external_codex_landing_effect.py"
+        ),
+        path=landing_effect_source_path,
+        source_ref=(
+            "uncommitted-runtime-source@" + _file_digest(landing_effect_source_path)
+        ),
+        schema_ref="text/x-python",
+        schema_version="abyss_stack_external_codex_landing_effect_source_v1",
+    )
+    (
+        landing_effect_grant_schema_ref,
+        workspace_manifest_schema_ref,
+        legacy_workspace_manifest_evidence_schema_ref,
+        legacy_workspace_manifest_owner_receipt_schema_ref,
+        legacy_owner_migration_catalog_schema_ref,
+    ) = _landing_effect_schema_refs()
+    legacy_owner_migration_catalog_ref = _legacy_owner_migration_catalog_ref()
     snapshot = load_plan_compilation_snapshot()
     route_policy = _task_route_policy(packet)
     contour = snapshot.contour_for(str(route_policy["scenario_id"]))
@@ -1585,6 +1751,55 @@ def _prepare_writers(args: argparse.Namespace) -> dict[str, Any]:
                     "input_id": "runtime-controller-source",
                     "local_path": str(controller_source_path),
                     "provenance": controller_source_ref.model_dump(mode="json"),
+                },
+                {
+                    "input_id": "runtime-landing-effect-source",
+                    "local_path": str(landing_effect_source_path),
+                    "provenance": landing_effect_source_ref.model_dump(mode="json"),
+                },
+                {
+                    "input_id": "runtime-landing-effect-grant-schema",
+                    "local_path": str(LANDING_EFFECT_GRANT_SCHEMA_PATH),
+                    "provenance": landing_effect_grant_schema_ref.model_dump(
+                        mode="json"
+                    ),
+                },
+                {
+                    "input_id": "runtime-workspace-manifest-schema",
+                    "local_path": str(WORKSPACE_MANIFEST_SCHEMA_PATH),
+                    "provenance": workspace_manifest_schema_ref.model_dump(
+                        mode="json"
+                    ),
+                },
+                {
+                    "input_id": "runtime-legacy-workspace-manifest-evidence-schema",
+                    "local_path": str(LEGACY_WORKSPACE_MANIFEST_EVIDENCE_SCHEMA_PATH),
+                    "provenance": legacy_workspace_manifest_evidence_schema_ref.model_dump(
+                        mode="json"
+                    ),
+                },
+                {
+                    "input_id": "runtime-legacy-workspace-manifest-owner-receipt-schema",
+                    "local_path": str(
+                        LEGACY_WORKSPACE_MANIFEST_OWNER_RECEIPT_SCHEMA_PATH
+                    ),
+                    "provenance": legacy_workspace_manifest_owner_receipt_schema_ref.model_dump(
+                        mode="json"
+                    ),
+                },
+                {
+                    "input_id": "runtime-legacy-owner-migration-catalog-schema",
+                    "local_path": str(LEGACY_OWNER_MIGRATION_CATALOG_SCHEMA_PATH),
+                    "provenance": legacy_owner_migration_catalog_schema_ref.model_dump(
+                        mode="json"
+                    ),
+                },
+                {
+                    "input_id": "runtime-legacy-owner-migration-catalog",
+                    "local_path": str(LEGACY_OWNER_MIGRATION_CATALOG_PATH),
+                    "provenance": legacy_owner_migration_catalog_ref.model_dump(
+                        mode="json"
+                    ),
                 },
                 {
                     "input_id": "summon-request",
@@ -1759,6 +1974,12 @@ def _prepare_writers(args: argparse.Namespace) -> dict[str, Any]:
                 summon_request_schema_ref,
                 summon_decision_ref,
                 summon_result_schema_ref,
+                landing_effect_grant_schema_ref,
+                workspace_manifest_schema_ref,
+                legacy_workspace_manifest_evidence_schema_ref,
+                legacy_workspace_manifest_owner_receipt_schema_ref,
+                legacy_owner_migration_catalog_schema_ref,
+                legacy_owner_migration_catalog_ref,
             )
             scenario_artifact_bindings = ()
         scenario = ScenarioBinding(
@@ -1801,6 +2022,13 @@ def _prepare_writers(args: argparse.Namespace) -> dict[str, Any]:
                     workspace_ref,
                     report_schema_ref,
                     controller_source_ref,
+                    landing_effect_source_ref,
+                    landing_effect_grant_schema_ref,
+                    workspace_manifest_schema_ref,
+                    legacy_workspace_manifest_evidence_schema_ref,
+                    legacy_workspace_manifest_owner_receipt_schema_ref,
+                    legacy_owner_migration_catalog_schema_ref,
+                    legacy_owner_migration_catalog_ref,
                     model_ref,
                     task_ref,
                     summon_request_ref,
@@ -1925,6 +2153,13 @@ def _prepare_writers(args: argparse.Namespace) -> dict[str, Any]:
                 packet_ref,
                 manifest_ref,
                 controller_source_ref,
+                landing_effect_source_ref,
+                landing_effect_grant_schema_ref,
+                workspace_manifest_schema_ref,
+                legacy_workspace_manifest_evidence_schema_ref,
+                legacy_workspace_manifest_owner_receipt_schema_ref,
+                legacy_owner_migration_catalog_schema_ref,
+                legacy_owner_migration_catalog_ref,
                 workspace_ref,
                 model_ref,
                 summon_request_ref,
@@ -1939,6 +2174,13 @@ def _prepare_writers(args: argparse.Namespace) -> dict[str, Any]:
             validation_refs=(
                 report_schema_ref,
                 controller_source_ref,
+                landing_effect_source_ref,
+                landing_effect_grant_schema_ref,
+                workspace_manifest_schema_ref,
+                legacy_workspace_manifest_evidence_schema_ref,
+                legacy_workspace_manifest_owner_receipt_schema_ref,
+                legacy_owner_migration_catalog_schema_ref,
+                legacy_owner_migration_catalog_ref,
                 packet_ref,
                 manifest_ref,
                 summon_request_schema_ref,

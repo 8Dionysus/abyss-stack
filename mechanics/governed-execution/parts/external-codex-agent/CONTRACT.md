@@ -721,6 +721,106 @@ All aliases remain no-MCP, no-network, and no-external-effect. The alias must
 match the realization and incarnation binding exactly; it does not choose the
 task family, selected role chain, domain procedure, or model-fit outcome.
 
+### Governed landing-effect grant ABI
+
+The provider-neutral landing ABI is
+`schemas/external-codex-governed-landing-effect-grant.schema.json`, with its
+small admission implementation in `external_codex_landing_effect.py`. A grant
+is a separate owner artifact, not a model or provider identity. It binds all of
+these exact relations in one document:
+
+The fixed-input study preparer content-addresses the grant, workspace-manifest,
+legacy-evidence, legacy-owner-receipt, and release-bound owner-catalog schemas
+beside the landing source.
+Each schema is repeated
+in the writer's immutable inputs, runtime constraint refs, continuation inputs,
+and validation refs, so a prepared study cannot silently read a later schema
+revision.
+
+- `goal_ref` and `holder_ref`, including the holder's exact incarnation;
+- `repository.repository_id` and its exact `revision`; repository coordinates
+  reject path-traversal components;
+- a standalone `commit` effect additionally binds `commit_content.kind` to
+  `workspace_manifest` and carries a non-zero
+  `commit_content.workspace_manifest_digest` for the exact bytes a future
+  executor may commit, together with an exact
+  `commit_content.workspace_manifest_binding_mode`; newly issued grants use
+  `cached_index_v1` and require the cached staged-diff digest, while only an
+  `authenticated_legacy_v1` grant with a separately supplied,
+  owner-authenticated legacy-evidence artifact plus a matching receipt resolved
+  from the release-bound owner migration catalog may bind a historical v1
+  manifest without the cached-index field; admission receives only the bounded
+  manifest and evidence bytes, resolves the receipt from the sealed catalog,
+  validates all four schemas, and enforces exact non-zero file/symlink digests
+  and modes plus directory/missing zero-size/null-digest invariants, and
+  recomputes the cached staged-diff digest when present;
+- either one exact branch target (which may bind only `commit` and `push`) or
+  one exact pull-request target (which may bind `push`, `pull_request`, and
+  `merge`, or a standalone `commit`), including the immutable reviewed head
+  revision;
+- an exact set drawn only from `commit`, `push`, `pull_request`, and `merge`,
+  with pull-request and merge effects requiring the pull-request target
+  coordinates and the immutable reviewed head revision;
+- an independent-review binding whose status is approved and whose reviewer
+  identity differs from the holder identity; and
+- a `return_posture` with the exact return owner, route, review-required status,
+  and wake condition.
+
+`grant_ref.artifact_digest` is the canonical semantic grant digest computed
+with that one self-referential digest field set to the zero digest. Admission
+also requires the exact grant artifact bytes and an independently supplied
+digest of those exact bytes; the semantic digest alone cannot authorize an
+artifact. Loading uses one bounded `O_NOFOLLOW` descriptor, rejects duplicate
+JSON members, rejects blocking special-file paths, and validates the complete
+Git ref grammar before admission. Boundary timestamp overflows are normalized
+to typed time denials.
+
+`admit_landing_effect_grant` is fail-closed: absent, malformed, stale,
+future-dated, review-pending, artifact-drifted, contradictory, narrower, wider,
+or path-traversal grants are rejected. The request passed to it must repeat the
+exact Goal, holder, repository, target, review, return, and effect-set
+relations. Repository revisions are exact bare 40- or 64-character Git object
+IDs, and every owner-reference digest is a true full-string coordinate. A
+commit request must also repeat the exact `commit_content`
+binding, and the effect executor must supply the exact bounded
+workspace-manifest bytes plus an independently observed digest that admission
+recomputes and matches. Legacy compatibility additionally requires an
+independently expected digest and exact bytes for a typed migration-evidence
+artifact, plus an exact matching entry in the sealed release-bound owner
+migration catalog. The catalog-resolved receipt must agree on its exact
+owner/schema coordinates, and the receipt, evidence, grant, repository,
+revision, and manifest bindings are all rechecked; caller-supplied receipt
+bytes are not accepted. The manifest `git_head` must equal the exact authorized
+repository revision, that repository revision must equal the branch
+`base_revision` or pull-request `head_revision`, and every status/content path
+must be canonical and unique within its array. An upgraded manifest also
+carries a strict non-zero digest of `git diff --cached --binary --full-index
+HEAD`, so a partially staged index cannot change the future commit while
+preserving the ordinary worktree diff. A historical v1 manifest without that
+field is admitted only when the exact owner grant carries the
+`authenticated_legacy_v1` binding mode, the independent migration-evidence
+artifact is valid, and its catalog-resolved owner receipt is valid; a newly
+issued grant cannot select that omission implicitly.
+Schema validation stops after the first error. A
+pull-request target's reviewed head revision is therefore
+immutable at admission and a commit cannot use post-review workspace bytes;
+there is no wildcard or subset match. `landing_effect_grant_allows` is only a
+boolean read of that admission result. Direct mapping admission preflights
+string byte lengths and sequence/node cardinality before JSON encoding, and
+owner-reference coordinates reject Unicode whitespace and control characters.
+Runtime-owned projections preserve either 40-hex SHA-1 or 64-hex SHA-256 Git
+object IDs, including the private repository's object-format configuration;
+terminal lowercase `z` is accepted as the RFC 3339 UTC designator.
+
+This ABI does not lower `RUNTIME_WIDE_FORBIDDEN_EFFECTS`, does not make
+`external_effects` true in any current profile, and does not authorize a
+model-issued shell, Git, provider, or network command. The existing command
+observer therefore continues to reject all ten forbidden effects for ordinary
+actors and for this first runtime contour. A future effect executor may use
+the exact admission only after a separately owned runtime profile and
+owner-qualified execution route consume the same observed target; the grant
+alone cannot perform commit, push, pull-request, or merge.
+
 Codex runs beneath a Linux supervisor that owns a separate process group but
 does not create an outer PID or network namespace. Inference adds only the
 rootless user+mount contour described above. Live proof must show that this

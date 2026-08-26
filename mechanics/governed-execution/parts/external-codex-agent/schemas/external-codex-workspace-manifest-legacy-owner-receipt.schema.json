@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/8Dionysus/abyss-stack/main/mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-workspace-manifest-legacy-owner-receipt.schema.json",
+  "title": "Trusted owner receipt for a historical workspace manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schema_version",
+    "kind",
+    "receipt_id",
+    "owner_repo",
+    "artifact_ref",
+    "source_ref",
+    "schema_ref",
+    "authorization",
+    "evidence_id",
+    "grant_id",
+    "repository_id",
+    "repository_revision",
+    "workspace_manifest_schema_version",
+    "workspace_manifest_digest"
+  ],
+  "properties": {
+    "$schema": {"const": "schemas/external-codex-workspace-manifest-legacy-owner-receipt.schema.json"},
+    "schema_version": {
+      "const": "abyss_stack_external_codex_workspace_manifest_legacy_owner_receipt_v1"
+    },
+    "kind": {"const": "workspace_manifest_legacy_owner_receipt"},
+    "receipt_id": {"type": "string", "pattern": "^[a-z][a-z0-9._:-]{2,127}$(?![\\s\\S])"},
+    "owner_repo": {"const": "abyss-stack"},
+    "artifact_ref": {"$ref": "#/$defs/coordinate"},
+    "source_ref": {"$ref": "#/$defs/coordinate"},
+    "schema_ref": {
+      "const": "schemas/external-codex-workspace-manifest-legacy-owner-receipt.schema.json"
+    },
+    "authorization": {"const": "owner_authenticated_legacy_manifest_migration"},
+    "evidence_id": {"type": "string", "pattern": "^[a-z][a-z0-9._:-]{2,127}$(?![\\s\\S])"},
+    "grant_id": {"type": "string", "pattern": "^[a-z][a-z0-9._:-]{2,127}$(?![\\s\\S])"},
+    "repository_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$(?![\\s\\S])",
+      "not": {"pattern": "^(?:\\.{1,2}/.*|[^/]+/\\.{1,2})$"}
+    },
+    "repository_revision": {
+      "type": "string",
+      "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$(?![\\s\\S])"
+    },
+    "workspace_manifest_schema_version": {
+      "const": "abyss_stack_external_codex_workspace_manifest_v1"
+    },
+    "workspace_manifest_digest": {"$ref": "#/$defs/digest"}
+  },
+  "$defs": {
+    "coordinate": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096,
+      "pattern": "^[^\\u0000-\\u0020\\u007f-\\u00a0\\u00ad\\u0600-\\u0605\\u061c\\u06dd\\u070f\\u0890-\\u0891\\u08e2\\u1680\\u180e\\u2000-\\u200f\\u2028-\\u202e\\u202f\\u205f\\u2060-\\u206f\\u3000\\ufeff\\ufff9-\\ufffb]+$(?![\\s\\S])"
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$(?![\\s\\S])",
+      "not": {"const": "sha256:0000000000000000000000000000000000000000000000000000000000000000"}
+    }
+  }
+}

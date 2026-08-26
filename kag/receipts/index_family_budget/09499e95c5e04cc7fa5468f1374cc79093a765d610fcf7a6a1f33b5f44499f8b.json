@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 29630116,
+  "allowed_tracked_bytes": 38497973,
+  "approved_by": "repository-owner",
+  "base_ref": "75b3d734ab96503a34cb1e2bd70ee87867ce558f",
+  "changed_generated_bytes": 29630116,
+  "changed_generated_files": 329,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "09499e95c5e04cc7fa5468f1374cc79093a765d610fcf7a6a1f33b5f44499f8b",
+  "reason": "Refresh the repository-local KAG family for final landing-admission guard repair.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 38497973,
+  "tracked_bytes_max": 24117248
+}

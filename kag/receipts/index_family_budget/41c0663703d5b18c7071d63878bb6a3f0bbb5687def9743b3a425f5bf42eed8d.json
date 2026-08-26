@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 25005469,
+  "allowed_tracked_bytes": 38266009,
+  "approved_by": "repository-owner",
+  "base_ref": "d1603cafd10b88a3372ec974d78b2b0163cf287d",
+  "changed_generated_bytes": 25005469,
+  "changed_generated_files": 247,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "41c0663703d5b18c7071d63878bb6a3f0bbb5687def9743b3a425f5bf42eed8d",
+  "reason": "Refresh the exact CI-pinned repository-local KAG family after admitting the governed landing-effect schema manifest expectation without raising the standing budget.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 38266009,
+  "tracked_bytes_max": 24117248
+}

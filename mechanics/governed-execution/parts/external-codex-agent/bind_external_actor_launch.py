@@ -75,6 +75,7 @@ def _git_head(workspace: Path) -> str:
         "GIT_CONFIG_VALUE_0": "/dev/null",
         "GIT_CONFIG_VALUE_1": "false",
         "GIT_CONFIG_VALUE_2": "/dev/null",
+        "GIT_NO_REPLACE_OBJECTS": "1",
         "GIT_OPTIONAL_LOCKS": "0",
         "GIT_TERMINAL_PROMPT": "0",
         "HOME": "/nonexistent",
@@ -94,7 +95,11 @@ def _git_head(workspace: Path) -> str:
     except (OSError, subprocess.TimeoutExpired) as exc:
         raise LaunchBindingError("cannot inspect exact workspace Git HEAD") from exc
     head = completed.stdout.strip()
-    if completed.returncode != 0 or len(head) != 40 or any(c not in "0123456789abcdef" for c in head):
+    if (
+        completed.returncode != 0
+        or len(head) not in {40, 64}
+        or any(c not in "0123456789abcdef" for c in head)
+    ):
         raise LaunchBindingError("workspace has no exact Git HEAD")
     return head
 

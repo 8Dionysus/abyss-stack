@@ -6446,6 +6446,130 @@ def test_neutral_binder_uses_exact_git_outside_ambient_path(
     assert marker.exists() is False
 
 
+def test_sha256_workspace_head_is_accepted_by_runtime_and_binder(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "sha256-workspace"
+    workspace.mkdir()
+    try:
+        _git(workspace, "init", "-q", "--object-format=sha256")
+    except subprocess.CalledProcessError:
+        pytest.skip("Git SHA-256 object format is unavailable")
+    _git(workspace, "config", "user.email", "fixture@example.invalid")
+    _git(workspace, "config", "user.name", "Fixture")
+    (workspace / "README.md").write_text("sha256\n", encoding="utf-8")
+    _git(workspace, "add", "README.md")
+    _git(workspace, "commit", "-m", "fixture")
+
+    expected = _git(workspace, "rev-parse", "HEAD")
+    assert len(expected) == 64
+    assert RUNTIME._git_head(workspace) == expected
+    assert BINDER._git_head(workspace) == expected
+    assert PREPARER._git_head(workspace) == expected
+    assert PREPARER._workspace_ref(workspace, expected).schema_version == "sha256"
+    assert RUNTIME.build_workspace_manifest(workspace)["git_head"] == expected
+
+
+def test_workspace_manifest_rejects_in_progress_merge_parent(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "merge-workspace"
+    workspace.mkdir()
+    _git(workspace, "init", "-q")
+    _git(workspace, "config", "user.email", "fixture@example.invalid")
+    _git(workspace, "config", "user.name", "Fixture")
+    (workspace / "README.md").write_text("merge state\n", encoding="utf-8")
+    _git(workspace, "add", "README.md")
+    _git(workspace, "commit", "-m", "fixture")
+
+    merge_head = workspace / _git(workspace, "rev-parse", "--git-path", "MERGE_HEAD")
+    merge_head.write_text(_git(workspace, "rev-parse", "HEAD") + "\n", encoding="ascii")
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        RUNTIME.build_workspace_manifest(workspace)
+
+    assert exc_info.value.code == "workspace_merge_in_progress"
+
+
+def test_workspace_manifest_rechecks_merge_state_after_capture(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workspace = tmp_path / "merge-after-capture-workspace"
+    workspace.mkdir()
+    _git(workspace, "init", "-q")
+    _git(workspace, "config", "user.email", "fixture@example.invalid")
+    _git(workspace, "config", "user.name", "Fixture")
+    (workspace / "README.md").write_text(
+        "merge state after capture\n", encoding="utf-8"
+    )
+    _git(workspace, "add", "README.md")
+    _git(workspace, "commit", "-m", "fixture")
+
+    original_status = RUNTIME._git_status
+
+    def status_then_start_merge(
+        path: Path,
+        *,
+        git_env: Mapping[str, str] | None = None,
+    ) -> dict[str, str]:
+        result = original_status(path, git_env=git_env)
+        merge_head = path / _git(path, "rev-parse", "--git-path", "MERGE_HEAD")
+        merge_head.write_text(_git(path, "rev-parse", "HEAD") + "\n", encoding="ascii")
+        return result
+
+    monkeypatch.setattr(RUNTIME, "_git_status", status_then_start_merge)
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        RUNTIME.build_workspace_manifest(workspace)
+
+    assert exc_info.value.code == "workspace_merge_in_progress"
+
+
+def test_workspace_manifest_rechecks_merge_state_after_cached_diff(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workspace = tmp_path / "merge-after-cached-diff-workspace"
+    workspace.mkdir()
+    _git(workspace, "init", "-q")
+    _git(workspace, "config", "user.email", "fixture@example.invalid")
+    _git(workspace, "config", "user.name", "Fixture")
+    (workspace / "README.md").write_text(
+        "merge state after cached diff\n", encoding="utf-8"
+    )
+    _git(workspace, "add", "README.md")
+    _git(workspace, "commit", "-m", "fixture")
+
+    original_cached_diff = RUNTIME._git_cached_diff_bytes
+    cached_diff_calls = 0
+
+    def cached_diff_then_start_merge(
+        path: Path,
+        *,
+        git_env: Mapping[str, str],
+    ) -> bytes:
+        nonlocal cached_diff_calls
+        result = original_cached_diff(path, git_env=git_env)
+        cached_diff_calls += 1
+        if cached_diff_calls == 2:
+            merge_head = path / _git(path, "rev-parse", "--git-path", "MERGE_HEAD")
+            merge_head.write_text(
+                _git(path, "rev-parse", "HEAD") + "\n", encoding="ascii"
+            )
+        return result
+
+    monkeypatch.setattr(
+        RUNTIME,
+        "_git_cached_diff_bytes",
+        cached_diff_then_start_merge,
+    )
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        RUNTIME.build_workspace_manifest(workspace)
+
+    assert exc_info.value.code == "workspace_merge_in_progress"
+    assert cached_diff_calls == 2
+
+
 @pytest.mark.skipif(
     not OWNER_EXECUTION_REQUEST_SCHEMA_PATH.is_file()
     or not TASK_LOCAL_DAG_SCHEMA_PATH.is_file(),
@@ -7807,6 +7931,75 @@ def test_study_preparer_binds_actual_sdk_import_root(tmp_path: Path) -> None:
     )
     with pytest.raises(PREPARER.StudyPreparationError, match="outside exact"):
         PREPARER._assert_aoa_sdk_import_root(tmp_path / "different-sdk")
+
+
+def test_study_preparer_pins_landing_admission_schemas() -> None:
+    (
+        grant_ref,
+        workspace_ref,
+        legacy_evidence_ref,
+        legacy_owner_receipt_ref,
+        legacy_owner_catalog_ref,
+    ) = PREPARER._landing_effect_schema_refs()
+    expected = (
+        (
+            grant_ref,
+            PREPARER.LANDING_EFFECT_GRANT_SCHEMA_PATH,
+            PREPARER.LANDING_EFFECT_GRANT_SCHEMA_REF,
+            PREPARER.LANDING_EFFECT_GRANT_SCHEMA_VERSION,
+        ),
+        (
+            workspace_ref,
+            PREPARER.WORKSPACE_MANIFEST_SCHEMA_PATH,
+            PREPARER.WORKSPACE_MANIFEST_SCHEMA_REF,
+            PREPARER.WORKSPACE_MANIFEST_SCHEMA_VERSION,
+        ),
+        (
+            legacy_evidence_ref,
+            PREPARER.LEGACY_WORKSPACE_MANIFEST_EVIDENCE_SCHEMA_PATH,
+            PREPARER.LEGACY_WORKSPACE_MANIFEST_EVIDENCE_SCHEMA_REF,
+            PREPARER.LEGACY_WORKSPACE_MANIFEST_EVIDENCE_SCHEMA_VERSION,
+        ),
+        (
+            legacy_owner_receipt_ref,
+            PREPARER.LEGACY_WORKSPACE_MANIFEST_OWNER_RECEIPT_SCHEMA_PATH,
+            PREPARER.LEGACY_WORKSPACE_MANIFEST_OWNER_RECEIPT_SCHEMA_REF,
+            PREPARER.LEGACY_WORKSPACE_MANIFEST_OWNER_RECEIPT_SCHEMA_VERSION,
+        ),
+        (
+            legacy_owner_catalog_ref,
+            PREPARER.LEGACY_OWNER_MIGRATION_CATALOG_SCHEMA_PATH,
+            PREPARER.LEGACY_OWNER_MIGRATION_CATALOG_SCHEMA_REF,
+            PREPARER.LEGACY_OWNER_MIGRATION_CATALOG_SCHEMA_VERSION,
+        ),
+    )
+    for reference, path, artifact_ref, schema_version in expected:
+        assert path.is_file()
+        assert reference.artifact_ref == artifact_ref
+        assert reference.artifact_digest == PREPARER._file_digest(path)
+        assert reference.source_ref == (
+            "uncommitted-runtime-source@" + reference.artifact_digest
+        )
+        assert reference.schema_ref == "https://json-schema.org/draft/2020-12/schema"
+        assert reference.schema_version == schema_version
+
+
+def test_study_preparer_pins_release_bound_landing_owner_catalog() -> None:
+    reference = PREPARER._legacy_owner_migration_catalog_ref()
+
+    assert reference.owner_repo == "abyss-stack"
+    assert reference.artifact_ref == PREPARER.LEGACY_OWNER_MIGRATION_CATALOG_ARTIFACT_REF
+    assert reference.artifact_digest == PREPARER._file_digest(
+        PREPARER.LEGACY_OWNER_MIGRATION_CATALOG_PATH
+    )
+    assert reference.source_ref == (
+        "uncommitted-runtime-source@" + reference.artifact_digest
+    )
+    assert reference.schema_ref == PREPARER.LEGACY_OWNER_MIGRATION_CATALOG_SCHEMA_REF
+    assert (
+        reference.schema_version
+        == PREPARER.LEGACY_OWNER_MIGRATION_CATALOG_SCHEMA_VERSION
+    )
 
 
 def test_study_preparer_rejects_auxiliary_sdk_module_outside_root(
@@ -9925,6 +10118,7 @@ def test_codex_environment_isolates_shell_startup_and_repository_hooks(
     assert environment["GIT_CONFIG_KEY_7"] == "filter.leak.smudge"
     assert environment["GIT_CONFIG_VALUE_7"] == ""
     assert environment["GIT_NO_LAZY_FETCH"] == "1"
+    assert environment["GIT_NO_REPLACE_OBJECTS"] == "1"
     assert Path(environment["GIT_CONFIG_VALUE_0"]).stat().st_mode & 0o222 == 0
     assert Path(environment["HOME"]).stat().st_mode & 0o222 == 0
     assert marker.exists() is False
@@ -11108,6 +11302,8 @@ def test_workspace_manifest_accepts_exact_pre_full_index_baseline(
     ).stdout
     legacy = dict(current)
     legacy["git_diff_binary_sha256"] = RUNTIME.sha256_bytes(legacy_diff)
+    legacy.pop("git_diff_cached_binary_sha256")
+    legacy.pop("git_shallow")
     _git(workspace, "config", "core.abbrev", "4")
 
     RUNTIME.assert_workspace_manifest(legacy, workspace)
@@ -11117,6 +11313,121 @@ def test_workspace_manifest_accepts_exact_pre_full_index_baseline(
     with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
         RUNTIME.assert_workspace_manifest(rejected, workspace)
     assert exc_info.value.code == "workspace_manifest_drift"
+
+
+def test_workspace_manifest_binds_partially_staged_index_bytes(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    _git(workspace, "init", "-b", "main")
+    _git(workspace, "config", "user.email", "fixture@example.invalid")
+    _git(workspace, "config", "user.name", "Fixture")
+    tracked = workspace / "tracked.txt"
+    tracked.write_text("baseline\n", encoding="utf-8")
+    _git(workspace, "add", "tracked.txt")
+    _git(workspace, "commit", "-m", "fixture")
+
+    tracked.write_text("staged-a\n", encoding="utf-8")
+    _git(workspace, "add", "tracked.txt")
+    tracked.write_text("worktree\n", encoding="utf-8")
+    first = RUNTIME.build_workspace_manifest(workspace)
+
+    tracked.write_text("staged-b\n", encoding="utf-8")
+    _git(workspace, "add", "tracked.txt")
+    tracked.write_text("worktree\n", encoding="utf-8")
+    second = RUNTIME.build_workspace_manifest(workspace)
+
+    assert first["git_status_porcelain_sha256"] == second[
+        "git_status_porcelain_sha256"
+    ]
+    assert first["git_diff_binary_sha256"] == second["git_diff_binary_sha256"]
+    assert first["git_diff_cached_binary_sha256"] != second[
+        "git_diff_cached_binary_sha256"
+    ]
+
+
+def test_legacy_workspace_manifest_rejects_partially_staged_index_drift(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    _git(workspace, "init", "-b", "main")
+    _git(workspace, "config", "user.email", "fixture@example.invalid")
+    _git(workspace, "config", "user.name", "Fixture")
+    tracked = workspace / "tracked.txt"
+    tracked.write_text("baseline\n", encoding="utf-8")
+    _git(workspace, "add", "tracked.txt")
+    _git(workspace, "commit", "-m", "fixture")
+
+    tracked.write_text("staged-a\n", encoding="utf-8")
+    _git(workspace, "add", "tracked.txt")
+    tracked.write_text("worktree\n", encoding="utf-8")
+    legacy = RUNTIME.build_workspace_manifest(workspace)
+    legacy.pop("git_diff_cached_binary_sha256")
+
+    tracked.write_text("staged-b\n", encoding="utf-8")
+    _git(workspace, "add", "tracked.txt")
+    tracked.write_text("worktree\n", encoding="utf-8")
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        RUNTIME.assert_workspace_manifest(legacy, workspace)
+
+    assert exc_info.value.code == "workspace_manifest_drift"
+
+
+def test_workspace_manifest_rejects_staged_index_change_during_capture(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    _git(workspace, "init", "-b", "main")
+    _git(workspace, "config", "user.email", "fixture@example.invalid")
+    _git(workspace, "config", "user.name", "Fixture")
+    tracked = workspace / "tracked.txt"
+    tracked.write_text("baseline\n", encoding="utf-8")
+    _git(workspace, "add", "tracked.txt")
+    _git(workspace, "commit", "-m", "fixture")
+
+    tracked.write_text("staged-a\n", encoding="utf-8")
+    _git(workspace, "add", "tracked.txt")
+    tracked.write_text("worktree\n", encoding="utf-8")
+
+    original_git_bytes = RUNTIME._git_bytes
+    cached_diff_args = (
+        "diff",
+        "--cached",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--binary",
+        "--full-index",
+        "HEAD",
+        "--",
+    )
+    cached_diff_calls = 0
+
+    def raced_git_bytes(
+        workspace_arg: Path,
+        *arguments: str,
+        **kwargs: object,
+    ) -> bytes:
+        nonlocal cached_diff_calls
+        result = original_git_bytes(workspace_arg, *arguments, **kwargs)
+        if workspace_arg == workspace and arguments == cached_diff_args:
+            cached_diff_calls += 1
+            if cached_diff_calls == 1:
+                tracked.write_text("staged-b\n", encoding="utf-8")
+                _git(workspace, "add", "tracked.txt")
+                tracked.write_text("worktree\n", encoding="utf-8")
+        return result
+
+    monkeypatch.setattr(RUNTIME, "_git_bytes", raced_git_bytes)
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        RUNTIME.build_workspace_manifest(workspace)
+
+    assert exc_info.value.code == "workspace_index_race"
+    assert cached_diff_calls == 2
 
 
 def test_workspace_manifest_disables_promisor_lazy_fetch_helpers(

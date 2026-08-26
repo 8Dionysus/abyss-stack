@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 25839659,
+  "allowed_tracked_bytes": 38355531,
+  "approved_by": "repository-owner",
+  "base_ref": "3b2bda61c1138da2af8f6c5d84bee9e4526e4f0f",
+  "changed_generated_bytes": 25839659,
+  "changed_generated_files": 256,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "429b821a5cef2c1c0b8b4edcee1f8a617240bc2f6f608e17cdae58d6f60fd93d",
+  "reason": "Refresh the exact CI-pinned repository-local KAG family after recording the governed landing-effect ABI in the package landing log while preserving the standing generated-delta budget.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 38355531,
+  "tracked_bytes_max": 24117248
+}

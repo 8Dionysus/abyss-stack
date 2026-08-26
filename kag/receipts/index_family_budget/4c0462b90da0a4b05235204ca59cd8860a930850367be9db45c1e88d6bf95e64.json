@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 25048339,
+  "allowed_tracked_bytes": 38303823,
+  "approved_by": "repository-owner",
+  "base_ref": "3ad477deeb7164b00be371896264d92071176197",
+  "changed_generated_bytes": 25048339,
+  "changed_generated_files": 247,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "4c0462b90da0a4b05235204ca59cd8860a930850367be9db45c1e88d6bf95e64",
+  "reason": "Refresh the exact CI-pinned repository-local KAG family after advancing the landing branch to current main without raising the standing budget.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 38303823,
+  "tracked_bytes_max": 24117248
+}
