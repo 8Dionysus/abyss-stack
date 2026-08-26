@@ -26,7 +26,8 @@
     "writer_projection_path": {"type": "string", "pattern": "^/"},
     "writer_final_manifest_ref": {"$ref": "#/$defs/evidenceRef"},
     "writer_delta_ref": {"$ref": "#/$defs/evidenceRef"},
-    "writer_source_manifest_ref": {"$ref": "#/$defs/evidenceRef"}
+    "writer_source_manifest_ref": {"$ref": "#/$defs/evidenceRef"},
+    "writer_review_seal_ref": {"$ref": "#/$defs/evidenceRef"}
   },
   "$defs": {
     "evidenceRef": {

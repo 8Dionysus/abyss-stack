@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 28827802,
+  "allowed_tracked_bytes": 38410484,
+  "approved_by": "repository-owner",
+  "base_ref": "75b3d734ab96503a34cb1e2bd70ee87867ce558f",
+  "changed_generated_bytes": 28827802,
+  "changed_generated_files": 292,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "8cb6abe6b23f7cd785a0081f814d031f09f53c674138ad5080be8f63b9aa50a8",
+  "reason": "Refresh the derived abyss-stack KAG family for per-attempt review-seed envelope identity; record measured generated amplification without changing the standing KAG limit.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 38410484,
+  "tracked_bytes_max": 24117248
+}

@@ -248,7 +248,10 @@ and replay only through their matching legacy wake reservation. A retry after a 
 - materializes every admitted Git baseline into a fresh runtime-owned actor
   projection before inference, rejecting unsupported special entries or unsafe
   symlinks and constructing a private source-independent `.git` body whose
-  status/diff exactly match the admitted manifest; the source manifest is
+  status/diff exactly match the admitted manifest. A shallow source carries
+  only exact, necessary commit-boundary lines into that private body; malformed,
+  forged, out-of-set, or unnecessary lines fail closed and strict full fsck
+  remains authoritative. The source manifest is
   recorded before and after materialization and must remain identical before
   inference. Staging and publication are relative to one pinned parent
   descriptor, the baseline is inventoried from the still-open staging inode,
@@ -261,9 +264,13 @@ and replay only through their matching legacy wake reservation. A retry after a 
   The model receives only the projection as target,
   cwd, and validation root; the source checkout remains the owner acceptance
   surface and is never an actor write target. Reviewer launches may seed an
-  exact writer projection only through a controller-issued review-seed envelope;
-  reviewer preparation and execution remain valid after the historical source
-  checkout disappears;
+  exact writer projection only through a controller-issued review-seed envelope.
+  Clean terminal writers seal the complete actor tree into a content-addressed
+  review-state root while the writer lock is held; delayed or repeated seed
+  issuance and reviewer materialization use that seal rather than mutable
+  post-closeout writer bytes, so benign index refreshes cannot redefine review
+  eligibility. Reviewer preparation and execution remain valid after the
+  historical source checkout disappears;
 - opens the actor projection once, inventories that descriptor, and passes the
   same open inode through the supervisor and mount launcher to bubblewrap at
   `/tmp/aoa-external-actor-workspace`. Final inventory uses the retained

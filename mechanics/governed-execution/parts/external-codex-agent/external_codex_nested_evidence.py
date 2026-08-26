@@ -15,6 +15,7 @@ import json
 import os
 import re
 import stat
+import sys
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -22,8 +23,16 @@ from typing import Any, Iterable, Mapping, Sequence
 
 from jsonschema import Draft202012Validator
 
-
 PART_ROOT = Path(__file__).resolve().parent
+if str(PART_ROOT) not in sys.path:
+    sys.path.insert(0, str(PART_ROOT))
+
+from external_codex_projection import (  # noqa: E402
+    ProjectionError,
+    verify_review_state_seal,
+)
+
+
 SCHEMA_ROOT = PART_ROOT / "schemas"
 ACTOR_INPUT_SCHEMA = SCHEMA_ROOT / "external-codex-actor-input-envelope.schema.json"
 TASK_SCHEMA = SCHEMA_ROOT / "external-codex-task.schema.json"
@@ -112,10 +121,14 @@ class _Producer:
     final_manifest_raw_digest: str
     workspace: Path
     terminal_attempt_id: str
+    review_seal: tuple[Path, dict[str, Any]] | None
 
     @property
     def task_id(self) -> str:
         return str(self.task.payload["task_id"])
+
+
+_REVIEW_SEAL_UNSET = object()
 
 
 def _canonical_bytes(value: Any) -> bytes:
@@ -234,10 +247,18 @@ def _task_result_ref(result: _Record, task: _Record) -> dict[str, Any] | None:
     return matches[0] if len(matches) == 1 else None
 
 
-def _producer_projection(result: _Record) -> Path:
+def _producer_projection(
+    result: _Record,
+    *,
+    review_seal: tuple[Path, dict[str, Any]] | None | object = _REVIEW_SEAL_UNSET,
+) -> Path:
+    if review_seal is _REVIEW_SEAL_UNSET:
+        review_seal = _producer_review_seal(result)
     projection = Path(str(result.payload.get("actor_projection_path", "")))
     if not projection.is_absolute():
         raise NestedEvidenceNamespaceError("producer runtime coordinate is not absolute")
+    if review_seal is not None:
+        return projection
     try:
         resolved_projection = projection.resolve(strict=True)
     except OSError as exc:
@@ -251,14 +272,78 @@ def _producer_projection(result: _Record) -> Path:
     return projection
 
 
+def _producer_review_seal(
+    result: _Record,
+) -> tuple[Path, dict[str, Any]] | None:
+    """Verify and return a producer's content-addressed terminal seal.
+
+    New terminal writer results deliberately remain reviewable after their
+    mutable actor projection changes or disappears.  The result coordinate is
+    therefore semantic identity only once a seal is present; every source byte
+    must come from the independently verified seal object store.
+    """
+
+    raw_ref = result.payload.get("review_seal_ref")
+    if raw_ref is None:
+        return None
+    if not isinstance(raw_ref, dict) or raw_ref.get("owner_repo") != "abyss-stack":
+        raise NestedEvidenceNamespaceError(
+            "producer result has a malformed runtime-owned review seal"
+        )
+    projection = Path(str(result.payload.get("actor_projection_path", "")))
+    seal_path = Path(str(raw_ref.get("artifact_ref", "")))
+    if (
+        not projection.is_absolute()
+        or not seal_path.is_absolute()
+        or seal_path.name != "review-state-seal.json"
+        or seal_path.is_symlink()
+        or not seal_path.is_file()
+    ):
+        raise NestedEvidenceNamespaceError(
+            "producer review seal coordinate is unavailable or unsafe"
+        )
+    seal_root = seal_path.parent
+    seal_base = projection.parent / "review-state-seal"
+    first_attempt = seal_root == seal_base
+    retry_attempt = (
+        seal_root.parent == seal_base
+        and re.fullmatch(r"attempt-[0-9]{3}", seal_root.name) is not None
+    )
+    seal_raw = _read_regular(seal_path)
+    if (
+        not (first_attempt or retry_attempt)
+        or _sha256_bytes(seal_raw) != raw_ref.get("artifact_digest")
+    ):
+        raise NestedEvidenceNamespaceError(
+            "producer review seal is not bound to its exact session"
+        )
+    try:
+        metadata = verify_review_state_seal(
+            seal_root,
+            expected_session_id=str(result.payload.get("session_id", "")),
+            expected_incarnation_id=str(result.payload.get("incarnation_id", "")),
+            expected_status=str(result.payload.get("status", "")),
+        )
+    except ProjectionError as exc:
+        raise NestedEvidenceNamespaceError(
+            "producer review seal failed independent verification"
+        ) from exc
+    if metadata.get("projection_path") != str(projection):
+        raise NestedEvidenceNamespaceError(
+            "producer review seal names another actor projection"
+        )
+    return seal_root, metadata
+
+
 def _verified_result_artifact(
     result: _Record,
     ref: Mapping[str, Any],
     *,
     label: str,
     expected_owner: str | None = None,
+    review_seal: tuple[Path, dict[str, Any]] | None | object = _REVIEW_SEAL_UNSET,
 ) -> tuple[Path, bytes]:
-    projection = _producer_projection(result)
+    projection = _producer_projection(result, review_seal=review_seal)
     session_root = projection.parent
     path = Path(str(ref.get("artifact_ref", "")))
     owner = ref.get("owner_repo")
@@ -281,18 +366,26 @@ def _verified_result_artifact(
 
 def _safe_result_final_manifest(
     result: _Record,
+    *,
+    review_seal: tuple[Path, dict[str, Any]] | None | object = _REVIEW_SEAL_UNSET,
 ) -> tuple[dict[str, Any], bytes, str, Path]:
     result_payload = result.payload
     final_ref = result_payload.get("actor_final_manifest_ref")
     if not isinstance(final_ref, dict) or final_ref.get("owner_repo") != "abyss-stack":
         raise NestedEvidenceNamespaceError("producer result has no runtime-owned final manifest")
-    projection = _producer_projection(result)
+    if review_seal is _REVIEW_SEAL_UNSET:
+        review_seal = _producer_review_seal(result)
+    projection = _producer_projection(result, review_seal=review_seal)
     expected_final_path = projection.parent / "actor-final-manifest.json"
+    if review_seal is not None:
+        seal_root, seal_metadata = review_seal
+        expected_final_path = seal_root / str(seal_metadata["manifest_path"])
     final_path, final_raw = _verified_result_artifact(
         result,
         final_ref,
         label="producer final manifest",
         expected_owner="abyss-stack",
+        review_seal=review_seal,
     )
     if final_path != expected_final_path:
         raise NestedEvidenceNamespaceError("producer final manifest escapes its session")
@@ -304,13 +397,34 @@ def _safe_result_final_manifest(
     )
     if final_manifest.get("workspace_path") != str(projection):
         raise NestedEvidenceNamespaceError("producer final manifest names another projection")
+    if review_seal is not None:
+        seal_root, seal_metadata = review_seal
+        delta_ref = result_payload.get("actor_delta_ref")
+        if (
+            str(final_ref.get("artifact_digest"))
+            != str(seal_metadata.get("manifest_file_digest"))
+            or not isinstance(delta_ref, dict)
+            or delta_ref.get("owner_repo") != "abyss-stack"
+            or Path(str(delta_ref.get("artifact_ref", "")))
+            != seal_root / str(seal_metadata["delta_path"])
+            or str(delta_ref.get("artifact_digest"))
+            != str(seal_metadata.get("delta_file_digest"))
+        ):
+            raise NestedEvidenceNamespaceError(
+                "producer final evidence is not bound into its review seal"
+            )
     return final_manifest, final_raw, str(final_ref["artifact_digest"]), projection
 
 
-def _terminal_attempt_id(result: _Record, report_path: Path) -> str:
+def _terminal_attempt_id(
+    result: _Record,
+    report_path: Path,
+    *,
+    review_seal: tuple[Path, dict[str, Any]] | None | object = _REVIEW_SEAL_UNSET,
+) -> str:
     """Derive the terminal attempt from the result-bound model report path."""
 
-    projection = _producer_projection(result)
+    projection = _producer_projection(result, review_seal=review_seal)
     try:
         relative = report_path.relative_to(projection.parent).as_posix()
     except ValueError as exc:
@@ -366,6 +480,7 @@ def _producers(records: Sequence[_Record]) -> list[_Producer]:
                 "producer result has ambiguous exact task inputs"
             )
         task, task_ref = task_candidates[0]
+        review_seal = _producer_review_seal(result)
         report_ref = result.payload.get("report_ref")
         delta_ref = result.payload.get("actor_delta_ref")
         if not isinstance(report_ref, dict) or not isinstance(delta_ref, dict):
@@ -397,6 +512,7 @@ def _producers(records: Sequence[_Record]) -> list[_Producer]:
             result,
             task_ref,
             label="producer task",
+            review_seal=review_seal,
         )
         if task_raw != task.raw:
             raise NestedEvidenceNamespaceError(
@@ -407,12 +523,14 @@ def _producers(records: Sequence[_Record]) -> list[_Producer]:
             report_ref,
             label="producer report",
             expected_owner="abyss-stack",
+            review_seal=review_seal,
         )
         _, delta_raw = _verified_result_artifact(
             result,
             delta_ref,
             label="producer delta",
             expected_owner="abyss-stack",
+            review_seal=review_seal,
         )
         if report_raw != report.raw or delta_raw != delta.raw:
             raise NestedEvidenceNamespaceError(
@@ -432,9 +550,13 @@ def _producers(records: Sequence[_Record]) -> list[_Producer]:
         _validate_schema(report.payload, REPORT_SCHEMA, label="producer report")
         _validate_schema(delta.payload, ACTOR_DELTA_SCHEMA, label="producer delta")
         final_manifest, final_raw, final_digest, projection = (
-            _safe_result_final_manifest(result)
+            _safe_result_final_manifest(result, review_seal=review_seal)
         )
-        terminal_attempt_id = _terminal_attempt_id(result, report_path)
+        terminal_attempt_id = _terminal_attempt_id(
+            result,
+            report_path,
+            review_seal=review_seal,
+        )
         if _sha256_bytes(_canonical_bytes(final_manifest)) != delta.payload.get(
             "final_manifest_digest"
         ):
@@ -471,6 +593,7 @@ def _producers(records: Sequence[_Record]) -> list[_Producer]:
                 final_manifest_raw_digest=final_digest,
                 workspace=projection,
                 terminal_attempt_id=terminal_attempt_id,
+                review_seal=review_seal,
             )
         )
     return sorted(
@@ -601,6 +724,34 @@ def _manifest_entry(producer: _Producer, relative: str) -> dict[str, Any]:
 
 def _producer_file(producer: _Producer, relative: str) -> tuple[bytes, dict[str, Any]]:
     entry = _manifest_entry(producer, relative)
+    review_seal = producer.review_seal
+    if review_seal is not None:
+        seal_root, seal_metadata = review_seal
+        seal_entries = [
+            item
+            for item in seal_metadata.get("tree_entries", [])
+            if isinstance(item, dict)
+            and item.get("path") == relative
+            and item.get("kind") == "file"
+        ]
+        if len(seal_entries) != 1:
+            raise NestedEvidenceNamespaceError(
+                f"producer sealed source is not unique: {relative}"
+            )
+        object_digest = str(seal_entries[0].get("object_digest", ""))
+        if not re.fullmatch(r"sha256:[0-9a-f]{64}", object_digest):
+            raise NestedEvidenceNamespaceError(
+                f"producer sealed source has no exact object: {relative}"
+            )
+        raw = _read_regular(seal_root / "objects" / object_digest.removeprefix("sha256:"))
+        if (
+            _sha256_bytes(raw) != object_digest
+            or object_digest != entry.get("sha256")
+        ):
+            raise NestedEvidenceNamespaceError(
+                f"producer sealed source bytes drifted: {relative}"
+            )
+        return raw, entry
     candidate = producer.workspace.joinpath(*relative.split("/"))
     try:
         resolved = candidate.resolve(strict=True)
