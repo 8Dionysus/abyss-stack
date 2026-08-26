@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 21321098,
+  "allowed_tracked_bytes": 38558817,
+  "approved_by": "repository-owner",
+  "base_ref": "23251264476333e54dbfe59c863871f58ba1608e",
+  "changed_generated_bytes": 21321098,
+  "changed_generated_files": 214,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "7bfe7916bac35281d56b9bb8d206ff48d8f43b6c7e99f6166292e9d4d1fd3768",
+  "reason": "Refresh the exact abyss-stack portable owner family after registering Goal lifecycle validation manifests.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 38558817,
+  "tracked_bytes_max": 24117248
+}
