@@ -184,10 +184,17 @@
     "commitContent": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["kind", "workspace_manifest_digest"],
+      "required": [
+        "kind",
+        "workspace_manifest_digest",
+        "workspace_manifest_binding_mode"
+      ],
       "properties": {
         "kind": {"const": "workspace_manifest"},
-        "workspace_manifest_digest": {"$ref": "#/$defs/digest"}
+        "workspace_manifest_digest": {"$ref": "#/$defs/digest"},
+        "workspace_manifest_binding_mode": {
+          "enum": ["cached_index_v1", "authenticated_legacy_v1"]
+        }
       }
     },
     "digest": {

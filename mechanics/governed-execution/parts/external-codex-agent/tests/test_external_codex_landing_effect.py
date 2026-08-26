@@ -147,6 +147,7 @@ def _grant(
         grant["commit_content"] = {
             "kind": "workspace_manifest",
             "workspace_manifest_digest": WORKSPACE_MANIFEST_DIGEST,
+            "workspace_manifest_binding_mode": "cached_index_v1",
         }
     grant["grant_ref"][
         "schema_ref"
@@ -424,6 +425,16 @@ def test_commit_grants_require_immutable_workspace_manifest_binding() -> None:
     assert exc.value.code == "landing_effect_grant_schema_invalid"
 
 
+def test_commit_grants_require_workspace_manifest_binding_mode() -> None:
+    grant = _grant(effects=["commit"])
+    del grant["commit_content"]["workspace_manifest_binding_mode"]
+    _refresh_semantic_digest(grant)
+
+    with pytest.raises(LandingEffectGrantError) as exc:
+        validate_landing_effect_grant(grant)
+    assert exc.value.code == "landing_effect_grant_schema_invalid"
+
+
 def test_commit_admission_requires_and_verifies_workspace_manifest_digest() -> None:
     grant = _grant(target_kind="branch", effects=["commit"])
     raw = _raw(grant)
@@ -476,6 +487,7 @@ def test_commit_admission_requires_and_verifies_workspace_manifest_digest() -> N
         admitted["admission"]["workspace_manifest_digest"]
         == WORKSPACE_MANIFEST_DIGEST
     )
+    assert admitted["admission"]["workspace_manifest_binding_mode"] == "cached_index_v1"
 
 
 def test_commit_admission_binds_workspace_manifest_to_repository_revision() -> None:
@@ -637,6 +649,10 @@ def test_commit_admission_accepts_kind_bound_manifest_content_entries() -> None:
         at=AT,
     )
     assert admitted["admission"]["status"] == "admitted"
+    assert (
+        admitted["admission"]["workspace_manifest_binding_mode"]
+        == "cached_index_v1"
+    )
 
 
 def test_workspace_manifest_accepts_bare_sha256_git_head() -> None:
@@ -665,6 +681,9 @@ def test_workspace_manifest_accepts_bare_sha256_git_head() -> None:
 
 def test_workspace_manifest_accepts_legacy_v1_without_cached_index_binding() -> None:
     grant = _grant(target_kind="branch", effects=["commit"])
+    grant["commit_content"][
+        "workspace_manifest_binding_mode"
+    ] = "authenticated_legacy_v1"
     raw_manifest_value = json.loads(WORKSPACE_MANIFEST_RAW)
     raw_manifest_value.pop("git_diff_cached_binary_sha256")
     raw_manifest_value.pop("git_shallow")
@@ -683,6 +702,33 @@ def test_workspace_manifest_accepts_legacy_v1_without_cached_index_binding() -> 
         at=AT,
     )
     assert admitted["admission"]["status"] == "admitted"
+    assert (
+        admitted["admission"]["workspace_manifest_binding_mode"]
+        == "authenticated_legacy_v1"
+    )
+
+
+def test_new_commit_grants_require_cached_index_binding() -> None:
+    grant = _grant(target_kind="branch", effects=["commit"])
+    raw_manifest_value = json.loads(WORKSPACE_MANIFEST_RAW)
+    raw_manifest_value.pop("git_diff_cached_binary_sha256")
+    raw_manifest_value.pop("git_shallow")
+    raw_manifest = _workspace_manifest_raw(raw_manifest_value)
+    grant["commit_content"]["workspace_manifest_digest"] = _raw_digest(raw_manifest)
+    _refresh_semantic_digest(grant)
+    raw = _raw(grant)
+
+    with pytest.raises(LandingEffectGrantError) as exc:
+        admit_landing_effect_grant(
+            grant,
+            _request(grant),
+            grant_raw=raw,
+            expected_artifact_digest=_raw_digest(raw),
+            observed_workspace_manifest_digest=_raw_digest(raw_manifest),
+            observed_workspace_manifest_raw=raw_manifest,
+            at=AT,
+        )
+    assert exc.value.code == "landing_effect_grant_content_invalid"
 
 
 def test_commit_admission_rejects_manifest_digest_newlines() -> None:

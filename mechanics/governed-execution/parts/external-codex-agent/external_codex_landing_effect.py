@@ -34,6 +34,14 @@ WORKSPACE_MANIFEST_SCHEMA_PATH = (
 )
 SCHEMA_VERSION = "abyss_stack_external_codex_governed_landing_effect_grant_v1"
 CAPABILITY_ID = "governed_git_landing_v1"
+CURRENT_WORKSPACE_MANIFEST_BINDING_MODE = "cached_index_v1"
+LEGACY_WORKSPACE_MANIFEST_BINDING_MODE = "authenticated_legacy_v1"
+WORKSPACE_MANIFEST_BINDING_MODES = frozenset(
+    {
+        CURRENT_WORKSPACE_MANIFEST_BINDING_MODE,
+        LEGACY_WORKSPACE_MANIFEST_BINDING_MODE,
+    }
+)
 ZERO_DIGEST = "sha256:" + "0" * 64
 MAX_GRANT_BYTES = 256 * 1024
 MAX_GRANT_MAPPING_KEYS = 4096
@@ -335,6 +343,32 @@ def _validate_workspace_manifest(raw: bytes) -> tuple[Mapping[str, Any], str]:
                 )
             seen_paths.add(path)
     return parsed, _digest_bytes(raw)
+
+
+def _validate_workspace_manifest_binding_mode(
+    commit_content: Mapping[str, Any],
+    workspace_manifest: Mapping[str, Any],
+) -> str:
+    """Require an explicit grant mode for current versus historical manifests."""
+
+    mode = commit_content.get("workspace_manifest_binding_mode")
+    if mode not in WORKSPACE_MANIFEST_BINDING_MODES:
+        raise LandingEffectGrantError(
+            "landing_effect_grant_content_invalid",
+            "commit grants require an exact workspace manifest binding mode",
+        )
+    has_cached_index_binding = "git_diff_cached_binary_sha256" in workspace_manifest
+    if mode == CURRENT_WORKSPACE_MANIFEST_BINDING_MODE and not has_cached_index_binding:
+        raise LandingEffectGrantError(
+            "landing_effect_grant_content_invalid",
+            "new commit grants require a cached-index workspace manifest digest",
+        )
+    if mode == LEGACY_WORKSPACE_MANIFEST_BINDING_MODE and has_cached_index_binding:
+        raise LandingEffectGrantError(
+            "landing_effect_grant_content_invalid",
+            "authenticated legacy commit grants cannot carry a cached-index binding",
+        )
+    return mode
 
 
 def _workspace_manifest_digest(raw: bytes) -> str:
@@ -869,6 +903,9 @@ def admit_landing_effect_grant(
         workspace_manifest, actual_workspace_manifest_digest = _validate_workspace_manifest(
             observed_workspace_manifest_raw
         )
+        workspace_manifest_binding_mode = _validate_workspace_manifest_binding_mode(
+            commit_content, workspace_manifest
+        )
         if actual_workspace_manifest_digest != observed_workspace_manifest_digest:
             raise LandingEffectGrantError(
                 "landing_effect_grant_content_drift",
@@ -920,6 +957,9 @@ def admit_landing_effect_grant(
     if "commit" in granted_effects:
         result["admission"]["workspace_manifest_digest"] = (
             actual_workspace_manifest_digest
+        )
+        result["admission"]["workspace_manifest_binding_mode"] = (
+            workspace_manifest_binding_mode
         )
     return result
 

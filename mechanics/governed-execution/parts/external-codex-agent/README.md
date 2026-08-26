@@ -176,7 +176,10 @@ and replay only through their matching legacy wake reservation. A retry after a 
   reviewed return posture. Branch targets may bind only commit and push;
   pull-request and merge effects require exact pull-request coordinates and
   the immutable reviewed head revision; repository coordinates reject
-  traversal components. The owner must also supply the exact artifact-byte digest independently of the
+  traversal components. Standalone commit grants also bind an explicit
+  workspace-manifest mode: newly issued grants require the cached-index digest,
+  while only an owner-authenticated legacy mode permits the historical v1
+  omission. The owner must also supply the exact artifact-byte digest independently of the
   grant's semantic self-digest. Missing, stale, wider, contradictory,
   duplicate-member, invalid-ref, oversized, or artifact-drifted grants fail
   closed. This is an owner-qualified admission seam only: current profiles

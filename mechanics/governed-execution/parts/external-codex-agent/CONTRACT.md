@@ -741,12 +741,15 @@ revision.
 - a standalone `commit` effect additionally binds `commit_content.kind` to
   `workspace_manifest` and carries a non-zero
   `commit_content.workspace_manifest_digest` for the exact bytes a future
-  executor may commit; admission receives those bounded manifest bytes,
-  validates the workspace-manifest schema, enforces exact non-zero
-file/symlink digests and modes plus directory/missing zero-size/null-digest
-invariants, binds and recomputes the cached staged-diff digest when the
-upgraded field is present; pre-upgrade v1 manifests without the cached-index
-or shallow-boundary fields retain their legacy compatibility semantics;
+  executor may commit, together with an exact
+  `commit_content.workspace_manifest_binding_mode`; newly issued grants use
+  `cached_index_v1` and require the cached staged-diff digest, while only an
+  owner-authenticated `authenticated_legacy_v1` grant may bind a historical
+  v1 manifest without the cached-index field; admission receives those
+  bounded manifest bytes, validates the workspace-manifest schema, enforces
+  exact non-zero file/symlink digests and modes plus directory/missing
+  zero-size/null-digest invariants, and recomputes the cached staged-diff
+  digest when present;
 - either one exact branch target (which may bind only `commit` and `push`) or
   one exact pull-request target (which may bind `push`, `pull_request`, and
   `merge`, or a standalone `commit`), including the immutable reviewed head
@@ -783,9 +786,10 @@ repository revision, that repository revision must equal the branch
 must be canonical and unique within its array. An upgraded manifest also
 carries a strict non-zero digest of `git diff --cached --binary --full-index
 HEAD`, so a partially staged index cannot change the future commit while
-preserving the ordinary worktree diff; a legacy v1 manifest without that field
-retains its pre-upgrade binding semantics. Schema validation stops after the
-first error. A
+preserving the ordinary worktree diff. A historical v1 manifest without that
+field is admitted only when the exact owner grant carries the
+`authenticated_legacy_v1` binding mode; a newly issued grant cannot select
+that omission implicitly. Schema validation stops after the first error. A
 pull-request target's reviewed head revision is therefore
 immutable at admission and a commit cannot use post-review workspace bytes;
 there is no wildcard or subset match. `landing_effect_grant_allows` is only a
