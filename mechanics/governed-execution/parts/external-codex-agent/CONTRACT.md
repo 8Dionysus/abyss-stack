@@ -731,7 +731,9 @@ these exact relations in one document:
   `workspace_manifest` and carries a non-zero
   `commit_content.workspace_manifest_digest` for the exact bytes a future
   executor may commit; admission receives those bounded manifest bytes,
-  validates the workspace-manifest schema, and recomputes their digest;
+  validates the workspace-manifest schema, enforces file/symlink digest and
+  directory/missing zero-size/null-digest invariants, and recomputes their
+  digest;
 - either one exact branch target (which may bind only `commit` and `push`) or
   one exact pull-request target (which may bind `push`, `pull_request`, and
   `merge`, or a standalone `commit`), including the immutable reviewed head
@@ -763,10 +765,11 @@ commit request must also repeat the exact `commit_content`
 binding, and the effect executor must supply the exact bounded
 workspace-manifest bytes plus an independently observed digest that admission
 recomputes and matches. The manifest `git_head` must equal the exact authorized
-repository revision, and every status/content path must be canonical and
-unique within its array; schema validation stops after the first error. A
-pull-request target's reviewed head revision is therefore immutable at
-admission and a commit cannot use post-review workspace bytes;
+repository revision, that repository revision must equal the branch
+`base_revision` or pull-request `head_revision`, and every status/content path
+must be canonical and unique within its array; schema validation stops after
+the first error. A pull-request target's reviewed head revision is therefore
+immutable at admission and a commit cannot use post-review workspace bytes;
 there is no wildcard or subset match. `landing_effect_grant_allows` is only a
 boolean read of that admission result.
 

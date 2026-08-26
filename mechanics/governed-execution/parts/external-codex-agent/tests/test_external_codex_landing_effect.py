@@ -473,6 +473,157 @@ def test_commit_admission_binds_workspace_manifest_to_repository_revision() -> N
 
 
 @pytest.mark.parametrize(
+    ("target_kind", "target_revision_field"),
+    (("branch", "base_revision"), ("pull_request", "head_revision")),
+)
+def test_commit_admission_binds_repository_revision_to_target_revision(
+    target_kind: str, target_revision_field: str
+) -> None:
+    grant = _grant(target_kind=target_kind, effects=["commit"])
+    grant["target"][target_revision_field] = "a" * 40
+    _refresh_semantic_digest(grant)
+    raw = _raw(grant)
+
+    with pytest.raises(LandingEffectGrantError) as exc:
+        admit_landing_effect_grant(
+            grant,
+            _request(grant),
+            grant_raw=raw,
+            expected_artifact_digest=_raw_digest(raw),
+            at=AT,
+        )
+    assert exc.value.code == "landing_effect_grant_target_mismatch"
+
+
+@pytest.mark.parametrize(
+    "entry",
+    (
+        {
+            "path": "file",
+            "kind": "file",
+            "size_bytes": 0,
+            "sha256": None,
+            "index_flags": [],
+        },
+        {
+            "path": "link",
+            "kind": "symlink",
+            "size_bytes": 0,
+            "sha256": None,
+            "index_flags": [],
+        },
+        {
+            "path": "directory",
+            "kind": "directory",
+            "size_bytes": 1,
+            "sha256": None,
+            "index_flags": [],
+        },
+        {
+            "path": "missing",
+            "kind": "missing",
+            "size_bytes": 0,
+            "sha256": REF_DIGEST,
+            "index_flags": [],
+        },
+    ),
+)
+def test_commit_admission_rejects_invalid_manifest_content_entry_invariants(
+    entry: dict[str, Any],
+) -> None:
+    grant = _grant(target_kind="branch", effects=["commit"])
+    raw_manifest_value = json.loads(WORKSPACE_MANIFEST_RAW)
+    raw_manifest_value["content_entries"] = [entry]
+    raw_manifest = _workspace_manifest_raw(raw_manifest_value)
+
+    with pytest.raises(LandingEffectGrantError) as exc:
+        admit_landing_effect_grant(
+            grant,
+            _request(grant),
+            grant_raw=_raw(grant),
+            expected_artifact_digest=_raw_digest(_raw(grant)),
+            observed_workspace_manifest_digest=_raw_digest(raw_manifest),
+            observed_workspace_manifest_raw=raw_manifest,
+            at=AT,
+        )
+    assert exc.value.code == "landing_effect_grant_content_invalid"
+
+
+def test_commit_admission_accepts_kind_bound_manifest_content_entries() -> None:
+    grant = _grant(target_kind="branch", effects=["commit"])
+    raw_manifest_value = json.loads(WORKSPACE_MANIFEST_RAW)
+    raw_manifest_value["content_entries"] = [
+        {
+            "path": "file",
+            "kind": "file",
+            "size_bytes": 0,
+            "sha256": REF_DIGEST,
+            "index_flags": [],
+        },
+        {
+            "path": "link",
+            "kind": "symlink",
+            "size_bytes": 0,
+            "sha256": REF_DIGEST,
+            "index_flags": [],
+        },
+        {
+            "path": "directory",
+            "kind": "directory",
+            "size_bytes": 0,
+            "sha256": None,
+            "index_flags": [],
+        },
+        {
+            "path": "missing",
+            "kind": "missing",
+            "size_bytes": 0,
+            "sha256": None,
+            "index_flags": [],
+        },
+    ]
+    raw_manifest = _workspace_manifest_raw(raw_manifest_value)
+    grant["commit_content"]["workspace_manifest_digest"] = _raw_digest(raw_manifest)
+    _refresh_semantic_digest(grant)
+    raw = _raw(grant)
+
+    admitted = admit_landing_effect_grant(
+        grant,
+        _request(grant),
+        grant_raw=raw,
+        expected_artifact_digest=_raw_digest(raw),
+        observed_workspace_manifest_digest=_raw_digest(raw_manifest),
+        observed_workspace_manifest_raw=raw_manifest,
+        at=AT,
+    )
+    assert admitted["admission"]["status"] == "admitted"
+
+
+def test_workspace_manifest_accepts_bare_sha256_git_head() -> None:
+    revision = "a" * 64
+    grant = _grant(target_kind="branch", effects=["commit"])
+    grant["repository"]["revision"] = revision
+    grant["target"]["base_revision"] = revision
+    raw_manifest_value = json.loads(WORKSPACE_MANIFEST_RAW)
+    raw_manifest_value["git_head"] = revision
+    raw_manifest = _workspace_manifest_raw(raw_manifest_value)
+    grant["commit_content"]["workspace_manifest_digest"] = _raw_digest(raw_manifest)
+    _refresh_semantic_digest(grant)
+    raw = _raw(grant)
+
+    admitted = admit_landing_effect_grant(
+        grant,
+        _request(grant),
+        grant_raw=raw,
+        expected_artifact_digest=_raw_digest(raw),
+        observed_workspace_manifest_digest=_raw_digest(raw_manifest),
+        observed_workspace_manifest_raw=raw_manifest,
+        at=AT,
+    )
+    assert admitted["repository"]["revision"] == revision
+
+
+@pytest.mark.parametrize(
     ("field", "entries"),
     (
         (

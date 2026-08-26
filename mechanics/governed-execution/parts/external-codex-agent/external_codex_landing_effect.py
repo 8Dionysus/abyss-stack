@@ -208,6 +208,20 @@ def _validate_workspace_manifest(raw: bytes) -> tuple[Mapping[str, Any], str]:
         entries = parsed[field]
         seen_paths: set[str] = set()
         for entry in entries:
+            kind = entry["kind"] if field == "content_entries" else None
+            if field == "content_entries":
+                if kind in {"file", "symlink"} and entry["sha256"] is None:
+                    raise LandingEffectGrantError(
+                        "landing_effect_grant_content_invalid",
+                        "workspace manifest files and symlinks require a digest",
+                    )
+                if kind in {"directory", "missing"} and (
+                    entry["size_bytes"] != 0 or entry["sha256"] is not None
+                ):
+                    raise LandingEffectGrantError(
+                        "landing_effect_grant_content_invalid",
+                        "workspace manifest directories and missing entries require zero size and no digest",
+                    )
             path = entry["path"]
             if (
                 path in seen_paths
@@ -708,6 +722,18 @@ def admit_landing_effect_grant(
         raise LandingEffectGrantError(
             code, "grant allowed_effects is not the exact requested effect set"
         )
+    if "commit" in granted_effects:
+        target = admitted["target"]
+        target_revision = (
+            target["base_revision"]
+            if target["kind"] == "branch"
+            else target["head_revision"]
+        )
+        if target_revision != admitted["repository"]["revision"]:
+            raise LandingEffectGrantError(
+                "landing_effect_grant_target_mismatch",
+                "commit repository revision differs from the immutable target revision",
+            )
     if "commit" in granted_effects:
         commit_content = admitted.get("commit_content")
         requested_commit_content = request.get("commit_content")

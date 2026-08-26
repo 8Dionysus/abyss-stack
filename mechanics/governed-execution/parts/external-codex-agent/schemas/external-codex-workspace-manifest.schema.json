@@ -28,7 +28,10 @@
         "ancestors": {"type": "array", "items": {"$ref": "#/$defs/identity"}}
       }
     },
-    "git_head": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "git_head": {
+      "type": "string",
+      "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$(?![\\s\\S])"
+    },
     "git_status_porcelain_sha256": {"$ref": "#/$defs/digest"},
     "git_diff_binary_sha256": {"$ref": "#/$defs/digest"},
     "status_entries": {
@@ -45,30 +48,7 @@
     },
     "content_entries": {
       "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["path", "kind", "size_bytes", "sha256", "index_flags"],
-        "properties": {
-          "path": {"$ref": "#/$defs/relativePath"},
-          "kind": {"enum": ["file", "symlink", "directory", "missing"]},
-          "size_bytes": {"type": "integer", "minimum": 0},
-          "sha256": {
-            "oneOf": [
-              {"$ref": "#/$defs/digest"},
-              {"type": "null"}
-            ]
-          },
-          "mode": {"type": ["integer", "null"], "minimum": 0},
-          "index_flags": {
-            "type": "array",
-            "uniqueItems": true,
-            "items": {
-              "enum": ["assume_unchanged", "skip_worktree"]
-            }
-          }
-        }
-      }
+      "items": {"$ref": "#/$defs/contentEntry"}
     }
   },
   "$defs": {
@@ -88,6 +68,48 @@
         "st_ino": {"type": "integer", "minimum": 0},
         "mode": {"type": "integer", "minimum": 0}
       }
+    },
+    "contentEntry": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "kind", "size_bytes", "sha256", "index_flags"],
+          "properties": {
+            "path": {"$ref": "#/$defs/relativePath"},
+            "kind": {"enum": ["file", "symlink"]},
+            "size_bytes": {"type": "integer", "minimum": 0},
+            "sha256": {"$ref": "#/$defs/digest"},
+            "mode": {"type": ["integer", "null"], "minimum": 0},
+            "index_flags": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "enum": ["assume_unchanged", "skip_worktree"]
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "kind", "size_bytes", "sha256", "index_flags"],
+          "properties": {
+            "path": {"$ref": "#/$defs/relativePath"},
+            "kind": {"enum": ["directory", "missing"]},
+            "size_bytes": {"const": 0},
+            "sha256": {"type": "null"},
+            "mode": {"type": ["integer", "null"], "minimum": 0},
+            "index_flags": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "enum": ["assume_unchanged", "skip_worktree"]
+              }
+            }
+          }
+        }
+      ]
     }
   }
 }
