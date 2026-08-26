@@ -276,3 +276,7 @@
 ## 2026-08-25
 
 - [ABYSS-STACK-D-0137 Canonical Codex 0.149.1 Runtime Subject Admission](../ABYSS-STACK-D-0137-canonical-codex-0-149-1-runtime-subject-admission.md) (`docs/decisions/ABYSS-STACK-D-0137-canonical-codex-0-149-1-runtime-subject-admission.md`)
+
+## 2026-08-26
+
+- [ABYSS-STACK-D-0138 Provider-Neutral Programmatic Execution Runtime](../ABYSS-STACK-D-0138-provider-neutral-programmatic-execution-runtime.md) (`docs/decisions/ABYSS-STACK-D-0138-provider-neutral-programmatic-execution-runtime.md`)

@@ -68,4 +68,6 @@ Current source surfaces stay in `mechanics/governed-execution/parts/governed-run
 `mechanics/governed-execution/parts/autonomy-status/aoa_status_autonomy.py`,
 `scripts/aoa-governed-run`, `scripts/aoa-status`, candidate export wrappers,
 config templates, and
-package-local parts under `mechanics/governed-execution/parts/`.
+package-local parts under `mechanics/governed-execution/parts/`. The
+`programmatic-tool-execution` part owns the provider-neutral runtime adapter
+seam and validated observation handoff.
