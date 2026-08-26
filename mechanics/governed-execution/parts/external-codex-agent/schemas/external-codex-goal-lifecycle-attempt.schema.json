@@ -63,6 +63,30 @@
     "transition_request": {"type": "object"},
     "transition_proof": {"type": "object"}
   },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "state": {"enum": ["dispatched", "proof_recorded"]}
+        }
+      },
+      "then": {"required": ["mutation_reserved", "mutation_dispatched"]}
+    },
+    {
+      "if": {
+        "properties": {"state": {"const": "proof_recorded"}}
+      },
+      "then": {
+        "required": ["goal_response", "transition_request", "transition_proof"]
+      }
+    },
+    {
+      "if": {
+        "properties": {"state": {"const": "reserved"}}
+      },
+      "then": {"not": {"required": ["mutation_dispatched"]}}
+    }
+  ],
   "$defs": {
     "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
     "contentRef": {
