@@ -347,7 +347,17 @@ def validate_landing_effect_grant(grant: Mapping[str, Any]) -> dict[str, Any]:
         raise LandingEffectGrantError(
             "landing_effect_grant_schema_invalid", "grant must be a JSON object"
         )
-    copied = _copy_json(grant)
+    bounded_raw = _bounded_canonical_bytes(grant, limit=MAX_GRANT_BYTES)
+    try:
+        copied = _parse_json_bytes(bounded_raw)
+    except (UnicodeDecodeError, json.JSONDecodeError, RecursionError) as exc:
+        raise LandingEffectGrantError(
+            "landing_effect_grant_not_json", "grant is not canonical JSON data"
+        ) from exc
+    if not isinstance(copied, dict):
+        raise LandingEffectGrantError(
+            "landing_effect_grant_not_json", "grant is not a JSON object"
+        )
     errors = _schema_errors(copied)
     if errors:
         raise LandingEffectGrantError(

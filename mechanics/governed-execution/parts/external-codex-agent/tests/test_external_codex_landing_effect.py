@@ -748,3 +748,9 @@ def test_schema_validation_rejects_non_landing_effects_and_unknown_fields() -> N
     with pytest.raises(LandingEffectGrantError) as field_exc:
         validate_landing_effect_grant(invalid)
     assert field_exc.value.code == "landing_effect_grant_schema_invalid"
+
+    oversized = deepcopy(grant)
+    oversized["return_posture"]["route"] = "x" * (MAX_GRANT_BYTES + 1)
+    with pytest.raises(LandingEffectGrantError) as size_exc:
+        validate_landing_effect_grant(oversized)
+    assert size_exc.value.code == "landing_effect_grant_too_large"
