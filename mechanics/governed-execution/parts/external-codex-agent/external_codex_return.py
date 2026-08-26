@@ -2946,6 +2946,10 @@ def _validate_pause_receipt(
                 "canonical Goal pause receipt post-read does not confirm a paused Goal"
             )
         post_read_response = lifecycle.get("post_read_response")
+        if post_read_summary != _safe_response_summary(post_read_response):
+            raise ExternalCodexReturnError(
+                "canonical Goal pause receipt post-read summary is not bound to its raw response"
+            )
         post_read_goal = _goal_object(post_read_response, "thread/goal/get")
         _validate_goal_binding(post_read_goal, owner)
         if _string_at(post_read_goal, ("status",)) != "paused":

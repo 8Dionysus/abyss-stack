@@ -688,6 +688,17 @@ def test_run_pause_reserves_and_replays_without_second_transport_mutation(
     ):
         MODULE.run_pause(args)
 
+    tampered_post_read_summary = json.loads(json.dumps(first))
+    tampered_post_read_summary["lifecycle"]["post_read"]["id"] = "different"
+    pause_path.write_bytes(
+        MODULE._canonical_bytes(tampered_post_read_summary) + b"\n"
+    )
+    with pytest.raises(
+        MODULE.ExternalCodexReturnError,
+        match="post-read summary",
+    ):
+        MODULE.run_pause(args)
+
     incomplete = json.loads(json.dumps(first))
     incomplete["lifecycle"]["response_available"] = False
     pause_path.write_bytes(MODULE._canonical_bytes(incomplete) + b"\n")
