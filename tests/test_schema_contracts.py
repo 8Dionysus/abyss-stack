@@ -90,6 +90,15 @@ EXPECTED_ACTIVE_SCHEMA_PATHS = {
         "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-pause-reservation.schema.json"
     ),
     Path(
+        "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-goal-lifecycle-attempt.schema.json"
+    ),
+    Path(
+        "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-goal-lifecycle-owner.schema.json"
+    ),
+    Path(
+        "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-goal-lifecycle-receipt.schema.json"
+    ),
+    Path(
         "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-pause-receipt.schema.json"
     ),
     Path(

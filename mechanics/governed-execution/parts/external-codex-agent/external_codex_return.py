@@ -41,6 +41,15 @@ PAUSE_RECEIPT_SCHEMA_VERSION = "abyss_stack_external_codex_pause_receipt_v1"
 PAUSE_TRANSITION_PROOF_SCHEMA_VERSION = (
     "abyss_stack_external_codex_atomic_goal_transition_v1"
 )
+GOAL_LIFECYCLE_OWNER_SCHEMA_VERSION = (
+    "abyss_stack_external_codex_goal_lifecycle_owner_v2"
+)
+GOAL_LIFECYCLE_RECEIPT_SCHEMA_VERSION = (
+    "abyss_stack_external_codex_goal_lifecycle_receipt_v2"
+)
+GOAL_LIFECYCLE_ATTEMPT_SCHEMA_VERSION = (
+    "abyss_stack_external_codex_goal_lifecycle_attempt_v1"
+)
 PAUSE_RECEIPT_SCHEMA_PATH = (
     Path(__file__).resolve().parent / "schemas" / "external-codex-pause-receipt.schema.json"
 )
@@ -257,6 +266,7 @@ def _validate_owner_binding(
     *,
     accepted_schema_versions: set[str],
     label: str,
+    extra_allowed_keys: set[str] | None = None,
 ) -> dict[str, Any]:
     """Validate one owner-selected Goal/thread transport binding."""
 
@@ -273,6 +283,8 @@ def _validate_owner_binding(
         "app_server_socket",
         "transport",
     }
+    if extra_allowed_keys:
+        allowed_keys.update(extra_allowed_keys)
     unknown_keys = set(owner) - allowed_keys
     if unknown_keys:
         raise ExternalCodexReturnError(
@@ -329,6 +341,31 @@ def validate_pause_owner(owner: dict[str, Any]) -> dict[str, Any]:
         accepted_schema_versions={PAUSE_OWNER_SCHEMA_VERSION},
         label="pause owner",
     )
+
+
+def validate_goal_lifecycle_owner(owner: dict[str, Any]) -> dict[str, Any]:
+    """Validate the transport binding for the generic Goal lifecycle leaf."""
+
+    validated = _validate_owner_binding(
+        owner,
+        accepted_schema_versions={GOAL_LIFECYCLE_OWNER_SCHEMA_VERSION},
+        label="Goal lifecycle owner",
+        extra_allowed_keys={"goal_ref", "return_owner_ref"},
+    )
+    for ref_key, id_key, label in (
+        ("goal_ref", "goal_id", "Goal"),
+        ("return_owner_ref", "owner_id", "return-owner"),
+    ):
+        reference = validated.get(ref_key)
+        if not isinstance(reference, dict) or reference.get("object_id") != validated[id_key]:
+            raise ExternalCodexReturnError(
+                f"Goal lifecycle owner {label} reference object_id must match {id_key}"
+            )
+        if reference.get("owner_repo") != validated["owner_repo"]:
+            raise ExternalCodexReturnError(
+                f"Goal lifecycle owner {label} reference owner_repo must match owner_repo"
+            )
+    return validated
 
 
 def _endpoint_from_owner(owner: dict[str, Any]) -> str | None:
@@ -3174,6 +3211,34 @@ def command_pause(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_goal_transition(args: argparse.Namespace) -> int:
+    """Project one typed owner decision onto the current runtime adapter."""
+
+    module_name = "goal_lifecycle_adapter"
+    module = sys.modules.get(module_name)
+    if module is None:
+        path = Path(__file__).with_name("goal_lifecycle_adapter.py")
+        spec = importlib.util.spec_from_file_location(module_name, path)
+        if spec is None or spec.loader is None:
+            raise ExternalCodexReturnError(
+                "cannot load the Goal lifecycle runtime adapter"
+            )
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[module_name] = module
+        spec.loader.exec_module(module)
+
+    bind_runtime = getattr(module, "bind_runtime_namespace", None)
+    if callable(bind_runtime):
+        # The installed return entrypoint uses runpy, so the executing
+        # runtime is a namespace rather than a sys.modules module.  Pass that
+        # live namespace to the adapter and preserve one exception identity.
+        bind_runtime(globals())
+
+    response = module.run_goal_transition(args)
+    print(json.dumps(response, ensure_ascii=False, sort_keys=True))
+    return 0
+
+
 def _command_return_detached(
     args: argparse.Namespace, lock: _ReturnAttemptLock
 ) -> int:
@@ -3400,6 +3465,19 @@ def parser() -> argparse.ArgumentParser:
     pause_parser.add_argument("--pause-owner", required=True)
     pause_parser.add_argument("--pause-receipt", required=True)
     pause_parser.set_defaults(handler=command_pause)
+    transition_parser = subcommands.add_parser(
+        "goal-transition",
+        aliases=["transition"],
+        help=(
+            "execute one accepted typed Goal lifecycle request through the "
+            "current runtime adapter"
+        ),
+    )
+    transition_parser.add_argument("--request", required=True)
+    transition_parser.add_argument("--decision", required=True)
+    transition_parser.add_argument("--owner", required=True)
+    transition_parser.add_argument("--receipt", required=True)
+    transition_parser.set_defaults(handler=command_goal_transition)
     route_parser = subcommands.add_parser(
         "return-route",
         help="deliver and close from one exact digest-bound return route",

@@ -23,6 +23,7 @@ python -m py_compile \
   mechanics/governed-execution/parts/external-codex-agent/external_codex_supervisor.py \
   mechanics/governed-execution/parts/external-codex-agent/install_external_codex_runtime.py \
   mechanics/governed-execution/parts/external-codex-agent/external_codex_return.py \
+  mechanics/governed-execution/parts/external-codex-agent/goal_lifecycle_adapter.py \
   mechanics/governed-execution/parts/external-codex-agent/external_codex_responsibility_movement.py \
   mechanics/governed-execution/parts/external-codex-agent/prepare_landing_study.py \
   mechanics/governed-execution/parts/external-codex-agent/visible_incarnation_home.py
@@ -77,7 +78,24 @@ its replacement provenance is missing. These checks still do not claim a live
 app-server delivery, holder closure, semantic acceptance, or installed-release
 parity.
 
-The focused external-return tests also cover the separate Goal pause contour:
+The focused external-return tests cover the generic Goal lifecycle contour:
+owner-resolved typed requests and decisions reject stale Goal/DAG/ownership
+state before transport, and the same adapter executes both delegation pause
+and accepted-return activation through `thread/goal/get`, one atomic
+`thread/goal/set`, and an authoritative read. The fixture receipt keeps
+requested, accepted, executed, delivered, semantically accepted, and closed
+claims separate and asserts that no turn or terminal transport is used. The
+adapter also rejects mismatched decisions and replays an already desired
+state through a read-only path. A mutating attempt persists its exact Goal
+precondition and dispatch marker before transport, records the server proof
+before receipt publication, and reconciles a proof-recorded ambiguous retry
+through `thread/goal/get` without a second `thread/goal/set`. Receipt replay
+revalidates the exact decision reference, transition frame, proof, and
+response digests; executed receipt replay also requires the mutation attempt
+sidecar, binds the authoritative result response to its digest and safe
+summary, and rejects a receipt whose path identity is missing or changed.
+
+The legacy external-return tests also cover the separate Goal pause contour:
 an exact active owner-bound Goal is refused before `thread/goal/set` when the
 app-server adapter lacks an `atomic_goal_transition` method with a
 server-supported compare-and-set/version proof; the fixture adapter supplies
