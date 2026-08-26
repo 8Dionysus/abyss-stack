@@ -1199,6 +1199,12 @@ def run_goal_transition(args: Any) -> dict[str, Any]:
             "ref": str(decision_path.resolve()),
             "sha256": runtime._sha256_bytes(decision_bytes),
         }
+        for path, expected, label in (
+            (request_path, request_bytes, "Goal lifecycle request"),
+            (decision_path, decision_bytes, "Goal lifecycle decision"),
+            (owner_path, owner_bytes, "Goal lifecycle owner"),
+        ):
+            runtime.VISIBLE._assert_file_snapshot(path, expected, label)
         runtime._replace_json(receipt_path, receipt, "Goal lifecycle receipt")
         runtime.VISIBLE._assert_file_snapshot(owner_path, owner_bytes, "Goal lifecycle owner")
         return _validate_existing_receipt(

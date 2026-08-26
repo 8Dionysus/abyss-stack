@@ -346,12 +346,22 @@ def validate_pause_owner(owner: dict[str, Any]) -> dict[str, Any]:
 def validate_goal_lifecycle_owner(owner: dict[str, Any]) -> dict[str, Any]:
     """Validate the transport binding for the generic Goal lifecycle leaf."""
 
-    return _validate_owner_binding(
+    validated = _validate_owner_binding(
         owner,
         accepted_schema_versions={GOAL_LIFECYCLE_OWNER_SCHEMA_VERSION},
         label="Goal lifecycle owner",
         extra_allowed_keys={"goal_ref", "return_owner_ref"},
     )
+    for ref_key, id_key, label in (
+        ("goal_ref", "goal_id", "Goal"),
+        ("return_owner_ref", "owner_id", "return-owner"),
+    ):
+        reference = validated.get(ref_key)
+        if not isinstance(reference, dict) or reference.get("object_id") != validated[id_key]:
+            raise ExternalCodexReturnError(
+                f"Goal lifecycle owner {label} reference object_id must match {id_key}"
+            )
+    return validated
 
 
 def _endpoint_from_owner(owner: dict[str, Any]) -> str | None:

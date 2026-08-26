@@ -398,6 +398,26 @@ def test_generic_adapter_binds_complete_owner_qualified_references(
     assert rpc.calls == []
 
 
+@pytest.mark.parametrize(
+    ("reference_key", "reference_id", "owner_key"),
+    (
+        ("goal_ref", "goal:other", "goal_id"),
+        ("return_owner_ref", "holder:other", "owner_id"),
+    ),
+)
+def test_generic_owner_binds_reference_object_ids_to_owner_ids(
+    reference_key: str, reference_id: str, owner_key: str
+) -> None:
+    owner = _owner()
+    owner[reference_key] = _ref(reference_id).model_dump(mode="json")
+
+    with pytest.raises(
+        RUNTIME.ExternalCodexReturnError,
+        match=rf"reference object_id must match {owner_key}",
+    ):
+        RUNTIME.validate_goal_lifecycle_owner(owner)
+
+
 def test_generic_adapter_rejects_recovery_under_a_different_decision(
     tmp_path: Path,
 ) -> None:
@@ -441,6 +461,53 @@ def test_generic_adapter_rejects_recovery_under_a_different_decision(
             attempt=attempt,
         )
     assert [method for method, _params in rpc.calls].count("thread/goal/set") == 1
+
+
+def test_generic_adapter_rechecks_all_inputs_before_publishing_receipt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    owner = _owner()
+    owner_path = tmp_path / "owner.json"
+    request_path = tmp_path / "request.json"
+    decision_path = tmp_path / "decision.json"
+    receipt_path = tmp_path / "receipt.json"
+    owner_path.write_bytes(RUNTIME._canonical_bytes(owner) + b"\n")
+    request = _request(
+        observed="active",
+        desired="paused",
+        kind="delegation_yield",
+        request_id="request:publication-snapshot",
+    )
+    decision = _decision(request)
+    request_bytes = RUNTIME._canonical_bytes(request.model_dump(mode="json")) + b"\n"
+    decision_bytes = RUNTIME._canonical_bytes(decision.model_dump(mode="json")) + b"\n"
+    request_path.write_bytes(request_bytes)
+    decision_path.write_bytes(decision_bytes)
+    rpc = FakeGoalRpc(tmp_path / "publication-snapshot.sock", status="active")
+    original_transition = rpc.atomic_goal_transition
+
+    def mutate_request_after_mutation(**kwargs: object) -> dict[str, object]:
+        result = original_transition(**kwargs)
+        request_path.write_bytes(b"{}\n")
+        return result
+
+    rpc.atomic_goal_transition = mutate_request_after_mutation  # type: ignore[method-assign]
+    monkeypatch.setattr(
+        RUNTIME,
+        "discover_app_server_socket",
+        lambda _owner: (rpc.endpoint, "test-fixture"),
+    )
+    monkeypatch.setattr(RUNTIME, "UnixWebSocketRpc", lambda _endpoint: rpc)
+    args = SimpleNamespace(
+        request=str(request_path),
+        decision=str(decision_path),
+        owner=str(owner_path),
+        receipt=str(receipt_path),
+    )
+
+    with pytest.raises(RUNTIME.VISIBLE.IncarnationHomeError, match="changed during validation"):
+        ADAPTER.run_goal_transition(args)
+    assert not receipt_path.exists()
 
 
 def test_generic_adapter_refuses_the_current_public_non_atomic_surface(tmp_path: Path) -> None:
