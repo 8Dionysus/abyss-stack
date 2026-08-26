@@ -136,6 +136,7 @@
         "mechanics/governed-execution/parts/governed-runner/tests/test_governed_runner_paths.py",
         "mechanics/governed-execution/parts/governed-runner/tests/test_governed_runner_policy_scope.py",
         "mechanics/governed-execution/parts/governed-runner/tests/test_governed_runner_review_packets.py",
+        "mechanics/governed-execution/parts/programmatic-tool-execution/tests/test_programmatic_tool_execution.py",
         "mechanics/inference-pilots/parts/llamacpp-pilot/tests/test_aoa_llamacpp_pilot.py",
         "mechanics/inference-pilots/parts/local-trials/tests/test_aoa_local_ai_trials.py",
         "mechanics/inference-pilots/parts/tos-foundation-lab/tests/test_human_review_workbench.py",

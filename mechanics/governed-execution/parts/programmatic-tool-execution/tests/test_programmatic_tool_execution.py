@@ -14,6 +14,7 @@ from aoa_sdk.contracts.control_plane import (
     ProvenanceRef,
 )
 from aoa_sdk.contracts.programmatic_execution import (
+    PROGRAMMATIC_ADMISSION_SCHEMA_VERSION,
     ProgrammaticActivation,
     ProgrammaticActivationRequirements,
     ProgrammaticEconomyObservation,
@@ -99,12 +100,27 @@ def _request(adapter_id: str, *, admitted: bool = True) -> ProgrammaticExecution
             required_plan_ref=plan_ref,
             required_runtime_profile_ref=profile_ref,
         ),
-        activation=(
-            ProgrammaticActivation(
-                state="admitted",
-                admission_ref=_ref("admission"),
-                admitted_at=NOW,
-            )
+            activation=(
+                ProgrammaticActivation(
+                    state="admitted",
+                    admission_ref=ContentRef(
+                        object_id="admission",
+                        owner_repo="fixture-owner",
+                        schema_version=PROGRAMMATIC_ADMISSION_SCHEMA_VERSION,
+                        digest=_digest("admission"),
+                    ),
+                    admission_authority=ProvenanceRef(
+                        owner_repo="fixture-owner",
+                        artifact_ref="admission.json",
+                        source_ref="fixture-admission-source",
+                        artifact_digest=_digest("admission"),
+                        schema_ref="admission.schema.json",
+                        schema_version=PROGRAMMATIC_ADMISSION_SCHEMA_VERSION,
+                    ),
+                    plan_ref=plan_ref,
+                    runtime_profile_ref=profile_ref,
+                    admitted_at=NOW,
+                )
             if admitted
             else ProgrammaticActivation()
         ),
