@@ -790,10 +790,13 @@ def test_terminal_review_state_seal_survives_index_refresh_and_rejects_tamper(
     tmp_path: Path,
 ) -> None:
     source, _ = _source_repo(tmp_path)
+    metadata_named_files = ("review-state-seal.json", ".seal-in-progress.json")
+    for name in metadata_named_files:
+        (source / name).write_text(f"repository file: {name}\n", encoding="utf-8")
     locked = source / "sealed-locked"
     locked.mkdir()
     (locked / "nested.txt").write_text("nested\n", encoding="utf-8")
-    _git(source, "add", "sealed-locked/nested.txt")
+    _git(source, "add", *metadata_named_files, "sealed-locked/nested.txt")
     _git(source, "commit", "-qm", "sealed read-only directory")
     locked.chmod(0o555)
     try:
@@ -853,6 +856,10 @@ def test_terminal_review_state_seal_survives_index_refresh_and_rejects_tamper(
         assert reviewer_manifest["private_git_digest"] == baseline["private_git_digest"]
         assert (reviewer / "sealed-locked").stat().st_mode & 0o777 == 0o555
         assert (reviewer / "sealed-locked" / "nested.txt").read_text() == "nested\n"
+        for name in metadata_named_files:
+            assert (reviewer / name).read_text(encoding="utf-8") == (
+                f"repository file: {name}\n"
+            )
         object_path = next(
             (tmp_path / "writer" / "review-state-seal" / "objects").iterdir()
         )

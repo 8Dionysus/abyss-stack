@@ -1780,8 +1780,6 @@ def _seal_projection_entries(root: Path) -> list[dict[str, Any]]:
     entries: list[dict[str, Any]] = []
     for raw in _inventory(root, include_git=True):
         relative = str(raw["path"])
-        if relative == REVIEW_STATE_SEAL_MANIFEST or relative == REVIEW_STATE_SEAL_MARKER:
-            raise ProjectionError("actor projection contains a reserved seal name")
         if relative == ".git" or relative.startswith(".git/"):
             if raw.get("kind") == "symlink":
                 raise ProjectionError("private Git seal cannot contain symlinks")
