@@ -13,7 +13,6 @@
     "git_status_porcelain_sha256",
     "git_diff_binary_sha256",
     "git_diff_cached_binary_sha256",
-    "git_shallow",
     "status_entries",
     "content_entries"
   ],
