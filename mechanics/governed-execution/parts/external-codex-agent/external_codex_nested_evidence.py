@@ -15,6 +15,7 @@ import json
 import os
 import re
 import stat
+import sys
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -22,10 +23,16 @@ from typing import Any, Iterable, Mapping, Sequence
 
 from jsonschema import Draft202012Validator
 
-from external_codex_projection import ProjectionError, verify_review_state_seal
-
-
 PART_ROOT = Path(__file__).resolve().parent
+if str(PART_ROOT) not in sys.path:
+    sys.path.insert(0, str(PART_ROOT))
+
+from external_codex_projection import (  # noqa: E402
+    ProjectionError,
+    verify_review_state_seal,
+)
+
+
 SCHEMA_ROOT = PART_ROOT / "schemas"
 ACTOR_INPUT_SCHEMA = SCHEMA_ROOT / "external-codex-actor-input-envelope.schema.json"
 TASK_SCHEMA = SCHEMA_ROOT / "external-codex-task.schema.json"

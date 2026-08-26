@@ -789,64 +789,78 @@ def test_shallow_root_boundary_is_rejected_as_unnecessary(tmp_path: Path) -> Non
 def test_terminal_review_state_seal_survives_index_refresh_and_rejects_tamper(
     tmp_path: Path,
 ) -> None:
-    source, source_manifest = _source_repo(tmp_path)
-    projection, baseline = materialize_actor_projection(
-        source,
-        tmp_path / "writer" / "actor-workspace",
-        source_manifest=source_manifest,
-        source_manifest_digest="sha256:" + "d" * 64,
-    )
-    private_git = build_private_git_admission_manifest(
-        projection,
-        expected_source_git_head=str(baseline["source_git_head"]),
-        require_strict_fsck=True,
-    )
-    delta = build_actor_delta(
-        baseline,
-        baseline,
-        baseline_digest="sha256:" + "e" * 64,
-        current_digest=PROJECTION._canonical_digest(baseline),
-        private_git_baseline=private_git,
-    )
-    seal = create_review_state_seal(
-        projection,
-        tmp_path / "writer" / "review-state-seal",
-        session_id="session:writer",
-        incarnation_id="incarnation:writer",
-        writer_status="review_required",
-        final_manifest=baseline,
-        actor_delta=delta,
-    )
-    repeated = create_review_state_seal(
-        projection,
-        tmp_path / "writer" / "review-state-seal",
-        session_id="session:writer",
-        incarnation_id="incarnation:writer",
-        writer_status="review_required",
-        final_manifest=baseline,
-        actor_delta=delta,
-    )
-    assert repeated["manifest_digest"] == seal["manifest_digest"]
-    index = projection / ".git" / "index"
-    index.write_bytes(index.read_bytes() + b"benign post-closeout refresh\n")
-    verify_review_state_seal(
-        tmp_path / "writer" / "review-state-seal",
-        expected_manifest=baseline,
-        expected_delta=delta,
-        expected_session_id="session:writer",
-        expected_incarnation_id="incarnation:writer",
-        expected_status="review_required",
-    )
-    reviewer, reviewer_manifest = materialize_actor_projection_from_seed(
-        tmp_path / "writer" / "review-state-seal",
-        tmp_path / "reviewer" / "actor-workspace",
-        expected_manifest=baseline,
-    )
-    assert reviewer_manifest["private_git_digest"] == baseline["private_git_digest"]
-    object_path = next((tmp_path / "writer" / "review-state-seal" / "objects").iterdir())
-    object_path.chmod(0o600)
-    with pytest.raises(ProjectionError, match="seal"):
-        verify_review_state_seal(tmp_path / "writer" / "review-state-seal")
+    source, _ = _source_repo(tmp_path)
+    locked = source / "sealed-locked"
+    locked.mkdir()
+    (locked / "nested.txt").write_text("nested\n", encoding="utf-8")
+    _git(source, "add", "sealed-locked/nested.txt")
+    _git(source, "commit", "-qm", "sealed read-only directory")
+    locked.chmod(0o555)
+    try:
+        source_manifest = build_workspace_manifest(source)
+        projection, baseline = materialize_actor_projection(
+            source,
+            tmp_path / "writer" / "actor-workspace",
+            source_manifest=source_manifest,
+            source_manifest_digest="sha256:" + "d" * 64,
+        )
+        private_git = build_private_git_admission_manifest(
+            projection,
+            expected_source_git_head=str(baseline["source_git_head"]),
+            require_strict_fsck=True,
+        )
+        delta = build_actor_delta(
+            baseline,
+            baseline,
+            baseline_digest="sha256:" + "e" * 64,
+            current_digest=PROJECTION._canonical_digest(baseline),
+            private_git_baseline=private_git,
+        )
+        seal = create_review_state_seal(
+            projection,
+            tmp_path / "writer" / "review-state-seal",
+            session_id="session:writer",
+            incarnation_id="incarnation:writer",
+            writer_status="review_required",
+            final_manifest=baseline,
+            actor_delta=delta,
+        )
+        repeated = create_review_state_seal(
+            projection,
+            tmp_path / "writer" / "review-state-seal",
+            session_id="session:writer",
+            incarnation_id="incarnation:writer",
+            writer_status="review_required",
+            final_manifest=baseline,
+            actor_delta=delta,
+        )
+        assert repeated["manifest_digest"] == seal["manifest_digest"]
+        index = projection / ".git" / "index"
+        index.write_bytes(index.read_bytes() + b"benign post-closeout refresh\n")
+        verify_review_state_seal(
+            tmp_path / "writer" / "review-state-seal",
+            expected_manifest=baseline,
+            expected_delta=delta,
+            expected_session_id="session:writer",
+            expected_incarnation_id="incarnation:writer",
+            expected_status="review_required",
+        )
+        reviewer, reviewer_manifest = materialize_actor_projection_from_seed(
+            tmp_path / "writer" / "review-state-seal",
+            tmp_path / "reviewer" / "actor-workspace",
+            expected_manifest=baseline,
+        )
+        assert reviewer_manifest["private_git_digest"] == baseline["private_git_digest"]
+        assert (reviewer / "sealed-locked").stat().st_mode & 0o777 == 0o555
+        assert (reviewer / "sealed-locked" / "nested.txt").read_text() == "nested\n"
+        object_path = next(
+            (tmp_path / "writer" / "review-state-seal" / "objects").iterdir()
+        )
+        object_path.chmod(0o600)
+        with pytest.raises(ProjectionError, match="seal"):
+            verify_review_state_seal(tmp_path / "writer" / "review-state-seal")
+    finally:
+        locked.chmod(0o755)
 
 
 def test_review_state_seal_reopens_only_from_its_owned_crash_marker(

@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 28888491,
+  "allowed_tracked_bytes": 38398140,
+  "approved_by": "repository-owner",
+  "base_ref": "3b2bda61c1138da2af8f6c5d84bee9e4526e4f0f",
+  "changed_generated_bytes": 28888491,
+  "changed_generated_files": 293,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "5c47da9162c2a2ec7279aa8cd2927737ed88929ed9e3f0605e4698fc571b1eea",
+  "reason": "Owner-approved portable-family regeneration for PR #433 after repairing the isolated nested-evidence import and sealed-directory materialization; preserve the tracked family with a digest-bound receipt and require normal CI review.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 38398140,
+  "tracked_bytes_max": 24117248
+}

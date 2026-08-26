@@ -2249,7 +2249,8 @@ def _copy_sealed_tree(seal_root: Path, staging: Path, metadata: Mapping[str, Any
     directories = [item for item in entries if item["kind"] == "directory"]
     for item in sorted(directories, key=lambda value: str(value["path"])):
         target = staging.joinpath(*str(item["path"]).split("/"))
-        target.mkdir(mode=int(item["mode"]), parents=True, exist_ok=True)
+        target.mkdir(mode=0o700, parents=True, exist_ok=True)
+        os.chmod(target, 0o700, follow_symlinks=False)
     for item in entries:
         relative = str(item["path"])
         target = staging.joinpath(*relative.split("/"))
