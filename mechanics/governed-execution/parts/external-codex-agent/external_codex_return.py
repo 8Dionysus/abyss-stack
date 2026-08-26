@@ -47,6 +47,9 @@ GOAL_LIFECYCLE_OWNER_SCHEMA_VERSION = (
 GOAL_LIFECYCLE_RECEIPT_SCHEMA_VERSION = (
     "abyss_stack_external_codex_goal_lifecycle_receipt_v1"
 )
+GOAL_LIFECYCLE_ATTEMPT_SCHEMA_VERSION = (
+    "abyss_stack_external_codex_goal_lifecycle_attempt_v1"
+)
 PAUSE_RECEIPT_SCHEMA_PATH = (
     Path(__file__).resolve().parent / "schemas" / "external-codex-pause-receipt.schema.json"
 )
@@ -3205,6 +3208,13 @@ def command_goal_transition(args: argparse.Namespace) -> int:
         module = importlib.util.module_from_spec(spec)
         sys.modules[module_name] = module
         spec.loader.exec_module(module)
+
+    bind_runtime = getattr(module, "bind_runtime_namespace", None)
+    if callable(bind_runtime):
+        # The installed return entrypoint uses runpy, so the executing
+        # runtime is a namespace rather than a sys.modules module.  Pass that
+        # live namespace to the adapter and preserve one exception identity.
+        bind_runtime(globals())
 
     response = module.run_goal_transition(args)
     print(json.dumps(response, ensure_ascii=False, sort_keys=True))

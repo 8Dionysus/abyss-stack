@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://abyss.local/schemas/external-codex-goal-lifecycle-attempt.schema.json",
+  "title": "Abyss external Codex Goal lifecycle attempt reservation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "state", "attempt_id", "attempt_ref", "reserved_at",
+    "correlation_id", "idempotency_key", "goal_ref", "request_ref",
+    "decision_ref", "expected_state", "desired_state", "owner_ref",
+    "owner_sha256", "owner", "transport", "precondition"
+  ],
+  "properties": {
+    "schema_version": {"const": "abyss_stack_external_codex_goal_lifecycle_attempt_v1"},
+    "state": {"enum": ["reserved", "dispatched", "proof_recorded"]},
+    "attempt_id": {"type": "string", "minLength": 1},
+    "attempt_ref": {"type": "string", "minLength": 1},
+    "reserved_at": {"type": "string", "format": "date-time"},
+    "correlation_id": {"type": "string", "minLength": 1},
+    "idempotency_key": {"type": "string", "minLength": 1},
+    "goal_ref": {"$ref": "#/$defs/contentRef"},
+    "request_ref": {"$ref": "#/$defs/contentRef"},
+    "decision_ref": {"$ref": "#/$defs/contentRef"},
+    "expected_state": {"type": "string", "minLength": 1},
+    "desired_state": {"type": "string", "minLength": 1},
+    "owner_ref": {"type": "string", "minLength": 1},
+    "owner_sha256": {"$ref": "#/$defs/digest"},
+    "owner": {
+      "type": "object", "additionalProperties": false,
+      "required": ["owner_id", "owner_repo", "goal_id", "thread_id", "runtime", "transport_posture", "acceptance_posture"],
+      "properties": {
+        "owner_id": {"type": "string", "minLength": 1},
+        "owner_repo": {"type": "string", "minLength": 1},
+        "goal_id": {"type": "string", "minLength": 1},
+        "thread_id": {"type": "string", "minLength": 1},
+        "runtime": {"const": "codex"},
+        "transport_posture": {"type": "string", "minLength": 1},
+        "acceptance_posture": {"type": "string", "minLength": 1}
+      }
+    },
+    "transport": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "endpoint"],
+      "properties": {
+        "kind": {"const": "codex_app_server_websocket_unix"},
+        "endpoint": {"type": "string", "minLength": 1}
+      }
+    },
+    "precondition": {
+      "type": "object", "additionalProperties": false,
+      "required": ["observed_state", "goal_get", "goal_get_response", "goal_get_summary_sha256", "goal_response_sha256"],
+      "properties": {
+        "observed_state": {"type": "string", "minLength": 1},
+        "goal_get": {"type": "object"},
+        "goal_get_response": {"type": "object"},
+        "goal_get_summary_sha256": {"$ref": "#/$defs/digest"},
+        "goal_response_sha256": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "mutation_reserved": {"$ref": "#/$defs/mutation"},
+    "mutation_dispatched": {"$ref": "#/$defs/mutation"},
+    "goal_response": {"type": "object"},
+    "transition_request": {"type": "object"},
+    "transition_proof": {"type": "object"}
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "contentRef": {
+      "type": "object", "additionalProperties": false,
+      "required": ["object_id", "owner_repo", "schema_version", "digest"],
+      "properties": {
+        "object_id": {"type": "string", "minLength": 1},
+        "owner_repo": {"type": "string", "minLength": 1},
+        "schema_version": {"type": "string", "minLength": 1},
+        "digest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "mutation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["attempt_id", "method", "request_id", "params", "params_sha256", "request_sha256"],
+      "properties": {
+        "attempt_id": {"type": "string", "minLength": 1},
+        "method": {"const": "thread/goal/set"},
+        "request_id": {"type": "integer", "minimum": 1},
+        "params": {"type": "object"},
+        "params_sha256": {"$ref": "#/$defs/digest"},
+        "request_sha256": {"$ref": "#/$defs/digest"},
+        "reserved_at": {"type": "string", "format": "date-time"},
+        "issued_at": {"type": "string", "format": "date-time"}
+      }
+    }
+  }
+}
