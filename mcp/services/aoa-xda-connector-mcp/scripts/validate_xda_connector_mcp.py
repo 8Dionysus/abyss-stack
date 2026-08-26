@@ -54,7 +54,7 @@ def main() -> None:
         tools = asyncio.run(server.list_tools())
     if answer["status"] != "ok" or len(tools) != 4:
         raise SystemExit("XDA connector MCP validation failed")
-    if any(tool.annotations.readOnlyHint is not True for tool in tools):
+    if any(tool.annotations.read_only_hint is not True for tool in tools):
         raise SystemExit("XDA connector MCP annotations drifted")
     print(json.dumps({"ok": True, "tool_count": len(tools)}, indent=2))
 
