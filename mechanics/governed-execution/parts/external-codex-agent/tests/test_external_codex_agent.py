@@ -6469,6 +6469,27 @@ def test_sha256_workspace_head_is_accepted_by_runtime_and_binder(
     assert RUNTIME.build_workspace_manifest(workspace)["git_head"] == expected
 
 
+def test_workspace_manifest_rejects_in_progress_merge_parent(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "merge-workspace"
+    workspace.mkdir()
+    _git(workspace, "init", "-q")
+    _git(workspace, "config", "user.email", "fixture@example.invalid")
+    _git(workspace, "config", "user.name", "Fixture")
+    (workspace / "README.md").write_text("merge state\n", encoding="utf-8")
+    _git(workspace, "add", "README.md")
+    _git(workspace, "commit", "-m", "fixture")
+
+    merge_head = workspace / _git(workspace, "rev-parse", "--git-path", "MERGE_HEAD")
+    merge_head.write_text(_git(workspace, "rev-parse", "HEAD") + "\n", encoding="ascii")
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        RUNTIME.build_workspace_manifest(workspace)
+
+    assert exc_info.value.code == "workspace_merge_in_progress"
+
+
 @pytest.mark.skipif(
     not OWNER_EXECUTION_REQUEST_SCHEMA_PATH.is_file()
     or not TASK_LOCAL_DAG_SCHEMA_PATH.is_file(),

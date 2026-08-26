@@ -4913,6 +4913,21 @@ def _repository_config_value(
     return value.lower() if normalize_lower else value
 
 
+def _assert_no_in_progress_merge(workspace: Path) -> None:
+    """Require a non-merge Git state before binding a workspace manifest."""
+
+    merge_head = _physical_git_metadata_file(
+        _repository_git_path(workspace, "MERGE_HEAD"),
+        purpose="in-progress merge state",
+        required=False,
+    )
+    if merge_head is not None:
+        raise ExternalCodexRuntimeError(
+            "workspace_merge_in_progress",
+            "workspace manifest cannot bind an in-progress merge",
+        )
+
+
 def _git_config_quoted(value: str) -> str:
     return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
@@ -6193,6 +6208,7 @@ def build_workspace_manifest(workspace: str | Path) -> dict[str, Any]:
         raise ExternalCodexRuntimeError(
             "workspace_unavailable", "workspace manifest target is unavailable"
         )
+    _assert_no_in_progress_merge(location)
     git_env = _controller_git_environment(location)
     status_raw = _git_bytes(
         location,

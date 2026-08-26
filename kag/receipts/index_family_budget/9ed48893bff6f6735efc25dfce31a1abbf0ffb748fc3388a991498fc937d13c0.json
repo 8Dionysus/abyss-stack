@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 29695241,
+  "allowed_tracked_bytes": 38629636,
+  "approved_by": "repository-owner",
+  "base_ref": "23251264476333e54dbfe59c863871f58ba1608e",
+  "changed_generated_bytes": 29695241,
+  "changed_generated_files": 305,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "9ed48893bff6f6735efc25dfce31a1abbf0ffb748fc3388a991498fc937d13c0",
+  "reason": "Refresh the pinned portable owner family for PR #429 review repair source and test changes.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 38629636,
+  "tracked_bytes_max": 24117248
+}
