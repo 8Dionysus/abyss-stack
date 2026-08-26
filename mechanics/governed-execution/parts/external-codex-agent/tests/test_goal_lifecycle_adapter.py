@@ -466,6 +466,39 @@ def test_generic_adapter_binds_complete_owner_qualified_references(
     assert rpc.calls == []
 
 
+def test_generic_adapter_rejects_owner_path_projection_split(
+    tmp_path: Path,
+) -> None:
+    owner = _owner()
+    owner_path = tmp_path / "owner.json"
+    owner_path.write_bytes(RUNTIME._canonical_bytes(owner) + b"\n")
+    supplied_owner = owner.copy()
+    supplied_owner["acceptance_posture"] = "different-owner-projection"
+    endpoint = tmp_path / "owner-projection.sock"
+    request = _request(
+        observed="active",
+        desired="paused",
+        kind="delegation_yield",
+        request_id="request:owner-projection",
+    )
+    decision = _decision(request)
+    rpc = FakeGoalRpc(endpoint, status="active")
+
+    with pytest.raises(
+        RUNTIME.ExternalCodexReturnError,
+        match="owner artifact does not match the supplied owner",
+    ):
+        ADAPTER.execute_goal_transition(
+            request,
+            decision,
+            supplied_owner,
+            owner_path,
+            endpoint,
+            rpc_factory=lambda _endpoint: rpc,
+        )
+    assert rpc.calls == []
+
+
 @pytest.mark.parametrize(
     ("reference_key", "reference_id", "owner_key"),
     (
