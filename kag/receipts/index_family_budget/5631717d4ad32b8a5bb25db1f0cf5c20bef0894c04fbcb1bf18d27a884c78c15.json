@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 476802,
+  "allowed_tracked_bytes": 38752166,
+  "approved_by": "repository-owner",
+  "base_ref": "dccf03843c49e4634e9d6aab14275ecbacb3b16a",
+  "changed_generated_bytes": 476802,
+  "changed_generated_files": 9,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "5631717d4ad32b8a5bb25db1f0cf5c20bef0894c04fbcb1bf18d27a884c78c15",
+  "reason": "Rebase PR #437 reviewed MCP 2 validator fix onto current origin/main after base drift; regenerate the exact owner family for fresh review.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "tracked_size",
+  "tracked_bytes": 38752166,
+  "tracked_bytes_max": 24117248
+}
