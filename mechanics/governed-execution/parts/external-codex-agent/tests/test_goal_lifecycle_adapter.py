@@ -165,7 +165,13 @@ class FakeGoalRpc:
             "params": params,
         }
         response = {"goal": {"threadId": "thread:test", "status": status}}
+        prepare_callback = getattr(self, "request_prepare_callback", None)
+        if callable(prepare_callback):
+            prepare_callback("thread/goal/set", params, request_id, payload)
         self.calls.append(("thread/goal/set", params))
+        issued_callback = getattr(self, "request_issued_callback", None)
+        if callable(issued_callback):
+            issued_callback("thread/goal/set", params, request_id, payload)
         self.status = status
         return {
             "goal_response": response,
@@ -205,6 +211,7 @@ def _run_transition(tmp_path: Path, *, initial: str, desired: str, kind: str) ->
         owner_path,
         endpoint,
         rpc_factory=lambda _endpoint: rpc,
+        attempt_path=tmp_path / f"{kind}.attempt.json",
     )
     return receipt, rpc
 

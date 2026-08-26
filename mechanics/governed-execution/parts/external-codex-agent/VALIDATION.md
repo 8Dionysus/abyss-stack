@@ -103,7 +103,12 @@ and accepted-return activation through `thread/goal/get`, one atomic
 requested, accepted, executed, delivered, semantically accepted, and closed
 claims separate and asserts that no turn or terminal transport is used. The
 adapter also rejects mismatched decisions and replays an already desired
-state through a read-only path.
+state through a read-only path. A mutating attempt persists its exact Goal
+precondition and dispatch marker before transport, records the server proof
+before receipt publication, and reconciles a proof-recorded ambiguous retry
+through `thread/goal/get` without a second `thread/goal/set`. Receipt replay
+revalidates the exact decision reference, transition frame, proof, and
+response digests.
 
 The legacy external-return tests also cover the separate Goal pause contour:
 an exact active owner-bound Goal is refused before `thread/goal/set` when the

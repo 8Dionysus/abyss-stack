@@ -66,7 +66,18 @@
         "before_response_sha256": {"$ref": "#/$defs/digest"},
         "result_response_sha256": {"$ref": "#/$defs/digest"},
         "transition_request": {"type": ["object", "null"]},
-        "transition_proof": {"type": ["object", "null"]}
+        "transition_proof": {"type": ["object", "null"]},
+        "recovery": {
+          "type": "object", "additionalProperties": false,
+          "required": ["mode", "mutation_response_available", "reconciled_by", "authoritative", "authoritative_response_sha256"],
+          "properties": {
+            "mode": {"const": "ambiguous_post_mutation"},
+            "mutation_response_available": {"const": true},
+            "reconciled_by": {"const": "thread/goal/get"},
+            "authoritative": {"type": "object"},
+            "authoritative_response_sha256": {"$ref": "#/$defs/digest"}
+          }
+        }
       }
     },
     "boundaries": {
@@ -91,6 +102,11 @@
       "properties": {"ref": {"type": "string", "minLength": 1}, "sha256": {"$ref": "#/$defs/digest"}}
     },
     "decision_artifact": {
+      "type": "object", "additionalProperties": false,
+      "required": ["ref", "sha256"],
+      "properties": {"ref": {"type": "string", "minLength": 1}, "sha256": {"$ref": "#/$defs/digest"}}
+    },
+    "attempt_artifact": {
       "type": "object", "additionalProperties": false,
       "required": ["ref", "sha256"],
       "properties": {"ref": {"type": "string", "minLength": 1}, "sha256": {"$ref": "#/$defs/digest"}}
