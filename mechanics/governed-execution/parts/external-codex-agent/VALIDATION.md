@@ -11,9 +11,11 @@ contradictory target binding, exact Goal/holder/repository/target/review/return
 admission, and preservation of the complete ten-effect runtime-wide forbidden
 closure. Commit cases additionally prove that newly issued
 `cached_index_v1` grants require the cached staged-diff digest, while an
-explicit owner-authenticated `authenticated_legacy_v1` mode is required for a
-historical v1 manifest that omits it. The grant result is admission evidence
-only; current command classification and profiles remain external-effect-free.
+`authenticated_legacy_v1` grant additionally requires independently
+digest-verified migration evidence bound to the exact grant, repository, and
+manifest before a historical v1 manifest may omit it. The grant result is
+admission evidence only; current command classification and profiles remain
+external-effect-free.
 
 ```bash
 AOA_SDK_SOURCE_ROOT=/absolute/path/to/aoa-sdk \

@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/8Dionysus/abyss-stack/main/mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-workspace-manifest-legacy-evidence.schema.json",
+  "title": "Owner-authenticated evidence for a historical workspace manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schema_version",
+    "kind",
+    "evidence_id",
+    "grant_id",
+    "repository_id",
+    "repository_revision",
+    "workspace_manifest_schema_version",
+    "workspace_manifest_digest",
+    "owner_authentication_ref"
+  ],
+  "properties": {
+    "$schema": {"const": "schemas/external-codex-workspace-manifest-legacy-evidence.schema.json"},
+    "schema_version": {
+      "const": "abyss_stack_external_codex_workspace_manifest_legacy_evidence_v1"
+    },
+    "kind": {"const": "workspace_manifest_legacy_evidence"},
+    "evidence_id": {"type": "string", "pattern": "^[a-z][a-z0-9._:-]{2,127}$"},
+    "grant_id": {"type": "string", "pattern": "^[a-z][a-z0-9._:-]{2,127}$"},
+    "repository_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$(?![\\s\\S])",
+      "not": {"pattern": "^(?:\\.{1,2}/.*|[^/]+/\\.{1,2})$"}
+    },
+    "repository_revision": {
+      "type": "string",
+      "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$(?![\\s\\S])"
+    },
+    "workspace_manifest_schema_version": {
+      "const": "abyss_stack_external_codex_workspace_manifest_v1"
+    },
+    "workspace_manifest_digest": {"$ref": "#/$defs/digest"},
+    "owner_authentication_ref": {"$ref": "#/$defs/ownerRef"}
+  },
+  "$defs": {
+    "coordinate": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096,
+      "pattern": "^[^\\u0000-\\u0020\\u007f-\\u00a0\\u1680\\u2000-\\u200a\\u2028-\\u2029\\u202f\\u205f\\u3000]+$(?![\\s\\S])"
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$(?![\\s\\S])",
+      "not": {"const": "sha256:0000000000000000000000000000000000000000000000000000000000000000"}
+    },
+    "ownerRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "owner_repo",
+        "artifact_ref",
+        "source_ref",
+        "artifact_digest",
+        "schema_ref",
+        "schema_version"
+      ],
+      "properties": {
+        "owner_repo": {"$ref": "#/$defs/coordinate"},
+        "artifact_ref": {"$ref": "#/$defs/coordinate"},
+        "source_ref": {"$ref": "#/$defs/coordinate"},
+        "artifact_digest": {"$ref": "#/$defs/digest"},
+        "schema_ref": {"type": "string", "minLength": 1},
+        "schema_version": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}

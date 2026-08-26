@@ -28,8 +28,9 @@ the immutable reviewed head revision, plus an independently supplied digest of
 the exact artifact bytes. Repository coordinates reject traversal components.
 Standalone commit admission also binds an explicit workspace-manifest mode:
 new grants require `cached_index_v1` and its cached staged-diff digest; only an
-owner-authenticated `authenticated_legacy_v1` grant can use a historical v1
-manifest without that field. Admission also rejects absent, stale, wider,
+`authenticated_legacy_v1` grant accompanied by separately supplied,
+owner-authenticated migration evidence can use a historical v1 manifest
+without that field. Admission also rejects absent, stale, wider,
 contradictory, duplicate-member, invalid-ref, oversized, and drifted artifacts. It is intentionally
 declarative: the current runtime profile still has `external_effects=false`,
 and command classification still retains all ten forbidden effects, so this

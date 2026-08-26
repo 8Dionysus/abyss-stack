@@ -194,8 +194,23 @@
         "workspace_manifest_digest": {"$ref": "#/$defs/digest"},
         "workspace_manifest_binding_mode": {
           "enum": ["cached_index_v1", "authenticated_legacy_v1"]
+        },
+        "legacy_workspace_manifest_evidence_digest": {"$ref": "#/$defs/digest"}
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "workspace_manifest_binding_mode": {"const": "cached_index_v1"}
+          },
+          "not": {"required": ["legacy_workspace_manifest_evidence_digest"]}
+        },
+        {
+          "properties": {
+            "workspace_manifest_binding_mode": {"const": "authenticated_legacy_v1"}
+          },
+          "required": ["legacy_workspace_manifest_evidence_digest"]
         }
-      }
+      ]
     },
     "digest": {
       "type": "string",

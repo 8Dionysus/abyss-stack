@@ -7854,7 +7854,11 @@ def test_study_preparer_binds_actual_sdk_import_root(tmp_path: Path) -> None:
 
 
 def test_study_preparer_pins_landing_admission_schemas() -> None:
-    grant_ref, workspace_ref = PREPARER._landing_effect_schema_refs()
+    (
+        grant_ref,
+        workspace_ref,
+        legacy_evidence_ref,
+    ) = PREPARER._landing_effect_schema_refs()
     expected = (
         (
             grant_ref,
@@ -7867,6 +7871,12 @@ def test_study_preparer_pins_landing_admission_schemas() -> None:
             PREPARER.WORKSPACE_MANIFEST_SCHEMA_PATH,
             PREPARER.WORKSPACE_MANIFEST_SCHEMA_REF,
             PREPARER.WORKSPACE_MANIFEST_SCHEMA_VERSION,
+        ),
+        (
+            legacy_evidence_ref,
+            PREPARER.LEGACY_WORKSPACE_MANIFEST_EVIDENCE_SCHEMA_PATH,
+            PREPARER.LEGACY_WORKSPACE_MANIFEST_EVIDENCE_SCHEMA_REF,
+            PREPARER.LEGACY_WORKSPACE_MANIFEST_EVIDENCE_SCHEMA_VERSION,
         ),
     )
     for reference, path, artifact_ref, schema_version in expected:

@@ -122,9 +122,10 @@ admission compares every scope member structurally against an explicit
 request and requires an independently supplied digest of the exact artifact
 bytes. A commit grant also carries an exact workspace-manifest binding mode:
 new grants require the cached-index digest, and only an
-owner-authenticated `authenticated_legacy_v1` mode may bind a historical v1
-manifest without it. The reviewer identity must differ from the holder
-identity. Branch
+`authenticated_legacy_v1` mode with separately supplied, digest-verified
+owner migration evidence may bind a historical v1 manifest without it. The
+evidence is bound to the exact grant, repository revision, and manifest digest;
+the reviewer identity must differ from the holder identity. Branch
 targets are limited to commit and push; pull-request and merge
 effects require exact pull-request coordinates. Descriptor-bound bounded
 loading rejects path races, duplicate JSON members, invalid Git refs, and

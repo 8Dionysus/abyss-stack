@@ -729,8 +729,8 @@ small admission implementation in `external_codex_landing_effect.py`. A grant
 is a separate owner artifact, not a model or provider identity. It binds all of
 these exact relations in one document:
 
-The fixed-input study preparer content-addresses both the grant schema and the
-workspace-manifest schema beside the landing source. Each schema is repeated
+The fixed-input study preparer content-addresses the grant, workspace-manifest,
+and legacy-evidence schemas beside the landing source. Each schema is repeated
 in the writer's immutable inputs, runtime constraint refs, continuation inputs,
 and validation refs, so a prepared study cannot silently read a later schema
 revision.
@@ -744,12 +744,12 @@ revision.
   executor may commit, together with an exact
   `commit_content.workspace_manifest_binding_mode`; newly issued grants use
   `cached_index_v1` and require the cached staged-diff digest, while only an
-  owner-authenticated `authenticated_legacy_v1` grant may bind a historical
-  v1 manifest without the cached-index field; admission receives those
-  bounded manifest bytes, validates the workspace-manifest schema, enforces
-  exact non-zero file/symlink digests and modes plus directory/missing
-  zero-size/null-digest invariants, and recomputes the cached staged-diff
-  digest when present;
+  `authenticated_legacy_v1` grant with a separately supplied,
+  owner-authenticated legacy-evidence artifact may bind a historical v1
+  manifest without the cached-index field; admission receives those bounded
+  manifest and evidence bytes, validates both schemas, enforces exact non-zero
+  file/symlink digests and modes plus directory/missing zero-size/null-digest
+  invariants, and recomputes the cached staged-diff digest when present;
 - either one exact branch target (which may bind only `commit` and `push`) or
   one exact pull-request target (which may bind `push`, `pull_request`, and
   `merge`, or a standalone `commit`), including the immutable reviewed head
@@ -780,7 +780,10 @@ IDs, and every owner-reference digest is a true full-string coordinate. A
 commit request must also repeat the exact `commit_content`
 binding, and the effect executor must supply the exact bounded
 workspace-manifest bytes plus an independently observed digest that admission
-recomputes and matches. The manifest `git_head` must equal the exact authorized
+recomputes and matches. Legacy compatibility additionally requires an
+independently expected digest and exact bytes for a typed migration-evidence
+artifact, whose grant, repository, revision, and manifest bindings admission
+rechecks. The manifest `git_head` must equal the exact authorized
 repository revision, that repository revision must equal the branch
 `base_revision` or pull-request `head_revision`, and every status/content path
 must be canonical and unique within its array. An upgraded manifest also
@@ -788,8 +791,9 @@ carries a strict non-zero digest of `git diff --cached --binary --full-index
 HEAD`, so a partially staged index cannot change the future commit while
 preserving the ordinary worktree diff. A historical v1 manifest without that
 field is admitted only when the exact owner grant carries the
-`authenticated_legacy_v1` binding mode; a newly issued grant cannot select
-that omission implicitly. Schema validation stops after the first error. A
+`authenticated_legacy_v1` binding mode and the independent migration-evidence
+artifact is valid; a newly issued grant cannot select that omission implicitly.
+Schema validation stops after the first error. A
 pull-request target's reviewed head revision is therefore
 immutable at admission and a commit cannot use post-review workspace bytes;
 there is no wildcard or subset match. `landing_effect_grant_allows` is only a

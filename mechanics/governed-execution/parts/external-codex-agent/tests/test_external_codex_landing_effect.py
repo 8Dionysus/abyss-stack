@@ -181,6 +181,50 @@ def _workspace_manifest_raw(value: dict[str, Any]) -> bytes:
     ).encode("utf-8")
 
 
+def _legacy_workspace_manifest_evidence_raw(
+    grant: dict[str, Any], manifest_digest: str
+) -> bytes:
+    return (
+        json.dumps(
+            {
+                "$schema": (
+                    "schemas/external-codex-workspace-manifest-legacy-evidence.schema.json"
+                ),
+                "schema_version": (
+                    "abyss_stack_external_codex_workspace_manifest_legacy_evidence_v1"
+                ),
+                "kind": "workspace_manifest_legacy_evidence",
+                "evidence_id": "evidence:legacy-manifest-fixture",
+                "grant_id": grant["grant_id"],
+                "repository_id": grant["repository"]["repository_id"],
+                "repository_revision": grant["repository"]["revision"],
+                "workspace_manifest_schema_version": (
+                    "abyss_stack_external_codex_workspace_manifest_v1"
+                ),
+                "workspace_manifest_digest": manifest_digest,
+                "owner_authentication_ref": {
+                    "owner_repo": "abyss-stack",
+                    "artifact_ref": (
+                        "runtime/landing-grants/legacy-evidence/fixture.json"
+                    ),
+                    "source_ref": "source-ref:owner-migration",
+                    "artifact_digest": REF_DIGEST,
+                    "schema_ref": (
+                        "schemas/external-codex-workspace-manifest-legacy-evidence.schema.json"
+                    ),
+                    "schema_version": (
+                        "abyss_stack_external_codex_workspace_manifest_legacy_evidence_v1"
+                    ),
+                },
+            },
+            ensure_ascii=True,
+            sort_keys=True,
+            indent=2,
+        )
+        + "\n"
+    ).encode("utf-8")
+
+
 WORKSPACE_MANIFEST_DIGEST = _raw_digest(WORKSPACE_MANIFEST_RAW)
 
 
@@ -679,7 +723,7 @@ def test_workspace_manifest_accepts_bare_sha256_git_head() -> None:
     assert admitted["repository"]["revision"] == revision
 
 
-def test_workspace_manifest_accepts_legacy_v1_without_cached_index_binding() -> None:
+def test_workspace_manifest_accepts_legacy_v1_with_migration_evidence() -> None:
     grant = _grant(target_kind="branch", effects=["commit"])
     grant["commit_content"][
         "workspace_manifest_binding_mode"
@@ -689,6 +733,13 @@ def test_workspace_manifest_accepts_legacy_v1_without_cached_index_binding() -> 
     raw_manifest_value.pop("git_shallow")
     raw_manifest = _workspace_manifest_raw(raw_manifest_value)
     grant["commit_content"]["workspace_manifest_digest"] = _raw_digest(raw_manifest)
+    evidence_raw = _legacy_workspace_manifest_evidence_raw(
+        grant, _raw_digest(raw_manifest)
+    )
+    evidence_digest = _raw_digest(evidence_raw)
+    grant["commit_content"]["legacy_workspace_manifest_evidence_digest"] = (
+        evidence_digest
+    )
     _refresh_semantic_digest(grant)
     raw = _raw(grant)
 
@@ -699,6 +750,8 @@ def test_workspace_manifest_accepts_legacy_v1_without_cached_index_binding() -> 
         expected_artifact_digest=_raw_digest(raw),
         observed_workspace_manifest_digest=_raw_digest(raw_manifest),
         observed_workspace_manifest_raw=raw_manifest,
+        expected_legacy_workspace_manifest_evidence_digest=evidence_digest,
+        legacy_workspace_manifest_evidence_raw=evidence_raw,
         at=AT,
     )
     assert admitted["admission"]["status"] == "admitted"
@@ -706,6 +759,75 @@ def test_workspace_manifest_accepts_legacy_v1_without_cached_index_binding() -> 
         admitted["admission"]["workspace_manifest_binding_mode"]
         == "authenticated_legacy_v1"
     )
+    assert (
+        admitted["admission"]["legacy_workspace_manifest_evidence_digest"]
+        == evidence_digest
+    )
+
+
+def test_legacy_commit_grants_require_independent_migration_evidence() -> None:
+    grant = _grant(target_kind="branch", effects=["commit"])
+    grant["commit_content"][
+        "workspace_manifest_binding_mode"
+    ] = "authenticated_legacy_v1"
+    grant["commit_content"]["legacy_workspace_manifest_evidence_digest"] = REF_DIGEST
+    raw_manifest_value = json.loads(WORKSPACE_MANIFEST_RAW)
+    raw_manifest_value.pop("git_diff_cached_binary_sha256")
+    raw_manifest_value.pop("git_shallow")
+    raw_manifest = _workspace_manifest_raw(raw_manifest_value)
+    grant["commit_content"]["workspace_manifest_digest"] = _raw_digest(raw_manifest)
+    _refresh_semantic_digest(grant)
+    raw = _raw(grant)
+
+    with pytest.raises(LandingEffectGrantError) as exc:
+        admit_landing_effect_grant(
+            grant,
+            _request(grant),
+            grant_raw=raw,
+            expected_artifact_digest=_raw_digest(raw),
+            observed_workspace_manifest_digest=_raw_digest(raw_manifest),
+            observed_workspace_manifest_raw=raw_manifest,
+            at=AT,
+        )
+    assert exc.value.code == "landing_effect_grant_content_unbound"
+
+
+def test_legacy_migration_evidence_must_bind_exact_grant_and_manifest() -> None:
+    grant = _grant(target_kind="branch", effects=["commit"])
+    grant["commit_content"][
+        "workspace_manifest_binding_mode"
+    ] = "authenticated_legacy_v1"
+    raw_manifest_value = json.loads(WORKSPACE_MANIFEST_RAW)
+    raw_manifest_value.pop("git_diff_cached_binary_sha256")
+    raw_manifest_value.pop("git_shallow")
+    raw_manifest = _workspace_manifest_raw(raw_manifest_value)
+    manifest_digest = _raw_digest(raw_manifest)
+    evidence_value = json.loads(
+        _legacy_workspace_manifest_evidence_raw(grant, manifest_digest)
+    )
+    evidence_value["grant_id"] = "grant:other"
+    evidence_raw = _workspace_manifest_raw(evidence_value)
+    evidence_digest = _raw_digest(evidence_raw)
+    grant["commit_content"]["workspace_manifest_digest"] = manifest_digest
+    grant["commit_content"]["legacy_workspace_manifest_evidence_digest"] = (
+        evidence_digest
+    )
+    _refresh_semantic_digest(grant)
+    raw = _raw(grant)
+
+    with pytest.raises(LandingEffectGrantError) as exc:
+        admit_landing_effect_grant(
+            grant,
+            _request(grant),
+            grant_raw=raw,
+            expected_artifact_digest=_raw_digest(raw),
+            observed_workspace_manifest_digest=manifest_digest,
+            observed_workspace_manifest_raw=raw_manifest,
+            expected_legacy_workspace_manifest_evidence_digest=evidence_digest,
+            legacy_workspace_manifest_evidence_raw=evidence_raw,
+            at=AT,
+        )
+    assert exc.value.code == "landing_effect_grant_content_mismatch"
 
 
 def test_new_commit_grants_require_cached_index_binding() -> None:
