@@ -28,6 +28,29 @@ def _load_nested_evidence():
 NESTED_EVIDENCE = _load_nested_evidence()
 
 
+def test_cached_review_seal_projection_does_not_reverify(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    projection = tmp_path / "missing-after-seal"
+    record = SimpleNamespace(payload={"actor_projection_path": str(projection)})
+    cached_seal = (tmp_path / "review-state-seal", {"tree_entries": []})
+
+    def fail_if_reverified(_record: object) -> object:
+        raise AssertionError("cached producer seal was verified again")
+
+    monkeypatch.setattr(
+        NESTED_EVIDENCE,
+        "_producer_review_seal",
+        fail_if_reverified,
+    )
+
+    assert NESTED_EVIDENCE._producer_projection(
+        record,
+        review_seal=cached_seal,
+    ) == projection
+
+
 def _result_shape(
     workspace: Path,
     *,

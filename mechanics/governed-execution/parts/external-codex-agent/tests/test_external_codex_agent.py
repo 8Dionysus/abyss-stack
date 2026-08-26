@@ -5678,6 +5678,7 @@ def test_reviewer_preparation_forwards_exact_writer_evidence_without_starting(
         "review-workspace-manifest",
         "writer-actor-final-manifest",
         "writer-actor-delta",
+        "writer-review-state-seal",
     }
     assert task["task_family"] == "landing_review"
     assert task["review_required"] is False
@@ -8471,7 +8472,10 @@ def test_nested_evidence_namespace_closes_exact_producer_graph(
             "writer-report",
             Path(str(result["report_ref"]["artifact_ref"])),
         ),
-        review_input("writer-delta", session / "actor-delta.json"),
+        review_input(
+            "writer-delta",
+            Path(str(result["actor_delta_ref"]["artifact_ref"])),
+        ),
         review_input(
             "writer-fixture-readme",
             Path(str(upstream_readme["path"])),
@@ -8585,15 +8589,12 @@ def test_nested_evidence_namespace_closes_exact_producer_graph(
 
     producer_readme = Path(str(result["actor_projection_path"])) / "README.md"
     producer_readme.write_text("drift after producer result\n", encoding="utf-8")
-    with pytest.raises(
-        RUNTIME.NestedEvidenceNamespaceError,
-        match="producer source bytes drifted",
-    ):
-        RUNTIME.build_nested_evidence_namespace(
-            review_task_id="task:nested-evidence-review",
-            review_task_digest=review_task_digest,
-            immutable_inputs=inputs,
-        )
+    replayed_namespace = RUNTIME.build_nested_evidence_namespace(
+        review_task_id="task:nested-evidence-review",
+        review_task_digest=review_task_digest,
+        immutable_inputs=inputs,
+    )
+    assert replayed_namespace == namespace
 
 
 @pytest.mark.parametrize(
@@ -8661,7 +8662,10 @@ def test_nested_evidence_namespace_preserves_all_runtime_manifest_anchors(
             "writer-report",
             Path(str(result["report_ref"]["artifact_ref"])),
         ),
-        review_input("writer-delta", session / "actor-delta.json"),
+        review_input(
+            "writer-delta",
+            Path(str(result["actor_delta_ref"]["artifact_ref"])),
+        ),
     ]
     if workspace_write:
         inputs.append(
@@ -8757,7 +8761,7 @@ def test_independent_review_materializes_nested_evidence_before_inference(
             ),
             forwarded(
                 "writer-delta",
-                writer_session / "actor-delta.json",
+                Path(str(writer_result["actor_delta_ref"]["artifact_ref"])),
                 "abyss_stack_external_codex_actor_delta_v1",
             ),
             forwarded(
@@ -11873,6 +11877,63 @@ def test_workspace_write_resume_continues_from_exact_prior_actor_tree(
     assert first_delta_ref in preserved_sources
 
 
+def test_review_seed_envelopes_follow_each_terminal_attempt(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(
+        tmp_path,
+        objective_marker="FAKE_WRITE_ALLOWED FAKE_ARTIFACT_PRODUCED",
+        role_id="coder",
+        task_family="landing_preparation",
+        workspace_write=True,
+        exact_baseline=True,
+        review_required=True,
+        identity_suffix="review-seed-resume",
+    )
+    runtime = fixture["runtime"]
+    runtime.start(fixture["launch_path"])
+    first_terminal = _wait_terminal(runtime, fixture["session_id"])
+    assert first_terminal["status"] == "review_required"
+
+    first_seed = runtime.issue_review_seed(fixture["session_id"])
+    first_seed_path = Path(first_seed["artifact_ref"])
+    assert first_seed_path == (
+        runtime._session_dir(fixture["session_id"])
+        / "review-seed-envelope.json"
+    )
+    first_seed_digest = _digest_path(first_seed_path)
+    result_path = runtime._session_dir(fixture["session_id"]) / "result.json"
+    resume_path = tmp_path / "review-seed-resume.json"
+    _write_json(
+        resume_path,
+        {
+            "schema_version": "abyss_stack_external_codex_resume_v1",
+            "session_id": fixture["session_id"],
+            "thread_id": first_terminal["thread_id"],
+            "after_event_sequence": first_terminal["last_event_sequence"],
+            "reason": "review_followup",
+            "instruction": "Continue the exact bounded writer obligation.",
+            "previous_result_digest": _digest_path(result_path),
+        },
+    )
+
+    assert runtime.resume(fixture["session_id"], resume_path)["status"] == "running"
+    second_terminal = _wait_terminal(runtime, fixture["session_id"])
+    assert second_terminal["status"] == "review_required"
+    second_seed = runtime.issue_review_seed(fixture["session_id"])
+    second_seed_path = Path(second_seed["artifact_ref"])
+
+    assert second_seed_path == (
+        runtime._session_dir(fixture["session_id"])
+        / "attempts"
+        / "002"
+        / "review-seed-envelope.json"
+    )
+    assert second_seed_path != first_seed_path
+    assert _digest_path(first_seed_path) == first_seed_digest
+    assert second_seed["artifact_digest"] != first_seed["artifact_digest"]
+
+
 def test_workspace_write_resume_loads_prior_manifest_before_replacement(
     tmp_path: Path,
 ) -> None:
@@ -13075,6 +13136,20 @@ def test_a2a_export_requires_exact_independent_review_result(
         ),
         schema_version="abyss_stack_external_codex_actor_delta_v1",
     )
+    writer_review_seal_path = Path(
+        str(writer_result["review_seal_ref"]["artifact_ref"])
+    )
+    writer_review_seal_ref = _provenance(
+        "abyss-stack",
+        "runtime-results/fixture-writer-review-state-seal.json",
+        digest=_digest_path(writer_review_seal_path),
+        source_ref=str(writer_result["thread_id"]),
+        schema_ref=(
+            "mechanics/governed-execution/parts/external-codex-agent/schemas/"
+            "external-codex-review-state-seal.schema.json"
+        ),
+        schema_version="abyss_stack_external_codex_review_state_seal_v1",
+    )
     reviewer_actor_inputs = (
         (
             "writer-actor-final-manifest",
@@ -13082,6 +13157,11 @@ def test_a2a_export_requires_exact_independent_review_result(
             writer_actor_final_ref,
         ),
         ("writer-actor-delta", writer_actor_delta_path, writer_actor_delta_ref),
+        (
+            "writer-review-state-seal",
+            writer_review_seal_path,
+            writer_review_seal_ref,
+        ),
     )
     reviewer = _fixture(
         tmp_path / "reviewer",

@@ -421,6 +421,7 @@ REQUIRED_FILE_PATHS = tuple(
         "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-resume.schema.json",
         "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-review-preparation.schema.json",
         "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-review-seed-envelope.schema.json",
+        "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-review-state-seal.schema.json",
         "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-runtime-profile.schema.json",
         "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-state.schema.json",
         "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-study-preparation.schema.json",
