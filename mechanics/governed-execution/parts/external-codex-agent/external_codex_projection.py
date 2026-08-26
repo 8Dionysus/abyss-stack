@@ -45,13 +45,26 @@ PRIVATE_GIT_CONFIG_BYTES = (
     "[gc]\n\tauto = 0\n"
 ).encode("utf-8")
 PRIVATE_GIT_PACK_FILE_PATTERN = re.compile(
-    r"objects/pack/pack-[0-9a-f]{40}\.(?:idx|pack|rev)"
+    r"objects/pack/pack-(?:[0-9a-f]{40}|[0-9a-f]{64})\.(?:idx|pack|rev)"
 )
-GIT_OBJECT_ID_PATTERN = re.compile(r"^[0-9a-f]{40}$")
+GIT_OBJECT_ID_PATTERN = re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
 
 
 class ProjectionError(RuntimeError):
     """One fail-closed projection or actor-tree error."""
+
+
+def _private_git_config_bytes(object_format: str) -> bytes:
+    if object_format == "sha1":
+        return PRIVATE_GIT_CONFIG_BYTES
+    if object_format == "sha256":
+        return PRIVATE_GIT_CONFIG_BYTES.replace(
+            b"\trepositoryFormatVersion = 0\n",
+            b"\trepositoryFormatVersion = 1\n",
+        ) + (
+            "[extensions]\n\tobjectFormat = sha256\n"
+        ).encode("utf-8")
+    raise ProjectionError("private actor Git object format is unsupported")
 
 
 def sha256_bytes(value: bytes) -> str:
@@ -111,6 +124,7 @@ def _git_environment() -> dict[str, str]:
         "GIT_TERMINAL_PROMPT": "0",
         "GIT_OPTIONAL_LOCKS": "0",
         "GIT_NO_LAZY_FETCH": "1",
+        "GIT_NO_REPLACE_OBJECTS": "1",
     }
 
 
@@ -413,7 +427,7 @@ def _read_source_shallow_boundary(
         raise ProjectionError("source Git shallow boundary exceeds its runtime bound")
     entries: list[str] = []
     for line in raw.splitlines(keepends=True):
-        if len(line) != 41 or not line.endswith(b"\n"):
+        if not line.endswith(b"\n"):
             raise ProjectionError("source Git shallow boundary has malformed lines")
         try:
             value = line[:-1].decode("ascii", errors="strict")
@@ -722,13 +736,24 @@ def build_private_git_admission_manifest(
         config_entries = [
             entry for entry in private_entries if entry.get("path") == "config"
         ]
+        try:
+            object_format = _git(
+                descriptor_root,
+                "rev-parse",
+                "--show-object-format",
+            ).decode("ascii").strip()
+            expected_config = _private_git_config_bytes(object_format)
+        except (UnicodeDecodeError, ProjectionError):
+            raise ProjectionError(
+                "actor private Git object format is unavailable"
+            ) from None
         if len(config_entries) != 1 or any(
             config_entries[0].get(key) != value
             for key, value in {
                 "path": "config",
                 "kind": "file",
-                "size_bytes": len(PRIVATE_GIT_CONFIG_BYTES),
-                "sha256": sha256_bytes(PRIVATE_GIT_CONFIG_BYTES),
+                "size_bytes": len(expected_config),
+                "sha256": sha256_bytes(expected_config),
             }.items()
         ):
             raise ProjectionError(
@@ -1035,7 +1060,11 @@ def _construct_private_git(
             continue
         metadata, separator, raw_path = record.partition(b"\t")
         fields = metadata.split()
-        if not separator or len(fields) != 3 or len(fields[1]) != 40:
+        if (
+            not separator
+            or len(fields) != 3
+            or len(fields[1]) not in {40, 64}
+        ):
             raise ProjectionError("source Git index cannot be reproduced safely")
         try:
             path = raw_path.decode("utf-8")
@@ -1046,7 +1075,7 @@ def _construct_private_git(
             ) from exc
         if (
             GIT_OBJECT_ID_PATTERN.fullmatch(object_id) is None
-            or object_id == "0" * 40
+            or object_id == "0" * len(object_id)
         ):
             raise ProjectionError(
                 "source Git index contains a malformed or zero object ID"
@@ -1127,7 +1156,11 @@ def _construct_private_git(
         input_bytes=("\n".join(sorted(object_ids)) + "\n").encode("ascii"),
         timeout=300,
     )
-    _git(staging, "init", "--quiet")
+    object_format = "sha256" if len(source_head) == 64 else "sha1"
+    init_arguments = ["init", "--quiet"]
+    if object_format == "sha256":
+        init_arguments.append("--object-format=sha256")
+    _git(staging, *init_arguments)
     _git(
         staging, "index-pack", "--stdin", "--fix-thin", input_bytes=packed, timeout=300
     )
@@ -1169,7 +1202,9 @@ def _construct_private_git(
         "\n".join(exclude_lines) + ("\n" if exclude_lines else "")
     ).encode("utf-8")
     (info / "exclude").write_bytes(exclude_bytes)
-    (staging / ".git" / "config").write_bytes(PRIVATE_GIT_CONFIG_BYTES)
+    (staging / ".git" / "config").write_bytes(
+        _private_git_config_bytes(object_format)
+    )
     for forbidden in (
         "branches",
         "description",
@@ -1217,9 +1252,12 @@ def _construct_private_git(
     diff_matches = sha256_bytes(diff_raw) == source_manifest.get(
         "git_diff_binary_sha256"
     )
-    cached_diff_matches = sha256_bytes(cached_diff_raw) == source_manifest.get(
-        "git_diff_cached_binary_sha256"
-    )
+    if "git_diff_cached_binary_sha256" not in source_manifest:
+        cached_diff_matches = True
+    else:
+        cached_diff_matches = sha256_bytes(cached_diff_raw) == source_manifest.get(
+            "git_diff_cached_binary_sha256"
+        )
     if status_matches and not diff_matches:
         source_git_environment = _source_git_environment(source)
         source_full_diff_raw = _git(

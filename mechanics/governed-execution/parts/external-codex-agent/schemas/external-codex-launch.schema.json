@@ -21,7 +21,10 @@
     "owner_execution_request_schema": {"$ref": "#/$defs/ownedArtifactCoordinate"},
     "task_local_dag_schema": {"$ref": "#/$defs/ownedArtifactCoordinate"},
     "workspace_path": {"type": "string", "pattern": "^/"},
-    "workspace_expected_head": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "workspace_expected_head": {
+      "type": "string",
+      "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$(?![\\s\\S])"
+    },
     "workspace_initial_posture": {"enum": ["clean_required", "exact_baseline"]},
     "workspace_manifest_input_id": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$", "maxLength": 96},
     "workspace_projection_seed": {

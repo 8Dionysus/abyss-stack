@@ -744,7 +744,9 @@ revision.
   executor may commit; admission receives those bounded manifest bytes,
   validates the workspace-manifest schema, enforces exact non-zero
 file/symlink digests and modes plus directory/missing zero-size/null-digest
-invariants, binds the cached staged-diff digest, and recomputes their digest;
+invariants, binds and recomputes the cached staged-diff digest when the
+upgraded field is present; pre-upgrade v1 manifests without the cached-index
+or shallow-boundary fields retain their legacy compatibility semantics;
 - either one exact branch target (which may bind only `commit` and `push`) or
   one exact pull-request target (which may bind `push`, `pull_request`, and
   `merge`, or a standalone `commit`), including the immutable reviewed head
@@ -778,14 +780,21 @@ workspace-manifest bytes plus an independently observed digest that admission
 recomputes and matches. The manifest `git_head` must equal the exact authorized
 repository revision, that repository revision must equal the branch
 `base_revision` or pull-request `head_revision`, and every status/content path
-must be canonical and unique within its array. The manifest also carries a
-strict non-zero digest of `git diff --cached --binary --full-index HEAD`, so a
-partially staged index cannot change the future commit while preserving the
-ordinary worktree diff. Schema validation stops after the first error. A
+must be canonical and unique within its array. An upgraded manifest also
+carries a strict non-zero digest of `git diff --cached --binary --full-index
+HEAD`, so a partially staged index cannot change the future commit while
+preserving the ordinary worktree diff; a legacy v1 manifest without that field
+retains its pre-upgrade binding semantics. Schema validation stops after the
+first error. A
 pull-request target's reviewed head revision is therefore
 immutable at admission and a commit cannot use post-review workspace bytes;
 there is no wildcard or subset match. `landing_effect_grant_allows` is only a
-boolean read of that admission result.
+boolean read of that admission result. Direct mapping admission preflights
+string byte lengths and sequence/node cardinality before JSON encoding, and
+owner-reference coordinates reject Unicode whitespace and control characters.
+Runtime-owned projections preserve either 40-hex SHA-1 or 64-hex SHA-256 Git
+object IDs, including the private repository's object-format configuration;
+terminal lowercase `z` is accepted as the RFC 3339 UTC designator.
 
 This ABI does not lower `RUNTIME_WIDE_FORBIDDEN_EFFECTS`, does not make
 `external_effects` true in any current profile, and does not authorize a

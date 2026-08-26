@@ -37,6 +37,8 @@ CAPABILITY_ID = "governed_git_landing_v1"
 ZERO_DIGEST = "sha256:" + "0" * 64
 MAX_GRANT_BYTES = 256 * 1024
 MAX_GRANT_MAPPING_KEYS = 4096
+MAX_GRANT_SEQUENCE_ITEMS = 65536
+MAX_GRANT_PRECHECK_NODES = 65536
 MAX_WORKSPACE_MANIFEST_BYTES = 16 * 1024 * 1024
 GIT_EXECUTABLE = "/usr/bin/git"
 GIT_REF_VALIDATION_ENV = {
@@ -91,14 +93,45 @@ def _canonical_bytes(value: object) -> bytes:
         ) from exc
 
 
+def _preflight_json_string(value: str, *, limit: int) -> None:
+    """Bound one JSON string without first materializing its encoded form."""
+
+    total = 2
+    for index, character in enumerate(value):
+        codepoint = ord(character)
+        if character in {'"', "\\", "\b", "\t", "\n", "\f", "\r"}:
+            total += 2
+        elif codepoint < 0x20:
+            total += 6
+        elif 0xD800 <= codepoint <= 0xDFFF:
+            raise ValueError("JSON strings may not contain surrogate code points")
+        elif codepoint <= 0x7F:
+            total += 1
+        elif codepoint <= 0x7FF:
+            total += 2
+        elif codepoint <= 0xFFFF:
+            total += 3
+        else:
+            total += 4
+        if total > limit:
+            raise LandingEffectGrantError(
+                "landing_effect_grant_too_large",
+                "grant mapping exceeds the bounded admission size",
+            )
+
+
 def _bounded_canonical_bytes(value: object, *, limit: int) -> bytes:
     """Canonicalize JSON data without materializing more than the bound."""
 
     pending: list[object] = [value]
     seen_containers: set[int] = set()
+    scheduled_nodes = 1
     try:
         while pending:
             candidate = pending.pop()
+            if isinstance(candidate, str):
+                _preflight_json_string(candidate, limit=limit)
+                continue
             if isinstance(candidate, (Mapping, list, tuple)):
                 identity = id(candidate)
                 if identity in seen_containers:
@@ -110,9 +143,28 @@ def _bounded_canonical_bytes(value: object, *, limit: int) -> bytes:
                         "landing_effect_grant_too_large",
                         "grant mapping exceeds the bounded key cardinality",
                     )
+                child_count = len(candidate) * 2
+                if scheduled_nodes + child_count > MAX_GRANT_PRECHECK_NODES:
+                    raise LandingEffectGrantError(
+                        "landing_effect_grant_too_large",
+                        "grant mapping exceeds the bounded node cardinality",
+                    )
+                pending.extend(candidate.keys())
                 pending.extend(candidate.values())
+                scheduled_nodes += child_count
             elif isinstance(candidate, (list, tuple)):
+                if len(candidate) > MAX_GRANT_SEQUENCE_ITEMS:
+                    raise LandingEffectGrantError(
+                        "landing_effect_grant_too_large",
+                        "grant sequence exceeds the bounded item cardinality",
+                    )
+                if scheduled_nodes + len(candidate) > MAX_GRANT_PRECHECK_NODES:
+                    raise LandingEffectGrantError(
+                        "landing_effect_grant_too_large",
+                        "grant mapping exceeds the bounded node cardinality",
+                    )
                 pending.extend(candidate)
+                scheduled_nodes += len(candidate)
     except LandingEffectGrantError:
         raise
     except (MemoryError, RecursionError, TypeError, ValueError, OverflowError) as exc:
@@ -234,13 +286,20 @@ def _validate_workspace_manifest(raw: bytes) -> tuple[Mapping[str, Any], str]:
     for digest_field in (
         "git_status_porcelain_sha256",
         "git_diff_binary_sha256",
-        "git_diff_cached_binary_sha256",
     ):
         if not _is_sha256_digest(parsed[digest_field]):
             raise LandingEffectGrantError(
                 "landing_effect_grant_content_invalid",
                 f"workspace manifest {digest_field} is not an exact non-zero digest",
             )
+    if (
+        "git_diff_cached_binary_sha256" in parsed
+        and not _is_sha256_digest(parsed["git_diff_cached_binary_sha256"])
+    ):
+        raise LandingEffectGrantError(
+            "landing_effect_grant_content_invalid",
+            "workspace manifest git_diff_cached_binary_sha256 is not an exact non-zero digest",
+        )
     for field in ("status_entries", "content_entries"):
         entries = parsed[field]
         seen_paths: set[str] = set()
@@ -324,7 +383,12 @@ def _parse_time(value: object, *, label: str) -> datetime:
             "landing_effect_grant_time_invalid", f"{label} is not an RFC3339 timestamp"
         )
     try:
-        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        normalized = (
+            value[:-1] + "+00:00"
+            if value.endswith(("Z", "z"))
+            else value
+        )
+        parsed = datetime.fromisoformat(normalized)
     except ValueError as exc:
         raise LandingEffectGrantError(
             "landing_effect_grant_time_invalid", f"{label} is not an RFC3339 timestamp"

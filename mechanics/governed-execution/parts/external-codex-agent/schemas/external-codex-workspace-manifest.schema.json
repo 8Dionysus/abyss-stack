@@ -12,7 +12,6 @@
     "git_head",
     "git_status_porcelain_sha256",
     "git_diff_binary_sha256",
-    "git_diff_cached_binary_sha256",
     "status_entries",
     "content_entries"
   ],
@@ -46,7 +45,10 @@
         "entries": {
           "type": "array",
           "uniqueItems": true,
-          "items": {"type": "string", "pattern": "^[0-9a-f]{40}$"}
+          "items": {
+            "type": "string",
+            "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$(?![\\s\\S])"
+          }
         },
         "identity": {
           "oneOf": [

@@ -6446,6 +6446,29 @@ def test_neutral_binder_uses_exact_git_outside_ambient_path(
     assert marker.exists() is False
 
 
+def test_sha256_workspace_head_is_accepted_by_runtime_and_binder(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "sha256-workspace"
+    workspace.mkdir()
+    try:
+        _git(workspace, "init", "-q", "--object-format=sha256")
+    except subprocess.CalledProcessError:
+        pytest.skip("Git SHA-256 object format is unavailable")
+    _git(workspace, "config", "user.email", "fixture@example.invalid")
+    _git(workspace, "config", "user.name", "Fixture")
+    (workspace / "README.md").write_text("sha256\n", encoding="utf-8")
+    _git(workspace, "add", "README.md")
+    _git(workspace, "commit", "-m", "fixture")
+
+    expected = _git(workspace, "rev-parse", "HEAD")
+    assert len(expected) == 64
+    assert RUNTIME._git_head(workspace) == expected
+    assert BINDER._git_head(workspace) == expected
+    assert PREPARER._git_head(workspace) == expected
+    assert RUNTIME.build_workspace_manifest(workspace)["git_head"] == expected
+
+
 @pytest.mark.skipif(
     not OWNER_EXECUTION_REQUEST_SCHEMA_PATH.is_file()
     or not TASK_LOCAL_DAG_SCHEMA_PATH.is_file(),
@@ -9952,6 +9975,7 @@ def test_codex_environment_isolates_shell_startup_and_repository_hooks(
     assert environment["GIT_CONFIG_KEY_7"] == "filter.leak.smudge"
     assert environment["GIT_CONFIG_VALUE_7"] == ""
     assert environment["GIT_NO_LAZY_FETCH"] == "1"
+    assert environment["GIT_NO_REPLACE_OBJECTS"] == "1"
     assert Path(environment["GIT_CONFIG_VALUE_0"]).stat().st_mode & 0o222 == 0
     assert Path(environment["HOME"]).stat().st_mode & 0o222 == 0
     assert marker.exists() is False
@@ -11135,6 +11159,8 @@ def test_workspace_manifest_accepts_exact_pre_full_index_baseline(
     ).stdout
     legacy = dict(current)
     legacy["git_diff_binary_sha256"] = RUNTIME.sha256_bytes(legacy_diff)
+    legacy.pop("git_diff_cached_binary_sha256")
+    legacy.pop("git_shallow")
     _git(workspace, "config", "core.abbrev", "4")
 
     RUNTIME.assert_workspace_manifest(legacy, workspace)

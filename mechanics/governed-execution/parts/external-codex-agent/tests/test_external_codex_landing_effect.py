@@ -330,6 +330,29 @@ def test_exact_coordinates_reject_trailing_newlines() -> None:
         assert exc.value.code == "landing_effect_grant_schema_invalid"
 
 
+@pytest.mark.parametrize("ref_path", [("goal_ref",), ("holder_ref",)])
+@pytest.mark.parametrize("field", ("owner_repo", "artifact_ref", "source_ref"))
+@pytest.mark.parametrize(
+    "invalid_coordinate",
+    ("owner\nrepo", "owner\u0085repo", "owner\u00a0repo", "owner\u2028repo"),
+)
+def test_owner_reference_coordinates_reject_controls_and_unicode_whitespace(
+    ref_path: tuple[str, ...],
+    field: str,
+    invalid_coordinate: str,
+) -> None:
+    grant = _grant()
+    reference: dict[str, Any] = grant
+    for key in ref_path:
+        reference = reference[key]
+    reference[field] = invalid_coordinate
+    _refresh_semantic_digest(grant)
+
+    with pytest.raises(LandingEffectGrantError) as exc:
+        validate_landing_effect_grant(grant)
+    assert exc.value.code == "landing_effect_grant_schema_invalid"
+
+
 def test_owner_reference_digests_reject_trailing_newlines() -> None:
     grant = _grant()
     _refresh_semantic_digest(grant)
@@ -640,6 +663,28 @@ def test_workspace_manifest_accepts_bare_sha256_git_head() -> None:
     assert admitted["repository"]["revision"] == revision
 
 
+def test_workspace_manifest_accepts_legacy_v1_without_cached_index_binding() -> None:
+    grant = _grant(target_kind="branch", effects=["commit"])
+    raw_manifest_value = json.loads(WORKSPACE_MANIFEST_RAW)
+    raw_manifest_value.pop("git_diff_cached_binary_sha256")
+    raw_manifest_value.pop("git_shallow")
+    raw_manifest = _workspace_manifest_raw(raw_manifest_value)
+    grant["commit_content"]["workspace_manifest_digest"] = _raw_digest(raw_manifest)
+    _refresh_semantic_digest(grant)
+    raw = _raw(grant)
+
+    admitted = admit_landing_effect_grant(
+        grant,
+        _request(grant),
+        grant_raw=raw,
+        expected_artifact_digest=_raw_digest(raw),
+        observed_workspace_manifest_digest=_raw_digest(raw_manifest),
+        observed_workspace_manifest_raw=raw_manifest,
+        at=AT,
+    )
+    assert admitted["admission"]["status"] == "admitted"
+
+
 def test_commit_admission_rejects_manifest_digest_newlines() -> None:
     for field in (
         "git_status_porcelain_sha256",
@@ -907,7 +952,19 @@ def test_invalid_git_refs_are_rejected_by_git_ref_rules(invalid_ref: str) -> Non
     assert exc.value.code == "landing_effect_grant_target_invalid"
 
 
-@pytest.mark.parametrize("invalid_id", ("42\n", " 42", "42 ", "42\t", "42\x00"))
+@pytest.mark.parametrize(
+    "invalid_id",
+    (
+        "42\n",
+        " 42",
+        "42 ",
+        "42\t",
+        "42\x00",
+        "42\u0085",
+        "42\u00a0",
+        "42\u2028",
+    ),
+)
 def test_pull_request_identifier_rejects_whitespace_and_controls(
     invalid_id: str,
 ) -> None:
@@ -1052,6 +1109,16 @@ def test_request_mapping_rejects_oversized_key_cardinality_before_sorting() -> N
     assert exc.value.code == "landing_effect_request_too_large"
 
 
+def test_request_sequence_rejects_oversized_cardinality_before_encoding() -> None:
+    request = {
+        "untrusted": ["x"] * (landing_effect.MAX_GRANT_SEQUENCE_ITEMS + 1)
+    }
+
+    with pytest.raises(LandingEffectGrantError) as exc:
+        admit_landing_effect_grant(None, request)
+    assert exc.value.code == "landing_effect_request_too_large"
+
+
 def test_nested_tuple_mapping_rejects_oversized_key_cardinality_before_sorting() -> None:
     request = {"nested": ({str(index): index for index in range(5000)},)}
 
@@ -1163,6 +1230,20 @@ def test_boundary_timestamp_overflow_is_a_typed_time_denial() -> None:
     with pytest.raises(LandingEffectGrantError) as exc:
         validate_landing_effect_grant(grant)
     assert exc.value.code == "landing_effect_grant_time_invalid"
+
+
+def test_lowercase_utc_designator_is_admitted() -> None:
+    grant = _grant(expires_at="2026-08-25T00:00:00z")
+    raw = _raw(grant)
+
+    admitted = admit_landing_effect_grant(
+        grant,
+        _request(grant),
+        grant_raw=raw,
+        expected_artifact_digest=_raw_digest(raw),
+        at=AT,
+    )
+    assert admitted["admission"]["status"] == "admitted"
 
 
 def test_admission_time_overflow_is_a_typed_time_denial() -> None:

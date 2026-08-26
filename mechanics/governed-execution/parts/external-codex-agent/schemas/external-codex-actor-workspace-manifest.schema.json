@@ -20,7 +20,10 @@
       }
     },
     "source_manifest_digest": {"$ref": "#/$defs/digest"},
-    "source_git_head": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "source_git_head": {
+      "type": "string",
+      "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$(?![\\s\\S])"
+    },
     "private_git_digest": {"$ref": "#/$defs/digest"},
     "content_entries": {
       "type": "array",

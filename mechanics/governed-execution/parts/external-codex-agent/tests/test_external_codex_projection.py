@@ -36,10 +36,17 @@ def _git(root: Path, *args: str) -> str:
     return completed.stdout.strip()
 
 
-def _source_repo(tmp_path: Path) -> tuple[Path, dict[str, object]]:
+def _source_repo(
+    tmp_path: Path,
+    *,
+    object_format: str | None = None,
+) -> tuple[Path, dict[str, object]]:
     source = tmp_path / "owner-source"
     source.mkdir()
-    _git(source, "init", "-q")
+    init_args = ["init", "-q"]
+    if object_format is not None:
+        init_args.extend([f"--object-format={object_format}"])
+    _git(source, *init_args)
     _git(source, "config", "user.name", "projection-test")
     _git(source, "config", "user.email", "projection@example.invalid")
     (source / "tracked.txt").write_text("owner bytes\n", encoding="utf-8")
@@ -114,6 +121,7 @@ def test_projection_packing_disables_promisor_lazy_fetch_helpers(
         )
 
     assert PROJECTION._git_environment()["GIT_NO_LAZY_FETCH"] == "1"
+    assert PROJECTION._git_environment()["GIT_NO_REPLACE_OBJECTS"] == "1"
     assert marker.exists() is False
 
 
@@ -139,6 +147,8 @@ def test_projection_accepts_exact_pre_full_index_source_manifest(
     _git(source, "config", "filter.projection-clean.clean", str(filter_helper))
     (source / "tracked.txt").write_text("dirty owner bytes\n", encoding="utf-8")
     source_manifest = build_workspace_manifest(source)
+    source_manifest.pop("git_diff_cached_binary_sha256")
+    source_manifest.pop("git_shallow")
     assert filter_marker.exists() is False
     legacy_diff = subprocess.run(
         [
@@ -172,6 +182,24 @@ def test_projection_accepts_exact_pre_full_index_source_manifest(
     )
     assert baseline["source_manifest_digest"] == "sha256:" + "9" * 64
     assert filter_marker.exists() is False
+
+
+def test_projection_accepts_sha256_source_git_object_ids(tmp_path: Path) -> None:
+    try:
+        source, source_manifest = _source_repo(tmp_path, object_format="sha256")
+    except subprocess.CalledProcessError:
+        pytest.skip("Git SHA-256 object format is unavailable")
+
+    assert len(str(source_manifest["git_head"])) == 64
+    projection, baseline = materialize_actor_projection(
+        source,
+        tmp_path / "runtime" / "actor-workspace",
+        source_manifest=source_manifest,
+        source_manifest_digest="sha256:" + "a" * 64,
+    )
+
+    assert _git(projection, "rev-parse", "HEAD") == source_manifest["git_head"]
+    assert baseline["source_git_head"] == source_manifest["git_head"]
 
 
 def test_projection_rejects_real_intent_to_add_zero_oid_before_private_git_reconstruction(

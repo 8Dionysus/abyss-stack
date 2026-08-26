@@ -400,7 +400,9 @@ def _git(root: Path, *args: str) -> bytes:
 
 def _git_head(root: Path) -> str:
     value = _git(root, "rev-parse", "HEAD").decode("ascii").strip()
-    if len(value) != 40 or any(char not in "0123456789abcdef" for char in value):
+    if len(value) not in {40, 64} or any(
+        char not in "0123456789abcdef" for char in value
+    ):
         raise StudyPreparationError(f"invalid Git HEAD in {root}")
     return value
 

@@ -4726,6 +4726,7 @@ def _base_controller_git_environment() -> dict[str, str]:
         "GIT_CONFIG_VALUE_5": "/usr/bin/false",
         "GIT_CONFIG_VALUE_6": "/usr/bin/false",
         "GIT_NO_LAZY_FETCH": "1",
+        "GIT_NO_REPLACE_OBJECTS": "1",
         "GIT_OPTIONAL_LOCKS": "0",
         "GIT_TERMINAL_PROMPT": "0",
         "HOME": "/nonexistent",
@@ -5898,7 +5899,10 @@ def _git_head(
         env=dict(git_env or _controller_git_environment(workspace)),
     )
     value = completed.stdout.strip()
-    if completed.returncode != 0 or re.fullmatch(r"[0-9a-f]{40}", value) is None:
+    if (
+        completed.returncode != 0
+        or re.fullmatch(r"(?:[0-9a-f]{40}|[0-9a-f]{64})", value) is None
+    ):
         raise ExternalCodexRuntimeError(
             "workspace_not_git", "workspace is not an exact Git worktree"
         )
@@ -6405,6 +6409,9 @@ def _workspace_manifests_match(
         return False
     baseline_without_diff = dict(baseline)
     current_without_diff = dict(current)
+    legacy_without_cached_diff = "git_diff_cached_binary_sha256" not in baseline
+    if legacy_without_cached_diff:
+        current_without_diff.pop("git_diff_cached_binary_sha256", None)
     # Older admitted manifests did not carry the shallow-boundary snapshot.
     # Preserve that compatibility only for a currently non-shallow source; a
     # shallow source must be re-admitted with its exact boundary bytes.
@@ -10685,6 +10692,7 @@ class ExternalCodexRuntime:
             if key.startswith("GIT_CONFIG_") or key in {
                 "GIT_ATTR_NOSYSTEM",
                 "GIT_NO_LAZY_FETCH",
+                "GIT_NO_REPLACE_OBJECTS",
                 "GIT_OPTIONAL_LOCKS",
                 "GIT_TERMINAL_PROMPT",
             }:

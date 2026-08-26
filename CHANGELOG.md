@@ -27,6 +27,12 @@ Tracking starts with the community-docs baseline for this repository.
   digest, and boundary-time overflows are normalized; fixed-input study
   preparation pins both landing admission schemas beside the landing source
   in writer inputs, runtime constraints, and validation refs.
+- Preserve pre-upgrade v1 workspace manifests when the cached-index and
+  shallow-boundary fields are absent, while enforcing the cached digest for
+  upgraded manifests; bound direct JSON string and sequence inputs before
+  encoding, reject Unicode whitespace/control coordinates, accept lowercase
+  RFC 3339 UTC designators, and carry SHA-256 Git heads through runtime,
+  private-projection, binder, and study schemas.
 - Bind the canonical `aoa-kag` MCP adapter to an authored absolute
   `AOA_KAG_ARTIFACT_ROOT` seam for v4 cold-CAS reads, preserving fail-closed
   loader behavior and separate artifact-admission verdicts.
