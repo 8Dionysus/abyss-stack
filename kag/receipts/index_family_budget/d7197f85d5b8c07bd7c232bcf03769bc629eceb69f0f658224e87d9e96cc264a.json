@@ -8,7 +8,7 @@
   "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
   "default_limit_bytes": 1048576,
   "head_family_digest": "d7197f85d5b8c07bd7c232bcf03769bc629eceb69f0f658224e87d9e96cc264a",
-  "reason": "Refresh exact owner portable family for PR #429 SHA-256 workspace provenance repair and trusted legacy owner receipt admission.",
+  "reason": "Refresh exact owner portable family for PR #429 release-bound owner catalog admission repair.",
   "repo": "abyss-stack",
   "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
   "scope": "generated_delta_and_tracked_size",
