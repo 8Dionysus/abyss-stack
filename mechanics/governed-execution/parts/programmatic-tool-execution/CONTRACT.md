@@ -14,9 +14,14 @@
 - The adapter returns a typed observation. The runtime validates exact request
   identity, tool handles, effect ceiling, observation dimensions, and explicit
   missingness before invoking the observation sink.
-- A bound adapter exception is reported as the stable
-  `adapter_execution_failed` error and carries no observation; it is not
-  reclassified as malformed evidence.
+- A bound adapter exception, including a provider-raised runtime boundary error,
+  is reported as the stable `adapter_execution_failed` error and carries no
+  observation; it is not reclassified as malformed evidence. The runtime's
+  own pre-invocation errors remain distinct.
+- If an adapter returns an invalid observation, the runtime keeps it out of the
+  sink and reports `invalid_observation` as a post-execution or indeterminate
+  error: a returned non-null typed observation is attached with
+  `execution_completed=True`, while a missing return is marked unknown.
 - A sink exception is reported as the stable
   `observation_sink_failed` post-execution error and retains the validated
   observation on the error object, so callers cannot mistake an evidence-store

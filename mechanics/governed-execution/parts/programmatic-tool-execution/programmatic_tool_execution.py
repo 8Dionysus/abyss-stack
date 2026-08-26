@@ -30,6 +30,13 @@ AdapterInvoker = Callable[
 ]
 
 
+class _UnsetExecutionCompletion:
+    """Sentinel distinguishing omitted completion from an explicit unknown."""
+
+
+_UNSET_EXECUTION_COMPLETION = _UnsetExecutionCompletion()
+
+
 class ProgrammaticExecutionRuntimeError(RuntimeError):
     """A stable, fail-closed runtime boundary error."""
 
@@ -39,11 +46,15 @@ class ProgrammaticExecutionRuntimeError(RuntimeError):
         message: str,
         *,
         observation: ProgrammaticExecutionObservation | None = None,
+        execution_completed: bool | None | _UnsetExecutionCompletion = _UNSET_EXECUTION_COMPLETION,
     ) -> None:
         super().__init__(message)
         self.code = code
         self.observation = observation
-        self.execution_completed = observation is not None
+        if isinstance(execution_completed, _UnsetExecutionCompletion):
+            self.execution_completed: bool | None = observation is not None
+        else:
+            self.execution_completed = execution_completed
 
 
 class ProgrammaticAdapterError(ProgrammaticExecutionRuntimeError):
@@ -78,7 +89,13 @@ def _invoke(
             f"{adapter_id}_unbound",
             f"{adapter_id} has no bound runtime invoker",
         )
-    return invoker(request)
+    try:
+        return invoker(request)
+    except Exception as exc:
+        raise ProgrammaticAdapterError(
+            "adapter_execution_failed",
+            "the selected adapter failed before returning an observation",
+        ) from exc
 
 
 @dataclass(frozen=True)
@@ -174,7 +191,7 @@ class ProgrammaticExecutionRuntime:
             )
         try:
             observation = adapter.execute(request)
-        except ProgrammaticExecutionRuntimeError:
+        except ProgrammaticAdapterError:
             raise
         except Exception as exc:
             raise ProgrammaticAdapterError(
@@ -183,12 +200,20 @@ class ProgrammaticExecutionRuntime:
             ) from exc
         try:
             assert_programmatic_execution_observation(request, observation)
-        except ProgrammaticExecutionRuntimeError:
-            raise
         except Exception as exc:
+            returned_completion: bool | None = (
+                True if observation is not None else None
+            )
+            retained_observation = (
+                observation
+                if isinstance(observation, ProgrammaticExecutionObservation)
+                else None
+            )
             raise ProgrammaticExecutionRuntimeError(
                 "invalid_observation",
                 f"adapter returned an invalid programmatic execution observation: {exc}",
+                observation=retained_observation,
+                execution_completed=returned_completion,
             ) from exc
         if self.observation_sink is not None:
             try:
