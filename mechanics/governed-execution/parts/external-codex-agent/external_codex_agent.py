@@ -11941,6 +11941,7 @@ Runtime session identity: {state["session_id"]}
         denied_paths: Sequence[Path] = (),
         workspace_access: Literal["read", "write"] = "write",
         shell_environment: Mapping[str, str] | None = None,
+        runtime_package_mask: Mapping[str, Any] | None = None,
     ) -> list[str]:
         executable = str(launch["codex_executable"])
         configuration = realization["configuration"]
@@ -11958,6 +11959,11 @@ Runtime session identity: {state["session_id"]}
                 "codex_permission_profile_invalid",
                 "external actor runtime requires the workspace-derived Codex profile",
             )
+        runtime_package_readable_paths = (
+            RUNTIME_PACKAGE_PERMISSION_PATHS
+            if runtime_package_mask is not None
+            else ()
+        )
         permission_profile = _actor_codex_permission_profile(
             actor_git_mask,
             sanitized_config_path=sanitized_config_path,
@@ -11965,7 +11971,7 @@ Runtime session identity: {state["session_id"]}
             readable_paths=(
                 *readable_paths,
                 Path(executable),
-                *RUNTIME_PACKAGE_PERMISSION_PATHS,
+                *runtime_package_readable_paths,
             ),
             writable_paths=writable_paths,
             denied_paths=denied_paths,
@@ -12362,6 +12368,7 @@ Runtime session identity: {state["session_id"]}
                     scratch,
                     specialized_environment,
                 ),
+                runtime_package_mask=runtime_package_mask,
             )
             process_identity_path = attempt_dir / "process-identity.json"
             child_workspace_descriptor = os.dup(projection_descriptor)
