@@ -199,6 +199,7 @@
           "pattern": "^sha256:[0-9a-f]{64}$"
         },
         "goal_response_sha256": {"type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$"},
+        "goal_response": {"type": ["object", "null"]},
         "post_read": {"type": "object"},
         "post_read_response": {"type": "object"},
         "post_read_response_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
@@ -277,6 +278,74 @@
               "post_read_response",
               "post_read_response_sha256"
             ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": ["lifecycle"],
+        "properties": {
+          "lifecycle": {
+            "required": ["transition_proof"],
+            "properties": {
+              "transition_proof": {
+                "properties": {
+                  "schema_version": {
+                    "const": "abyss_stack_external_codex_goal_transition_v2"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "lifecycle": {
+            "required": ["goal_response"]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": ["lifecycle"],
+        "properties": {
+          "lifecycle": {
+            "properties": {
+              "response_available": {"const": true}
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "lifecycle": {
+            "properties": {
+              "goal_response": {"type": "object"}
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": ["lifecycle"],
+        "properties": {
+          "lifecycle": {
+            "properties": {
+              "response_available": {"const": false}
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "lifecycle": {
+            "properties": {
+              "goal_response": {"type": "null"}
+            }
           }
         }
       }

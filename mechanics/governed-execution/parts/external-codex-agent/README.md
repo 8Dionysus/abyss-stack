@@ -167,8 +167,9 @@ and replay only through their matching legacy wake reservation. A retry after a 
   native `thread/goal/set`; replay of a completed receipt is read-only. The
   current public `ThreadGoalSetParams` surface exposes the native
   `thread/goal/set` mutation without a CAS/version field, so this route binds
-  the exact request, optional returned Goal response, and bounded post-read
-  instead of requiring an unsupported protocol feature. Historical atomic
+  the exact request, optional returned Goal response with raw bytes, and
+  bounded post-read bytes instead of requiring an unsupported protocol feature.
+  Historical atomic
   transition proofs remain accepted only for migration/replay;
 - exposes `aoa-external-codex-stasis` as a generic, model-neutral responsibility
   movement observer. It consumes one exact lifecycle/session evidence snapshot,

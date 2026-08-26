@@ -909,6 +909,12 @@ def execute_goal_transition(
             authoritative_response = (
                 proof_post_read if proof_is_current else before_response
             )
+            if not proof_is_current and isinstance(stored_response, dict):
+                # Legacy proofs had no separate post-read field.  The
+                # receipt-attempt binding treats their mutation response as
+                # the historical result, so project that same response
+                # rather than combining the legacy proof with a fresh read.
+                authoritative_response = stored_response
             resulting_response = authoritative_response
             resulting_state = request.desired_state
             status = "executed"

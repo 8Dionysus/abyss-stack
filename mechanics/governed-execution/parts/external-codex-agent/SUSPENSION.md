@@ -56,7 +56,8 @@ Goal first, refuses anything other than `active`, reserves and issues exactly
 one native `thread/goal/set(status=paused)` request, then performs a bounded
 fresh `thread/goal/get`. The installed public `ThreadGoalSetParams` transport
 has no CAS/version field; the receipt therefore binds the active precondition,
-exact request marker, returned Goal response when available, and post-read. A
+exact request marker, returned Goal response bytes when available, and
+post-read bytes. A
 response-loss retry is allowed only with the durable dispatch marker and fresh
 read, and never issues a second lifecycle set. Historical
 `abyss_stack_external_codex_atomic_goal_transition_v1` proofs remain accepted

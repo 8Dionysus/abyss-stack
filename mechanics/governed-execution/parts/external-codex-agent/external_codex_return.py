@@ -1483,6 +1483,9 @@ def _pause_receipt(
             if goal_response is not None
             else None
         ),
+        # Preserve the returned mutation response too.  A digest without the
+        # response bytes cannot be recomputed during receipt replay.
+        "goal_response": goal_response,
         "post_read": _safe_response_summary(post_read_response),
         # Keep the exact post-read alongside its digest.  The safe summary is
         # useful for projection, but cannot by itself prove which bytes the
@@ -2870,6 +2873,20 @@ def _validate_pause_receipt(
             )
         )
         or (
+            not legacy_transition_proof
+            and "goal_response" not in lifecycle
+        )
+        or (
+            not legacy_transition_proof
+            and lifecycle.get("response_available") is True
+            and not isinstance(lifecycle.get("goal_response"), dict)
+        )
+        or (
+            not legacy_transition_proof
+            and lifecycle.get("response_available") is False
+            and lifecycle.get("goal_response") is not None
+        )
+        or (
             lifecycle.get("response_available") is False
             and recovery is None
         )
@@ -2935,6 +2952,14 @@ def _validate_pause_receipt(
             raise ExternalCodexReturnError(
                 "canonical Goal pause receipt raw post-read does not confirm a paused Goal"
             )
+    stored_goal_response = lifecycle.get("goal_response")
+    if isinstance(stored_goal_response, dict):
+        stored_goal = _goal_object(stored_goal_response, "thread/goal/set")
+        _validate_goal_binding(stored_goal, owner)
+        if _string_at(stored_goal, ("status",)) != "paused":
+            raise ExternalCodexReturnError(
+                "canonical Goal pause receipt raw mutation response does not confirm a paused Goal"
+            )
     if recovery is not None:
         if (
             not isinstance(recovery, dict)
@@ -2968,6 +2993,9 @@ def _validate_pause_receipt(
         owner=owner,
         precondition=precondition,
         mutation=mutation_dispatched,
+        goal_response=(
+            stored_goal_response if isinstance(stored_goal_response, dict) else None
+        ),
         expected_response_digest=lifecycle.get("goal_response_sha256"),
         expected_post_read_digest=(
             lifecycle.get("post_read_response_sha256")

@@ -47,9 +47,10 @@ authorize a new mutation.
 
 Pause evidence remains separate from transport ambiguity, wake delivery,
 semantic acceptance, owner acceptance, holder closure, and Goal completion.
-The completed pause receipt retains the raw post-read response as well as its
-safe summary and digest; proof-recorded recovery reuses those stored bytes,
-while a fresh read is only an owner-identity and current-state check. Receipt
+The completed pause receipt retains the raw mutation response and raw post-read
+response as well as their safe summaries and digests; proof-recorded recovery
+reuses stored post-read bytes, while a fresh read is only an owner-identity and
+current-state check. Receipt
 replay therefore tolerates mutable app-server metadata without rewriting the
 historical transition evidence. The legacy pause entrypoint remains a
 mutating compatibility path for new reservations, while replay of a completed

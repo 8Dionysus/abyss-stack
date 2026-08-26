@@ -675,6 +675,19 @@ def test_run_pause_reserves_and_replays_without_second_transport_mutation(
     ):
         MODULE.run_pause(args)
 
+    tampered_goal_response = json.loads(json.dumps(first))
+    tampered_goal_response["lifecycle"]["goal_response"]["server_metadata"] = {
+        "revision": 2
+    }
+    pause_path.write_bytes(
+        MODULE._canonical_bytes(tampered_goal_response) + b"\n"
+    )
+    with pytest.raises(
+        MODULE.ExternalCodexReturnError,
+        match="response digest",
+    ):
+        MODULE.run_pause(args)
+
     incomplete = json.loads(json.dumps(first))
     incomplete["lifecycle"]["response_available"] = False
     pause_path.write_bytes(MODULE._canonical_bytes(incomplete) + b"\n")

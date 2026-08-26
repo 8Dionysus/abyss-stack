@@ -868,6 +868,72 @@ def test_generic_adapter_reconciles_a_lost_set_response_without_a_second_set(
     assert [method for method, _params in rpc.calls].count("thread/goal/set") == 1
 
 
+def test_generic_adapter_legacy_recovery_projects_its_stored_mutation_response(
+    tmp_path: Path,
+) -> None:
+    endpoint = tmp_path / "legacy-recovery.sock"
+    owner = _owner(endpoint)
+    owner_path = tmp_path / "owner-legacy-recovery.json"
+    owner_path.write_bytes(RUNTIME._canonical_bytes(owner) + b"\n")
+    request = _request(
+        observed="active",
+        desired="paused",
+        kind="delegation_yield",
+        request_id="request:legacy-recovery",
+    )
+    decision = _decision(request)
+    attempt_path = tmp_path / "legacy-recovery.attempt.json"
+    rpc = FakeGoalRpc(endpoint, status="active")
+    ADAPTER.execute_goal_transition(
+        request,
+        decision,
+        owner,
+        owner_path,
+        endpoint,
+        rpc_factory=lambda _endpoint: rpc,
+        attempt_path=attempt_path,
+    )
+
+    attempt = json.loads(attempt_path.read_text(encoding="utf-8"))
+    proof = attempt["transition_proof"]
+    attempt["transition_proof"] = {
+        key: proof[key]
+        for key in (
+            "schema_version",
+            "kind",
+            "method",
+            "thread_id",
+            "from_status",
+            "to_status",
+            "precondition_sha256",
+            "request_id",
+            "request_sha256",
+            "goal_response_sha256",
+        )
+    }
+    attempt["transition_proof"]["schema_version"] = (
+        ADAPTER.LEGACY_GOAL_TRANSITION_PROOF_SCHEMA_VERSION
+    )
+    attempt["transition_proof"]["kind"] = "server_compare_and_set"
+    historical_mutation_response = attempt["goal_response"]
+    attempt.pop("post_read_response")
+    attempt_path.write_bytes(RUNTIME._canonical_bytes(attempt) + b"\n")
+    rpc.goal_get_extra = {"server_metadata": {"revision": 2}}
+
+    recovered = ADAPTER.execute_goal_transition(
+        request,
+        decision,
+        owner,
+        owner_path,
+        endpoint,
+        rpc_factory=lambda _endpoint: rpc,
+        attempt_path=attempt_path,
+    )
+
+    assert recovered["lifecycle"]["result_response"] == historical_mutation_response
+    assert [method for method, _params in rpc.calls].count("thread/goal/set") == 1
+
+
 @pytest.mark.parametrize("missing_marker", ("mutation_reserved", "mutation_dispatched"))
 def test_generic_adapter_requires_both_dispatch_markers_for_recovery(
     tmp_path: Path, missing_marker: str

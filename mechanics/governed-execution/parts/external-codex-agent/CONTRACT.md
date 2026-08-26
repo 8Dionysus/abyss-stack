@@ -151,8 +151,9 @@ Operations are:
 
   The legacy projection's receipt is reserved before its app-server mutation
   and binds the owner
-  bytes, Goal/thread identities, transition proof, transport response digest,
-  and separate owner/semantic-acceptance markers. It does not read or start a
+  bytes, Goal/thread identities, transition proof, raw mutation and post-read
+  responses with their digests, and separate owner/semantic-acceptance
+  markers. It does not read or start a
   turn, deliver a handoff, authorize or close a holder, or claim semantic
   acceptance. The reservation also stores the exact active precondition and
   mutation reservation before the WebSocket request is sent, then records a
