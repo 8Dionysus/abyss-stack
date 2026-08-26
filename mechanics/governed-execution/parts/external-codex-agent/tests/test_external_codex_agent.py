@@ -6466,6 +6466,7 @@ def test_sha256_workspace_head_is_accepted_by_runtime_and_binder(
     assert RUNTIME._git_head(workspace) == expected
     assert BINDER._git_head(workspace) == expected
     assert PREPARER._git_head(workspace) == expected
+    assert PREPARER._workspace_ref(workspace, expected).schema_version == "sha256"
     assert RUNTIME.build_workspace_manifest(workspace)["git_head"] == expected
 
 

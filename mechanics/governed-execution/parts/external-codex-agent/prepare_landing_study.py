@@ -1102,13 +1102,18 @@ def _requirement_refs(
 
 
 def _workspace_ref(workspace: Path, head: str) -> ProvenanceRef:
+    schema_version = {40: "sha1", 64: "sha256"}.get(len(head))
+    if schema_version is None:
+        raise StudyPreparationError(
+            f"invalid Git HEAD width for workspace reference in {workspace}"
+        )
     return _generated_ref(
         owner="abyss-stack",
         artifact_ref=f"workspaces/{workspace.name}/HEAD",
         raw=head.encode("ascii"),
         source_ref=head,
         schema_ref="git:commit",
-        schema_version="sha1",
+        schema_version=schema_version,
     )
 
 
