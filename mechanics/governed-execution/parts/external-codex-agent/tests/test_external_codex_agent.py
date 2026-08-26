@@ -1127,6 +1127,40 @@ def test_owner_contour_preflight_rechecks_exact_runtime_package_inventory(
     assert exc_info.value.code == "runtime_package_subject_invalid"
 
 
+@pytest.mark.parametrize("subject_state", ("missing", "drifted"))
+def test_owner_contour_rejects_missing_or_drifted_command_visible_runtime_subject(
+    tmp_path: Path,
+    subject_state: str,
+) -> None:
+    fixture = _fixture(tmp_path, owner_contour=True, exact_preflight=True)
+    owner_request_path = fixture["owner_execution_request_path"]
+    assert owner_request_path is not None
+
+    preflight = fixture["runtime"].preflight(
+        fixture["launch_path"],
+        owner_request_path=owner_request_path,
+    )
+    assert preflight["admitted"] is True
+    package_executable = (
+        Path(fixture["launch"]["runtime_package"]["package_root"])
+        / "bin/codex"
+    )
+    if subject_state == "missing":
+        package_executable.unlink()
+    else:
+        package_executable.write_bytes(b"command-visible runtime package drift\n")
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        fixture["runtime"].preflight(
+            fixture["launch_path"],
+            owner_request_path=owner_request_path,
+        )
+    assert exc_info.value.code == {
+        "missing": "codex_unavailable",
+        "drifted": "codex_executable_drift",
+    }[subject_state]
+
+
 def _adapt_plan(
     *,
     task_ref: ProvenanceRef,

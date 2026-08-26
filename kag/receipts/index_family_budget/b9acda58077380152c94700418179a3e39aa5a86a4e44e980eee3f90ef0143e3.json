@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 27457416,
+  "allowed_tracked_bytes": 38244252,
+  "approved_by": "repository-owner",
+  "base_ref": "3b2bda61c1138da2af8f6c5d84bee9e4526e4f0f",
+  "changed_generated_bytes": 27457416,
+  "changed_generated_files": 266,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "b9acda58077380152c94700418179a3e39aa5a86a4e44e980eee3f90ef0143e3",
+  "reason": "Refresh the derived owner portable family after the bounded external-Codex runtime containment alias repair.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 38244252,
+  "tracked_bytes_max": 24117248
+}
