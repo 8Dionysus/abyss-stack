@@ -11347,6 +11347,35 @@ def test_workspace_manifest_binds_partially_staged_index_bytes(
     ]
 
 
+def test_legacy_workspace_manifest_rejects_partially_staged_index_drift(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    _git(workspace, "init", "-b", "main")
+    _git(workspace, "config", "user.email", "fixture@example.invalid")
+    _git(workspace, "config", "user.name", "Fixture")
+    tracked = workspace / "tracked.txt"
+    tracked.write_text("baseline\n", encoding="utf-8")
+    _git(workspace, "add", "tracked.txt")
+    _git(workspace, "commit", "-m", "fixture")
+
+    tracked.write_text("staged-a\n", encoding="utf-8")
+    _git(workspace, "add", "tracked.txt")
+    tracked.write_text("worktree\n", encoding="utf-8")
+    legacy = RUNTIME.build_workspace_manifest(workspace)
+    legacy.pop("git_diff_cached_binary_sha256")
+
+    tracked.write_text("staged-b\n", encoding="utf-8")
+    _git(workspace, "add", "tracked.txt")
+    tracked.write_text("worktree\n", encoding="utf-8")
+
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        RUNTIME.assert_workspace_manifest(legacy, workspace)
+
+    assert exc_info.value.code == "workspace_manifest_drift"
+
+
 def test_workspace_manifest_rejects_staged_index_change_during_capture(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

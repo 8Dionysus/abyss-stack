@@ -6447,6 +6447,21 @@ def _workspace_manifests_match(
     current_without_diff = dict(current)
     legacy_without_cached_diff = "git_diff_cached_binary_sha256" not in baseline
     if legacy_without_cached_diff:
+        # A pre-canonical v1 baseline cannot bind arbitrary index bytes.  Keep
+        # compatibility only when its recorded status proves that the index
+        # had no staged edits and the current index is still empty relative to
+        # HEAD; otherwise a partially staged workspace could be re-admitted
+        # with an unbound commit payload.
+        baseline_status_entries = baseline_without_diff.get("status_entries")
+        if not isinstance(baseline_status_entries, list) or any(
+            not isinstance(item, Mapping)
+            or not isinstance(item.get("status"), str)
+            or item["status"][:1] not in {"", " ", "?", "!"}
+            for item in baseline_status_entries
+        ):
+            return False
+        if current.get("git_diff_cached_binary_sha256") != sha256_bytes(b""):
+            return False
         current_without_diff.pop("git_diff_cached_binary_sha256", None)
     # Older admitted manifests did not carry the shallow-boundary snapshot.
     # Preserve that compatibility only for a currently non-shallow source; a
