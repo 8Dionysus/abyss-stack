@@ -111,7 +111,7 @@ def test_workflow_routes_reusable_commands_through_ci_gate() -> None:
     assert "https://github.com/8Dionysus/aoa-sdk" in workflow
     assert (
         "git -C \"$RUNNER_TEMP/aoa-sdk-source\" fetch --depth 1 origin "
-        "8a349e5f8ae0d60f840378a91ecea3d101777de0"
+        "a5e09eb96d3b7f32737b2cde9694ce09ad999eb6"
     ) in workflow
     assert (
         "git -C \"$RUNNER_TEMP/aoa-agents-source\" fetch --depth 1 origin "
