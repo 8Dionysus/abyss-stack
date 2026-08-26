@@ -99,7 +99,7 @@ def _bounded_canonical_bytes(value: object, *, limit: int) -> bytes:
     try:
         while pending:
             candidate = pending.pop()
-            if isinstance(candidate, (Mapping, list)):
+            if isinstance(candidate, (Mapping, list, tuple)):
                 identity = id(candidate)
                 if identity in seen_containers:
                     continue
@@ -111,7 +111,7 @@ def _bounded_canonical_bytes(value: object, *, limit: int) -> bytes:
                         "grant mapping exceeds the bounded key cardinality",
                     )
                 pending.extend(candidate.values())
-            elif isinstance(candidate, list):
+            elif isinstance(candidate, (list, tuple)):
                 pending.extend(candidate)
     except LandingEffectGrantError:
         raise

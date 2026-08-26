@@ -1033,6 +1033,14 @@ def test_request_mapping_rejects_oversized_key_cardinality_before_sorting() -> N
     assert exc.value.code == "landing_effect_request_too_large"
 
 
+def test_nested_tuple_mapping_rejects_oversized_key_cardinality_before_sorting() -> None:
+    request = {"nested": ({str(index): index for index in range(5000)},)}
+
+    with pytest.raises(LandingEffectGrantError) as exc:
+        admit_landing_effect_grant(None, request)
+    assert exc.value.code == "landing_effect_request_too_large"
+
+
 def test_git_ref_validation_ignores_ambient_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     fake_git = tmp_path / "git"
     fake_git.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
