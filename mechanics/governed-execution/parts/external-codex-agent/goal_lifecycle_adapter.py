@@ -51,6 +51,7 @@ def _contract_types() -> tuple[Any, ...]:
             GoalLifecycleExecutionReceipt,
             GoalLifecycleRequest,
             assert_goal_lifecycle_execution_scope,
+            assert_goal_lifecycle_execution_receipt_scope,
         )
     except ImportError as exc:  # pragma: no cover - install mismatch path
         raise _runtime().ExternalCodexReturnError(
@@ -62,6 +63,7 @@ def _contract_types() -> tuple[Any, ...]:
         GoalLifecycleExecutionReceipt,
         GoalLifecycleRequest,
         assert_goal_lifecycle_execution_scope,
+        assert_goal_lifecycle_execution_receipt_scope,
         canonical_digest,
     )
 
@@ -219,7 +221,15 @@ def _execution_projection(
     transition_proof: dict[str, Any] | None,
 ) -> dict[str, Any]:
     runtime = _runtime()
-    content_ref_type, _decision_type, execution_type, _request_type, _scope, canonical_digest = _contract_types()
+    (
+        content_ref_type,
+        _decision_type,
+        execution_type,
+        _request_type,
+        _scope,
+        assert_receipt_scope,
+        canonical_digest,
+    ) = _contract_types()
     request_ref = decision.request_ref
     decision_ref = _decision_ref(decision, content_ref_type, canonical_digest)
     generated_at = runtime._utc_now()
@@ -259,7 +269,10 @@ def _execution_projection(
         **base,
         "schema_version": execution_type.model_fields["schema_version"].default,
     }
-    _model(typed_base, execution_type, "Goal lifecycle execution receipt")
+    typed_receipt = _model(
+        typed_base, execution_type, "Goal lifecycle execution receipt"
+    )
+    assert_receipt_scope(request, decision, typed_receipt)
     receipt = {
         **base,
         "owner_ref": str(owner_path.resolve()),
@@ -311,6 +324,7 @@ def execute_goal_transition(
         _execution_type,
         request_type,
         assert_scope,
+        _assert_receipt_scope,
         _canonical_digest,
     ) = _contract_types()
     request = _model(request, request_type, "Goal lifecycle request")
@@ -460,6 +474,7 @@ def _validate_existing_receipt(
         execution_type,
         _request_type,
         assert_scope,
+        assert_receipt_scope,
         _digest,
     ) = _contract_types()
     assert_scope(request, decision)
@@ -496,6 +511,7 @@ def _validate_existing_receipt(
     parsed = _model(
         typed_projection, execution_type, "existing Goal lifecycle receipt"
     )
+    assert_receipt_scope(request, decision, parsed)
     if (
         parsed.correlation_id != request.correlation_id
         or parsed.idempotency_key != request.idempotency_key
@@ -570,6 +586,7 @@ def run_goal_transition(args: Any) -> dict[str, Any]:
         _execution_type,
         request_type,
         assert_scope,
+        _assert_receipt_scope,
         _canonical_digest,
     ) = _contract_types()
     request_path = runtime._regular_file(Path(args.request), "Goal lifecycle request")
