@@ -257,7 +257,7 @@ def _producer_projection(
     projection = Path(str(result.payload.get("actor_projection_path", "")))
     if not projection.is_absolute():
         raise NestedEvidenceNamespaceError("producer runtime coordinate is not absolute")
-    if _producer_review_seal(result) is not None:
+    if review_seal is not None:
         return projection
     try:
         resolved_projection = projection.resolve(strict=True)

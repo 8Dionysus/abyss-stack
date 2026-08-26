@@ -8,7 +8,7 @@
   "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
   "default_limit_bytes": 1048576,
   "head_family_digest": "4bb3b3b8466544d11e40cf021992c8885a1733ba70af6bf3c2ab30ca6e8fb98d",
-  "reason": "Owner-approved portable-family regeneration for PR #433 after committed seal-name collision repair; bind the derived family to the committed head and require normal CI review.",
+  "reason": "Owner-approved portable-family regeneration for PR #433 after reusing the cached producer seal in projection resolution and adding the regression; require normal CI review.",
   "repo": "abyss-stack",
   "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
   "scope": "generated_delta_and_tracked_size",
