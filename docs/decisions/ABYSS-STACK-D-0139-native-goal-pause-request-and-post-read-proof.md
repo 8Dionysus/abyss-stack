@@ -1,6 +1,6 @@
 # Native Goal Pause Request And Post-Read Proof
 
-- Decision ID: ABYSS-STACK-D-0138
+- Decision ID: ABYSS-STACK-D-0139
 - Status: accepted
 - Date: 2026-08-26
 - Owner surface: `mechanics/governed-execution/parts/external-codex-agent`

@@ -2,7 +2,7 @@
 
 - Decision ID: ABYSS-STACK-D-0133
 - Status: superseded
-- Superseded by: `ABYSS-STACK-D-0138-native-goal-pause-request-and-post-read-proof.md`
+- Superseded by: `ABYSS-STACK-D-0139-native-goal-pause-request-and-post-read-proof.md`
 - Date: 2026-08-22
 - Owner surface: `mechanics/governed-execution/parts/external-codex-agent`
 
