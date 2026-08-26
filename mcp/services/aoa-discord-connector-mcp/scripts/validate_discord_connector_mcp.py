@@ -101,9 +101,9 @@ def main() -> int:
         "server": server is not None,
         "tool_annotations": len(tools) == 4
         and all(
-            tool.annotations.readOnlyHint is True
-            and tool.annotations.destructiveHint is False
-            and tool.annotations.openWorldHint is False
+            tool.annotations.read_only_hint is True
+            and tool.annotations.destructive_hint is False
+            and tool.annotations.open_world_hint is False
             for tool in tools
         ),
     }

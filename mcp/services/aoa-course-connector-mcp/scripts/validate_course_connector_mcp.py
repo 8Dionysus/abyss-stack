@@ -35,7 +35,7 @@ def main() -> None:
     if sources["owner_result"]["arguments"]["include_source_refs"] is not False:
         raise SystemExit("course source refs are not fail-closed")
     if len(tools) != 9 or any(
-        tool.annotations.readOnlyHint is not True for tool in tools
+        tool.annotations.read_only_hint is not True for tool in tools
     ):
         raise SystemExit("course read tool catalog drifted")
     print(json.dumps({"ok": True, "tool_count": len(tools)}, indent=2))
