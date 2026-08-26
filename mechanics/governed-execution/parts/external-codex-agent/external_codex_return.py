@@ -1923,6 +1923,11 @@ def _load_return_route(path: Path) -> dict[str, str]:
     ):
         if _sha256_bytes(path_value.read_bytes()) != values[digest_key]:
             raise ExternalCodexReturnError(f"canonical return route {label} digest has drifted")
+    holder_document, _holder_bytes = _load_json_file(
+        holder_path, "holder terminal receipt"
+    )
+    if holder_document.get("schema_version") == VISIBLE.HOLDER_RECEIPT_SCHEMA_VERSION:
+        VISIBLE._load_holder_receipt_snapshot(holder_path)
     output_paths = [
         (_validate_output_path(Path(values["return_receipt_ref"]), "return receipt"), "return receipt"),
         (

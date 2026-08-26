@@ -115,7 +115,11 @@ the runtime snapshot loader for both v3 and legacy-v2 snapshots; a typed v3
 receipt additionally requires the durable `holder_claim`,
 `holder_claim_digest`, and `holder_claim_snapshot_b64` fields. The schema and
 loader reject that claim omission, while pre-snapshot compatibility receipts
-remain readable without the conditional fields. Rebind
+remain readable without the conditional fields. Presence of those fields is
+not semantic admission: one canonical runtime validator requires the decoded
+claim to have exactly the holder-claim field set and cross-binds its manifest
+path/digest, holder binding, receipt reference, canonical manifest-derived
+claim pathname, and snapshot bytes/digest to the enclosing receipt. Rebind
 reserves the same holder claim under the preparation lock before publishing a
 replacement receipt; if canonical launch already claimed the home, rebind
 transfers the receipt binding from the superseded receipt under that lock. It

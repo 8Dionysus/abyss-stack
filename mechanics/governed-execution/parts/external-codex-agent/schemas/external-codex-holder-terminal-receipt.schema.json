@@ -2,6 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/8Dionysus/abyss-stack/main/mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-holder-terminal-receipt.schema.json",
   "title": "Visible responsibility-holder terminal receipt",
+  "$comment": "The base64 holder-claim snapshot is opaque to JSON Schema; typed receipt admission must apply the runtime semantic validator to bind its exact claim fields to the enclosing manifest, holder binding, receipt reference, canonical claim pathname, and snapshot bytes/digest.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema_version", "receipt_ref", "created_at", "lifecycle_role", "boot_id", "holder", "runtime", "terminal"],

@@ -81,6 +81,16 @@ TERMINAL_BINDING_CONTEXT_FIELDS = (
 )
 HOLDER_CLAIM_SCHEMA_VERSION = "abyss_stack_visible_incarnation_holder_claim_v1"
 HOLDER_CLAIM_FILE_NAME = "holder-claim.json"
+HOLDER_CLAIM_FIELDS = frozenset(
+    {
+        "schema_version",
+        "manifest_path",
+        "manifest_digest",
+        "holder_binding",
+        "holder_receipt",
+        "created_at",
+    }
+)
 PREPARATION_LOCK_FILE_NAME = ".incarnation-home.lock"
 PREPARATION_OWNER_FILE_NAME = ".prepare-owner.json"
 PREPARATION_OWNER_SCHEMA_VERSION = (
@@ -6309,6 +6319,36 @@ def _reserve_holder_claim(
     return claim_path, claim_digest
 
 
+def _validate_holder_claim_semantics(
+    claim: object,
+    *,
+    manifest_path: Path,
+    manifest_digest: str,
+    holder_binding: object,
+    holder_receipt_path: Path,
+) -> dict[str, Any]:
+    """Validate one claim object against its enclosing launch identities."""
+
+    if not isinstance(claim, dict) or set(claim) != HOLDER_CLAIM_FIELDS:
+        raise IncarnationHomeError("holder claim fields are not exact")
+    if claim.get("schema_version") != HOLDER_CLAIM_SCHEMA_VERSION:
+        raise IncarnationHomeError("unsupported holder claim schema")
+    if not isinstance(claim.get("created_at"), str) or not claim["created_at"].strip():
+        raise IncarnationHomeError("holder claim creation time is invalid")
+    if SHA256_DIGEST_PATTERN.fullmatch(manifest_digest) is None:
+        raise IncarnationHomeError("holder claim manifest digest is invalid")
+    expected_claim = {
+        "manifest_path": str(manifest_path.resolve()),
+        "manifest_digest": manifest_digest,
+        "holder_binding": _validate_holder_binding_manifest_record(holder_binding),
+        "holder_receipt": _safe_source_receipt_path(holder_receipt_path),
+    }
+    for key, expected in expected_claim.items():
+        if claim.get(key) != expected:
+            raise IncarnationHomeError(f"holder claim {key} disagrees with launch")
+    return claim
+
+
 def _validate_holder_claim(
     *,
     claim_path: Path,
@@ -6322,39 +6362,19 @@ def _validate_holder_claim(
     claim, raw = _load_json_snapshot(claim_path, "holder claim")
     if sha256_bytes(raw) != claim_digest:
         raise IncarnationHomeError("holder claim digest drifted")
-    expected_fields = {
-        "schema_version",
-        "manifest_path",
-        "manifest_digest",
-        "holder_binding",
-        "holder_receipt",
-        "created_at",
-    }
-    if set(claim) != expected_fields:
-        raise IncarnationHomeError("holder claim fields are not exact")
-    if claim.get("schema_version") != HOLDER_CLAIM_SCHEMA_VERSION:
-        raise IncarnationHomeError("unsupported holder claim schema")
     if not isinstance(claim_digest, str) or SHA256_DIGEST_PATTERN.fullmatch(
         claim_digest
     ) is None:
         raise IncarnationHomeError("holder claim digest is invalid")
-    if not isinstance(claim.get("created_at"), str) or not claim["created_at"].strip():
-        raise IncarnationHomeError("holder claim creation time is invalid")
-    expected_claim = {
-        "manifest_path": str(manifest_path.resolve()),
-        "manifest_digest": manifest_digest,
-        "holder_binding": _validate_holder_binding_manifest_record(
-            manifest.get("holder_binding")
-        ),
-        "holder_receipt": _safe_source_receipt_path(holder_receipt_path),
-    }
-    if SHA256_DIGEST_PATTERN.fullmatch(manifest_digest) is None:
-        raise IncarnationHomeError("holder claim manifest digest is invalid")
+    claim = _validate_holder_claim_semantics(
+        claim,
+        manifest_path=manifest_path,
+        manifest_digest=manifest_digest,
+        holder_binding=manifest.get("holder_binding"),
+        holder_receipt_path=holder_receipt_path,
+    )
     if SHA256_DIGEST_PATTERN.fullmatch(binding_context_digest) is None:
         raise IncarnationHomeError("holder claim binding context digest is invalid")
-    for key, expected in expected_claim.items():
-        if claim.get(key) != expected:
-            raise IncarnationHomeError(f"holder claim {key} disagrees with launch")
     if claim["holder_binding"]["binding_digest"] != binding_context_digest:
         raise IncarnationHomeError("holder claim binding context digest disagrees")
 
@@ -7098,7 +7118,12 @@ def _holder_receipt(
                 ).decode("ascii"),
             }
         )
-    _decode_holder_claim_snapshot(runtime, required=typed_manifest)
+    _decode_holder_claim_snapshot(
+        runtime,
+        required=typed_manifest,
+        receipt_path=receipt_path,
+        expected_manifest_path=manifest_path,
+    )
     binding: dict[str, object] | None = None
     terminal: dict[str, object] = {
         "binding": "kitty_ancestor_at_exec",
@@ -7341,6 +7366,7 @@ def _rebind_replacement_holder_receipt(
             # safely admit.
             _validate_rebind_receipt_claim_snapshot(
                 receipt=existing,
+                receipt_path=receipt_path,
                 manifest_path=manifest_path,
                 ambient_identities=ambient_identities,
             )
@@ -7413,6 +7439,12 @@ def _rebind_replacement_holder_receipt(
                         claim_snapshot
                     ).decode("ascii"),
                 }
+            )
+            _decode_holder_claim_snapshot(
+                receipt["runtime"],
+                required=True,
+                receipt_path=receipt_path,
+                expected_manifest_path=manifest_path,
             )
             _assert_safe_projection(receipt)
             _write_new_json(
@@ -7563,10 +7595,14 @@ def _decode_holder_manifest_snapshot(runtime: dict[str, Any]) -> bytes | None:
     return snapshot
 
 
-def _decode_holder_claim_snapshot(
-    runtime: dict[str, Any], *, required: bool = False
+def _validate_holder_claim_snapshot_binding(
+    runtime: dict[str, Any],
+    *,
+    receipt_path: Path | None,
+    required: bool = False,
+    expected_manifest_path: Path | None = None,
 ) -> bytes | None:
-    """Validate the immutable holder-claim bytes carried by a typed receipt."""
+    """Validate one immutable claim snapshot against its enclosing receipt."""
 
     claim_path = runtime.get("holder_claim")
     claim_digest = runtime.get("holder_claim_digest")
@@ -7577,6 +7613,10 @@ def _decode_holder_claim_snapshot(
                 "typed v3 holder receipt requires a durable holder claim snapshot"
             )
         return None
+    if receipt_path is None:
+        raise IncarnationHomeError(
+            "holder claim snapshot enclosing receipt reference is missing"
+        )
     if (
         not isinstance(claim_path, str)
         or not Path(claim_path).is_absolute()
@@ -7586,6 +7626,24 @@ def _decode_holder_claim_snapshot(
         or not encoded
     ):
         raise IncarnationHomeError("holder claim snapshot binding is incomplete")
+    manifest_value = runtime.get("incarnation_manifest")
+    if not isinstance(manifest_value, str) or not Path(manifest_value).is_absolute():
+        raise IncarnationHomeError("holder claim manifest path is invalid")
+    manifest_path = Path(manifest_value)
+    try:
+        canonical_manifest_path = manifest_path.resolve()
+    except (OSError, RuntimeError) as exc:
+        raise IncarnationHomeError("holder claim manifest path is invalid") from exc
+    if manifest_value != str(canonical_manifest_path):
+        raise IncarnationHomeError("holder claim manifest path is not canonical")
+    if expected_manifest_path is not None:
+        if manifest_value != str(expected_manifest_path.resolve()):
+            raise IncarnationHomeError(
+                "holder claim manifest path disagrees with enclosing manifest"
+            )
+    expected_claim_path = _holder_claim_path(canonical_manifest_path).resolve()
+    if claim_path != str(expected_claim_path):
+        raise IncarnationHomeError("holder claim path is not canonical")
     try:
         snapshot = base64.b64decode(encoded.encode("ascii"), validate=True)
     except (UnicodeEncodeError, ValueError, base64.binascii.Error) as exc:
@@ -7594,18 +7652,46 @@ def _decode_holder_claim_snapshot(
         ) from exc
     if not snapshot or sha256_bytes(snapshot) != claim_digest:
         raise IncarnationHomeError("holder claim snapshot digest has drifted")
+    manifest_snapshot = _decode_holder_manifest_snapshot(runtime)
+    if manifest_snapshot is None:
+        raise IncarnationHomeError(
+            "holder claim snapshot requires an incarnation manifest snapshot"
+        )
     try:
         claim = json.loads(snapshot.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise IncarnationHomeError("holder claim snapshot is not valid JSON") from exc
-    if not isinstance(claim, dict) or claim.get("schema_version") != HOLDER_CLAIM_SCHEMA_VERSION:
-        raise IncarnationHomeError("holder claim snapshot is unsupported")
+    claim = _validate_holder_claim_semantics(
+        claim,
+        manifest_path=canonical_manifest_path,
+        manifest_digest=runtime["incarnation_manifest_digest"],
+        holder_binding=runtime.get("holder_binding"),
+        holder_receipt_path=receipt_path,
+    )
     return snapshot
+
+
+def _decode_holder_claim_snapshot(
+    runtime: dict[str, Any],
+    *,
+    required: bool = False,
+    receipt_path: Path | None = None,
+    expected_manifest_path: Path | None = None,
+) -> bytes | None:
+    """Apply the canonical semantic holder-claim snapshot validator."""
+
+    return _validate_holder_claim_snapshot_binding(
+        runtime,
+        receipt_path=receipt_path,
+        required=required,
+        expected_manifest_path=expected_manifest_path,
+    )
 
 
 def _validate_rebind_receipt_claim_snapshot(
     *,
     receipt: dict[str, Any],
+    receipt_path: Path,
     manifest_path: Path,
     ambient_identities: set[tuple[int, int]],
 ) -> None:
@@ -7614,7 +7700,12 @@ def _validate_rebind_receipt_claim_snapshot(
     runtime = receipt.get("runtime")
     if not isinstance(runtime, dict):
         raise IncarnationHomeError("replacement holder receipt runtime is invalid")
-    snapshot = _decode_holder_claim_snapshot(runtime, required=True)
+    snapshot = _decode_holder_claim_snapshot(
+        runtime,
+        required=True,
+        receipt_path=receipt_path,
+        expected_manifest_path=manifest_path,
+    )
     if snapshot is None:
         return
     claim_value = runtime.get("holder_claim")
@@ -8073,7 +8164,11 @@ def _load_holder_receipt_snapshot(
     ):
         raise IncarnationHomeError("holder executable identity is invalid")
     manifest_snapshot = _decode_holder_manifest_snapshot(runtime)
-    _decode_holder_claim_snapshot(runtime, required=manifest_snapshot is not None)
+    _decode_holder_claim_snapshot(
+        runtime,
+        required=manifest_snapshot is not None,
+        receipt_path=path,
+    )
     if "binding" in receipt:
         binding = _validate_terminal_binding_shape(receipt["binding"])
         _validate_receipt_binding_consistency(receipt, binding)
@@ -8882,6 +8977,12 @@ def _validate_visible_launch_receipt(
         raise IncarnationHomeError(
             "visible launch receipt runtime identity does not match this launch"
         )
+    _decode_holder_claim_snapshot(
+        runtime,
+        required=manifest.get("schema_version") == SCHEMA_VERSION,
+        receipt_path=receipt_path,
+        expected_manifest_path=manifest_path,
+    )
     if companion_binding is None:
         if "codex_companion" in runtime:
             raise IncarnationHomeError(

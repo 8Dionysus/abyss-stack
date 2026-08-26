@@ -105,6 +105,87 @@ def _holder_binding_context_path(
     return path
 
 
+def _typed_holder_receipt_fixture(
+    tmp_path: Path,
+) -> tuple[Path, dict[str, object], Path, dict[str, object], dict[str, str]]:
+    receipt_path = tmp_path / "holder.json"
+    manifest_path = tmp_path / "incarnation-home.json"
+    context = _holder_binding_context(tmp_path, "claim-snapshot")
+    context_bytes = MODULE.canonical_bytes(context)
+    context_digest = MODULE.sha256_bytes(context_bytes)
+    holder_binding = MODULE._holder_binding_manifest_record(
+        context,
+        context_digest,
+        MODULE._holder_binding_context_coordinate(context, context_digest),
+    )
+    manifest = {
+        "schema_version": MODULE.SCHEMA_VERSION,
+        "model_slug": "gpt-5.6-luna",
+        "reasoning_effort": "max",
+        "ambient_codex_home": str(tmp_path / "ambient-home"),
+        "codex_home": str(tmp_path / "incarnation-home"),
+        "holder_binding": holder_binding,
+    }
+    manifest_bytes = MODULE.canonical_bytes(manifest)
+    manifest_digest = MODULE.sha256_bytes(manifest_bytes)
+    claim_path = MODULE._holder_claim_path(manifest_path).resolve()
+    claim = {
+        "schema_version": MODULE.HOLDER_CLAIM_SCHEMA_VERSION,
+        "manifest_path": str(manifest_path.resolve()),
+        "manifest_digest": manifest_digest,
+        "holder_binding": holder_binding,
+        "holder_receipt": str(receipt_path.resolve()),
+        "created_at": "2026-08-25T00:00:00Z",
+    }
+    claim_snapshot = MODULE.canonical_bytes(claim) + b"\n"
+    argv = ["/usr/bin/codex", "exec"]
+    receipt = {
+        "schema_version": MODULE.HOLDER_RECEIPT_SCHEMA_VERSION,
+        "receipt_ref": str(receipt_path.resolve()),
+        "created_at": "2026-08-25T00:00:00Z",
+        "lifecycle_role": "responsibility_holder",
+        "boot_id": "00000000-0000-0000-0000-000000000001",
+        "holder": {
+            "pid": 101,
+            "start_ticks": 1001,
+            "parent_pid": 202,
+            "parent_start_ticks": 2002,
+            "parent_comm": "kitty",
+            "argv": argv,
+            "argv_digest": MODULE.sha256_bytes(MODULE.canonical_bytes(argv)),
+        },
+        "runtime": {
+            "codex_executable": "/usr/bin/codex",
+            "codex_executable_digest": "sha256:" + "1" * 64,
+            "incarnation_manifest": str(manifest_path.resolve()),
+            "incarnation_manifest_digest": manifest_digest,
+            "incarnation_manifest_snapshot_b64": base64.b64encode(
+                manifest_bytes
+            ).decode("ascii"),
+            "model": manifest["model_slug"],
+            "reasoning_effort": manifest["reasoning_effort"],
+            "ambient_codex_home": manifest["ambient_codex_home"],
+            "incarnation_codex_home": manifest["codex_home"],
+            "holder_binding": holder_binding,
+            "holder_claim": str(claim_path),
+            "holder_claim_digest": MODULE.sha256_bytes(claim_snapshot),
+            "holder_claim_snapshot_b64": base64.b64encode(
+                claim_snapshot
+            ).decode("ascii"),
+        },
+        "terminal": {
+            "binding": "kitty_ancestor_at_exec",
+            "required_comm": "kitty",
+            "pid": 202,
+            "start_ticks": 2002,
+            "argv": ["/usr/bin/kitty"],
+            "window_id": "1",
+            "dedicated": True,
+        },
+    }
+    return receipt_path, receipt, manifest_path, claim, holder_binding
+
+
 def _payload_binding_arguments(
     runtime_root: Path,
     manifest: dict[str, object],
@@ -4180,6 +4261,119 @@ def test_holder_schema_and_loader_reject_rebind_post_exec_identity_without_prove
             match="holder binding fields are not exact",
         ):
             MODULE._validate_holder_binding_manifest_record(incomplete)
+
+
+def test_typed_holder_claim_snapshot_exact_binding_is_admitted(tmp_path: Path) -> None:
+    receipt_path, receipt, _manifest_path, _claim, _holder_binding = (
+        _typed_holder_receipt_fixture(tmp_path)
+    )
+    schema = json.loads(
+        (PART / "schemas" / "external-codex-holder-terminal-receipt.schema.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    Draft202012Validator(schema).validate(receipt)
+    receipt_path.write_bytes(MODULE.canonical_bytes(receipt) + b"\n")
+
+    loaded, raw, digest = MODULE._load_holder_receipt_snapshot(receipt_path)
+
+    assert loaded == receipt
+    assert digest == MODULE.sha256_bytes(raw)
+
+
+@pytest.mark.parametrize(
+    ("adversary", "expected_error"),
+    [
+        pytest.param(
+            "minimal_schema_only",
+            "holder claim fields are not exact",
+            id="minimal-schema-only-claim",
+        ),
+        pytest.param(
+            "non_canonical_absolute_claim_path",
+            "holder claim path is not canonical",
+            id="non-canonical-absolute-claim-path",
+        ),
+        pytest.param(
+            "cross_manifest",
+            "holder claim manifest_path disagrees with launch",
+            id="cross-manifest-claim",
+        ),
+        pytest.param(
+            "cross_binding",
+            "holder claim holder_binding disagrees with launch",
+            id="cross-binding-claim",
+        ),
+        pytest.param(
+            "cross_receipt",
+            "holder claim holder_receipt disagrees with launch",
+            id="cross-receipt-claim",
+        ),
+    ],
+)
+def test_typed_holder_claim_snapshot_adversaries_fail_closed(
+    tmp_path: Path,
+    adversary: str,
+    expected_error: str,
+) -> None:
+    receipt_path, receipt, manifest_path, claim, _holder_binding = (
+        _typed_holder_receipt_fixture(tmp_path)
+    )
+    schema = json.loads(
+        (PART / "schemas" / "external-codex-holder-terminal-receipt.schema.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    adversarial_receipt = json.loads(json.dumps(receipt))
+    adversarial_claim = json.loads(json.dumps(claim))
+    runtime = adversarial_receipt["runtime"]
+    if adversary == "minimal_schema_only":
+        adversarial_claim = {
+            "schema_version": MODULE.HOLDER_CLAIM_SCHEMA_VERSION,
+        }
+    elif adversary == "non_canonical_absolute_claim_path":
+        runtime["holder_claim"] = str(
+            tmp_path / "nested" / ".." / MODULE.HOLDER_CLAIM_FILE_NAME
+        )
+    elif adversary == "cross_manifest":
+        adversarial_claim["manifest_path"] = str(
+            (tmp_path / "foreign-incarnation-home.json").resolve()
+        )
+        adversarial_claim["manifest_digest"] = "sha256:" + "f" * 64
+    elif adversary == "cross_binding":
+        foreign_context = _holder_binding_context(tmp_path, "foreign-claim-snapshot")
+        foreign_context_bytes = MODULE.canonical_bytes(foreign_context)
+        foreign_context_digest = MODULE.sha256_bytes(foreign_context_bytes)
+        adversarial_claim["holder_binding"] = MODULE._holder_binding_manifest_record(
+            foreign_context,
+            foreign_context_digest,
+            MODULE._holder_binding_context_coordinate(
+                foreign_context, foreign_context_digest
+            ),
+        )
+    elif adversary == "cross_receipt":
+        adversarial_claim["holder_receipt"] = str(
+            (tmp_path / "foreign-holder.json").resolve()
+        )
+    else:  # pragma: no cover - the parameter list is exhaustive
+        raise AssertionError(f"unknown adversary: {adversary}")
+
+    if adversary != "non_canonical_absolute_claim_path":
+        # The claim pathname itself remains the canonical pathname in every
+        # snapshot adversary except the explicit enclosing-runtime pathname case.
+        runtime["holder_claim"] = str(
+            MODULE._holder_claim_path(manifest_path).resolve()
+        )
+    claim_snapshot = MODULE.canonical_bytes(adversarial_claim) + b"\n"
+    runtime["holder_claim_digest"] = MODULE.sha256_bytes(claim_snapshot)
+    runtime["holder_claim_snapshot_b64"] = base64.b64encode(
+        claim_snapshot
+    ).decode("ascii")
+
+    Draft202012Validator(schema).validate(adversarial_receipt)
+    receipt_path.write_bytes(MODULE.canonical_bytes(adversarial_receipt) + b"\n")
+    with pytest.raises(MODULE.IncarnationHomeError, match=expected_error):
+        MODULE._load_holder_receipt_snapshot(receipt_path)
 
 
 def test_holder_loss_reentry_is_exactly_bound_to_source_evidence(

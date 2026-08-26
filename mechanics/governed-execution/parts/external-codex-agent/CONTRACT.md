@@ -240,7 +240,11 @@ snapshot, including a legacy-v2 snapshot, must carry the complete typed
 `holder_binding` in both the receipt runtime and the snapshot; a typed v3
 receipt must additionally carry `holder_claim`, `holder_claim_digest`, and
 `holder_claim_snapshot_b64` for the durable claim bytes. The runtime loader and
-public schema reject either omission. Legacy receipts without the snapshot
+public schema reject either omission. The runtime semantic validator then
+requires the decoded snapshot to have exactly the holder-claim field set and
+to agree with the enclosing manifest path and digest, holder binding, receipt
+reference, canonical claim pathname derived from that manifest, and encoded
+snapshot digest. Legacy receipts without the snapshot
 retain their prior fail-closed pathname check. The holder argv is the post-exec `/proc` shape, including the
 interpreter argv of a shebang-backed executable. For that shebang route, an
 internal `payload-launch` helper runs as bubblewrap's payload, revalidates the
