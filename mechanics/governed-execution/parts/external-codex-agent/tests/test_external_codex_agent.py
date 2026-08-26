@@ -7808,6 +7808,33 @@ def test_study_preparer_binds_actual_sdk_import_root(tmp_path: Path) -> None:
         PREPARER._assert_aoa_sdk_import_root(tmp_path / "different-sdk")
 
 
+def test_study_preparer_pins_landing_admission_schemas() -> None:
+    grant_ref, workspace_ref = PREPARER._landing_effect_schema_refs()
+    expected = (
+        (
+            grant_ref,
+            PREPARER.LANDING_EFFECT_GRANT_SCHEMA_PATH,
+            PREPARER.LANDING_EFFECT_GRANT_SCHEMA_REF,
+            PREPARER.LANDING_EFFECT_GRANT_SCHEMA_VERSION,
+        ),
+        (
+            workspace_ref,
+            PREPARER.WORKSPACE_MANIFEST_SCHEMA_PATH,
+            PREPARER.WORKSPACE_MANIFEST_SCHEMA_REF,
+            PREPARER.WORKSPACE_MANIFEST_SCHEMA_VERSION,
+        ),
+    )
+    for reference, path, artifact_ref, schema_version in expected:
+        assert path.is_file()
+        assert reference.artifact_ref == artifact_ref
+        assert reference.artifact_digest == PREPARER._file_digest(path)
+        assert reference.source_ref == (
+            "uncommitted-runtime-source@" + reference.artifact_digest
+        )
+        assert reference.schema_ref == "https://json-schema.org/draft/2020-12/schema"
+        assert reference.schema_version == schema_version
+
+
 def test_study_preparer_rejects_auxiliary_sdk_module_outside_root(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

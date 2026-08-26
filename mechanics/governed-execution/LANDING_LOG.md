@@ -53,6 +53,16 @@ nullable file modes, with focused regression coverage. The focused
 landing-effect suite passed 65 tests; runtime posture remains source-only with
 `external_effects=false` and the complete ten-effect forbidden closure.
 
+## 2026-08-25 - Review repair for landing schema pinning
+
+The fixed-input study preparer now content-addresses the governed landing-effect
+grant schema and workspace-manifest schema beside the landing source. Each
+schema is repeated in writer immutable inputs, non-A2A scenario inputs, runtime
+constraint refs, continuation inputs, and validation refs, so a prepared study
+cannot execute against silently changed admission rules. The change remains
+source-only and preserves `external_effects=false` plus the complete
+ten-effect forbidden closure.
+
 ## 2026-08-13 - Stable external owner-request result identity
 
 Separated the cross-owner identity of an admitted `aoa-agents` execution

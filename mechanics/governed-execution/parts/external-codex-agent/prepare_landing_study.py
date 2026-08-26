@@ -107,6 +107,19 @@ WORKSPACE_MANIFEST_SCHEMA_REF = (
 WORKSPACE_MANIFEST_SCHEMA_PATH = (
     PART_ROOT / "schemas/external-codex-workspace-manifest.schema.json"
 )
+LANDING_EFFECT_GRANT_SCHEMA_REF = (
+    "mechanics/governed-execution/parts/external-codex-agent/"
+    "schemas/external-codex-governed-landing-effect-grant.schema.json"
+)
+LANDING_EFFECT_GRANT_SCHEMA_PATH = PART_ROOT / Path(
+    "schemas/external-codex-governed-landing-effect-grant.schema.json"
+)
+LANDING_EFFECT_GRANT_SCHEMA_VERSION = (
+    "abyss_stack_external_codex_governed_landing_effect_grant_v1"
+)
+WORKSPACE_MANIFEST_SCHEMA_VERSION = (
+    "abyss_stack_external_codex_workspace_manifest_v1"
+)
 ACTOR_MANIFEST_SCHEMA_REF = (
     "mechanics/governed-execution/parts/external-codex-agent/"
     "schemas/external-codex-actor-workspace-manifest.schema.json"
@@ -410,6 +423,34 @@ def _file_ref(
         schema_ref=schema_ref,
         schema_version=schema_version,
     )
+
+
+def _landing_effect_schema_refs() -> tuple[ProvenanceRef, ProvenanceRef]:
+    """Bind the exact landing grant and workspace schemas for one study."""
+
+    grant_ref = _file_ref(
+        owner="abyss-stack",
+        artifact_ref=LANDING_EFFECT_GRANT_SCHEMA_REF,
+        path=LANDING_EFFECT_GRANT_SCHEMA_PATH,
+        source_ref=(
+            "uncommitted-runtime-source@"
+            + _file_digest(LANDING_EFFECT_GRANT_SCHEMA_PATH)
+        ),
+        schema_ref="https://json-schema.org/draft/2020-12/schema",
+        schema_version=LANDING_EFFECT_GRANT_SCHEMA_VERSION,
+    )
+    workspace_ref = _file_ref(
+        owner="abyss-stack",
+        artifact_ref=WORKSPACE_MANIFEST_SCHEMA_REF,
+        path=WORKSPACE_MANIFEST_SCHEMA_PATH,
+        source_ref=(
+            "uncommitted-runtime-source@"
+            + _file_digest(WORKSPACE_MANIFEST_SCHEMA_PATH)
+        ),
+        schema_ref="https://json-schema.org/draft/2020-12/schema",
+        schema_version=WORKSPACE_MANIFEST_SCHEMA_VERSION,
+    )
+    return grant_ref, workspace_ref
 
 
 def _generated_ref(
@@ -1442,6 +1483,10 @@ def _prepare_writers(args: argparse.Namespace) -> dict[str, Any]:
         schema_ref="text/x-python",
         schema_version="abyss_stack_external_codex_landing_effect_source_v1",
     )
+    (
+        landing_effect_grant_schema_ref,
+        workspace_manifest_schema_ref,
+    ) = _landing_effect_schema_refs()
     snapshot = load_plan_compilation_snapshot()
     route_policy = _task_route_policy(packet)
     contour = snapshot.contour_for(str(route_policy["scenario_id"]))
@@ -1600,6 +1645,20 @@ def _prepare_writers(args: argparse.Namespace) -> dict[str, Any]:
                     "input_id": "runtime-landing-effect-source",
                     "local_path": str(landing_effect_source_path),
                     "provenance": landing_effect_source_ref.model_dump(mode="json"),
+                },
+                {
+                    "input_id": "runtime-landing-effect-grant-schema",
+                    "local_path": str(LANDING_EFFECT_GRANT_SCHEMA_PATH),
+                    "provenance": landing_effect_grant_schema_ref.model_dump(
+                        mode="json"
+                    ),
+                },
+                {
+                    "input_id": "runtime-workspace-manifest-schema",
+                    "local_path": str(WORKSPACE_MANIFEST_SCHEMA_PATH),
+                    "provenance": workspace_manifest_schema_ref.model_dump(
+                        mode="json"
+                    ),
                 },
                 {
                     "input_id": "summon-request",
@@ -1774,6 +1833,8 @@ def _prepare_writers(args: argparse.Namespace) -> dict[str, Any]:
                 summon_request_schema_ref,
                 summon_decision_ref,
                 summon_result_schema_ref,
+                landing_effect_grant_schema_ref,
+                workspace_manifest_schema_ref,
             )
             scenario_artifact_bindings = ()
         scenario = ScenarioBinding(
@@ -1817,6 +1878,8 @@ def _prepare_writers(args: argparse.Namespace) -> dict[str, Any]:
                     report_schema_ref,
                     controller_source_ref,
                     landing_effect_source_ref,
+                    landing_effect_grant_schema_ref,
+                    workspace_manifest_schema_ref,
                     model_ref,
                     task_ref,
                     summon_request_ref,
@@ -1942,6 +2005,8 @@ def _prepare_writers(args: argparse.Namespace) -> dict[str, Any]:
                 manifest_ref,
                 controller_source_ref,
                 landing_effect_source_ref,
+                landing_effect_grant_schema_ref,
+                workspace_manifest_schema_ref,
                 workspace_ref,
                 model_ref,
                 summon_request_ref,
@@ -1957,6 +2022,8 @@ def _prepare_writers(args: argparse.Namespace) -> dict[str, Any]:
                 report_schema_ref,
                 controller_source_ref,
                 landing_effect_source_ref,
+                landing_effect_grant_schema_ref,
+                workspace_manifest_schema_ref,
                 packet_ref,
                 manifest_ref,
                 summon_request_schema_ref,

@@ -724,6 +724,12 @@ small admission implementation in `external_codex_landing_effect.py`. A grant
 is a separate owner artifact, not a model or provider identity. It binds all of
 these exact relations in one document:
 
+The fixed-input study preparer content-addresses both the grant schema and the
+workspace-manifest schema beside the landing source. Each schema is repeated
+in the writer's immutable inputs, runtime constraint refs, continuation inputs,
+and validation refs, so a prepared study cannot silently read a later schema
+revision.
+
 - `goal_ref` and `holder_ref`, including the holder's exact incarnation;
 - `repository.repository_id` and its exact `revision`; repository coordinates
   reject path-traversal components;
