@@ -36,6 +36,7 @@ SCHEMA_VERSION = "abyss_stack_external_codex_governed_landing_effect_grant_v1"
 CAPABILITY_ID = "governed_git_landing_v1"
 ZERO_DIGEST = "sha256:" + "0" * 64
 MAX_GRANT_BYTES = 256 * 1024
+MAX_GRANT_MAPPING_KEYS = 4096
 MAX_WORKSPACE_MANIFEST_BYTES = 16 * 1024 * 1024
 GIT_EXECUTABLE = "/usr/bin/git"
 GIT_REF_VALIDATION_ENV = {
@@ -92,6 +93,32 @@ def _canonical_bytes(value: object) -> bytes:
 
 def _bounded_canonical_bytes(value: object, *, limit: int) -> bytes:
     """Canonicalize JSON data without materializing more than the bound."""
+
+    pending: list[object] = [value]
+    seen_containers: set[int] = set()
+    try:
+        while pending:
+            candidate = pending.pop()
+            if isinstance(candidate, (Mapping, list)):
+                identity = id(candidate)
+                if identity in seen_containers:
+                    continue
+                seen_containers.add(identity)
+            if isinstance(candidate, Mapping):
+                if len(candidate) > MAX_GRANT_MAPPING_KEYS:
+                    raise LandingEffectGrantError(
+                        "landing_effect_grant_too_large",
+                        "grant mapping exceeds the bounded key cardinality",
+                    )
+                pending.extend(candidate.values())
+            elif isinstance(candidate, list):
+                pending.extend(candidate)
+    except LandingEffectGrantError:
+        raise
+    except (MemoryError, RecursionError, TypeError, ValueError, OverflowError) as exc:
+        raise LandingEffectGrantError(
+            "landing_effect_grant_not_json", "grant is not canonical JSON data"
+        ) from exc
 
     encoder = json.JSONEncoder(
         ensure_ascii=False,
@@ -207,6 +234,7 @@ def _validate_workspace_manifest(raw: bytes) -> tuple[Mapping[str, Any], str]:
     for digest_field in (
         "git_status_porcelain_sha256",
         "git_diff_binary_sha256",
+        "git_diff_cached_binary_sha256",
     ):
         if not _is_sha256_digest(parsed[digest_field]):
             raise LandingEffectGrantError(
@@ -386,7 +414,7 @@ def _read_grant_bytes(grant_path: Path) -> bytes:
     )
     try:
         descriptor = os.open(grant_path, flags)
-    except OSError as exc:
+    except (OSError, ValueError) as exc:
         raise LandingEffectGrantError(
             "landing_effect_grant_unavailable",
             "grant path could not be opened as a regular file",

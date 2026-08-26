@@ -50,6 +50,7 @@ WORKSPACE_MANIFEST_RAW = (
             "git_head": "e" * 40,
             "git_status_porcelain_sha256": "sha256:" + "3" * 64,
             "git_diff_binary_sha256": "sha256:" + "4" * 64,
+            "git_diff_cached_binary_sha256": "sha256:" + "5" * 64,
             "status_entries": [],
             "content_entries": [],
         },
@@ -637,6 +638,7 @@ def test_commit_admission_rejects_manifest_digest_newlines() -> None:
     for field in (
         "git_status_porcelain_sha256",
         "git_diff_binary_sha256",
+        "git_diff_cached_binary_sha256",
     ):
         grant = _grant(target_kind="branch", effects=["commit"])
         raw_manifest_value = json.loads(WORKSPACE_MANIFEST_RAW)
@@ -934,6 +936,15 @@ def test_loader_rejects_fifo_without_blocking(tmp_path: Path) -> None:
     assert exc.value.code == "landing_effect_grant_unavailable"
 
 
+def test_loader_rejects_nul_path_as_typed_unavailable(tmp_path: Path) -> None:
+    with pytest.raises(LandingEffectGrantError) as exc:
+        load_landing_effect_grant(
+            tmp_path / "grant.json\0suffix",
+            expected_digest=REF_DIGEST,
+        )
+    assert exc.value.code == "landing_effect_grant_unavailable"
+
+
 def test_loader_rejects_oversized_artifacts_before_json_parse(tmp_path: Path) -> None:
     path = tmp_path / "oversized-grant.json"
     path.write_bytes(b"{" + (b" " * MAX_GRANT_BYTES))
@@ -1006,6 +1017,15 @@ def test_direct_admission_bounds_untrusted_mapping_after_artifact_validation() -
 
 def test_request_mapping_is_bounded_before_absent_grant_denial() -> None:
     request = {"untrusted": "x" * (MAX_GRANT_BYTES + 1)}
+
+    assert not landing_effect_grant_allows(None, request)
+    with pytest.raises(LandingEffectGrantError) as exc:
+        admit_landing_effect_grant(None, request)
+    assert exc.value.code == "landing_effect_request_too_large"
+
+
+def test_request_mapping_rejects_oversized_key_cardinality_before_sorting() -> None:
+    request = {f"untrusted-{index}": index for index in range(5000)}
 
     assert not landing_effect_grant_allows(None, request)
     with pytest.raises(LandingEffectGrantError) as exc:

@@ -1026,11 +1026,25 @@ def _construct_private_git(
         "HEAD",
         "--",
     )
+    cached_diff_raw = _git(
+        staging,
+        "diff",
+        "--cached",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--binary",
+        "--full-index",
+        "HEAD",
+        "--",
+    )
     status_matches = sha256_bytes(status_raw) == source_manifest.get(
         "git_status_porcelain_sha256"
     )
     diff_matches = sha256_bytes(diff_raw) == source_manifest.get(
         "git_diff_binary_sha256"
+    )
+    cached_diff_matches = sha256_bytes(cached_diff_raw) == source_manifest.get(
+        "git_diff_cached_binary_sha256"
     )
     if status_matches and not diff_matches:
         source_git_environment = _source_git_environment(source)
@@ -1053,7 +1067,7 @@ def _construct_private_git(
             )
             and sha256_bytes(diff_raw) == sha256_bytes(source_full_diff_raw)
         )
-    if not status_matches or not diff_matches:
+    if not status_matches or not diff_matches or not cached_diff_matches:
         raise ProjectionError(
             "private actor Git baseline differs from the admitted source"
         )

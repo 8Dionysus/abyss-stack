@@ -1,5 +1,18 @@
 # Governed Execution Landing Log
 
+## 2026-08-25 - Review repair for staged-index and loader boundaries
+
+Commit admission now requires a strict non-zero
+`git_diff_cached_binary_sha256` in the workspace manifest. The runtime builder
+captures `git diff --cached --binary --full-index HEAD`, the private actor
+projection verifies the same digest, and admission rejects malformed values, so
+a partially staged index cannot change the future commit while preserving the
+ordinary worktree diff. Bounded grant/request mappings reject excessive key
+cardinality before canonical JSON sorting, and malformed NUL-containing loader
+paths return the typed unavailable denial. The focused and full suites remain
+source-only with `external_effects=false` and the complete ten-effect forbidden
+closure.
+
 ## 2026-08-25 - Declarative governed landing-effect grant ABI
 
 Recorded the source-only landing of the provider-neutral governed landing-effect

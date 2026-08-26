@@ -23,7 +23,8 @@ Tracking starts with the community-docs baseline for this repository.
   zero-size/null-digest invariants; workspace manifest heads accept bare
   SHA-1/SHA-256 object IDs, manifest digests use strict full-string ends,
   owner-reference digests use true string ends, special-file opens are
-  nonblocking, and boundary-time overflows are normalized; fixed-input study
+  nonblocking, partially staged index bytes are bound by an exact cached-diff
+  digest, and boundary-time overflows are normalized; fixed-input study
   preparation pins both landing admission schemas beside the landing source
   in writer inputs, runtime constraints, and validation refs.
 - Bind the canonical `aoa-kag` MCP adapter to an authored absolute

@@ -11142,6 +11142,38 @@ def test_workspace_manifest_accepts_exact_pre_full_index_baseline(
     assert exc_info.value.code == "workspace_manifest_drift"
 
 
+def test_workspace_manifest_binds_partially_staged_index_bytes(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    _git(workspace, "init", "-b", "main")
+    _git(workspace, "config", "user.email", "fixture@example.invalid")
+    _git(workspace, "config", "user.name", "Fixture")
+    tracked = workspace / "tracked.txt"
+    tracked.write_text("baseline\n", encoding="utf-8")
+    _git(workspace, "add", "tracked.txt")
+    _git(workspace, "commit", "-m", "fixture")
+
+    tracked.write_text("staged-a\n", encoding="utf-8")
+    _git(workspace, "add", "tracked.txt")
+    tracked.write_text("worktree\n", encoding="utf-8")
+    first = RUNTIME.build_workspace_manifest(workspace)
+
+    tracked.write_text("staged-b\n", encoding="utf-8")
+    _git(workspace, "add", "tracked.txt")
+    tracked.write_text("worktree\n", encoding="utf-8")
+    second = RUNTIME.build_workspace_manifest(workspace)
+
+    assert first["git_status_porcelain_sha256"] == second[
+        "git_status_porcelain_sha256"
+    ]
+    assert first["git_diff_binary_sha256"] == second["git_diff_binary_sha256"]
+    assert first["git_diff_cached_binary_sha256"] != second[
+        "git_diff_cached_binary_sha256"
+    ]
+
+
 def test_workspace_manifest_disables_promisor_lazy_fetch_helpers(
     tmp_path: Path,
 ) -> None:

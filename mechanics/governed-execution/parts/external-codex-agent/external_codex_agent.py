@@ -6203,6 +6203,19 @@ def build_workspace_manifest(workspace: str | Path) -> dict[str, Any]:
         timeout=60,
         git_env=git_env,
     )
+    cached_diff_raw = _git_bytes(
+        location,
+        "diff",
+        "--cached",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--binary",
+        "--full-index",
+        "HEAD",
+        "--",
+        timeout=60,
+        git_env=git_env,
+    )
     changed = _nul_paths(
         _git_bytes(
             location,
@@ -6342,6 +6355,7 @@ def build_workspace_manifest(workspace: str | Path) -> dict[str, Any]:
         "git_head": _git_head(location, git_env=git_env),
         "git_status_porcelain_sha256": sha256_bytes(status_raw),
         "git_diff_binary_sha256": sha256_bytes(diff_raw),
+        "git_diff_cached_binary_sha256": sha256_bytes(cached_diff_raw),
         "status_entries": [
             {"path": path, "status": status[path]} for path in sorted(status)
         ],
