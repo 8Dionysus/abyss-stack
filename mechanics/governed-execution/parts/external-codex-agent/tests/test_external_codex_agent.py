@@ -6491,6 +6491,40 @@ def test_workspace_manifest_rejects_in_progress_merge_parent(
     assert exc_info.value.code == "workspace_merge_in_progress"
 
 
+def test_workspace_manifest_rechecks_merge_state_after_capture(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workspace = tmp_path / "merge-after-capture-workspace"
+    workspace.mkdir()
+    _git(workspace, "init", "-q")
+    _git(workspace, "config", "user.email", "fixture@example.invalid")
+    _git(workspace, "config", "user.name", "Fixture")
+    (workspace / "README.md").write_text(
+        "merge state after capture\n", encoding="utf-8"
+    )
+    _git(workspace, "add", "README.md")
+    _git(workspace, "commit", "-m", "fixture")
+
+    original_status = RUNTIME._git_status
+
+    def status_then_start_merge(
+        path: Path,
+        *,
+        git_env: Mapping[str, str] | None = None,
+    ) -> dict[str, str]:
+        result = original_status(path, git_env=git_env)
+        merge_head = path / _git(path, "rev-parse", "--git-path", "MERGE_HEAD")
+        merge_head.write_text(_git(path, "rev-parse", "HEAD") + "\n", encoding="ascii")
+        return result
+
+    monkeypatch.setattr(RUNTIME, "_git_status", status_then_start_merge)
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        RUNTIME.build_workspace_manifest(workspace)
+
+    assert exc_info.value.code == "workspace_merge_in_progress"
+
+
 @pytest.mark.skipif(
     not OWNER_EXECUTION_REQUEST_SCHEMA_PATH.is_file()
     or not TASK_LOCAL_DAG_SCHEMA_PATH.is_file(),
@@ -7903,6 +7937,24 @@ def test_study_preparer_pins_landing_admission_schemas() -> None:
         )
         assert reference.schema_ref == "https://json-schema.org/draft/2020-12/schema"
         assert reference.schema_version == schema_version
+
+
+def test_study_preparer_pins_release_bound_landing_owner_catalog() -> None:
+    reference = PREPARER._legacy_owner_migration_catalog_ref()
+
+    assert reference.owner_repo == "abyss-stack"
+    assert reference.artifact_ref == PREPARER.LEGACY_OWNER_MIGRATION_CATALOG_ARTIFACT_REF
+    assert reference.artifact_digest == PREPARER._file_digest(
+        PREPARER.LEGACY_OWNER_MIGRATION_CATALOG_PATH
+    )
+    assert reference.source_ref == (
+        "uncommitted-runtime-source@" + reference.artifact_digest
+    )
+    assert reference.schema_ref == PREPARER.LEGACY_OWNER_MIGRATION_CATALOG_SCHEMA_REF
+    assert (
+        reference.schema_version
+        == PREPARER.LEGACY_OWNER_MIGRATION_CATALOG_SCHEMA_VERSION
+    )
 
 
 def test_study_preparer_rejects_auxiliary_sdk_module_outside_root(

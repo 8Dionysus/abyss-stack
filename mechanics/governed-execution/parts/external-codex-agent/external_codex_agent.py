@@ -6374,6 +6374,7 @@ def build_workspace_manifest(workspace: str | Path) -> dict[str, Any]:
                 }
             )
     status = _git_status(location, git_env=git_env)
+    _assert_no_in_progress_merge(location)
     return {
         "$schema": "schemas/external-codex-workspace-manifest.schema.json",
         "schema_version": "abyss_stack_external_codex_workspace_manifest_v1",
