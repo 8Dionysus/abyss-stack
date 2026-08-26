@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 30272027,
+  "allowed_tracked_bytes": 38850168,
+  "approved_by": "repository-owner",
+  "base_ref": "86c14c6acd9d205bdb8ab343e72144305b2fe222",
+  "changed_generated_bytes": 30272027,
+  "changed_generated_files": 315,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "409fe5b6e6fbbde5c88a4070791cfffb40816cac936a4796ce06f99e5a606017",
+  "reason": "Refresh the stack owner family after the programmatic runtime failure-boundary repair and its roadmap, landing, and validation records; exact base 86c14c6acd9d205bdb8ab343e72144305b2fe222.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 38850168,
+  "tracked_bytes_max": 24117248
+}
