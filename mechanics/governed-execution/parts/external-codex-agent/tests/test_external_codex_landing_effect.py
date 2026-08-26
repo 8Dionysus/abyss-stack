@@ -513,6 +513,14 @@ def test_commit_admission_binds_repository_revision_to_target_revision(
             "index_flags": [],
         },
         {
+            "path": "file-without-mode",
+            "kind": "file",
+            "size_bytes": 0,
+            "sha256": REF_DIGEST,
+            "mode": None,
+            "index_flags": [],
+        },
+        {
             "path": "directory",
             "kind": "directory",
             "size_bytes": 1,
@@ -558,6 +566,7 @@ def test_commit_admission_accepts_kind_bound_manifest_content_entries() -> None:
             "kind": "file",
             "size_bytes": 0,
             "sha256": REF_DIGEST,
+            "mode": 33188,
             "index_flags": [],
         },
         {
@@ -565,6 +574,7 @@ def test_commit_admission_accepts_kind_bound_manifest_content_entries() -> None:
             "kind": "symlink",
             "size_bytes": 0,
             "sha256": REF_DIGEST,
+            "mode": 41471,
             "index_flags": [],
         },
         {
@@ -621,6 +631,55 @@ def test_workspace_manifest_accepts_bare_sha256_git_head() -> None:
         at=AT,
     )
     assert admitted["repository"]["revision"] == revision
+
+
+def test_commit_admission_rejects_manifest_digest_newlines() -> None:
+    for field in (
+        "git_status_porcelain_sha256",
+        "git_diff_binary_sha256",
+    ):
+        grant = _grant(target_kind="branch", effects=["commit"])
+        raw_manifest_value = json.loads(WORKSPACE_MANIFEST_RAW)
+        raw_manifest_value[field] += "\n"
+        raw_manifest = _workspace_manifest_raw(raw_manifest_value)
+
+        with pytest.raises(LandingEffectGrantError) as exc:
+            admit_landing_effect_grant(
+                grant,
+                _request(grant),
+                grant_raw=_raw(grant),
+                expected_artifact_digest=_raw_digest(_raw(grant)),
+                observed_workspace_manifest_digest=_raw_digest(raw_manifest),
+                observed_workspace_manifest_raw=raw_manifest,
+                at=AT,
+            )
+        assert exc.value.code == "landing_effect_grant_content_invalid"
+
+    grant = _grant(target_kind="branch", effects=["commit"])
+    raw_manifest_value = json.loads(WORKSPACE_MANIFEST_RAW)
+    raw_manifest_value["content_entries"] = [
+        {
+            "path": "file",
+            "kind": "file",
+            "size_bytes": 0,
+            "sha256": REF_DIGEST + "\n",
+            "mode": 33188,
+            "index_flags": [],
+        }
+    ]
+    raw_manifest = _workspace_manifest_raw(raw_manifest_value)
+
+    with pytest.raises(LandingEffectGrantError) as exc:
+        admit_landing_effect_grant(
+            grant,
+            _request(grant),
+            grant_raw=_raw(grant),
+            expected_artifact_digest=_raw_digest(_raw(grant)),
+            observed_workspace_manifest_digest=_raw_digest(raw_manifest),
+            observed_workspace_manifest_raw=raw_manifest,
+            at=AT,
+        )
+    assert exc.value.code == "landing_effect_grant_content_invalid"
 
 
 @pytest.mark.parametrize(

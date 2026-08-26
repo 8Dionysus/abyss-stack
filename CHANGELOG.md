@@ -19,8 +19,9 @@ Tracking starts with the community-docs baseline for this repository.
   require the manifest head to equal the authorized repository revision, and
   require the repository revision to equal the branch base or pull-request
   head target revision, reject non-canonical or duplicate manifest paths, and
-  enforce file/symlink digest plus directory/missing zero-size/null-digest
-  invariants; workspace manifest heads accept bare SHA-1/SHA-256 object IDs,
+  enforce exact non-zero file/symlink digests and modes plus directory/missing
+  zero-size/null-digest invariants; workspace manifest heads accept bare
+  SHA-1/SHA-256 object IDs, manifest digests use strict full-string ends,
   owner-reference digests use true string ends, special-file opens are
   nonblocking, and boundary-time overflows are normalized.
 - Bind the canonical `aoa-kag` MCP adapter to an authored absolute

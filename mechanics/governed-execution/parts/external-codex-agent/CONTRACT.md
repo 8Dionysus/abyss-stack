@@ -731,9 +731,9 @@ these exact relations in one document:
   `workspace_manifest` and carries a non-zero
   `commit_content.workspace_manifest_digest` for the exact bytes a future
   executor may commit; admission receives those bounded manifest bytes,
-  validates the workspace-manifest schema, enforces file/symlink digest and
-  directory/missing zero-size/null-digest invariants, and recomputes their
-  digest;
+  validates the workspace-manifest schema, enforces exact non-zero
+  file/symlink digests and modes plus directory/missing zero-size/null-digest
+  invariants, and recomputes their digest;
 - either one exact branch target (which may bind only `commit` and `push`) or
   one exact pull-request target (which may bind `push`, `pull_request`, and
   `merge`, or a standalone `commit`), including the immutable reviewed head

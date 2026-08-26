@@ -204,16 +204,28 @@ def _validate_workspace_manifest(raw: bytes) -> tuple[Mapping[str, Any], str]:
         raise LandingEffectGrantError(
             "landing_effect_grant_content_invalid", errors[0]
         )
+    for digest_field in (
+        "git_status_porcelain_sha256",
+        "git_diff_binary_sha256",
+    ):
+        if not _is_sha256_digest(parsed[digest_field]):
+            raise LandingEffectGrantError(
+                "landing_effect_grant_content_invalid",
+                f"workspace manifest {digest_field} is not an exact non-zero digest",
+            )
     for field in ("status_entries", "content_entries"):
         entries = parsed[field]
         seen_paths: set[str] = set()
         for entry in entries:
             kind = entry["kind"] if field == "content_entries" else None
             if field == "content_entries":
-                if kind in {"file", "symlink"} and entry["sha256"] is None:
+                if kind in {"file", "symlink"} and (
+                    not _is_sha256_digest(entry["sha256"])
+                    or entry["mode"] is None
+                ):
                     raise LandingEffectGrantError(
                         "landing_effect_grant_content_invalid",
-                        "workspace manifest files and symlinks require a digest",
+                        "workspace manifest files and symlinks require exact digests and modes",
                     )
                 if kind in {"directory", "missing"} and (
                     entry["size_bytes"] != 0 or entry["sha256"] is not None

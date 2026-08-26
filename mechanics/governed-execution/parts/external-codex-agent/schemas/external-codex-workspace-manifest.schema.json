@@ -52,7 +52,10 @@
     }
   },
   "$defs": {
-    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$(?![\\s\\S])"
+    },
     "relativePath": {
       "type": "string",
       "minLength": 1,
@@ -74,13 +77,13 @@
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["path", "kind", "size_bytes", "sha256", "index_flags"],
+          "required": ["path", "kind", "size_bytes", "sha256", "mode", "index_flags"],
           "properties": {
             "path": {"$ref": "#/$defs/relativePath"},
             "kind": {"enum": ["file", "symlink"]},
             "size_bytes": {"type": "integer", "minimum": 0},
             "sha256": {"$ref": "#/$defs/digest"},
-            "mode": {"type": ["integer", "null"], "minimum": 0},
+            "mode": {"type": "integer", "minimum": 0},
             "index_flags": {
               "type": "array",
               "uniqueItems": true,
