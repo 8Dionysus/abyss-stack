@@ -43,6 +43,16 @@ focused landing-effect suite passed 63 tests, including positive and negative
 coverage for each invariant. Runtime posture remains source-only with
 `external_effects=false` and the complete ten-effect forbidden closure.
 
+## 2026-08-25 - Review repair for manifest digest and mode binding
+
+The follow-up repair in `c68814df3bca0c0f2021909c4aaeee46fa3cc97f` makes every
+commit workspace digest a strict full-string, non-zero coordinate and requires
+file and symlink content entries to carry a non-null mode. The workspace
+manifest schema and admission checks reject trailing-newline digest values and
+nullable file modes, with focused regression coverage. The focused
+landing-effect suite passed 65 tests; runtime posture remains source-only with
+`external_effects=false` and the complete ten-effect forbidden closure.
+
 ## 2026-08-13 - Stable external owner-request result identity
 
 Separated the cross-owner identity of an admitted `aoa-agents` execution
