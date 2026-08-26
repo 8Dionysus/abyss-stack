@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 28821258,
+  "allowed_tracked_bytes": 38403940,
+  "approved_by": "repository-owner",
+  "base_ref": "75b3d734ab96503a34cb1e2bd70ee87867ce558f",
+  "changed_generated_bytes": 28821258,
+  "changed_generated_files": 292,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "9f043d5774d36c76c04785bc2f6477fbb3d89ff1ced6639e144b7a119b7d26ae",
+  "reason": "Owner-approved portable-family regeneration for PR #433 after committed cached-seal reuse repair and regression; bind the derived family to the committed head and require normal CI review.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 38403940,
+  "tracked_bytes_max": 24117248
+}
