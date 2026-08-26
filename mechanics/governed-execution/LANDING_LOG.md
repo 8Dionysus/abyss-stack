@@ -12,16 +12,17 @@ duplicate-member, digest, ref, size, and boundary time cases remain typed
 denials.
 
 The focused landing-effect suite (`test_external_codex_landing_effect.py`)
-collected and passed 53 tests on source repair commit
-`07b1364cfbbbfb195df9720e68e1484c1656fbe8`. Commit grants are standalone when
+collected and passed 55 tests on source repair commit
+`200e8e368871183aca85d41dc7aac455b840497b`. Commit grants are standalone when
 the target is a pull request: a revision-producing commit cannot be combined
 with a downstream push, pull-request, or merge effect, and it must carry exact
 workspace-manifest bytes plus a digest that admission bounds, schema-validates,
 and recomputes before accepting. Admission also requires the manifest `git_head`
 to equal the authorized repository revision, rejects non-canonical or duplicate
 status/content paths, and stops after the first schema error. The full
-external-agent suite also passed, and the exported validator bounds caller
-mappings before copying and schema validation.
+external-agent suite also passed. Git revisions accept exact bare 40- or
+64-character object IDs, owner-reference digests use true string ends, and the
+exported validator bounds caller mappings before copying and schema validation.
 Repository IDs and revisions use true full-string validation. The canonical
 repository-local KAG gate and hosted Repo Validation are rerun on the
 synchronized final branch. This is source/CI evidence only: the current runtime

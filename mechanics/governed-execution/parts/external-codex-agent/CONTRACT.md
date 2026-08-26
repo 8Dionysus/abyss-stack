@@ -757,7 +757,9 @@ to typed time denials.
 future-dated, review-pending, artifact-drifted, contradictory, narrower, wider,
 or path-traversal grants are rejected. The request passed to it must repeat the
 exact Goal, holder, repository, target, review, return, and effect-set
-relations. A commit request must also repeat the exact `commit_content`
+relations. Repository revisions are exact bare 40- or 64-character Git object
+IDs, and every owner-reference digest is a true full-string coordinate. A
+commit request must also repeat the exact `commit_content`
 binding, and the effect executor must supply the exact bounded
 workspace-manifest bytes plus an independently observed digest that admission
 recomputes and matches. The manifest `git_head` must equal the exact authorized

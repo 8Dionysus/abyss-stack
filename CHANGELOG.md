@@ -14,9 +14,12 @@ Tracking starts with the community-docs baseline for this repository.
   complete Git ref validation, effect-specific target constraints, and a
   reviewer identity distinct from the holder; repository IDs reject traversal
   components, pull-request targets bind an immutable head revision,
+  repository revisions accept bare 40- or 64-hex Git object IDs, and
   standalone commit grants bind exact workspace-manifest bytes and digest,
   require the manifest head to equal the authorized repository revision, and
-  reject non-canonical or duplicate manifest paths,
+  reject non-canonical or duplicate manifest paths; Git revisions accept bare
+  SHA-1/SHA-256 object IDs and owner-reference digests use true string ends,
+  owner-reference digests are anchored to the true string end,
   special-file opens are nonblocking, and boundary-time overflows are
   normalized.
 - Bind the canonical `aoa-kag` MCP adapter to an authored absolute
