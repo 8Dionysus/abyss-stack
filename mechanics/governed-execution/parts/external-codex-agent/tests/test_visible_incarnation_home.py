@@ -674,29 +674,27 @@ def test_late_ambient_inode_after_manifest_publication_fails_before_return(
     late_name = _unknown_fixture_name(tmp_path)
     late_entry = ambient / late_name
     realization = _realization(tmp_path / "realization.json")
-    original_write_exact = MODULE._write_exact
+    original_validate = MODULE._PreparationPublicationLease.validate
     moved = False
 
-    def mutate_after_manifest_publication(
-        path: Path,
-        content: bytes,
-        mode: int,
-        *,
-        ambient_identities: set[tuple[int, int]] | None = None,
+    def mutate_after_terminal_owner_validation(
+        lease: object,
+        stage: str,
     ) -> None:
         nonlocal moved
-        original_write_exact(
-            path,
-            content,
-            mode,
-            ambient_identities=ambient_identities,
-        )
-        if path.name == "incarnation-home.json" and not moved:
+        original_validate(lease, stage)  # type: ignore[arg-type]
+        if stage == "preparation owner handoff" and not moved:
+            target_home = getattr(lease, "_target_home")
+            assert isinstance(target_home, Path)
             late_entry.write_bytes(b"late-terminal-secret")
-            late_entry.rename(path.parent / "codex-home" / late_name)
+            late_entry.rename(target_home / late_name)
             moved = True
 
-    monkeypatch.setattr(MODULE, "_write_exact", mutate_after_manifest_publication)
+    monkeypatch.setattr(
+        MODULE._PreparationPublicationLease,
+        "validate",
+        mutate_after_terminal_owner_validation,
+    )
     with pytest.raises(
         MODULE.IncarnationHomeError,
         match="ambient projection changed during preparation owner handoff",
@@ -4065,6 +4063,9 @@ def test_holder_schema_and_loader_reject_rebind_post_exec_identity_without_prove
         "holder_binding": snapshot_binding,
     }
     snapshot = MODULE.canonical_bytes(snapshot_manifest)
+    claim_snapshot = MODULE.canonical_bytes(
+        {"schema_version": MODULE.HOLDER_CLAIM_SCHEMA_VERSION}
+    )
     snapshot_path = tmp_path / "snapshot-holder.json"
     snapshot_receipt = {
         **receipt,
@@ -4080,6 +4081,11 @@ def test_holder_schema_and_loader_reject_rebind_post_exec_identity_without_prove
                 "ascii"
             ),
             "incarnation_manifest_digest": MODULE.sha256_bytes(snapshot),
+            "holder_claim": str((tmp_path / "holder-claim.json").resolve()),
+            "holder_claim_digest": MODULE.sha256_bytes(claim_snapshot),
+            "holder_claim_snapshot_b64": base64.b64encode(
+                claim_snapshot
+            ).decode("ascii"),
         },
     }
     with pytest.raises(ValidationError):
@@ -4090,6 +4096,26 @@ def test_holder_schema_and_loader_reject_rebind_post_exec_identity_without_prove
         match="holder incarnation manifest snapshot holder binding is missing",
     ):
         MODULE._load_holder_receipt_snapshot(snapshot_path)
+
+    typed_omission_path = tmp_path / "typed-v3-claim-omission.json"
+    typed_omission = json.loads(json.dumps(snapshot_receipt))
+    typed_omission["receipt_ref"] = str(typed_omission_path.resolve())
+    typed_omission["runtime"]["holder_binding"] = snapshot_binding
+    for key in (
+        "holder_claim",
+        "holder_claim_digest",
+        "holder_claim_snapshot_b64",
+    ):
+        typed_omission["runtime"].pop(key, None)
+    assert list(Draft202012Validator(schema).iter_errors(typed_omission))
+    typed_omission_path.write_bytes(
+        MODULE.canonical_bytes(typed_omission) + b"\n"
+    )
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="typed v3 holder receipt requires a durable holder claim snapshot",
+    ):
+        MODULE._load_holder_receipt_snapshot(typed_omission_path)
 
     legacy_snapshot = MODULE.canonical_bytes(
         {
@@ -4753,8 +4779,8 @@ def test_rebind_receipt_binds_holder_environment_and_manifest_snapshot(
 
 @pytest.mark.parametrize(
     "mutation_point",
-    ["after-digest-read", "after-return-assertion"],
-    ids=["after-digest-read", "after-return-assertion"],
+    ["after-digest-read", "after-return-assertion", "after-claim-binding"],
+    ids=["after-digest-read", "after-return-assertion", "after-claim-binding"],
 )
 def test_rebind_claim_mutation_after_digest_read_fails_before_receipt_return(
     tmp_path: Path,
@@ -4853,7 +4879,7 @@ def test_rebind_claim_mutation_after_digest_read_fails_before_receipt_return(
             "_read_descriptor_bytes",
             mutate_after_second_claim_digest_read,
         )
-    else:
+    elif mutation_point == "after-return-assertion":
         original_assert = MODULE._assert_retained_regular_file_at
 
         def mutate_after_return_assertion(
@@ -4883,6 +4909,22 @@ def test_rebind_claim_mutation_after_digest_read_fails_before_receipt_return(
             MODULE,
             "_assert_retained_regular_file_at",
             mutate_after_return_assertion,
+        )
+    else:
+        original_claim_binding = MODULE._assert_holder_claim_receipt_binding_at
+
+        def mutate_after_claim_binding(**kwargs: object) -> None:
+            nonlocal mutated, mutation_inode
+            original_claim_binding(**kwargs)  # type: ignore[arg-type]
+            if not mutated:
+                mutation_inode = claim_path.stat().st_ino
+                claim_path.write_bytes(b"unrelated-claim-bytes")
+                mutated = True
+
+        monkeypatch.setattr(
+            MODULE,
+            "_assert_holder_claim_receipt_binding_at",
+            mutate_after_claim_binding,
         )
     with pytest.raises(
         MODULE.IncarnationHomeError,
@@ -5329,6 +5371,13 @@ def test_direct_launch_records_the_actual_responsibility_holder_before_exec(
             manifest_bytes=manifest_snapshot,
             manifest_digest=MODULE.sha256_bytes(manifest_snapshot),
             holder_binding=manifest["holder_binding"],
+            holder_claim_path=manifest_path.parent / MODULE.HOLDER_CLAIM_FILE_NAME,
+            holder_claim_digest=MODULE.sha256_bytes(
+                (manifest_path.parent / MODULE.HOLDER_CLAIM_FILE_NAME).read_bytes()
+            ),
+            holder_claim_snapshot=(
+                manifest_path.parent / MODULE.HOLDER_CLAIM_FILE_NAME
+            ).read_bytes(),
         )
 
     original_holder_receipt = MODULE._holder_receipt
@@ -5712,6 +5761,11 @@ def test_payload_launch_retains_claim_when_receipt_published_before_interrupt(
                 "ambient_codex_home": manifest["ambient_codex_home"],
                 "incarnation_codex_home": manifest["codex_home"],
                 "holder_binding": manifest["holder_binding"],
+                "holder_claim": str(claim_path.resolve()),
+                "holder_claim_digest": MODULE.sha256_bytes(claim_path.read_bytes()),
+                "holder_claim_snapshot_b64": base64.b64encode(
+                    claim_path.read_bytes()
+                ).decode("ascii"),
             },
             "terminal": {
                 "binding": "kitty_ancestor_at_exec",
@@ -6630,6 +6684,18 @@ def test_live_close_uses_holder_bound_companion_after_host_removal(
             "holder_binding": snapshot_binding,
         }
     )
+    claim_path = tmp_path / MODULE.HOLDER_CLAIM_FILE_NAME
+    claim_snapshot = MODULE.canonical_bytes(
+        {
+            "schema_version": MODULE.HOLDER_CLAIM_SCHEMA_VERSION,
+            "manifest_path": str(tmp_path / "missing-manifest"),
+            "manifest_digest": MODULE.sha256_bytes(manifest_snapshot),
+            "holder_binding": snapshot_binding,
+            "holder_receipt": str(holder.resolve()),
+            "created_at": "2026-08-15T00:00:00Z",
+        }
+    ) + b"\n"
+    claim_path.write_bytes(claim_snapshot)
     holder_pid, parent_pid, kitty_pid = 101, 102, 103
     holder_argv = ["/usr/bin/codex", "exec"]
     kitty_argv = ["/usr/bin/kitty", "--detach", "--title", "holder"]
@@ -6675,6 +6741,11 @@ def test_live_close_uses_holder_bound_companion_after_host_removal(
             "ambient_codex_home": str(tmp_path / "ambient"),
             "incarnation_codex_home": str(tmp_path / "incarnation"),
             "holder_binding": snapshot_binding,
+            "holder_claim": str(claim_path.resolve()),
+            "holder_claim_digest": MODULE.sha256_bytes(claim_snapshot),
+            "holder_claim_snapshot_b64": base64.b64encode(
+                claim_snapshot
+            ).decode("ascii"),
         },
         "terminal": {
             "binding": "kitty_ancestor_at_exec",

@@ -162,7 +162,14 @@
       },
       "then": {
         "properties": {
-          "runtime": {"required": ["holder_binding"]}
+          "runtime": {
+            "required": [
+              "holder_binding",
+              "holder_claim",
+              "holder_claim_digest",
+              "holder_claim_snapshot_b64"
+            ]
+          }
         }
       }
     }

@@ -106,8 +106,10 @@ The final publication lease retains the ambient and target roots through the
 owner-token handoff, and migration retains its source and target roots while
 walking descendants relative to owned parents; descendant descriptors close
 after each subtree, so descriptor ownership is bounded by tree depth rather
-than node count. Receipt publication also performs a distinct retained-claim
-byte binding after the ordinary return assertion, while existing receipt
+than node count. A structural terminal-publication handoff keeps those
+descriptors owned through the caller's success return and performs one private
+handoff validation before owner-token retirement. Receipt publication uses the
+same handoff shape for the retained claim inode, while existing receipt
 snapshots are validated before any claim transfer.
 Provenance-bearing v2 is rejected even on the non-canonical loader route because
 the public v2 branch forbids that field. A multiply linked preparation lock is
@@ -128,9 +130,11 @@ it.
 Incomplete holder receipts missing `runtime_state_root` or `closeout_route`
 are rejected by both the receipt schema and runtime binding validator. A
 receipt carrying an immutable manifest snapshot must also carry the complete
-`holder_binding`; the schema and snapshot loader reject its omission for both
-v3 and legacy-v2 snapshots, while pre-snapshot receipts retain their bounded
-compatibility path. Rebind reserves that same holder claim under the
+`holder_binding`; a typed v3 receipt must additionally carry the complete
+durable `holder_claim`, `holder_claim_digest`, and `holder_claim_snapshot_b64`
+tuple. The schema and snapshot loader reject either omission for typed v3 and
+legacy-v2 snapshot-shaped receipts, while pre-snapshot receipts retain their
+bounded compatibility path. Rebind reserves that same holder claim under the
 preparation lock before publishing a replacement receipt, transferring an
 existing claim from the superseded receipt under that lock; an exact retry is
 idempotent. A failed receipt publication restores the superseded claim

@@ -237,9 +237,11 @@ holder-bound snapshot, while the claimed home is frozen and
 preparation/profile refreshes may not rewrite its content-addressed pathname.
 Any receipt carrying a manifest
 snapshot, including a legacy-v2 snapshot, must carry the complete typed
-`holder_binding` in both the receipt runtime and the snapshot; the runtime
-loader and public schema reject its omission. Legacy receipts without the
-snapshot retain their prior fail-closed pathname check. The holder argv is the post-exec `/proc` shape, including the
+`holder_binding` in both the receipt runtime and the snapshot; a typed v3
+receipt must additionally carry `holder_claim`, `holder_claim_digest`, and
+`holder_claim_snapshot_b64` for the durable claim bytes. The runtime loader and
+public schema reject either omission. Legacy receipts without the snapshot
+retain their prior fail-closed pathname check. The holder argv is the post-exec `/proc` shape, including the
 interpreter argv of a shebang-backed executable. For that shebang route, an
 internal `payload-launch` helper runs as bubblewrap's payload, revalidates the
 manifest and private launcher digests, writes the receipt from its own PID
@@ -281,8 +283,10 @@ validates its existing claim; recovery of an already claimed live holder
 transfers that claim's receipt binding from the superseded receipt to the
 replacement receipt under the lock, while a different holder or manifest is
 rejected. The existing output is accepted only when it is the same complete
-canonical receipt apart from its creation timestamp. If receipt publication
-fails after transfer, the exact prior claim snapshot is restored through its
+canonical receipt apart from its creation timestamp. The terminal claim
+handoff retains the published claim descriptor through the surrounding
+success return and performs its final byte/path binding before releasing it.
+If receipt publication fails after transfer, the exact prior claim snapshot is restored through its
 validated descriptor before the failure is propagated. A rebind therefore
 cannot leave the live home writable after receipt publication.
 

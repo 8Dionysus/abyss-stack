@@ -111,8 +111,11 @@ schema-valid compatibility shape and is rejected by the loader on any route.
 Holder receipts require the complete runtime binding, including
 `runtime_state_root` and `closeout_route`. A receipt carrying an immutable
 manifest snapshot also requires `holder_binding` in the public schema, matching
-the runtime snapshot loader for both v3 and legacy-v2 snapshots; pre-snapshot
-compatibility receipts remain readable without that conditional field. Rebind
+the runtime snapshot loader for both v3 and legacy-v2 snapshots; a typed v3
+receipt additionally requires the durable `holder_claim`,
+`holder_claim_digest`, and `holder_claim_snapshot_b64` fields. The schema and
+loader reject that claim omission, while pre-snapshot compatibility receipts
+remain readable without the conditional fields. Rebind
 reserves the same holder claim under the preparation lock before publishing a
 replacement receipt; if canonical launch already claimed the home, rebind
 transfers the receipt binding from the superseded receipt under that lock. It
@@ -129,14 +132,13 @@ the names in the classified view; projection materialization fails if that
 root changes or a projected identity was not admitted by that view. Regular
 claim publication retains the descriptor-bound content snapshot, rejects
 source-version drift, atomically exchanges the snapshot, and carries the
-snapshot and digest through the replacement receipt. The receipt return
-handoff performs a distinct descriptor-bound byte and pathname check after the
-ordinary retained-file assertion, so the canonical claim and receipt snapshot
-remain one binding through success. Preparation retains the ambient and target
-root descriptors through marker publication and validates the classified
-projection again at the preparation-owner handoff before retiring the owner
-token. Legacy migration retains source and target root descriptors through
-terminal publication and the return handoff; descendant identities and content
+snapshot and digest through the replacement receipt. One terminal publication
+handoff context keeps that ownership live through the caller's success return;
+its exit independently validates the retained claim, preparation, or migration
+descriptors before releasing the claim or retiring the owner token. Preparation
+therefore retains the ambient and target root descriptors through marker
+publication, and legacy migration retains source and target root descriptors
+through terminal publication and return. Descendant identities and content
 digests are traversed relative to those roots with descriptors closed after
 each subtree, so descriptor ownership is bounded by tree depth rather than
 node count. A terminal mutation removes the unpublished marker and rolls the

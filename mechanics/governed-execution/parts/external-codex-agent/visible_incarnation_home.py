@@ -2137,7 +2137,7 @@ class _MigrationPublicationLease:
             if descriptor is not None:
                 os.close(descriptor)
 
-    def validate(self, stage: str) -> None:
+    def _validate_terminal_handoff(self, stage: str) -> None:
         if self._closed:
             raise IncarnationHomeError("legacy migration publication lease is closed")
         try:
@@ -2182,6 +2182,11 @@ class _MigrationPublicationLease:
             raise IncarnationHomeError(
                 f"legacy migration publication ownership changed during {stage}"
             ) from exc
+
+    def validate(self, stage: str) -> None:
+        """Run the public preflight observation for a publication stage."""
+
+        self._validate_terminal_handoff(stage)
 
     def close(self) -> None:
         if self._closed:
@@ -2313,7 +2318,7 @@ class _PreparationPublicationLease:
                 f"incarnation publication target changed during {stage}"
             )
 
-    def validate(self, stage: str) -> None:
+    def _validate_terminal_handoff(self, stage: str) -> None:
         if self._closed:
             raise IncarnationHomeError("preparation publication lease is closed")
         self._validate_ambient_root(stage)
@@ -2337,6 +2342,11 @@ class _PreparationPublicationLease:
             initially_ambient_identities=self._classified,
         )
 
+    def validate(self, stage: str) -> None:
+        """Run the public preflight observation for a publication stage."""
+
+        self._validate_terminal_handoff(stage)
+
     def close(self) -> None:
         if self._closed:
             return
@@ -2347,6 +2357,99 @@ class _PreparationPublicationLease:
         if self._ambient_descriptor is not None:
             os.close(self._ambient_descriptor)
             self._ambient_descriptor = None
+
+
+class _TerminalPublicationHandoff:
+    """Keep publication ownership through the caller's success return.
+
+    The body of this context performs the ordinary, named preflight
+    observation.  Its exit is the ownership-transfer primitive: it validates
+    the retained descriptors through private handoff methods and only then
+    retires the preparation owner token or releases the claim publication
+    edge.  A check helper can therefore return and still leave an owned
+    handoff outstanding; success is not observable until this context exits.
+    """
+
+    def __init__(
+        self,
+        *,
+        stage: str,
+        publication_leases: Sequence[
+            _MigrationPublicationLease | _PreparationPublicationLease
+        ] = (),
+        owner: dict[str, Any] | None = None,
+        claim_parent_fd: int | None = None,
+        claim_name: str | None = None,
+        claim_descriptor: int | None = None,
+        claim_initial: os.stat_result | None = None,
+        claim_snapshot: bytes | None = None,
+        claim_ambient_identities: set[tuple[int, int]] | None = None,
+    ) -> None:
+        self._stage = stage
+        self._publication_leases = tuple(publication_leases)
+        self._owner = owner
+        claim_values = (
+            claim_parent_fd,
+            claim_name,
+            claim_descriptor,
+            claim_initial,
+            claim_snapshot,
+        )
+        if any(value is not None for value in claim_values) and not all(
+            value is not None for value in claim_values
+        ):
+            raise IncarnationHomeError(
+                "terminal claim publication handoff is incomplete"
+            )
+        self._claim_parent_fd = claim_parent_fd
+        self._claim_name = claim_name
+        self._claim_descriptor = claim_descriptor
+        self._claim_initial = claim_initial
+        self._claim_snapshot = claim_snapshot
+        self._claim_ambient_identities = claim_ambient_identities or set()
+        self._entered = False
+        self._committed = False
+
+    def __enter__(self) -> "_TerminalPublicationHandoff":
+        if self._entered:
+            raise IncarnationHomeError("terminal publication handoff was re-entered")
+        self._entered = True
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: object | None,
+    ) -> bool:
+        if not self._entered:
+            raise IncarnationHomeError("terminal publication handoff was not entered")
+        if exc_type is None:
+            self._commit()
+        return False
+
+    def _commit(self) -> None:
+        if self._committed:
+            raise IncarnationHomeError("terminal publication handoff was committed twice")
+        for lease in self._publication_leases:
+            lease._validate_terminal_handoff(self._stage)
+        if self._claim_parent_fd is not None:
+            assert self._claim_name is not None
+            assert self._claim_descriptor is not None
+            assert self._claim_initial is not None
+            assert self._claim_snapshot is not None
+            _assert_holder_claim_receipt_binding(
+                parent_fd=self._claim_parent_fd,
+                name=self._claim_name,
+                descriptor=self._claim_descriptor,
+                initial=self._claim_initial,
+                expected_snapshot=self._claim_snapshot,
+                label="holder claim",
+                ambient_identities=self._claim_ambient_identities,
+            )
+        if self._owner is not None:
+            _retire_preparation_owner(self._owner)
+        self._committed = True
 
 
 def _denied_state_provenance(
@@ -2832,7 +2935,7 @@ def _revalidate_regular_file_publication_boundary(
     return content
 
 
-def _assert_holder_claim_receipt_binding_at(
+def _assert_holder_claim_receipt_binding(
     *,
     parent_fd: int,
     name: str,
@@ -2842,7 +2945,7 @@ def _assert_holder_claim_receipt_binding_at(
     label: str,
     ambient_identities: set[tuple[int, int]],
 ) -> None:
-    """Bind the published receipt to the claim inode immediately at return.
+    """Bind the published receipt to the claim inode at the owned handoff.
 
     This is a distinct handoff check rather than another call through the
     public retained-file hook.  It reads the exact descriptor that was linked
@@ -2887,6 +2990,29 @@ def _assert_holder_claim_receipt_binding_at(
         != _actor_local_source_version(after_read)
     ):
         raise IncarnationHomeError(f"{label} changed at receipt return")
+
+
+def _assert_holder_claim_receipt_binding_at(
+    *,
+    parent_fd: int,
+    name: str,
+    descriptor: int,
+    initial: os.stat_result,
+    expected_snapshot: bytes,
+    label: str,
+    ambient_identities: set[tuple[int, int]],
+) -> None:
+    """Run the public preflight claim-binding observation."""
+
+    _assert_holder_claim_receipt_binding(
+        parent_fd=parent_fd,
+        name=name,
+        descriptor=descriptor,
+        initial=initial,
+        expected_snapshot=expected_snapshot,
+        label=label,
+        ambient_identities=ambient_identities,
+    )
 
 
 def _publish_retained_regular_file_snapshot_at(
@@ -6350,6 +6476,24 @@ def _stable_regular_file_bytes(
         os.close(parent_fd)
 
 
+def _holder_claim_snapshot_for_receipt(
+    path: Path,
+    expected_digest: str,
+) -> bytes:
+    """Capture the exact durable claim bytes carried by a typed receipt."""
+
+    if SHA256_DIGEST_PATTERN.fullmatch(expected_digest) is None:
+        raise IncarnationHomeError("holder claim receipt digest is invalid")
+    raw = _stable_regular_file_bytes(
+        path,
+        "holder claim receipt snapshot",
+        ambient_identities=set(),
+    )
+    if raw is None or sha256_bytes(raw) != expected_digest:
+        raise IncarnationHomeError("holder claim changed before receipt publication")
+    return raw
+
+
 def _restore_holder_claim_snapshot(
     *,
     claim_path: Path,
@@ -6854,6 +6998,9 @@ def _holder_receipt(
     manifest_digest: str | None = None,
     companion_binding: dict[str, str] | None = None,
     holder_binding: dict[str, str] | None = None,
+    holder_claim_path: Path | None = None,
+    holder_claim_digest: str | None = None,
+    holder_claim_snapshot: bytes | None = None,
     binding_context: dict[str, str] | None = None,
     control_socket: str | None = None,
     terminal_title: str | None = None,
@@ -6923,6 +7070,35 @@ def _holder_receipt(
     if companion_binding is not None:
         runtime["codex_companion"] = dict(companion_binding)
     _decode_holder_manifest_snapshot(runtime)
+    typed_manifest = manifest.get("schema_version") == SCHEMA_VERSION
+    claim_values = (holder_claim_path, holder_claim_digest, holder_claim_snapshot)
+    if any(value is not None for value in claim_values) and not all(
+        value is not None for value in claim_values
+    ):
+        raise IncarnationHomeError("typed holder receipt claim snapshot is incomplete")
+    if typed_manifest:
+        if holder_claim_path is None or holder_claim_digest is None or holder_claim_snapshot is None:
+            raise IncarnationHomeError(
+                "typed v3 holder receipt requires a durable holder claim snapshot"
+            )
+        expected_claim_path = _holder_claim_path(manifest_path).resolve()
+        if holder_claim_path.resolve() != expected_claim_path:
+            raise IncarnationHomeError("typed holder receipt claim path is not canonical")
+        if (
+            SHA256_DIGEST_PATTERN.fullmatch(holder_claim_digest) is None
+            or sha256_bytes(holder_claim_snapshot) != holder_claim_digest
+        ):
+            raise IncarnationHomeError("typed holder receipt claim snapshot digest is invalid")
+        runtime.update(
+            {
+                "holder_claim": str(expected_claim_path),
+                "holder_claim_digest": holder_claim_digest,
+                "holder_claim_snapshot_b64": base64.b64encode(
+                    holder_claim_snapshot
+                ).decode("ascii"),
+            }
+        )
+    _decode_holder_claim_snapshot(runtime, required=typed_manifest)
     binding: dict[str, object] | None = None
     terminal: dict[str, object] = {
         "binding": "kitty_ancestor_at_exec",
@@ -7245,35 +7421,41 @@ def _rebind_replacement_holder_receipt(
                 "replacement holder terminal receipt",
                 ambient_identities=ambient_identities,
             )
-            _revalidate_regular_file_at(
-                claim_parent_fd,
-                claim_path.name,
-                published_claim_descriptor,
-                published_claim_initial,
-                label="holder claim changed after receipt publication",
-                ambient_identities=ambient_identities,
-            )
-            # Keep the final return edge independent of the public
-            # revalidation hook.  A caller may instrument that helper
-            # and mutate the pathname after its wrapped check returns;
-            # the retained descriptor assertion still owns the edge.
-            _assert_retained_regular_file_at(
-                claim_parent_fd,
-                claim_path.name,
-                published_claim_descriptor,
-                published_claim_initial,
-                label="holder claim changed at receipt return",
-                ambient_identities=ambient_identities,
-            )
-            _assert_holder_claim_receipt_binding_at(
-                parent_fd=claim_parent_fd,
-                name=claim_path.name,
-                descriptor=published_claim_descriptor,
-                initial=published_claim_initial,
-                expected_snapshot=claim_snapshot,
-                label="holder claim",
-                ambient_identities=ambient_identities,
-            )
+            with _TerminalPublicationHandoff(
+                stage="holder claim",
+                claim_parent_fd=claim_parent_fd,
+                claim_name=claim_path.name,
+                claim_descriptor=published_claim_descriptor,
+                claim_initial=published_claim_initial,
+                claim_snapshot=claim_snapshot,
+                claim_ambient_identities=ambient_identities,
+            ):
+                _revalidate_regular_file_at(
+                    claim_parent_fd,
+                    claim_path.name,
+                    published_claim_descriptor,
+                    published_claim_initial,
+                    label="holder claim changed after receipt publication",
+                    ambient_identities=ambient_identities,
+                )
+                _assert_retained_regular_file_at(
+                    claim_parent_fd,
+                    claim_path.name,
+                    published_claim_descriptor,
+                    published_claim_initial,
+                    label="holder claim changed at receipt return",
+                    ambient_identities=ambient_identities,
+                )
+                _assert_holder_claim_receipt_binding_at(
+                    parent_fd=claim_parent_fd,
+                    name=claim_path.name,
+                    descriptor=published_claim_descriptor,
+                    initial=published_claim_initial,
+                    expected_snapshot=claim_snapshot,
+                    label="holder claim",
+                    ambient_identities=ambient_identities,
+                )
+                return receipt
         except BaseException as exc:
             try:
                 _restore_holder_claim_snapshot(
@@ -7312,7 +7494,6 @@ def _rebind_replacement_holder_receipt(
                 os.close(claim_descriptor)
             if claim_parent_fd is not None:
                 os.close(claim_parent_fd)
-        return receipt
 
 
 def _decode_holder_manifest_snapshot(runtime: dict[str, Any]) -> bytes | None:
@@ -7382,13 +7563,19 @@ def _decode_holder_manifest_snapshot(runtime: dict[str, Any]) -> bytes | None:
     return snapshot
 
 
-def _decode_holder_claim_snapshot(runtime: dict[str, Any]) -> bytes | None:
-    """Validate the immutable holder-claim bytes carried by a repaired receipt."""
+def _decode_holder_claim_snapshot(
+    runtime: dict[str, Any], *, required: bool = False
+) -> bytes | None:
+    """Validate the immutable holder-claim bytes carried by a typed receipt."""
 
     claim_path = runtime.get("holder_claim")
     claim_digest = runtime.get("holder_claim_digest")
     encoded = runtime.get("holder_claim_snapshot_b64")
     if claim_path is None and claim_digest is None and encoded is None:
+        if required:
+            raise IncarnationHomeError(
+                "typed v3 holder receipt requires a durable holder claim snapshot"
+            )
         return None
     if (
         not isinstance(claim_path, str)
@@ -7427,7 +7614,7 @@ def _validate_rebind_receipt_claim_snapshot(
     runtime = receipt.get("runtime")
     if not isinstance(runtime, dict):
         raise IncarnationHomeError("replacement holder receipt runtime is invalid")
-    snapshot = _decode_holder_claim_snapshot(runtime)
+    snapshot = _decode_holder_claim_snapshot(runtime, required=True)
     if snapshot is None:
         return
     claim_value = runtime.get("holder_claim")
@@ -7885,8 +8072,8 @@ def _load_holder_receipt_snapshot(
         or SHA256_DIGEST_PATTERN.fullmatch(holder_exe_digest) is None
     ):
         raise IncarnationHomeError("holder executable identity is invalid")
-    _decode_holder_manifest_snapshot(runtime)
-    _decode_holder_claim_snapshot(runtime)
+    manifest_snapshot = _decode_holder_manifest_snapshot(runtime)
+    _decode_holder_claim_snapshot(runtime, required=manifest_snapshot is not None)
     if "binding" in receipt:
         binding = _validate_terminal_binding_shape(receipt["binding"])
         _validate_receipt_binding_consistency(receipt, binding)
@@ -10266,15 +10453,12 @@ def _validate_publication_leases(
         lease.validate(stage)
 
 
-def _finish_preparation_owner(
+def _retire_preparation_owner(
     owner: dict[str, Any] | None,
-    *,
-    publication_leases: Sequence[
-        _MigrationPublicationLease | _PreparationPublicationLease
-    ] = (),
 ) -> None:
+    """Retire one exact preparation token after handoff ownership is proven."""
+
     if owner is None:
-        _validate_publication_leases(publication_leases, "preparation owner handoff")
         return
     owner_path = Path(str(owner["incarnation_root"])) / PREPARATION_OWNER_FILE_NAME
     parent_fd = _open_pinned_parent_directory(
@@ -10285,7 +10469,6 @@ def _finish_preparation_owner(
         try:
             initial = os.lstat(owner_path.name, dir_fd=parent_fd)
         except FileNotFoundError:
-            _validate_publication_leases(publication_leases, "preparation owner handoff")
             return
         except OSError as exc:
             raise IncarnationHomeError(
@@ -10320,10 +10503,6 @@ def _finish_preparation_owner(
             raise IncarnationHomeError(
                 "incarnation preparation owner token changed before publication cleanup"
             ) from exc
-        # This is the publication linearization boundary: the retained
-        # ambient, target, and migration roots are validated while the exact
-        # owner token is still retained, immediately before its retirement.
-        _validate_publication_leases(publication_leases, "preparation owner handoff")
         _remove_staged_file_at(
             parent_fd,
             owner_path.name,
@@ -10335,6 +10514,21 @@ def _finish_preparation_owner(
         if descriptor is not None:
             os.close(descriptor)
         os.close(parent_fd)
+
+
+def _finish_preparation_owner(
+    owner: dict[str, Any] | None,
+    *,
+    publication_leases: Sequence[
+        _MigrationPublicationLease | _PreparationPublicationLease
+    ] = (),
+) -> None:
+    with _TerminalPublicationHandoff(
+        stage="preparation owner handoff",
+        publication_leases=publication_leases,
+        owner=owner,
+    ):
+        _validate_publication_leases(publication_leases, "preparation owner handoff")
 
 
 def _prepare_home_attempt_owner(
@@ -10933,10 +11127,9 @@ def _prepare_home_impl(
                 stage="final publication source validation",
             )
             # These named checks preserve the existing source and terminal
-            # return evidence.  The ownership transfer itself is performed
-            # inside _finish_preparation_owner immediately before token
-            # retirement, where all retained publication leases are checked
-            # together.
+            # return evidence.  The ownership transfer below remains open
+            # through the caller's return edge and performs its own private
+            # handoff validation before retiring the owner token.
             migration_publication_lease.validate("final publication validation")
             migration_publication_lease.validate("terminal migration return")
         assert preparation_publication_lease is not None
@@ -10945,11 +11138,15 @@ def _prepare_home_impl(
         ] = [preparation_publication_lease]
         if migration_publication_lease is not None:
             publication_leases.insert(0, migration_publication_lease)
-        _finish_preparation_owner(
-            active_owner,
+        with _TerminalPublicationHandoff(
+            stage="preparation owner handoff",
             publication_leases=tuple(publication_leases),
-        )
-        return manifest
+            owner=active_owner,
+        ):
+            _validate_publication_leases(
+                tuple(publication_leases), "preparation owner handoff"
+            )
+            return manifest
     except IncarnationHomeError as exc:
         if active_owner is not None and (
             marker_published or manifest_path.exists() or manifest_path.is_symlink()
@@ -13660,6 +13857,9 @@ def _command_payload_launch_impl(
         binding_context_digest=binding_context_digest,
         holder_receipt_path=Path(args.holder_receipt),
     )
+    holder_claim_snapshot = _holder_claim_snapshot_for_receipt(
+        holder_claim_path, claim_digest
+    )
     if claim_state is not None:
         claim_state["validated"] = True
     holder_binding = _validate_holder_binding_manifest_record(
@@ -13755,6 +13955,9 @@ def _command_payload_launch_impl(
             manifest_digest=manifest_digest,
             companion_binding=companion_binding,
             holder_binding=holder_binding,
+            holder_claim_path=holder_claim_path,
+            holder_claim_digest=claim_digest,
+            holder_claim_snapshot=holder_claim_snapshot,
             binding_context=(binding_context if terminal_title is not None else None),
             control_socket=control_socket,
             terminal_title=terminal_title,
@@ -14184,6 +14387,9 @@ def command_launch(args: argparse.Namespace) -> int:
             launch_path = executable_snapshot_mount["executable_path"]
             launch_argv = [str(launch_path), *argv[1:]]
         if args.holder_receipt and executable_snapshot_mount is None:
+            holder_claim_snapshot = _holder_claim_snapshot_for_receipt(
+                holder_claim_path, holder_claim_digest
+            )
             _holder_receipt(
                 receipt_path=Path(args.holder_receipt),
                 manifest_path=manifest_path,
@@ -14195,6 +14401,9 @@ def command_launch(args: argparse.Namespace) -> int:
                 manifest_bytes=manifest_bytes,
                 manifest_digest=manifest_digest,
                 holder_binding=holder_binding,
+                holder_claim_path=holder_claim_path,
+                holder_claim_digest=holder_claim_digest,
+                holder_claim_snapshot=holder_claim_snapshot,
             )
             holder_receipt_published = True
         final_argv = launch_argv
