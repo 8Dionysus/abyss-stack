@@ -14,6 +14,7 @@ import struct
 import subprocess
 import sys
 import tempfile
+import unicodedata
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
@@ -567,7 +568,7 @@ def require_legacy_owner_migration_catalog(path: Path) -> Path:
     }
     identifier_pattern = re.compile(r"^[a-z][a-z0-9._:-]{2,127}$")
     coordinate_pattern = re.compile(
-        r"^[^\x00-\x20\x7f-\xa0\u1680\u2000-\u200a\u2028-\u2029\u202f\u205f\u3000]+$"
+        r"^[^\x00-\x20\x7f-\xa0\u00ad\u0600-\u0605\u061c\u06dd\u070f\u0890-\u0891\u08e2\u1680\u180e\u2000-\u200f\u2028-\u202e\u202f\u205f\u2060-\u206f\u3000\ufeff\ufff9-\ufffb]+$"
     )
     repository_pattern = re.compile(r"^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$")
     revision_pattern = re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
@@ -581,6 +582,7 @@ def require_legacy_owner_migration_catalog(path: Path) -> Path:
             isinstance(value, str)
             and len(value) <= 4096
             and coordinate_pattern.fullmatch(value) is not None
+            and all(unicodedata.category(character) not in {"Cc", "Cf"} for character in value)
         )
 
     def valid_digest(value: object) -> bool:

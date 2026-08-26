@@ -22,8 +22,8 @@
       "const": "abyss_stack_external_codex_workspace_manifest_legacy_evidence_v1"
     },
     "kind": {"const": "workspace_manifest_legacy_evidence"},
-    "evidence_id": {"type": "string", "pattern": "^[a-z][a-z0-9._:-]{2,127}$"},
-    "grant_id": {"type": "string", "pattern": "^[a-z][a-z0-9._:-]{2,127}$"},
+    "evidence_id": {"type": "string", "pattern": "^[a-z][a-z0-9._:-]{2,127}$(?![\\s\\S])"},
+    "grant_id": {"type": "string", "pattern": "^[a-z][a-z0-9._:-]{2,127}$(?![\\s\\S])"},
     "repository_id": {
       "type": "string",
       "pattern": "^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$(?![\\s\\S])",
@@ -44,7 +44,7 @@
       "type": "string",
       "minLength": 1,
       "maxLength": 4096,
-      "pattern": "^[^\\u0000-\\u0020\\u007f-\\u00a0\\u1680\\u2000-\\u200a\\u2028-\\u2029\\u202f\\u205f\\u3000]+$(?![\\s\\S])"
+      "pattern": "^[^\\u0000-\\u0020\\u007f-\\u00a0\\u00ad\\u0600-\\u0605\\u061c\\u06dd\\u070f\\u0890-\\u0891\\u08e2\\u1680\\u180e\\u2000-\\u200f\\u2028-\\u202e\\u202f\\u205f\\u2060-\\u206f\\u3000\\ufeff\\ufff9-\\ufffb]+$(?![\\s\\S])"
     },
     "digest": {
       "type": "string",

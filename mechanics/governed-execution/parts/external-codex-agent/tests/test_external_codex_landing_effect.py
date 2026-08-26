@@ -472,6 +472,16 @@ def test_exact_coordinates_reject_trailing_newlines() -> None:
         assert exc.value.code == "landing_effect_grant_schema_invalid"
 
 
+def test_grant_id_rejects_trailing_newlines() -> None:
+    grant = _grant()
+    grant["grant_id"] += "\n"
+    _refresh_semantic_digest(grant)
+
+    with pytest.raises(LandingEffectGrantError) as exc:
+        validate_landing_effect_grant(grant)
+    assert exc.value.code == "landing_effect_grant_schema_invalid"
+
+
 @pytest.mark.parametrize("ref_path", [("goal_ref",), ("holder_ref",)])
 @pytest.mark.parametrize(
     "field",
@@ -479,7 +489,14 @@ def test_exact_coordinates_reject_trailing_newlines() -> None:
 )
 @pytest.mark.parametrize(
     "invalid_coordinate",
-    ("owner\nrepo", "owner\u0085repo", "owner\u00a0repo", "owner\u2028repo"),
+    (
+        "owner\nrepo",
+        "owner\u0085repo",
+        "owner\u00a0repo",
+        "owner\u200erepo",
+        "owner\u202erepo",
+        "owner\u2028repo",
+    ),
 )
 def test_owner_reference_coordinates_reject_controls_and_unicode_whitespace(
     ref_path: tuple[str, ...],
@@ -500,7 +517,14 @@ def test_owner_reference_coordinates_reject_controls_and_unicode_whitespace(
 
 @pytest.mark.parametrize(
     "invalid_coordinate",
-    ("incarnation\nid", "incarnation\u0085id", "incarnation\u00a0id", "incarnation\u2028id"),
+    (
+        "incarnation\nid",
+        "incarnation\u0085id",
+        "incarnation\u00a0id",
+        "incarnation\u200eid",
+        "incarnation\u202eid",
+        "incarnation\u2028id",
+    ),
 )
 def test_holder_incarnation_id_rejects_controls_and_unicode_whitespace(
     invalid_coordinate: str,
