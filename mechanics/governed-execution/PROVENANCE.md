@@ -38,5 +38,8 @@ proof verdicts, playbook meaning, and final acceptance.
   owns bounded recurrence and return policy.
 - [parts/local-worker-path/docs/CONTEXT_BUDGET_POLICY.md](parts/local-worker-path/docs/CONTEXT_BUDGET_POLICY.md)
   owns local-worker context-budget posture.
+- [parts/programmatic-tool-execution/CONTRACT.md](parts/programmatic-tool-execution/CONTRACT.md)
+  owns the stack-side provider-neutral adapter seam and validated observation
+  handoff; `aoa-sdk` remains the request/observation ABI owner.
 - [../federation-seams/README.md](../federation-seams/README.md) owns advisory
   owner inputs consumed by local-worker routes.

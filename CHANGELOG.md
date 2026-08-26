@@ -9,6 +9,11 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Add the source-only, default-off provider-neutral programmatic execution
+  runtime seam with explicit admission, independent Codex/local adapter
+  boundaries, validated observation handoff, and distinct adapter versus
+  post-execution sink failures; retain the exact d0 paired-baseline trigger
+  before binding real invokers.
 - Harden governed landing-effect admission with an independent artifact-byte
   digest, descriptor-bound bounded no-follow reads, duplicate-member rejection,
   complete Git ref validation, effect-specific target constraints, and a

@@ -286,6 +286,10 @@
 - [ABYSS-STACK-D-0116 Bind Terminal Validation Suite After Command-Sandbox Settlement](../ABYSS-STACK-D-0116-bind-terminal-validation-suite-after-command-sandbox-settlement.md) (`docs/decisions/ABYSS-STACK-D-0116-bind-terminal-validation-suite-after-command-sandbox-settlement.md`)
 - [ABYSS-STACK-D-0127 Bind Resume Private-Git Observation to the Accepted Actor Final](../ABYSS-STACK-D-0127-bind-resume-private-git-to-accepted-actor-final.md) (`docs/decisions/ABYSS-STACK-D-0127-bind-resume-private-git-to-accepted-actor-final.md`)
 
+## adapter protocol
+
+- [ABYSS-STACK-D-0138 Provider-Neutral Programmatic Execution Runtime](../ABYSS-STACK-D-0138-provider-neutral-programmatic-execution-runtime.md) (`docs/decisions/ABYSS-STACK-D-0138-provider-neutral-programmatic-execution-runtime.md`)
+
 ## admission recovery
 
 - [ABYSS-STACK-D-0109 Recover Expired Modern MCP Read Admission](../ABYSS-STACK-D-0109-recover-expired-modern-mcp-read-admission.md) (`docs/decisions/ABYSS-STACK-D-0109-recover-expired-modern-mcp-read-admission.md`)
@@ -545,6 +549,10 @@
 
 - [ABYSS-STACK-D-0110 Admit External Actors Through Role-First Owner Contours](../ABYSS-STACK-D-0110-admit-external-actors-through-role-first-owner-contours.md) (`docs/decisions/ABYSS-STACK-D-0110-admit-external-actors-through-role-first-owner-contours.md`)
 
+## observation
+
+- [ABYSS-STACK-D-0138 Provider-Neutral Programmatic Execution Runtime](../ABYSS-STACK-D-0138-provider-neutral-programmatic-execution-runtime.md) (`docs/decisions/ABYSS-STACK-D-0138-provider-neutral-programmatic-execution-runtime.md`)
+
 ## operational evidence
 
 - [ABYSS-STACK-D-0107 Fail Closed MCP Admission Maintenance](../ABYSS-STACK-D-0107-fail-closed-mcp-admission-maintenance.md) (`docs/decisions/ABYSS-STACK-D-0107-fail-closed-mcp-admission-maintenance.md`)
@@ -670,6 +678,7 @@
 - [ABYSS-STACK-D-0117 Recover Review Inputs Without Rewriting Owner Writers](../ABYSS-STACK-D-0117-recover-review-inputs-without-rewriting-owner-writers.md) (`docs/decisions/ABYSS-STACK-D-0117-recover-review-inputs-without-rewriting-owner-writers.md`)
 - [ABYSS-STACK-D-0118 Admit Role-First Owner Reviewers to A2A Return](../ABYSS-STACK-D-0118-admit-role-first-owner-reviewers-to-a2a-return.md) (`docs/decisions/ABYSS-STACK-D-0118-admit-role-first-owner-reviewers-to-a2a-return.md`)
 - [ABYSS-STACK-D-0119 Preserve Actor Continuity Across Provider Capacity Loss](../ABYSS-STACK-D-0119-preserve-actor-continuity-across-provider-capacity-loss.md) (`docs/decisions/ABYSS-STACK-D-0119-preserve-actor-continuity-across-provider-capacity-loss.md`)
+- [ABYSS-STACK-D-0138 Provider-Neutral Programmatic Execution Runtime](../ABYSS-STACK-D-0138-provider-neutral-programmatic-execution-runtime.md) (`docs/decisions/ABYSS-STACK-D-0138-provider-neutral-programmatic-execution-runtime.md`)
 
 ## runtime containment
 

@@ -210,6 +210,7 @@
 - [ABYSS-STACK-D-0123 Parent Passive Turns Disable Code Mode](../ABYSS-STACK-D-0123-parent-passive-code-mode-disable.md) (`docs/decisions/ABYSS-STACK-D-0123-parent-passive-code-mode-disable.md`)
 - [ABYSS-STACK-D-0124 Visible Holder Terminal Lifecycle Identity](../ABYSS-STACK-D-0124-visible-holder-terminal-lifecycle-identity.md) (`docs/decisions/ABYSS-STACK-D-0124-visible-holder-terminal-lifecycle-identity.md`)
 - [ABYSS-STACK-D-0127 Bind Resume Private-Git Observation to the Accepted Actor Final](../ABYSS-STACK-D-0127-bind-resume-private-git-to-accepted-actor-final.md) (`docs/decisions/ABYSS-STACK-D-0127-bind-resume-private-git-to-accepted-actor-final.md`)
+- [ABYSS-STACK-D-0138 Provider-Neutral Programmatic Execution Runtime](../ABYSS-STACK-D-0138-provider-neutral-programmatic-execution-runtime.md) (`docs/decisions/ABYSS-STACK-D-0138-provider-neutral-programmatic-execution-runtime.md`)
 
 ## diagnostics
 
@@ -421,6 +422,10 @@
 ## runtime access plane
 
 - [ABYSS-STACK-D-0078 Federated Stats MCP Access Plane](../ABYSS-STACK-D-0078-federated-stats-mcp-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0078-federated-stats-mcp-access-plane.md`)
+
+## runtime evidence
+
+- [ABYSS-STACK-D-0138 Provider-Neutral Programmatic Execution Runtime](../ABYSS-STACK-D-0138-provider-neutral-programmatic-execution-runtime.md) (`docs/decisions/ABYSS-STACK-D-0138-provider-neutral-programmatic-execution-runtime.md`)
 
 ## runtime knowledge
 

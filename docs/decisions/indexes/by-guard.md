@@ -369,6 +369,10 @@
 
 - [ABYSS-STACK-D-0056 Decision Surface Validator Module](../ABYSS-STACK-D-0056-decision-surface-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0056-decision-surface-validator-module.md`)
 
+## default-off activation
+
+- [ABYSS-STACK-D-0138 Provider-Neutral Programmatic Execution Runtime](../ABYSS-STACK-D-0138-provider-neutral-programmatic-execution-runtime.md) (`docs/decisions/ABYSS-STACK-D-0138-provider-neutral-programmatic-execution-runtime.md`)
+
 ## deny by default
 
 - [ABYSS-STACK-D-0097 Codex Consumer Handoff Remains Owner-Composed](../ABYSS-STACK-D-0097-codex-consumer-handoff-remains-owner-composed.md) (`docs/decisions/ABYSS-STACK-D-0097-codex-consumer-handoff-remains-owner-composed.md`)
@@ -498,6 +502,10 @@
 ## explicit adapter
 
 - [ABYSS-STACK-D-0098 Agent OS Subprocess Runtime Adapter](../ABYSS-STACK-D-0098-agent-os-subprocess-runtime-adapter.md) (`docs/decisions/ABYSS-STACK-D-0098-agent-os-subprocess-runtime-adapter.md`)
+
+## explicit admission
+
+- [ABYSS-STACK-D-0138 Provider-Neutral Programmatic Execution Runtime](../ABYSS-STACK-D-0138-provider-neutral-programmatic-execution-runtime.md) (`docs/decisions/ABYSS-STACK-D-0138-provider-neutral-programmatic-execution-runtime.md`)
 
 ## explicit approval
 
@@ -729,6 +737,10 @@
 ## no semantic proxy
 
 - [ABYSS-STACK-D-0095 Cross-Organ Orchestration Host Boundary](../ABYSS-STACK-D-0095-cross-organ-orchestration-host-boundary.md) (`docs/decisions/ABYSS-STACK-D-0095-cross-organ-orchestration-host-boundary.md`)
+
+## observation integrity
+
+- [ABYSS-STACK-D-0138 Provider-Neutral Programmatic Execution Runtime](../ABYSS-STACK-D-0138-provider-neutral-programmatic-execution-runtime.md) (`docs/decisions/ABYSS-STACK-D-0138-provider-neutral-programmatic-execution-runtime.md`)
 
 ## observe-only usage
 

@@ -12,6 +12,9 @@
 - keep the source-local external Codex lane bound to exact SDK incarnation and
   model-realization refs, durable sessions, independent review, and disabled
   external effects
+- keep the programmatic execution seam source-only and default-off until d0
+  admits a paired baseline; only then bind real Codex and local-model invokers
+  and route their observations to the appropriate owner review surfaces
 
 ## Next candidates
 
@@ -20,6 +23,9 @@
 - add stronger invariant tests for return policy if recurrence behavior grows
 - widen Agent OS scenarios only after a new owner contour, explicit execution
   lane, runtime phase map, failure matrix, and paired SDK/runtime proof exist
+- after paired d0 baseline admission, bind the two programmatic adapter lanes
+  through explicit runtime profiles and collect comparable observations before
+  any activation, economy comparison, eval, or promotion claim
 - run fixed Sol max, Luna max, and Luna xhigh landing trials, then submit their
   runtime receipts to `aoa-evals`; do not admit model fit or center integration
   from the fake-process transport suite
