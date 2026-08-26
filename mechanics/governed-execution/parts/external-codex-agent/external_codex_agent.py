@@ -85,6 +85,10 @@ RUNTIME_PACKAGE_EXECUTION_ROOT = Path(
     "/var/tmp/aoa-external-actor-runtime-package"
 )
 RUNTIME_PACKAGE_EXECUTABLE = RUNTIME_PACKAGE_EXECUTION_ROOT / "bin/codex"
+RUNTIME_PACKAGE_PERMISSION_PATHS = (
+    RUNTIME_PACKAGE_EXECUTION_ROOT,
+    RUNTIME_PACKAGE_EXECUTABLE,
+)
 SCHEMA_ROOT = PART_ROOT / "schemas"
 LAUNCH_SCHEMA_PATH = SCHEMA_ROOT / "external-codex-launch.schema.json"
 TASK_SCHEMA_PATH = SCHEMA_ROOT / "external-codex-task.schema.json"
@@ -8588,7 +8592,11 @@ class ExternalCodexRuntime:
             permission_profile = _actor_codex_permission_profile(
                 actor_git_mask,
                 execution_root=execution_root,
-                readable_paths=(sanitized_config, executable),
+                readable_paths=(
+                    sanitized_config,
+                    executable,
+                    *RUNTIME_PACKAGE_PERMISSION_PATHS,
+                ),
                 writable_paths=(preflight_root,),
             )
             nested_sandbox_probe = [
@@ -11784,7 +11792,11 @@ Runtime session identity: {state["session_id"]}
             actor_git_mask,
             sanitized_config_path=sanitized_config_path,
             execution_root=execution_root,
-            readable_paths=(*readable_paths, Path(executable)),
+            readable_paths=(
+                *readable_paths,
+                Path(executable),
+                *RUNTIME_PACKAGE_PERMISSION_PATHS,
+            ),
             writable_paths=writable_paths,
             denied_paths=denied_paths,
             workspace_access=workspace_access,
