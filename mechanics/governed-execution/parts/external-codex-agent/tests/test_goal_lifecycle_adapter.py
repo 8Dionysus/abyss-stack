@@ -134,6 +134,7 @@ class FakeGoalRpc:
         self.calls: list[tuple[str, dict[str, object] | None]] = []
         self.counter = 0
         self.mutation_response_extra: dict[str, object] = {}
+        self.goal_get_extra: dict[str, object] = {}
         self.lose_goal_set_response = False
 
     def __enter__(self) -> "FakeGoalRpc":
@@ -151,7 +152,11 @@ class FakeGoalRpc:
         if method == "initialize":
             return {"protocolVersion": "1"}
         if method == "thread/goal/get":
-            return {"goal": {"threadId": "thread:test", "status": self.status}}
+            response: dict[str, object] = {
+                "goal": {"threadId": "thread:test", "status": self.status}
+            }
+            response.update(self.goal_get_extra)
+            return response
         if method == "thread/goal/set":
             assert isinstance(params, dict)
             request_id = self.counter
@@ -348,6 +353,7 @@ def test_generic_adapter_cli_route_replays_canonical_receipt(
     rpc.mutation_response_extra = {"set_response_only": True}
 
     first = ADAPTER.run_goal_transition(args)
+    rpc.goal_get_extra = {"server_metadata": {"revision": 2}}
     second = ADAPTER.run_goal_transition(args)
 
     assert first == second
@@ -840,6 +846,10 @@ def test_generic_adapter_reconciles_a_lost_set_response_without_a_second_set(
     )
     assert [method for method, _params in rpc.calls].count("thread/goal/set") == 1
 
+    historical_post_read = json.loads(attempt_path.read_text(encoding="utf-8"))[
+        "post_read_response"
+    ]
+    rpc.goal_get_extra = {"server_metadata": {"revision": 2}}
     replay = ADAPTER.execute_goal_transition(
         request,
         decision,
@@ -849,6 +859,11 @@ def test_generic_adapter_reconciles_a_lost_set_response_without_a_second_set(
         rpc_factory=lambda _endpoint: rpc,
         attempt_path=attempt_path,
     )
+    assert replay["lifecycle"]["result_response"] == historical_post_read
+    assert replay["lifecycle"]["result_response"] != {
+        "goal": {"threadId": "thread:test", "status": "paused"},
+        "server_metadata": {"revision": 2},
+    }
     assert replay["lifecycle"]["recovery"]["mutation_response_available"] is False
     assert [method for method, _params in rpc.calls].count("thread/goal/set") == 1
 

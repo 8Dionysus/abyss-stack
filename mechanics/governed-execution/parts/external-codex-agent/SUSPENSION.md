@@ -60,7 +60,9 @@ exact request marker, returned Goal response when available, and post-read. A
 response-loss retry is allowed only with the durable dispatch marker and fresh
 read, and never issues a second lifecycle set. Historical
 `abyss_stack_external_codex_atomic_goal_transition_v1` proofs remain accepted
-only for migration/replay. A completed
+only for migration/replay. Although this is the legacy projection, invoking it
+without a completed receipt is still a mutating compatibility path: it creates
+the durable reservation and performs the one native Goal-set request. A completed
 `abyss_stack_external_codex_pause_receipt_v1` carries the v2 observational proof
 and binds the exact request ID and digest, thread, method, and post-read digest.
 

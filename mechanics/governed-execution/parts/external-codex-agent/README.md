@@ -161,12 +161,15 @@ and replay only through their matching legacy wake reservation. A retry after a 
   server-side CAS or mutation causality. Executed receipts retain and
   revalidate the authoritative result response, require the mutation attempt
   sidecar, and bind the file-backed receipt to its canonical path;
-- keeps `aoa-external-codex-return pause` only as a legacy pause projection for
-  existing evidence. The current public `ThreadGoalSetParams` surface exposes
-  the native `thread/goal/set` mutation without a CAS/version field, so this
-  route binds the exact request, optional returned Goal response, and bounded
-  post-read instead of requiring an unsupported protocol feature. Historical
-  atomic transition proofs remain accepted only for migration/replay;
+- keeps `aoa-external-codex-return pause` as a backwards-compatible legacy
+  pause projection. It remains a mutating compatibility entrypoint when no
+  completed receipt exists, reserving the exact precondition and issuing one
+  native `thread/goal/set`; replay of a completed receipt is read-only. The
+  current public `ThreadGoalSetParams` surface exposes the native
+  `thread/goal/set` mutation without a CAS/version field, so this route binds
+  the exact request, optional returned Goal response, and bounded post-read
+  instead of requiring an unsupported protocol feature. Historical atomic
+  transition proofs remain accepted only for migration/replay;
 - exposes `aoa-external-codex-stasis` as a generic, model-neutral responsibility
   movement observer. It consumes one exact lifecycle/session evidence snapshot,
   requires a matching lifecycle transition before classifying movement, and

@@ -65,6 +65,7 @@ class FakeRpc:
         self.bounded_turns = bounded_turns
         self.fallback_active_turn = fallback_active_turn
         self.goal_set_status = goal_set_status
+        self.goal_get_extra: dict[str, object] = {}
         self.lose_goal_set_response = False
         self.calls: list[tuple[str, dict[str, object] | None]] = []
         self.request_prepare_callback = None
@@ -86,12 +87,14 @@ class FakeRpc:
         if method == "initialize":
             return {"protocolVersion": "1"}
         if method == "thread/goal/get":
-            return {
+            response: dict[str, object] = {
                 "goal": {
                     "threadId": self.thread_id,
                     "status": self.goal_status,
                 }
             }
+            response.update(self.goal_get_extra)
+            return response
         if method == "thread/goal/set":
             self.goal_status = self.goal_set_status
             if self.request_prepare_callback is not None:
@@ -655,7 +658,22 @@ def test_run_pause_reserves_and_replays_without_second_transport_mutation(
     first = MODULE.run_pause(args)
     assert first["goal_binding"]["transition"] == "active_to_paused"
     assert first["pause_receipt_ref"] == str(pause_path.resolve())
+    assert isinstance(first["lifecycle"]["post_read_response"], dict)
+    assert first["lifecycle"]["post_read_response_sha256"] == MODULE._sha256_bytes(
+        MODULE._canonical_bytes(first["lifecycle"]["post_read_response"])
+    )
     assert len([method for method, _params in fake.calls if method == "thread/goal/set"]) == 1
+
+    tampered_post_read = json.loads(json.dumps(first))
+    tampered_post_read["lifecycle"]["post_read_response"]["server_metadata"] = {
+        "revision": 2
+    }
+    pause_path.write_bytes(MODULE._canonical_bytes(tampered_post_read) + b"\n")
+    with pytest.raises(
+        MODULE.ExternalCodexReturnError,
+        match="lifecycle evidence",
+    ):
+        MODULE.run_pause(args)
 
     incomplete = json.loads(json.dumps(first))
     incomplete["lifecycle"]["response_available"] = False
@@ -811,6 +829,7 @@ def test_run_pause_reserves_and_replays_without_second_transport_mutation(
         "pause_goal",
         lambda *_args, **_kwargs: pytest.fail("pause transport replayed"),
     )
+    fake.goal_get_extra = {"server_metadata": {"revision": 2}}
     second = MODULE.run_pause(args)
     assert second == first
 
@@ -951,9 +970,15 @@ def test_run_pause_reconciles_reserved_mutation_after_receipt_publication_failur
         "discover_app_server_socket",
         lambda _owner: (endpoint, "explicit-endpoint"),
     )
+    historical_post_read = reserved["post_read_response"]
+    fake.goal_get_extra = {"server_metadata": {"revision": 2}}
     second = MODULE.run_pause(args)
     assert second["recovery"]["mode"] == "ambiguous_post_mutation"
     assert second["lifecycle"]["response_available"] is True
+    assert second["lifecycle"]["post_read_response"] == historical_post_read
+    assert second["lifecycle"]["transition_proof"]["post_read_response_sha256"] == (
+        MODULE._sha256_bytes(MODULE._canonical_bytes(historical_post_read))
+    )
     assert len([method for method, _params in fake.calls if method == "thread/goal/set"]) == 1
 
 

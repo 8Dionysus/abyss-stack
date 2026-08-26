@@ -1484,6 +1484,10 @@ def _pause_receipt(
             else None
         ),
         "post_read": _safe_response_summary(post_read_response),
+        # Keep the exact post-read alongside its digest.  The safe summary is
+        # useful for projection, but cannot by itself prove which bytes the
+        # transition proof covered.
+        "post_read_response": post_read_response,
         "post_read_response_sha256": _sha256_bytes(
             _canonical_bytes(post_read_response)
         ),
@@ -1605,7 +1609,30 @@ def pause_goal(
                     )
             stored_proof = reservation.get("transition_proof")
             stored_post_read = reservation.get("post_read_response")
+            if (
+                isinstance(stored_proof, dict)
+                and stored_proof.get("schema_version")
+                == PAUSE_TRANSITION_PROOF_SCHEMA_VERSION
+                and not isinstance(stored_post_read, dict)
+            ):
+                raise ExternalCodexReturnError(
+                    "stored Goal pause transition proof lacks its post-read response"
+                )
+            if isinstance(stored_post_read, dict):
+                stored_post_read_goal = _goal_object(
+                    stored_post_read, "thread/goal/get"
+                )
+                _validate_goal_binding(stored_post_read_goal, owner)
+                if _string_at(stored_post_read_goal, ("status",)) != "paused":
+                    raise ExternalCodexReturnError(
+                        "stored Goal pause post-read did not confirm a paused Goal"
+                    )
             if stored_proof is not None:
+                proof_post_read = (
+                    stored_post_read
+                    if isinstance(stored_post_read, dict)
+                    else None
+                )
                 _validated_pause_transition_proof(
                     stored_proof,
                     owner=owner,
@@ -1617,11 +1644,7 @@ def pause_goal(
                         if isinstance(stored_proof, dict)
                         else None
                     ),
-                    post_read_response=(
-                        stored_post_read
-                        if isinstance(stored_post_read, dict)
-                        else None
-                    ),
+                    post_read_response=proof_post_read,
                     expected_post_read_digest=(
                         stored_proof.get("post_read_response_sha256")
                         if isinstance(stored_proof, dict)
@@ -1629,20 +1652,29 @@ def pause_goal(
                     ),
                 )
             # A paused Goal plus the durable dispatch marker is enough to
-            # reconcile an interrupted attempt.  Rebuild the current proof
-            # from this fresh read rather than replaying a legacy proof whose
-            # semantics depended on an unsupported server-side CAS claim.
-            transition_proof = _pause_transition_proof(
-                owner=owner,
-                precondition=precondition,
-                mutation=mutation_dispatched,
-                goal_response=durable_goal_response,
-                post_read_response=goal_get_response,
-            )
-            _validate_goal_binding(goal_before, owner)
+            # reconcile an interrupted attempt.  When proof and post-read
+            # bytes already exist, the fresh read above is only a current
+            # identity/state check; preserve those historical proof bytes
+            # instead of rewriting them from mutable Goal metadata.
+            if isinstance(stored_proof, dict):
+                transition_proof = stored_proof
+                proof_post_read = (
+                    stored_post_read
+                    if isinstance(stored_post_read, dict)
+                    else goal_get_response
+                )
+            else:
+                proof_post_read = goal_get_response
+                transition_proof = _pause_transition_proof(
+                    owner=owner,
+                    precondition=precondition,
+                    mutation=mutation_dispatched,
+                    goal_response=durable_goal_response,
+                    post_read_response=proof_post_read,
+                )
             proof_reservation = {
                 **reservation,
-                "post_read_response": goal_get_response,
+                "post_read_response": proof_post_read,
                 "transition_proof": transition_proof,
             }
             _replace_json(
@@ -1661,7 +1693,7 @@ def pause_goal(
                 initialize=initialize,
                 goal_get_response=goal_get_response,
                 goal_response=durable_goal_response,
-                post_read_response=goal_get_response,
+                post_read_response=proof_post_read,
                 before_status="active",
                 goal_status="paused",
                 identity_source=goal_identity_source,
@@ -2826,6 +2858,18 @@ def _validate_pause_receipt(
             and not _is_sha256_digest(lifecycle.get("post_read_response_sha256"))
         )
         or (
+            not legacy_transition_proof
+            and not isinstance(lifecycle.get("post_read_response"), dict)
+        )
+        or (
+            not legacy_transition_proof
+            and isinstance(lifecycle.get("post_read_response"), dict)
+            and lifecycle.get("post_read_response_sha256")
+            != _sha256_bytes(
+                _canonical_bytes(lifecycle.get("post_read_response"))
+            )
+        )
+        or (
             lifecycle.get("response_available") is False
             and recovery is None
         )
@@ -2884,6 +2928,13 @@ def _validate_pause_receipt(
             raise ExternalCodexReturnError(
                 "canonical Goal pause receipt post-read does not confirm a paused Goal"
             )
+        post_read_response = lifecycle.get("post_read_response")
+        post_read_goal = _goal_object(post_read_response, "thread/goal/get")
+        _validate_goal_binding(post_read_goal, owner)
+        if _string_at(post_read_goal, ("status",)) != "paused":
+            raise ExternalCodexReturnError(
+                "canonical Goal pause receipt raw post-read does not confirm a paused Goal"
+            )
     if recovery is not None:
         if (
             not isinstance(recovery, dict)
@@ -2923,6 +2974,11 @@ def _validate_pause_receipt(
             if not legacy_transition_proof
             else None
         ),
+        post_read_response=(
+            lifecycle.get("post_read_response")
+            if not legacy_transition_proof
+            else None
+        ),
     )
     if validated_proof.get("goal_response_sha256") != lifecycle.get(
         "goal_response_sha256"
@@ -2930,8 +2986,10 @@ def _validate_pause_receipt(
         raise ExternalCodexReturnError(
             "canonical Goal pause transition proof does not match its response"
         )
-    if validated_proof.get("post_read_response_sha256") != lifecycle.get(
-        "post_read_response_sha256"
+    if (
+        not legacy_transition_proof
+        and validated_proof.get("post_read_response_sha256")
+        != lifecycle.get("post_read_response_sha256")
     ):
         raise ExternalCodexReturnError(
             "canonical Goal pause transition proof does not match its post-read"

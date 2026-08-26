@@ -882,22 +882,33 @@ def execute_goal_transition(
                 raise runtime.ExternalCodexReturnError(
                     "Goal lifecycle attempt lacks complete mutation evidence"
                 )
+            proof_post_read = (
+                stored_post_read
+                if isinstance(stored_post_read, dict)
+                else before_response
+            )
             _validated_transition_proof(
                 stored_proof,
                 owner=owner,
                 precondition=stored_precondition,
                 mutation_response=stored_response,
-                post_read_response=(
-                    stored_post_read
-                    if isinstance(stored_post_read, dict)
-                    else before_response
-                ),
+                post_read_response=proof_post_read,
                 request_frame=stored_request,
                 from_state=request.expected_state,
                 to_state=request.desired_state,
             )
             mutation_response = stored_response
-            authoritative_response = before_response
+            # The fresh read above is only a current-state check.  Preserve
+            # the post-read that was already bound into the durable proof so
+            # a metadata-only change cannot rewrite the historical receipt
+            # or make the attempt/receipt bindings disagree.
+            proof_is_current = (
+                stored_proof.get("schema_version")
+                == GOAL_TRANSITION_PROOF_SCHEMA_VERSION
+            )
+            authoritative_response = (
+                proof_post_read if proof_is_current else before_response
+            )
             resulting_response = authoritative_response
             resulting_state = request.desired_state
             status = "executed"
@@ -1349,13 +1360,13 @@ def _validate_authoritative_result_response(
             "existing Goal lifecycle receipt lacks authoritative result evidence"
         )
     result_digest = lifecycle.get("result_response_sha256")
-    if (
-        not runtime._is_sha256_digest(result_digest)
-        or runtime._sha256_bytes(runtime._canonical_bytes(response)) != result_digest
-    ):
+    if not runtime._is_sha256_digest(result_digest):
         raise runtime.ExternalCodexReturnError(
-            "existing Goal lifecycle receipt authoritative result does not match the fresh Goal read"
+            "existing Goal lifecycle receipt authoritative result evidence is not bound"
         )
+    # A receipt's result response is immutable historical evidence.  The
+    # current read is a state/identity check only: app-server metadata may
+    # legitimately change between a receipt publication and a replay.
     goal = runtime._goal_object(response, "thread/goal/get")
     runtime._validate_goal_binding(goal, owner)
     state = runtime._string_at(goal, ("status",))

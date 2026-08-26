@@ -200,6 +200,7 @@
         },
         "goal_response_sha256": {"type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$"},
         "post_read": {"type": "object"},
+        "post_read_response": {"type": "object"},
         "post_read_response_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
         "precondition": {
           "type": "object",
@@ -271,7 +272,11 @@
       "then": {
         "properties": {
           "lifecycle": {
-            "required": ["post_read", "post_read_response_sha256"]
+            "required": [
+              "post_read",
+              "post_read_response",
+              "post_read_response_sha256"
+            ]
           }
         }
       }

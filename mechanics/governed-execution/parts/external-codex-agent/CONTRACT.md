@@ -141,9 +141,13 @@ Operations are:
   identity is selected by source.
 
   `aoa-external-codex-return pause --pause-owner ... --pause-receipt ...` is a
-  backwards-compatible legacy pause projection. New Masters use the generic
-  typed route above; the legacy route remains only for replay/migration of its
-  existing `abyss_stack_external_codex_pause_receipt_v1` evidence.
+  backwards-compatible legacy pause projection and remains a mutating
+  compatibility entrypoint when no completed receipt exists: it reserves the
+  active precondition and issues the one native Goal-set request. New Masters
+  use the generic typed route above. Once a completed pause receipt exists,
+  replay of that receipt is read-only, while historical
+  `abyss_stack_external_codex_atomic_goal_transition_v1` evidence remains
+  accepted only for migration/replay.
 
   The legacy projection's receipt is reserved before its app-server mutation
   and binds the owner
