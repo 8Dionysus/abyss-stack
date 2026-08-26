@@ -812,6 +812,16 @@ def test_terminal_review_state_seal_survives_index_refresh_and_rejects_tamper(
             expected_source_git_head=str(baseline["source_git_head"]),
             require_strict_fsck=True,
         )
+        legacy_reviewer, _ = materialize_actor_projection_from_seed(
+            projection,
+            tmp_path / "legacy-reviewer" / "actor-workspace",
+            expected_manifest=baseline,
+            seed_kind="projection",
+        )
+        for name in metadata_named_files:
+            assert (legacy_reviewer / name).read_text(encoding="utf-8") == (
+                f"repository file: {name}\n"
+            )
         delta = build_actor_delta(
             baseline,
             baseline,
@@ -852,6 +862,7 @@ def test_terminal_review_state_seal_survives_index_refresh_and_rejects_tamper(
             tmp_path / "writer" / "review-state-seal",
             tmp_path / "reviewer" / "actor-workspace",
             expected_manifest=baseline,
+            seed_kind="seal",
         )
         assert reviewer_manifest["private_git_digest"] == baseline["private_git_digest"]
         assert (reviewer / "sealed-locked").stat().st_mode & 0o777 == 0o555
@@ -1015,6 +1026,7 @@ def test_seed_projection_cleans_exact_inode_after_post_rename_failure(
             seed,
             target,
             expected_manifest=seed_manifest,
+            seed_kind="projection",
         )
 
     assert not target.exists()

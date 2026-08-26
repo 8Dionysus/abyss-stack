@@ -19,7 +19,7 @@ import re
 import stat
 import subprocess
 from pathlib import Path, PurePosixPath
-from typing import Any, Mapping, MutableMapping
+from typing import Any, Literal, Mapping, MutableMapping
 
 
 PROJECTION_MANIFEST_SCHEMA_VERSION = (
@@ -1525,20 +1525,26 @@ def materialize_actor_projection_from_seed(
     projection_path: str | Path,
     *,
     expected_manifest: Mapping[str, Any],
+    seed_kind: Literal["projection", "seal"],
     private_git_admission: MutableMapping[str, Any] | None = None,
 ) -> tuple[Path, dict[str, Any]]:
-    """Clone one exact terminal writer tree for an independent reviewer."""
+    """Clone one exact terminal writer tree for an independent reviewer.
+
+    The review seed envelope owns whether the coordinate is a sealed terminal
+    snapshot or a legacy mutable projection.  Do not infer that identity from
+    a repository filename that may legitimately share the seal metadata name.
+    """
 
     seed = Path(seed_path)
-    if (seed / REVIEW_STATE_SEAL_MANIFEST).is_file() and not (
-        seed / REVIEW_STATE_SEAL_MANIFEST
-    ).is_symlink():
+    if seed_kind == "seal":
         return materialize_actor_projection_from_seal(
             seed,
             projection_path,
             expected_manifest=expected_manifest,
             private_git_admission=private_git_admission,
         )
+    if seed_kind != "projection":
+        raise ProjectionError("actor projection seed kind is unsupported")
     target = Path(projection_path)
     if (
         not seed.is_absolute()

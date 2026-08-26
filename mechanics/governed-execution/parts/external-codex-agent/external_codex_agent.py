@@ -7325,10 +7325,12 @@ class ExternalCodexRuntime:
                     )
                 else:
                     seed_path = Path(str(review_seed["writer_projection_path"]))
+                    seed_kind = "projection"
                     if isinstance(review_seed.get("writer_review_seal_ref"), dict):
                         seed_path = Path(
                             str(review_seed["writer_review_seal_ref"]["artifact_ref"])
                         ).parent
+                        seed_kind = "seal"
                     seed_manifest = _load_verified_json_ref(
                         review_seed["writer_final_manifest_ref"],
                         label="actor projection recovery seed manifest",
@@ -7351,6 +7353,7 @@ class ExternalCodexRuntime:
                                 seed_path,
                                 witness_path,
                                 expected_manifest=seed_manifest,
+                                seed_kind=seed_kind,
                                 private_git_admission=witness_private_git,
                             )
                         )
@@ -7480,10 +7483,12 @@ class ExternalCodexRuntime:
                 )
             else:
                 seed_path = Path(str(review_seed["writer_projection_path"]))
+                seed_kind = "projection"
                 if isinstance(review_seed.get("writer_review_seal_ref"), dict):
                     seed_path = Path(
                         str(review_seed["writer_review_seal_ref"]["artifact_ref"])
                     ).parent
+                    seed_kind = "seal"
                 seed_manifest_ref = review_seed["writer_final_manifest_ref"]
                 seed_manifest = _load_verified_json_ref(
                     seed_manifest_ref,
@@ -7503,6 +7508,7 @@ class ExternalCodexRuntime:
                         seed_path,
                         projection_path,
                         expected_manifest=seed_manifest,
+                        seed_kind=seed_kind,
                     )
                 projection_identity = actor_baseline["workspace_identity"]
                 if (
