@@ -132,12 +132,14 @@ are rejected by both the receipt schema and runtime binding validator. A
 receipt carrying an immutable manifest snapshot must also carry the complete
 `holder_binding`; a typed v3 receipt must additionally carry the complete
 durable `holder_claim`, `holder_claim_digest`, and `holder_claim_snapshot_b64`
-tuple. The schema and snapshot loader reject either omission for typed v3 and
-legacy-v2 snapshot-shaped receipts, while pre-snapshot receipts retain their
-bounded compatibility path. The loader also decodes the immutable claim and
-requires its exact field set, manifest path/digest, holder binding, enclosing
-receipt reference, canonical manifest-derived claim pathname, and bytes/digest
-to agree before any typed receipt consumer proceeds. Rebind reserves that same holder claim under the
+tuple, while a readable legacy-v2 snapshot may omit it. The schema enforces
+holder binding for snapshots and rejects any partial supplied tuple; the
+schema-aware snapshot loader decodes the manifest identity to derive whether
+the tuple is required. When supplied, it requires the exact field set,
+manifest path/digest, holder binding, enclosing receipt reference, canonical
+manifest-derived claim pathname, and encoded bytes/digest to agree with a
+stable read of the durable claim path through the bounded ambient-identity
+reader before any typed receipt consumer proceeds. Rebind reserves that same holder claim under the
 preparation lock before publishing a replacement receipt, transferring an
 existing claim from the superseded receipt under that lock; an exact retry is
 idempotent. A failed receipt publication restores the superseded claim

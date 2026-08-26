@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/8Dionysus/abyss-stack/main/mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-holder-terminal-receipt.schema.json",
   "title": "Visible responsibility-holder terminal receipt",
-  "$comment": "The base64 holder-claim snapshot is opaque to JSON Schema; typed receipt admission must apply the runtime semantic validator to bind its exact claim fields to the enclosing manifest, holder binding, receipt reference, canonical claim pathname, and snapshot bytes/digest.",
+  "$comment": "The base64 manifest and holder-claim snapshots are opaque to JSON Schema. A manifest snapshot requires holder_binding, and any supplied holder-claim tuple must be complete; the runtime admission policy decodes the manifest schema to require claims for typed v3, preserve legacy-v2 compatibility without claims, and bind supplied claims to the enclosing manifest, holder binding, receipt reference, canonical claim pathname, and stable durable claim bytes/digest.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema_version", "receipt_ref", "created_at", "lifecycle_role", "boot_id", "holder", "runtime", "terminal"],
@@ -165,6 +165,29 @@
         "properties": {
           "runtime": {
             "required": [
+              "holder_binding"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "runtime": {
+            "anyOf": [
+              {"required": ["holder_claim"]},
+              {"required": ["holder_claim_digest"]},
+              {"required": ["holder_claim_snapshot_b64"]}
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "runtime": {
+            "required": [
+              "incarnation_manifest_snapshot_b64",
               "holder_binding",
               "holder_claim",
               "holder_claim_digest",

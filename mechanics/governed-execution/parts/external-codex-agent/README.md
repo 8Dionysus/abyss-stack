@@ -36,8 +36,12 @@ The controller:
   supervisor. The receipt includes the exact launch-time incarnation manifest
   bytes as a digest-bound base64 snapshot; after launch, its pathname is
   provenance for receipt binding, while the claimed home is frozen and profile
-  preparation may not refresh it. The installed launcher closes that exact holder
-  terminal only after typed closure authorization. Authorization may be
+  preparation may not refresh it. Canonical receipt admission derives claim
+  requiredness from the decoded manifest schema: typed v3 requires the complete
+  claim tuple, readable legacy v2 may omit it, and any supplied tuple is bound
+  to stable bytes from the canonical durable claim path. The installed launcher
+  closes that exact holder terminal only after typed closure authorization.
+  Authorization may be
   `wake_delivered` (a separate wake receipt proves delivery) or
   `join_completed` (a non-waking join proves a returned responsibility); both
   forms bind the exact holder receipt, handoff, closure path, PIDs, and

@@ -235,17 +235,22 @@ base64 snapshot bound to that digest. After launch, the recorded manifest
 pathname remains provenance for receipt binding: the closer validates the
 holder-bound snapshot, while the claimed home is frozen and
 preparation/profile refreshes may not rewrite its content-addressed pathname.
-Any receipt carrying a manifest
-snapshot, including a legacy-v2 snapshot, must carry the complete typed
-`holder_binding` in both the receipt runtime and the snapshot; a typed v3
-receipt must additionally carry `holder_claim`, `holder_claim_digest`, and
-`holder_claim_snapshot_b64` for the durable claim bytes. The runtime loader and
-public schema reject either omission. The runtime semantic validator then
-requires the decoded snapshot to have exactly the holder-claim field set and
-to agree with the enclosing manifest path and digest, holder binding, receipt
-reference, canonical claim pathname derived from that manifest, and encoded
-snapshot digest. Legacy receipts without the snapshot
-retain their prior fail-closed pathname check. The holder argv is the post-exec `/proc` shape, including the
+Any receipt carrying a manifest snapshot, including a legacy-v2 snapshot, must
+carry the complete typed `holder_binding` in both the receipt runtime and the
+snapshot. A typed v3 receipt must additionally carry `holder_claim`,
+`holder_claim_digest`, and `holder_claim_snapshot_b64` for the durable claim
+bytes; a readable legacy-v2 snapshot may omit that claim tuple. The public
+schema enforces the holder binding for a manifest snapshot and rejects a
+partial supplied claim tuple, while the canonical runtime admission policy
+decodes the manifest identity and requires the tuple only for typed v3. Any
+supplied tuple must have exactly the holder-claim field set and agree with the
+enclosing manifest path and digest, holder binding, receipt reference,
+canonical claim pathname derived from that manifest, encoded snapshot digest,
+and stable bytes read from that durable canonical claim path through the
+descriptor-relative ambient-identity-checked reader. Missing, substituted, or
+drifted durable bytes fail closed before a typed receipt consumer proceeds.
+Legacy receipts without the snapshot retain their prior fail-closed pathname
+check. The holder argv is the post-exec `/proc` shape, including the
 interpreter argv of a shebang-backed executable. For that shebang route, an
 internal `payload-launch` helper runs as bubblewrap's payload, revalidates the
 manifest and private launcher digests, writes the receipt from its own PID

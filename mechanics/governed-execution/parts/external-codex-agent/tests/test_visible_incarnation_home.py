@@ -111,6 +111,8 @@ def _typed_holder_receipt_fixture(
     receipt_path = tmp_path / "holder.json"
     manifest_path = tmp_path / "incarnation-home.json"
     context = _holder_binding_context(tmp_path, "claim-snapshot")
+    ambient_home = tmp_path / "ambient-home"
+    ambient_home.mkdir()
     context_bytes = MODULE.canonical_bytes(context)
     context_digest = MODULE.sha256_bytes(context_bytes)
     holder_binding = MODULE._holder_binding_manifest_record(
@@ -122,7 +124,7 @@ def _typed_holder_receipt_fixture(
         "schema_version": MODULE.SCHEMA_VERSION,
         "model_slug": "gpt-5.6-luna",
         "reasoning_effort": "max",
-        "ambient_codex_home": str(tmp_path / "ambient-home"),
+        "ambient_codex_home": str(ambient_home),
         "codex_home": str(tmp_path / "incarnation-home"),
         "holder_binding": holder_binding,
     }
@@ -138,6 +140,7 @@ def _typed_holder_receipt_fixture(
         "created_at": "2026-08-25T00:00:00Z",
     }
     claim_snapshot = MODULE.canonical_bytes(claim) + b"\n"
+    claim_path.write_bytes(claim_snapshot)
     argv = ["/usr/bin/codex", "exec"]
     receipt = {
         "schema_version": MODULE.HOLDER_RECEIPT_SCHEMA_VERSION,
@@ -4188,7 +4191,7 @@ def test_holder_schema_and_loader_reject_rebind_post_exec_identity_without_prove
         "holder_claim_snapshot_b64",
     ):
         typed_omission["runtime"].pop(key, None)
-    assert list(Draft202012Validator(schema).iter_errors(typed_omission))
+    Draft202012Validator(schema).validate(typed_omission)
     typed_omission_path.write_bytes(
         MODULE.canonical_bytes(typed_omission) + b"\n"
     )
@@ -4282,6 +4285,168 @@ def test_typed_holder_claim_snapshot_exact_binding_is_admitted(tmp_path: Path) -
 
 
 @pytest.mark.parametrize(
+    ("durable_state", "expected_error"),
+    [
+        pytest.param(
+            "missing",
+            "holder claim durable file is missing",
+            id="durable-claim-missing",
+        ),
+        pytest.param(
+            "substituted",
+            "holder claim durable snapshot has drifted",
+            id="durable-claim-substituted",
+        ),
+    ],
+)
+def test_typed_holder_claim_snapshot_requires_canonical_durable_bytes(
+    tmp_path: Path,
+    durable_state: str,
+    expected_error: str,
+) -> None:
+    receipt_path, receipt, manifest_path, claim, _holder_binding = (
+        _typed_holder_receipt_fixture(tmp_path)
+    )
+    claim_path = MODULE._holder_claim_path(manifest_path)
+    if durable_state == "missing":
+        claim_path.unlink()
+    elif durable_state == "substituted":
+        substituted_claim = dict(claim)
+        substituted_claim["holder_receipt"] = str(
+            (tmp_path / "foreign-holder.json").resolve()
+        )
+        claim_path.write_bytes(MODULE.canonical_bytes(substituted_claim) + b"\n")
+    else:  # pragma: no cover - the parameter list is exhaustive
+        raise AssertionError(f"unknown durable state: {durable_state}")
+    receipt_path.write_bytes(MODULE.canonical_bytes(receipt) + b"\n")
+
+    with pytest.raises(MODULE.IncarnationHomeError, match=expected_error):
+        MODULE._load_holder_receipt_snapshot(receipt_path)
+
+
+def test_legacy_v2_holder_manifest_snapshot_is_admitted_without_claim_tuple(
+    tmp_path: Path,
+) -> None:
+    receipt_path, receipt, manifest_path, _claim, holder_binding = (
+        _typed_holder_receipt_fixture(tmp_path)
+    )
+    legacy_manifest = {
+        "schema_version": MODULE.LEGACY_SCHEMA_VERSION,
+        "model_slug": receipt["runtime"]["model"],
+        "reasoning_effort": receipt["runtime"]["reasoning_effort"],
+        "ambient_codex_home": receipt["runtime"]["ambient_codex_home"],
+        "codex_home": receipt["runtime"]["incarnation_codex_home"],
+        "holder_binding": holder_binding,
+    }
+    legacy_snapshot = MODULE.canonical_bytes(legacy_manifest)
+    legacy_receipt = json.loads(json.dumps(receipt))
+    legacy_receipt["runtime"]["incarnation_manifest_snapshot_b64"] = (
+        base64.b64encode(legacy_snapshot).decode("ascii")
+    )
+    legacy_receipt["runtime"]["incarnation_manifest_digest"] = MODULE.sha256_bytes(
+        legacy_snapshot
+    )
+    for key in (
+        "holder_claim",
+        "holder_claim_digest",
+        "holder_claim_snapshot_b64",
+    ):
+        legacy_receipt["runtime"].pop(key, None)
+
+    schema = json.loads(
+        (PART / "schemas" / "external-codex-holder-terminal-receipt.schema.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    Draft202012Validator(schema).validate(legacy_receipt)
+    receipt_path.write_bytes(MODULE.canonical_bytes(legacy_receipt) + b"\n")
+
+    loaded, raw, digest = MODULE._load_holder_receipt_snapshot(receipt_path)
+
+    assert loaded == legacy_receipt
+    assert digest == MODULE.sha256_bytes(raw)
+
+
+def test_legacy_v2_supplied_holder_claim_must_remain_semantically_consistent(
+    tmp_path: Path,
+) -> None:
+    receipt_path, receipt, _manifest_path, claim, holder_binding = (
+        _typed_holder_receipt_fixture(tmp_path)
+    )
+    legacy_manifest = {
+        "schema_version": MODULE.LEGACY_SCHEMA_VERSION,
+        "model_slug": receipt["runtime"]["model"],
+        "reasoning_effort": receipt["runtime"]["reasoning_effort"],
+        "ambient_codex_home": receipt["runtime"]["ambient_codex_home"],
+        "codex_home": receipt["runtime"]["incarnation_codex_home"],
+        "holder_binding": holder_binding,
+    }
+    legacy_snapshot = MODULE.canonical_bytes(legacy_manifest)
+    inconsistent_claim = dict(claim)
+    inconsistent_claim["manifest_digest"] = MODULE.sha256_bytes(legacy_snapshot)
+    inconsistent_claim["holder_receipt"] = str(
+        (tmp_path / "foreign-holder.json").resolve()
+    )
+    inconsistent_claim_snapshot = MODULE.canonical_bytes(inconsistent_claim) + b"\n"
+    legacy_receipt = json.loads(json.dumps(receipt))
+    legacy_receipt["runtime"].update(
+        {
+            "incarnation_manifest_snapshot_b64": base64.b64encode(
+                legacy_snapshot
+            ).decode("ascii"),
+            "incarnation_manifest_digest": MODULE.sha256_bytes(legacy_snapshot),
+            "holder_claim_digest": MODULE.sha256_bytes(inconsistent_claim_snapshot),
+            "holder_claim_snapshot_b64": base64.b64encode(
+                inconsistent_claim_snapshot
+            ).decode("ascii"),
+        }
+    )
+    receipt_path.write_bytes(MODULE.canonical_bytes(legacy_receipt) + b"\n")
+    MODULE._holder_claim_path(_manifest_path).write_bytes(
+        inconsistent_claim_snapshot
+    )
+
+    schema = json.loads(
+        (PART / "schemas" / "external-codex-holder-terminal-receipt.schema.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    Draft202012Validator(schema).validate(legacy_receipt)
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="holder claim holder_receipt disagrees with launch",
+    ):
+        MODULE._load_holder_receipt_snapshot(receipt_path)
+
+
+@pytest.mark.parametrize(
+    "missing_key",
+    ["holder_claim", "holder_claim_digest", "holder_claim_snapshot_b64"],
+)
+def test_supplied_holder_claim_tuple_is_complete_or_rejected(
+    tmp_path: Path,
+    missing_key: str,
+) -> None:
+    receipt_path, receipt, _manifest_path, _claim, _holder_binding = (
+        _typed_holder_receipt_fixture(tmp_path)
+    )
+    partial_receipt = json.loads(json.dumps(receipt))
+    partial_receipt["runtime"].pop(missing_key)
+    schema = json.loads(
+        (PART / "schemas" / "external-codex-holder-terminal-receipt.schema.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert list(Draft202012Validator(schema).iter_errors(partial_receipt))
+    receipt_path.write_bytes(MODULE.canonical_bytes(partial_receipt) + b"\n")
+    with pytest.raises(
+        MODULE.IncarnationHomeError,
+        match="holder claim snapshot binding is incomplete",
+    ):
+        MODULE._load_holder_receipt_snapshot(receipt_path)
+
+
+@pytest.mark.parametrize(
     ("adversary", "expected_error"),
     [
         pytest.param(
@@ -4369,6 +4534,8 @@ def test_typed_holder_claim_snapshot_adversaries_fail_closed(
     runtime["holder_claim_snapshot_b64"] = base64.b64encode(
         claim_snapshot
     ).decode("ascii")
+    if adversary != "non_canonical_absolute_claim_path":
+        MODULE._holder_claim_path(manifest_path).write_bytes(claim_snapshot)
 
     Draft202012Validator(schema).validate(adversarial_receipt)
     receipt_path.write_bytes(MODULE.canonical_bytes(adversarial_receipt) + b"\n")
@@ -4957,7 +5124,7 @@ def test_rebind_receipt_binds_holder_environment_and_manifest_snapshot(
     claim_path.write_bytes(MODULE.canonical_bytes(tampered_claim))
     with pytest.raises(
         MODULE.IncarnationHomeError,
-        match="replacement holder receipt claim snapshot has drifted",
+        match="holder claim durable snapshot has drifted",
     ):
         MODULE._rebind_replacement_holder_receipt(
             receipt_path=output_path,
@@ -6857,6 +7024,8 @@ def test_live_close_uses_holder_bound_companion_after_host_removal(
     closure = tmp_path / "closure.json"
     snapshot_runtime = tmp_path / "snapshot-runtime"
     snapshot_runtime.mkdir()
+    ambient = tmp_path / "ambient"
+    ambient.mkdir()
     snapshot_context = _holder_binding_context(snapshot_runtime, "snapshot-close")
     snapshot_context_digest = MODULE.sha256_bytes(
         MODULE.canonical_bytes(snapshot_context)

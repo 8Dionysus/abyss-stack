@@ -9,6 +9,11 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Bind supplied holder-claim receipt snapshots to stable bytes from the
+  canonical durable claim path through the existing bounded ambient-identity
+  reader, and derive claim requiredness from the decoded manifest schema so
+  typed v3 remains strict while readable legacy-v2 snapshots retain
+  compatibility without claims.
 - Bind the canonical `aoa-kag` MCP adapter to an authored absolute
   `AOA_KAG_ARTIFACT_ROOT` seam for v4 cold-CAS reads, preserving fail-closed
   loader behavior and separate artifact-admission verdicts.
