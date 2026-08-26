@@ -169,6 +169,22 @@ def _preflight_json_string(value: str, *, limit: int) -> int:
     return total
 
 
+def _preflight_json_integer(value: int, *, limit: int) -> None:
+    """Reject integers whose decimal magnitude cannot fit the JSON bound."""
+
+    magnitude = int.__abs__(value)
+    bit_length = int.bit_length(magnitude)
+    # log10(2) is greater than 301/1000.  For a non-zero integer with
+    # ``bit_length`` b, its decimal digit count is at least
+    # floor((b - 1) * log10(2)) + 1.  This comparison therefore rejects an
+    # over-bound integer without converting it to decimal text first.
+    if bit_length and (bit_length - 1) * 301 >= limit * 1000:
+        raise LandingEffectGrantError(
+            "landing_effect_grant_too_large",
+            "grant integer exceeds the bounded admission size",
+        )
+
+
 def _bounded_canonical_bytes(value: object, *, limit: int) -> bytes:
     """Canonicalize JSON data without materializing more than the bound."""
 
@@ -192,6 +208,9 @@ def _bounded_canonical_bytes(value: object, *, limit: int) -> bytes:
                         "landing_effect_grant_too_large",
                         "grant mapping exceeds the bounded admission size",
                     )
+                continue
+            if isinstance(candidate, int) and not isinstance(candidate, bool):
+                _preflight_json_integer(candidate, limit=limit)
                 continue
             if isinstance(candidate, (Mapping, list, tuple)):
                 identity = id(candidate)

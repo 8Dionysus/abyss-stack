@@ -471,7 +471,10 @@ def test_exact_coordinates_reject_trailing_newlines() -> None:
 
 
 @pytest.mark.parametrize("ref_path", [("goal_ref",), ("holder_ref",)])
-@pytest.mark.parametrize("field", ("owner_repo", "artifact_ref", "source_ref"))
+@pytest.mark.parametrize(
+    "field",
+    ("owner_repo", "artifact_ref", "source_ref", "schema_ref", "schema_version"),
+)
 @pytest.mark.parametrize(
     "invalid_coordinate",
     ("owner\nrepo", "owner\u0085repo", "owner\u00a0repo", "owner\u2028repo"),
@@ -1482,6 +1485,24 @@ def test_request_reuses_scalar_preflight_size_before_encoding(
 
     assert exc.value.code == "landing_effect_request_too_large"
     assert calls == 1
+
+
+def test_request_rejects_huge_integer_before_json_encoding() -> None:
+    get_digit_limit = getattr(sys, "get_int_max_str_digits", None)
+    set_digit_limit = getattr(sys, "set_int_max_str_digits", None)
+    previous_limit = get_digit_limit() if get_digit_limit is not None else None
+    if set_digit_limit is not None:
+        set_digit_limit(0)
+    try:
+        request = {"untrusted": 10 ** MAX_GRANT_BYTES}
+
+        assert not landing_effect_grant_allows(None, request)
+        with pytest.raises(LandingEffectGrantError) as exc:
+            admit_landing_effect_grant(None, request)
+        assert exc.value.code == "landing_effect_request_too_large"
+    finally:
+        if set_digit_limit is not None and previous_limit is not None:
+            set_digit_limit(previous_limit)
 
 
 def test_request_mapping_rejects_oversized_key_cardinality_before_sorting() -> None:

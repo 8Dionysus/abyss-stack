@@ -246,8 +246,8 @@
           "pattern": "^sha256:[0-9a-f]{64}$(?![\\s\\S])",
           "not": {"const": "sha256:0000000000000000000000000000000000000000000000000000000000000000"}
         },
-        "schema_ref": {"type": "string", "minLength": 1},
-        "schema_version": {"type": "string", "minLength": 1}
+        "schema_ref": {"$ref": "#/$defs/coordinate"},
+        "schema_version": {"$ref": "#/$defs/coordinate"}
       }
     },
     "holderRef": {
@@ -271,8 +271,8 @@
           "pattern": "^sha256:[0-9a-f]{64}$(?![\\s\\S])",
           "not": {"const": "sha256:0000000000000000000000000000000000000000000000000000000000000000"}
         },
-        "schema_ref": {"type": "string", "minLength": 1},
-        "schema_version": {"type": "string", "minLength": 1},
+        "schema_ref": {"$ref": "#/$defs/coordinate"},
+        "schema_version": {"$ref": "#/$defs/coordinate"},
         "incarnation_id": {"type": "string", "minLength": 1}
       }
     },
