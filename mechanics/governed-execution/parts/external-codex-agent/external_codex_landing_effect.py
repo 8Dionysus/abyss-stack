@@ -141,7 +141,7 @@ def _canonical_bytes(value: object) -> bytes:
         ) from exc
 
 
-def _preflight_json_string(value: str, *, limit: int) -> None:
+def _preflight_json_string(value: str, *, limit: int) -> int:
     """Bound one JSON string without first materializing its encoded form."""
 
     total = 2
@@ -166,6 +166,7 @@ def _preflight_json_string(value: str, *, limit: int) -> None:
                 "landing_effect_grant_too_large",
                 "grant mapping exceeds the bounded admission size",
             )
+    return total
 
 
 def _bounded_canonical_bytes(value: object, *, limit: int) -> bytes:
@@ -173,12 +174,24 @@ def _bounded_canonical_bytes(value: object, *, limit: int) -> bytes:
 
     pending: list[object] = [value]
     seen_containers: set[int] = set()
+    seen_string_sizes: dict[int, int] = {}
+    preflight_string_bytes = 0
     scheduled_nodes = 1
     try:
         while pending:
             candidate = pending.pop()
             if isinstance(candidate, str):
-                _preflight_json_string(candidate, limit=limit)
+                identity = id(candidate)
+                string_size = seen_string_sizes.get(identity)
+                if string_size is None:
+                    string_size = _preflight_json_string(candidate, limit=limit)
+                    seen_string_sizes[identity] = string_size
+                preflight_string_bytes += string_size
+                if preflight_string_bytes > limit:
+                    raise LandingEffectGrantError(
+                        "landing_effect_grant_too_large",
+                        "grant mapping exceeds the bounded admission size",
+                    )
                 continue
             if isinstance(candidate, (Mapping, list, tuple)):
                 identity = id(candidate)

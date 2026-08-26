@@ -1462,6 +1462,28 @@ def test_request_mapping_is_bounded_before_absent_grant_denial() -> None:
     assert exc.value.code == "landing_effect_request_too_large"
 
 
+def test_request_reuses_scalar_preflight_size_before_encoding(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repeated = "x" * (MAX_GRANT_BYTES - 32)
+    request = {"first": repeated, "second": repeated}
+    calls = 0
+    original = landing_effect._preflight_json_string
+
+    def counted(value: str, *, limit: int) -> int:
+        nonlocal calls
+        calls += 1
+        return original(value, limit=limit)
+
+    monkeypatch.setattr(landing_effect, "_preflight_json_string", counted)
+
+    with pytest.raises(LandingEffectGrantError) as exc:
+        admit_landing_effect_grant(None, request)
+
+    assert exc.value.code == "landing_effect_request_too_large"
+    assert calls == 1
+
+
 def test_request_mapping_rejects_oversized_key_cardinality_before_sorting() -> None:
     request = {f"untrusted-{index}": index for index in range(5000)}
 
