@@ -270,7 +270,7 @@ def test_adapter_execution_failure_is_distinct_from_invalid_observation() -> Non
 
     assert raised.value.code == "adapter_execution_failed"
     assert raised.value.observation is None
-    assert raised.value.execution_completed is False
+    assert raised.value.execution_completed is None
 
 
 def test_bound_invoker_runtime_error_is_normalized_as_adapter_failure() -> None:
@@ -291,7 +291,7 @@ def test_bound_invoker_runtime_error_is_normalized_as_adapter_failure() -> None:
 
     assert raised.value.code == "adapter_execution_failed"
     assert raised.value.observation is None
-    assert raised.value.execution_completed is False
+    assert raised.value.execution_completed is None
 
 
 def test_custom_adapter_runtime_error_is_normalized_as_adapter_failure() -> None:
@@ -317,7 +317,33 @@ def test_custom_adapter_runtime_error_is_normalized_as_adapter_failure() -> None
 
     assert raised.value.code == "adapter_execution_failed"
     assert raised.value.observation is None
-    assert raised.value.execution_completed is False
+    assert raised.value.execution_completed is None
+
+
+def test_custom_adapter_error_is_normalized_as_adapter_failure() -> None:
+    class FailingAdapter:
+        @property
+        def adapter_id(self) -> str:
+            return "custom-adapter"
+
+        def execute(
+            self, request: ProgrammaticExecutionRequest
+        ) -> ProgrammaticExecutionObservation:
+            raise RUNTIME.ProgrammaticAdapterError(
+                "provider_specific_failure", f"provider failed: {request.execution_id}"
+            )
+
+    adapter = FailingAdapter()
+    runtime = RUNTIME.ProgrammaticExecutionRuntime(
+        {adapter.adapter_id: adapter}, enabled=True
+    )
+
+    with pytest.raises(RUNTIME.ProgrammaticAdapterError) as raised:
+        runtime.execute(_request(adapter.adapter_id))
+
+    assert raised.value.code == "adapter_execution_failed"
+    assert raised.value.observation is None
+    assert raised.value.execution_completed is None
 
 
 def test_invalid_observation_is_not_sent_to_sink() -> None:

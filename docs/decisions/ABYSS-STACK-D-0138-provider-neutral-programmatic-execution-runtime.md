@@ -52,6 +52,9 @@ shared ABI. Source presence therefore cannot silently activate provider work.
 - Adapter invocation failures and post-execution observation-sink failures
   have distinct stable runtime errors; a sink failure retains the validated
   observation so callers do not blindly repeat completed effects.
+- Once adapter invocation begins, an exception reports completion as unknown
+  unless a returned observation establishes it; only adapter pre-invocation
+  rejection remains a safely pre-execution error.
 - Invalid returned observations stay out of the sink while retaining a typed
   malformed observation when available and marking execution completed or
   indeterminate, rather than presenting the failure as safely pre-execution.

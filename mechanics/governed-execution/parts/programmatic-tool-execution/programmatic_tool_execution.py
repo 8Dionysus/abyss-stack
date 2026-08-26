@@ -61,6 +61,10 @@ class ProgrammaticAdapterError(ProgrammaticExecutionRuntimeError):
     """An adapter cannot satisfy the selected execution request."""
 
 
+class _AdapterPreInvocationError(ProgrammaticAdapterError):
+    """An adapter rejected the request before its bound invoker ran."""
+
+
 @runtime_checkable
 class ProgrammaticExecutionAdapter(Protocol):
     """Runtime-owned adapter ABI for one provider-neutral execution."""
@@ -80,22 +84,16 @@ def _invoke(
     request: ProgrammaticExecutionRequest,
 ) -> ProgrammaticExecutionObservation:
     if request.adapter_id != adapter_id:
-        raise ProgrammaticAdapterError(
+        raise _AdapterPreInvocationError(
             "adapter_identity_mismatch",
             f"request selects {request.adapter_id!r}, not {adapter_id!r}",
         )
     if invoker is None:
-        raise ProgrammaticAdapterError(
+        raise _AdapterPreInvocationError(
             f"{adapter_id}_unbound",
             f"{adapter_id} has no bound runtime invoker",
         )
-    try:
-        return invoker(request)
-    except Exception as exc:
-        raise ProgrammaticAdapterError(
-            "adapter_execution_failed",
-            "the selected adapter failed before returning an observation",
-        ) from exc
+    return invoker(request)
 
 
 @dataclass(frozen=True)
@@ -191,12 +189,14 @@ class ProgrammaticExecutionRuntime:
             )
         try:
             observation = adapter.execute(request)
-        except ProgrammaticAdapterError:
+        except _AdapterPreInvocationError:
             raise
         except Exception as exc:
             raise ProgrammaticAdapterError(
                 "adapter_execution_failed",
-                "the selected adapter failed before returning an observation",
+                "the selected adapter failed without returning an observation; "
+                "execution completion is unknown",
+                execution_completed=None,
             ) from exc
         try:
             assert_programmatic_execution_observation(request, observation)
