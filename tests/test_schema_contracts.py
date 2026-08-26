@@ -55,6 +55,14 @@ EXPECTED_ACTIVE_SCHEMA_PATHS = {
     Path("mcp/services/abyss-stack-mcp/schemas/policy-audit-summary.schema.json"),
     Path("mcp/services/abyss-stack-mcp/schemas/runtime-observation.schema.json"),
     Path("mcp/services/abyss-stack-mcp/schemas/runtime-plan-candidate.schema.json"),
+    Path(
+        "mcp/services/abyss-stack-mcp/schemas/progressive-exposure-invocation-receipt.schema.json"
+    ),
+    Path(
+        "mcp/services/abyss-stack-mcp/schemas/progressive-exposure-materialization-receipt.schema.json"
+    ),
+    Path("mcp/services/abyss-stack-mcp/schemas/progressive-exposure-plan.schema.json"),
+    Path("mcp/services/abyss-stack-mcp/schemas/progressive-exposure-snapshot.schema.json"),
     Path("mcp/services/aoa-decisions-mcp/organ-access.schema.json"),
     Path(
         "mcp/services/aoa-session-memory-mcp/src/aoa_session_memory_mcp/organ-access.schema.json"
