@@ -49,6 +49,9 @@ shared ABI. Source presence therefore cannot silently activate provider work.
   baseline.
 - A future activation must supply explicit admission and concrete invokers for
   both adapter lanes.
+- Adapter invocation failures and post-execution observation-sink failures
+  have distinct stable runtime errors; a sink failure retains the validated
+  observation so callers do not blindly repeat completed effects.
 - Runtime observations remain evidence; eval verdicts, promotion, economy
   claims, closeout, and owner acceptance remain separate owner decisions.
 

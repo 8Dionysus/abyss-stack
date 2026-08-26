@@ -33,9 +33,17 @@ AdapterInvoker = Callable[
 class ProgrammaticExecutionRuntimeError(RuntimeError):
     """A stable, fail-closed runtime boundary error."""
 
-    def __init__(self, code: str, message: str) -> None:
+    def __init__(
+        self,
+        code: str,
+        message: str,
+        *,
+        observation: ProgrammaticExecutionObservation | None = None,
+    ) -> None:
         super().__init__(message)
         self.code = code
+        self.observation = observation
+        self.execution_completed = observation is not None
 
 
 class ProgrammaticAdapterError(ProgrammaticExecutionRuntimeError):
@@ -166,6 +174,14 @@ class ProgrammaticExecutionRuntime:
             )
         try:
             observation = adapter.execute(request)
+        except ProgrammaticExecutionRuntimeError:
+            raise
+        except Exception as exc:
+            raise ProgrammaticAdapterError(
+                "adapter_execution_failed",
+                "the selected adapter failed before returning an observation",
+            ) from exc
+        try:
             assert_programmatic_execution_observation(request, observation)
         except ProgrammaticExecutionRuntimeError:
             raise
@@ -175,5 +191,13 @@ class ProgrammaticExecutionRuntime:
                 f"adapter returned an invalid programmatic execution observation: {exc}",
             ) from exc
         if self.observation_sink is not None:
-            self.observation_sink(observation)
+            try:
+                self.observation_sink(observation)
+            except Exception as exc:
+                raise ProgrammaticExecutionRuntimeError(
+                    "observation_sink_failed",
+                    "validated execution completed but recording its observation failed; "
+                    "preserve the attached observation before considering a retry",
+                    observation=observation,
+                ) from exc
         return observation

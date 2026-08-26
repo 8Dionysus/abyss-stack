@@ -230,6 +230,10 @@ The current direction is:
   exercise conflicting and incomplete multi-agent returns plus isolated
   service-failure restoration, while composing eval verdicts and memory
   receipts outside the runtime adapter.
+- Programmatic execution trigger:
+  keep the provider-neutral seam source-only and default-off until d0 admits
+  a paired baseline; only then bind real Codex and local-model invokers and
+  route comparable observations to their owner review surfaces.
 - Guardrail:
   an SDK plan is not runtime permission, runtime evidence is not an eval
   verdict, and runtime completion is not final reviewed closeout.

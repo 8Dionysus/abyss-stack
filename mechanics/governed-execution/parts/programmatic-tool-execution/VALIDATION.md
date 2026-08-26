@@ -11,7 +11,7 @@ python scripts/validate_decision_records.py
 ```
 
 The focused suite proves disabled-by-default dispatch, explicit admission,
-independent Codex and local adapter seams, observation-sink ordering, and
-fail-closed invalid observations. It does not prove live provider execution,
-runtime deployment, paired baseline admission, eval quality, promotion,
-economy comparison, or owner acceptance.
+independent Codex and local adapter seams, observation-sink ordering,
+distinct adapter and sink failures, and fail-closed invalid observations. It
+does not prove live provider execution, runtime deployment, paired baseline
+admission, eval quality, promotion, economy comparison, or owner acceptance.

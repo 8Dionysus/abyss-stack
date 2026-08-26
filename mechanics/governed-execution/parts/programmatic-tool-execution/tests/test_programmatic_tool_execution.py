@@ -254,6 +254,25 @@ def test_unbound_adapters_fail_closed(adapter_factory, error_code: str) -> None:
     assert raised.value.code == error_code
 
 
+def test_adapter_execution_failure_is_distinct_from_invalid_observation() -> None:
+    def failing_invoker(request: ProgrammaticExecutionRequest) -> ProgrammaticExecutionObservation:
+        raise TimeoutError(f"timed out: {request.execution_id}")
+
+    adapter = RUNTIME.LocalModelSubstrateAdapter(
+        route_ref=_ref("local-route"), invoker=failing_invoker
+    )
+    runtime = RUNTIME.ProgrammaticExecutionRuntime(
+        {adapter.adapter_id: adapter}, enabled=True
+    )
+
+    with pytest.raises(RUNTIME.ProgrammaticAdapterError) as raised:
+        runtime.execute(_request(adapter.adapter_id))
+
+    assert raised.value.code == "adapter_execution_failed"
+    assert raised.value.observation is None
+    assert raised.value.execution_completed is False
+
+
 def test_invalid_observation_is_not_sent_to_sink() -> None:
     recorded: list[ProgrammaticExecutionObservation] = []
 
@@ -272,3 +291,27 @@ def test_invalid_observation_is_not_sent_to_sink() -> None:
 
     assert raised.value.code == "invalid_observation"
     assert recorded == []
+
+
+def test_sink_failure_is_a_post_execution_error_with_the_validated_observation() -> None:
+    observed: list[ProgrammaticExecutionObservation] = []
+
+    def sink_failure(observation: ProgrammaticExecutionObservation) -> None:
+        observed.append(observation)
+        raise OSError("evidence store unavailable")
+
+    adapter = RUNTIME.LocalModelSubstrateAdapter(
+        route_ref=_ref("local-route"), invoker=_observation
+    )
+    runtime = RUNTIME.ProgrammaticExecutionRuntime(
+        {adapter.adapter_id: adapter},
+        enabled=True,
+        observation_sink=sink_failure,
+    )
+
+    with pytest.raises(RUNTIME.ProgrammaticExecutionRuntimeError) as raised:
+        runtime.execute(_request(adapter.adapter_id))
+
+    assert raised.value.code == "observation_sink_failed"
+    assert raised.value.observation is observed[0]
+    assert raised.value.execution_completed is True

@@ -1,5 +1,27 @@
 # Governed Execution Landing Log
 
+## 2026-08-26 - Provider-neutral programmatic execution runtime seam
+
+Landed the source-only provider-neutral programmatic execution runtime seam
+under `parts/programmatic-tool-execution/`. The runtime requires exact SDK
+admission, remains disabled by default, dispatches only to explicitly
+registered Codex-host or local-model adapter seams, validates observations
+before the sink, and distinguishes adapter execution failure from a
+post-execution observation-sink failure while retaining the validated
+observation.
+
+The SDK source contract landed first in `aoa-sdk` PR #268 at merge commit
+`9540358c9443c2b7ef78dd9d1d8a0bc7b50ef240`; this stack landing is PR #441,
+whose protected `Repo Validation` and `validate-windows-host-bridge` checks
+passed on `dfcb78d41818b1db51c381bdd53085fbc28d8f8b`. The stack KAG family
+was regenerated from base `86c14c6acd9d205bdb8ab343e72144305b2fe222` with
+accepted receipt
+`c9cf90ce60330f67e4ffdb150ac999bb12f23bef12a4b3a77a41409d9eca3fa1`.
+
+This records source, generated-family, and CI evidence only. It does not
+claim provider binding, activation, live runtime execution, paired baseline,
+economy comparison, eval, promotion, closeout, or owner acceptance.
+
 ## 2026-08-25 - Review repair for staged-index and loader boundaries
 
 Commit admission now requires a strict non-zero
