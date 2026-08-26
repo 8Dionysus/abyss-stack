@@ -254,8 +254,9 @@ def test_owner_references_reject_zero_digest(ref_path: tuple[str, ...]) -> None:
     assert exc.value.code == "landing_effect_grant_schema_invalid"
 
 
-def test_revision_coordinates_reject_trailing_newlines() -> None:
+def test_exact_coordinates_reject_trailing_newlines() -> None:
     for ref_path in (
+        ("repository", "repository_id"),
         ("repository", "revision"),
         ("target", "base_revision"),
         ("target", "head_revision"),
