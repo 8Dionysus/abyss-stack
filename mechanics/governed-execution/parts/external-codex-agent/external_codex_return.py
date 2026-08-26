@@ -42,10 +42,10 @@ PAUSE_TRANSITION_PROOF_SCHEMA_VERSION = (
     "abyss_stack_external_codex_atomic_goal_transition_v1"
 )
 GOAL_LIFECYCLE_OWNER_SCHEMA_VERSION = (
-    "abyss_stack_external_codex_goal_lifecycle_owner_v1"
+    "abyss_stack_external_codex_goal_lifecycle_owner_v2"
 )
 GOAL_LIFECYCLE_RECEIPT_SCHEMA_VERSION = (
-    "abyss_stack_external_codex_goal_lifecycle_receipt_v1"
+    "abyss_stack_external_codex_goal_lifecycle_receipt_v2"
 )
 GOAL_LIFECYCLE_ATTEMPT_SCHEMA_VERSION = (
     "abyss_stack_external_codex_goal_lifecycle_attempt_v1"
@@ -266,6 +266,7 @@ def _validate_owner_binding(
     *,
     accepted_schema_versions: set[str],
     label: str,
+    extra_allowed_keys: set[str] | None = None,
 ) -> dict[str, Any]:
     """Validate one owner-selected Goal/thread transport binding."""
 
@@ -282,6 +283,8 @@ def _validate_owner_binding(
         "app_server_socket",
         "transport",
     }
+    if extra_allowed_keys:
+        allowed_keys.update(extra_allowed_keys)
     unknown_keys = set(owner) - allowed_keys
     if unknown_keys:
         raise ExternalCodexReturnError(
@@ -347,6 +350,7 @@ def validate_goal_lifecycle_owner(owner: dict[str, Any]) -> dict[str, Any]:
         owner,
         accepted_schema_versions={GOAL_LIFECYCLE_OWNER_SCHEMA_VERSION},
         label="Goal lifecycle owner",
+        extra_allowed_keys={"goal_ref", "return_owner_ref"},
     )
 
 

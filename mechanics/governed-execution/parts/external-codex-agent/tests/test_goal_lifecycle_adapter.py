@@ -64,13 +64,15 @@ def _ref(object_id: str, owner: str = "codex-goal") -> ContentRef:
     )
 
 
-def _owner() -> dict[str, str]:
+def _owner() -> dict[str, Any]:
     return {
         "schema_version": RUNTIME.GOAL_LIFECYCLE_OWNER_SCHEMA_VERSION,
         "owner_id": "holder:master:test",
         "owner_repo": "codex-goal",
         "goal_id": "goal:test",
         "thread_id": "thread:test",
+        "goal_ref": _ref("goal:test").model_dump(mode="json"),
+        "return_owner_ref": _ref("holder:master:test").model_dump(mode="json"),
         "runtime": "codex",
         "transport_posture": "explicit-endpoint",
         "acceptance_posture": "owner-return-pending",
@@ -130,6 +132,7 @@ class FakeGoalRpc:
         self.status = status
         self.calls: list[tuple[str, dict[str, object] | None]] = []
         self.counter = 0
+        self.mutation_response_extra: dict[str, object] = {}
 
     def __enter__(self) -> "FakeGoalRpc":
         return self
@@ -165,6 +168,7 @@ class FakeGoalRpc:
             "params": params,
         }
         response = {"goal": {"threadId": "thread:test", "status": status}}
+        response.update(self.mutation_response_extra)
         prepare_callback = getattr(self, "request_prepare_callback", None)
         if callable(prepare_callback):
             prepare_callback("thread/goal/set", params, request_id, payload)
@@ -281,6 +285,7 @@ def test_generic_adapter_cli_route_replays_canonical_receipt(
         RUNTIME._canonical_bytes(decision.model_dump(mode="json")) + b"\n"
     )
     rpc = FakeGoalRpc(tmp_path / "cli.sock", status="active")
+    rpc.mutation_response_extra = {"set_response_only": True}
     monkeypatch.setattr(
         RUNTIME,
         "discover_app_server_socket",
@@ -300,6 +305,141 @@ def test_generic_adapter_cli_route_replays_canonical_receipt(
     assert first == second
     assert first["receipt_ref"] == str(receipt_path.resolve())
     assert first["transport"]["resolution"] == "test-fixture"
+    assert (
+        first["lifecycle"]["mutation_response_sha256"]
+        == _digest(
+            {
+                "goal": {"threadId": "thread:test", "status": "paused"},
+                "set_response_only": True,
+            }
+        )
+    )
+    assert first["lifecycle"]["result_response_sha256"] == _digest(
+        {"goal": {"threadId": "thread:test", "status": "paused"}}
+    )
+    assert (
+        first["lifecycle"]["mutation_response_sha256"]
+        != first["lifecycle"]["result_response_sha256"]
+    )
+    assert [method for method, _params in rpc.calls].count("thread/goal/set") == 1
+
+
+def test_generic_adapter_rejects_attempt_sidecar_input_before_transport(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    owner = _owner()
+    owner_path = tmp_path / "owner.json"
+    decision_path = tmp_path / "decision.json"
+    receipt_path = tmp_path / "receipt.json"
+    attempt_path = Path(f"{receipt_path}.attempt.json")
+    owner_path.write_bytes(RUNTIME._canonical_bytes(owner) + b"\n")
+    request = _request(
+        observed="active",
+        desired="paused",
+        kind="delegation_yield",
+        request_id="request:attempt-alias",
+    )
+    decision = _decision(request)
+    attempt_path.write_bytes(
+        RUNTIME._canonical_bytes(request.model_dump(mode="json")) + b"\n"
+    )
+    decision_path.write_bytes(
+        RUNTIME._canonical_bytes(decision.model_dump(mode="json")) + b"\n"
+    )
+    rpc = FakeGoalRpc(tmp_path / "alias.sock", status="active")
+
+    def fail_discovery(_owner: dict[str, Any]) -> tuple[Path, str]:
+        raise AssertionError("transport opened")
+
+    monkeypatch.setattr(RUNTIME, "discover_app_server_socket", fail_discovery)
+    args = SimpleNamespace(
+        request=str(attempt_path),
+        decision=str(decision_path),
+        owner=str(owner_path),
+        receipt=str(receipt_path),
+    )
+
+    with pytest.raises(
+        RUNTIME.ExternalCodexReturnError,
+        match="distinct from all input artifacts",
+    ):
+        ADAPTER.run_goal_transition(args)
+    assert rpc.calls == []
+
+
+def test_generic_adapter_binds_complete_owner_qualified_references(
+    tmp_path: Path,
+) -> None:
+    owner = _owner()
+    owner_path = tmp_path / "owner.json"
+    owner_path.write_bytes(RUNTIME._canonical_bytes(owner) + b"\n")
+    endpoint = tmp_path / "owner-ref.sock"
+    request = _request(
+        observed="active",
+        desired="paused",
+        kind="delegation_yield",
+        request_id="request:owner-ref",
+    ).model_copy(update={"goal_ref": _ref("goal:test", "different-owner")})
+    decision = _decision(request)
+    rpc = FakeGoalRpc(endpoint, status="active")
+
+    with pytest.raises(
+        RUNTIME.ExternalCodexReturnError,
+        match="Goal reference mismatch",
+    ):
+        ADAPTER.execute_goal_transition(
+            request,
+            decision,
+            owner,
+            owner_path,
+            endpoint,
+            rpc_factory=lambda _endpoint: rpc,
+        )
+    assert rpc.calls == []
+
+
+def test_generic_adapter_rejects_recovery_under_a_different_decision(
+    tmp_path: Path,
+) -> None:
+    owner = _owner()
+    owner_path = tmp_path / "owner.json"
+    owner_path.write_bytes(RUNTIME._canonical_bytes(owner) + b"\n")
+    endpoint = tmp_path / "decision-recovery.sock"
+    attempt_path = tmp_path / "decision-recovery.attempt.json"
+    request = _request(
+        observed="active",
+        desired="paused",
+        kind="delegation_yield",
+        request_id="request:decision-recovery",
+    )
+    decision = _decision(request)
+    rpc = FakeGoalRpc(endpoint, status="active")
+    ADAPTER.execute_goal_transition(
+        request,
+        decision,
+        owner,
+        owner_path,
+        endpoint,
+        rpc_factory=lambda _endpoint: rpc,
+        attempt_path=attempt_path,
+    )
+    attempt = json.loads(attempt_path.read_text(encoding="utf-8"))
+    alternate_decision = decision.model_copy(update={"decision_id": "decision:alternate"})
+
+    with pytest.raises(
+        RUNTIME.ExternalCodexReturnError,
+        match="attempt reservation is outside request/owner scope",
+    ):
+        ADAPTER.execute_goal_transition(
+            request,
+            alternate_decision,
+            owner,
+            owner_path,
+            endpoint,
+            rpc_factory=lambda _endpoint: rpc,
+            attempt_path=attempt_path,
+            attempt=attempt,
+        )
     assert [method for method, _params in rpc.calls].count("thread/goal/set") == 1
 
 
