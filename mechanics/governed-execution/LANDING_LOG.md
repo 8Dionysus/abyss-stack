@@ -31,6 +31,18 @@ profile retains
 runtime activation, landing-effect execution, deployment, semantic/Goal verdict,
 or owner acceptance is claimed.
 
+## 2026-08-25 - Review repair for commit target and manifest content binding
+
+The review repair in `c530640eb756f75361738e8b08544567753f8b7e` closes three
+admission gaps without enabling any effect executor. Commit grants now require
+the repository revision to equal the branch `base_revision` or pull-request
+`head_revision`; workspace-manifest content entries require digests for files
+and symlinks and zero-size/null-digest pairs for directories and missing paths;
+and workspace `git_head` accepts exact bare 40- or 64-hex Git object IDs. The
+focused landing-effect suite passed 63 tests, including positive and negative
+coverage for each invariant. Runtime posture remains source-only with
+`external_effects=false` and the complete ten-effect forbidden closure.
+
 ## 2026-08-13 - Stable external owner-request result identity
 
 Separated the cross-owner identity of an admitted `aoa-agents` execution
