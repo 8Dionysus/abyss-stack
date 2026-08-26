@@ -878,6 +878,12 @@ def test_workspace_manifest_accepts_legacy_v1_with_migration_evidence(
         admitted["admission"]["legacy_workspace_manifest_owner_receipt_digest"]
         == owner_receipt_digest
     )
+    assert (
+        admitted["admission"]["legacy_owner_migration_catalog_digest"]
+        == _raw_digest(
+            (tmp_path / "legacy-owner-admission-migrations.v1.json").read_bytes()
+        )
+    )
 
 
 def test_legacy_commit_grants_require_independent_migration_evidence() -> None:

@@ -471,7 +471,7 @@ def _validate_legacy_workspace_manifest_evidence(
     *,
     grant: Mapping[str, Any],
     workspace_manifest_digest: str,
-) -> tuple[str, str]:
+) -> tuple[str, str, str]:
     """Verify evidence against the release-bound owner migration catalog."""
 
     if not isinstance(raw, bytes) or not _is_sha256_digest(expected_digest):
@@ -536,7 +536,7 @@ def _validate_legacy_workspace_manifest_evidence(
             "landing_effect_grant_content_mismatch",
             "legacy manifest evidence is not bound to the exact grant, repository, or manifest",
         )
-    catalog, _catalog_digest = _load_release_bound_legacy_owner_catalog()
+    catalog, catalog_digest = _load_release_bound_legacy_owner_catalog()
     commit_content = grant.get("commit_content")
     expected_owner_receipt_digest = (
         commit_content.get("legacy_workspace_manifest_owner_receipt_digest")
@@ -625,7 +625,7 @@ def _validate_legacy_workspace_manifest_evidence(
             "landing_effect_grant_content_mismatch",
             "legacy manifest owner receipt is not bound to the exact evidence, grant, repository, or manifest",
         )
-    return actual_digest, actual_owner_receipt_digest
+    return actual_digest, actual_owner_receipt_digest, catalog_digest
 
 
 def _workspace_manifest_digest(raw: bytes) -> str:
@@ -1197,6 +1197,7 @@ def admit_landing_effect_grant(
                 "landing_effect_grant_content_mismatch",
                 "workspace manifest git_head differs from the authorized repository revision",
             )
+        legacy_owner_migration_catalog_digest = None
         if workspace_manifest_binding_mode == LEGACY_WORKSPACE_MANIFEST_BINDING_MODE:
             expected_legacy_evidence_digest = commit_content.get(
                 "legacy_workspace_manifest_evidence_digest"
@@ -1220,6 +1221,7 @@ def admit_landing_effect_grant(
             (
                 legacy_evidence_digest,
                 legacy_owner_receipt_digest,
+                legacy_owner_migration_catalog_digest,
             ) = _validate_legacy_workspace_manifest_evidence(
                 legacy_workspace_manifest_evidence_raw,
                 expected_legacy_workspace_manifest_evidence_digest,
@@ -1287,6 +1289,10 @@ def admit_landing_effect_grant(
             result["admission"][
                 "legacy_workspace_manifest_owner_receipt_digest"
             ] = legacy_owner_receipt_digest
+        if legacy_owner_migration_catalog_digest is not None:
+            result["admission"]["legacy_owner_migration_catalog_digest"] = (
+                legacy_owner_migration_catalog_digest
+            )
     return result
 
 
