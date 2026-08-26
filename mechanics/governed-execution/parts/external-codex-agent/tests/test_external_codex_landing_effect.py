@@ -498,6 +498,22 @@ def test_owner_reference_coordinates_reject_controls_and_unicode_whitespace(
     assert exc.value.code == "landing_effect_grant_schema_invalid"
 
 
+@pytest.mark.parametrize(
+    "invalid_coordinate",
+    ("incarnation\nid", "incarnation\u0085id", "incarnation\u00a0id", "incarnation\u2028id"),
+)
+def test_holder_incarnation_id_rejects_controls_and_unicode_whitespace(
+    invalid_coordinate: str,
+) -> None:
+    grant = _grant()
+    grant["holder_ref"]["incarnation_id"] = invalid_coordinate
+    _refresh_semantic_digest(grant)
+
+    with pytest.raises(LandingEffectGrantError) as exc:
+        validate_landing_effect_grant(grant)
+    assert exc.value.code == "landing_effect_grant_schema_invalid"
+
+
 def test_owner_reference_digests_reject_trailing_newlines() -> None:
     grant = _grant()
     _refresh_semantic_digest(grant)

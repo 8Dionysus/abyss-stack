@@ -273,7 +273,7 @@
         },
         "schema_ref": {"$ref": "#/$defs/coordinate"},
         "schema_version": {"$ref": "#/$defs/coordinate"},
-        "incarnation_id": {"type": "string", "minLength": 1}
+        "incarnation_id": {"$ref": "#/$defs/coordinate"}
       }
     },
     "branch": {
