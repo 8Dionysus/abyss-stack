@@ -72,17 +72,16 @@ semantic re-entry, and owner meaning stay with their owners.
 
 The same source adapter exposes a separate owner-selected Goal pause action.
 After responsibility has moved to the external holder, it verifies the exact
-active Goal/thread binding and requires an `atomic_goal_transition` adapter
-method that performs a server-supported compare-and-set or version proof before
-producing an `active_to_paused` receipt. The installed
-public `ThreadGoalSetParams` app-server method currently has no such proof, so
-the canonical adapter refuses to mutate or certify that transition until a
-protocol adapter supplies the typed
-`abyss_stack_external_codex_atomic_goal_transition_v1` evidence. A completed
-pause receipt binds that proof to the active precondition, exact request, and
-returned Goal response. The action uses no TTY, PID, GDB, keystroke, turn,
-wake, or holder-close transport. The pause receipt is runtime evidence; it
-does not grant the runtime owner acceptance or semantic authority.
+active Goal/thread binding, reserves the mutation, issues the native
+`thread/goal/set(status=paused)` request once, and confirms the result with a
+fresh `thread/goal/get`. The resulting v2 receipt binds the active
+precondition, exact request marker, returned Goal response when available, and
+post-read. A response-loss retry uses the durable dispatch marker and fresh
+read without a second set; it does not claim unsupported server-side CAS or
+mutation causality. Historical v1 atomic proofs are accepted only for
+migration/replay. The action uses no TTY, PID, GDB, keystroke, turn, wake, or
+holder-close transport. The pause receipt is runtime evidence; it does not
+grant the runtime owner acceptance or semantic authority.
 
 ## Proof sequence
 

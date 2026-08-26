@@ -52,19 +52,17 @@ aoa-external-codex-return pause \
 ```
 
 The pause owner must bind the exact Goal and thread. The leaf reads the current
-Goal first, refuses anything other than `active`, and requires the app-server
-adapter to provide an `atomic_goal_transition` method that performs a
-server-supported compare-and-set/version proof for the
-`thread/goal/set(status=paused)` mutation. The installed public
-`ThreadGoalSetParams` transport has no such precondition, so the canonical
-adapter fails closed before mutation and cannot certify `active_to_paused` on
-that server. A future protocol adapter may opt in only by returning the typed
-`abyss_stack_external_codex_atomic_goal_transition_v1` proof. The adapter owns
-any version-token request fields and the proof is checked against the exact
-request marker. A completed
-`abyss_stack_external_codex_pause_receipt_v1` must carry that proof, binding the
-active precondition, exact request ID and digest, thread, method, and returned
-Goal response digest.
+Goal first, refuses anything other than `active`, reserves and issues exactly
+one native `thread/goal/set(status=paused)` request, then performs a bounded
+fresh `thread/goal/get`. The installed public `ThreadGoalSetParams` transport
+has no CAS/version field; the receipt therefore binds the active precondition,
+exact request marker, returned Goal response when available, and post-read. A
+response-loss retry is allowed only with the durable dispatch marker and fresh
+read, and never issues a second lifecycle set. Historical
+`abyss_stack_external_codex_atomic_goal_transition_v1` proofs remain accepted
+only for migration/replay. A completed
+`abyss_stack_external_codex_pause_receipt_v1` carries the v2 observational proof
+and binds the exact request ID and digest, thread, method, and post-read digest.
 
 Its pre-mutation durable file uses the separate
 `abyss_stack_external_codex_pause_reservation_v1` schema; it does not claim to
@@ -75,12 +73,12 @@ closure, semantic re-entry, and owner acceptance require their own later
 evidence. If a previously persisted atomic transition proof exists but receipt
 publication was lost, a retry may publish an `ambiguous_post_mutation`
 recovery receipt from a read-only `thread/goal/get` without issuing a second
-lifecycle set. A lost mutation response without that persisted proof is not
-recoverable as an exact pause receipt. Endpoint drift, missing proof,
-pre-send reservations, and incomplete dispatch evidence fail closed. A
-persisted receipt with `response_available=false` must retain its recovery
-evidence and its `pause_receipt_ref` must match the exact output path; a
-copied or incomplete receipt is not replayable.
+lifecycle set. A lost mutation response is recoverable only when the durable
+dispatch marker survives; an unproven pre-send reservation is not. Endpoint
+drift, missing proof, pre-send reservations, and incomplete dispatch evidence
+fail closed. A persisted receipt with `response_available=false` must retain
+its recovery evidence and its `pause_receipt_ref` must match the exact output
+path; a copied or incomplete receipt is not replayable.
 
 ## Observe responsibility movement once
 

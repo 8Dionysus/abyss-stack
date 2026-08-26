@@ -153,15 +153,20 @@ and replay only through their matching legacy wake reservation. A retry after a 
   activation, and its receipt separates execution from delivery, semantic
   acceptance, owner acceptance, and closure. It never injects terminal input
   or starts a turn. A mutating execution first persists a content-addressed
-  precondition/dispatch reservation and records the server proof before the
-  final receipt; a proof-backed retry reconciles through a fresh Goal read
-  without issuing a second lifecycle set. Executed receipts retain and
+  precondition/dispatch reservation, issues exactly one native
+  `thread/goal/set`, and records its response when available before performing
+  a fresh Goal read. A retry after response loss reconciles from the durable
+  dispatch marker and fresh read without issuing a second lifecycle set; the
+  receipt records response availability and does not claim unsupported
+  server-side CAS or mutation causality. Executed receipts retain and
   revalidate the authoritative result response, require the mutation attempt
   sidecar, and bind the file-backed receipt to its canonical path;
 - keeps `aoa-external-codex-return pause` only as a legacy pause projection for
-  existing evidence. The current public `ThreadGoalSetParams` surface lacks a
-  server-side compare-and-set proof, so the generic mutating adapter fails
-  closed before `thread/goal/set` until a protocol-capable adapter is supplied;
+  existing evidence. The current public `ThreadGoalSetParams` surface exposes
+  the native `thread/goal/set` mutation without a CAS/version field, so this
+  route binds the exact request, optional returned Goal response, and bounded
+  post-read instead of requiring an unsupported protocol feature. Historical
+  atomic transition proofs remain accepted only for migration/replay;
 - exposes `aoa-external-codex-stasis` as a generic, model-neutral responsibility
   movement observer. It consumes one exact lifecycle/session evidence snapshot,
   requires a matching lifecycle transition before classifying movement, and

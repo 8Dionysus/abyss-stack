@@ -19,6 +19,9 @@ from typing import Any, Callable
 
 RUNTIME_MODULE_NAME = "external_codex_return"
 GOAL_TRANSITION_PROOF_SCHEMA_VERSION = (
+    "abyss_stack_external_codex_goal_transition_v2"
+)
+LEGACY_GOAL_TRANSITION_PROOF_SCHEMA_VERSION = (
     "abyss_stack_external_codex_goal_transition_v1"
 )
 GOAL_TRANSITION_METHOD = "thread/goal/set"
@@ -321,6 +324,15 @@ def _validate_attempt_markers(
         )
 
 
+def _request_frame_from_marker(marker: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "jsonrpc": "2.0",
+        "id": marker["request_id"],
+        "method": marker["method"],
+        "params": marker["params"],
+    }
+
+
 def _validate_attempt(
     value: dict[str, Any],
     *,
@@ -394,46 +406,20 @@ def _write_attempt(
     return value
 
 
-def _require_atomic_adapter(rpc: Any) -> None:
-    runtime = _runtime()
-    if getattr(rpc, "supports_atomic_goal_transition", False) is not True:
-        raise runtime.ExternalCodexReturnError(
-            "Codex app-server Goal adapter lacks a server-supported "
-            "compare-and-set/version proof"
-        )
-    if not callable(getattr(rpc, "atomic_goal_transition", None)):
-        raise runtime.ExternalCodexReturnError(
-            "Codex app-server Goal adapter lacks atomic_goal_transition"
-        )
-
-
 def _validated_transition_proof(
     proof: object,
     *,
     owner: dict[str, Any],
     precondition: dict[str, Any],
-    mutation_response: dict[str, Any],
+    mutation_response: dict[str, Any] | None,
+    expected_mutation_response_digest: object | None = None,
+    post_read_response: dict[str, Any] | None,
     request_frame: object,
     from_state: str,
     to_state: str,
 ) -> dict[str, Any]:
     runtime = _runtime()
-    expected_keys = {
-        "schema_version",
-        "kind",
-        "method",
-        "thread_id",
-        "from_status",
-        "to_status",
-        "precondition_sha256",
-        "request_id",
-        "request_sha256",
-        "goal_response_sha256",
-    }
-    response_digest = runtime._sha256_bytes(
-        runtime._canonical_bytes(mutation_response)
-    )
-    if not isinstance(proof, dict) or set(proof) != expected_keys:
+    if not isinstance(proof, dict):
         raise runtime.ExternalCodexReturnError(
             "Codex app-server Goal transition proof is incomplete"
         )
@@ -453,9 +439,88 @@ def _validated_transition_proof(
             "Codex app-server Goal transition request frame is not bound to "
             "the owner and requested state"
         )
+    mutation_response_available = mutation_response is not None or runtime._is_sha256_digest(
+        expected_mutation_response_digest
+    )
+    response_digest = (
+        runtime._sha256_bytes(runtime._canonical_bytes(mutation_response))
+        if mutation_response is not None
+        else expected_mutation_response_digest
+    )
     if (
-        proof.get("schema_version") != GOAL_TRANSITION_PROOF_SCHEMA_VERSION
-        or proof.get("kind") != "server_compare_and_set"
+        expected_mutation_response_digest is not None
+        and mutation_response is not None
+        and response_digest != expected_mutation_response_digest
+    ):
+        raise runtime.ExternalCodexReturnError(
+            "Codex app-server Goal transition response digest is not bound"
+        )
+    if proof.get("schema_version") == LEGACY_GOAL_TRANSITION_PROOF_SCHEMA_VERSION:
+        expected_keys = {
+            "schema_version",
+            "kind",
+            "method",
+            "thread_id",
+            "from_status",
+            "to_status",
+            "precondition_sha256",
+            "request_id",
+            "request_sha256",
+            "goal_response_sha256",
+        }
+        if not runtime._is_sha256_digest(response_digest):
+            raise runtime.ExternalCodexReturnError(
+                "legacy Goal transition proof lacks its mutation response"
+            )
+        if (
+            set(proof) != expected_keys
+            or proof.get("kind") != "server_compare_and_set"
+            or proof.get("method") != GOAL_TRANSITION_METHOD
+            or proof.get("thread_id") != owner["thread_id"]
+            or proof.get("from_status") != from_state
+            or proof.get("to_status") != to_state
+            or proof.get("precondition_sha256")
+            != precondition["goal_response_sha256"]
+            or proof.get("request_id") != request_frame.get("id")
+            or not runtime._is_sha256_digest(proof.get("request_sha256"))
+            or proof.get("request_sha256")
+            != runtime._sha256_bytes(runtime._canonical_bytes(request_frame))
+            or proof.get("goal_response_sha256") != response_digest
+        ):
+            raise runtime.ExternalCodexReturnError(
+                "legacy Goal transition proof is not bound to its request and response"
+            )
+        return proof
+    if not isinstance(post_read_response, dict):
+        raise runtime.ExternalCodexReturnError(
+            "Codex app-server Goal transition evidence lacks a post-read"
+        )
+    post_read_digest = runtime._sha256_bytes(
+        runtime._canonical_bytes(post_read_response)
+    )
+    expected_keys = {
+        "schema_version",
+        "kind",
+        "method",
+        "thread_id",
+        "from_status",
+        "to_status",
+        "precondition_sha256",
+        "request_id",
+        "request_sha256",
+        "goal_response_sha256",
+        "post_read_response_sha256",
+        "response_available",
+    }
+    if (
+        set(proof) != expected_keys
+        or proof.get("schema_version") != GOAL_TRANSITION_PROOF_SCHEMA_VERSION
+        or proof.get("kind")
+        != (
+            "request_response_post_read"
+            if mutation_response_available
+            else "dispatch_reconciled_post_read"
+        )
         or proof.get("method") != GOAL_TRANSITION_METHOD
         or proof.get("thread_id") != owner["thread_id"]
         or proof.get("from_status") != from_state
@@ -471,12 +536,63 @@ def _validated_transition_proof(
         or proof.get("request_sha256")
         != runtime._sha256_bytes(runtime._canonical_bytes(request_frame))
         or proof.get("goal_response_sha256") != response_digest
+        or proof.get("post_read_response_sha256") != post_read_digest
+        or proof.get("response_available") is not mutation_response_available
     ):
         raise runtime.ExternalCodexReturnError(
-            "Codex app-server Goal transition proof is not bound to the "
-            "precondition, request, and resulting Goal"
+            "Codex app-server Goal transition evidence is not bound to the "
+            "precondition, request, response, and post-read"
         )
     return proof
+
+
+def _transition_proof(
+    *,
+    owner: dict[str, Any],
+    precondition: dict[str, Any],
+    mutation_response: dict[str, Any] | None,
+    post_read_response: dict[str, Any],
+    request_frame: dict[str, Any],
+    from_state: str,
+    to_state: str,
+) -> dict[str, Any]:
+    runtime = _runtime()
+    proof = {
+        "schema_version": GOAL_TRANSITION_PROOF_SCHEMA_VERSION,
+        "kind": (
+            "request_response_post_read"
+            if mutation_response is not None
+            else "dispatch_reconciled_post_read"
+        ),
+        "method": GOAL_TRANSITION_METHOD,
+        "thread_id": owner["thread_id"],
+        "from_status": from_state,
+        "to_status": to_state,
+        "precondition_sha256": precondition["goal_response_sha256"],
+        "request_id": request_frame["id"],
+        "request_sha256": runtime._sha256_bytes(
+            runtime._canonical_bytes(request_frame)
+        ),
+        "goal_response_sha256": (
+            runtime._sha256_bytes(runtime._canonical_bytes(mutation_response))
+            if mutation_response is not None
+            else None
+        ),
+        "post_read_response_sha256": runtime._sha256_bytes(
+            runtime._canonical_bytes(post_read_response)
+        ),
+        "response_available": mutation_response is not None,
+    }
+    return _validated_transition_proof(
+        proof,
+        owner=owner,
+        precondition=precondition,
+        mutation_response=mutation_response,
+        post_read_response=post_read_response,
+        request_frame=request_frame,
+        from_state=from_state,
+        to_state=to_state,
+    )
 
 
 def _decision_ref(decision: Any, content_ref_type: Any, canonical_digest: Callable[..., str]) -> Any:
@@ -727,6 +843,13 @@ def execute_goal_transition(
 
     rpc_factory = rpc_factory or runtime.UnixWebSocketRpc
     mutation_response: dict[str, Any] | None = None
+    resulting_response: dict[str, Any]
+    resulting_state: str
+    status: str
+    method: str
+    transition_request: dict[str, Any] | None = None
+    transition_proof: dict[str, Any] | None = None
+    recovery: dict[str, Any] | None = None
     with rpc_factory(endpoint) as rpc:
         initialize = runtime._initialize_rpc(rpc)
         before_response = rpc.call(
@@ -748,11 +871,11 @@ def execute_goal_transition(
         ):
             stored_precondition = attempt.get("precondition")
             stored_response = attempt.get("goal_response")
+            stored_post_read = attempt.get("post_read_response")
             stored_proof = attempt.get("transition_proof")
             stored_request = attempt.get("transition_request")
             if (
                 not isinstance(stored_precondition, dict)
-                or not isinstance(stored_response, dict)
                 or not isinstance(stored_proof, dict)
                 or not isinstance(stored_request, dict)
             ):
@@ -764,6 +887,11 @@ def execute_goal_transition(
                 owner=owner,
                 precondition=stored_precondition,
                 mutation_response=stored_response,
+                post_read_response=(
+                    stored_post_read
+                    if isinstance(stored_post_read, dict)
+                    else before_response
+                ),
                 request_frame=stored_request,
                 from_state=request.expected_state,
                 to_state=request.desired_state,
@@ -778,7 +906,7 @@ def execute_goal_transition(
             transition_proof = stored_proof
             recovery = {
                 "mode": "ambiguous_post_mutation",
-                "mutation_response_available": True,
+                "mutation_response_available": isinstance(stored_response, dict),
                 "reconciled_by": "thread/goal/get",
                 "authoritative": runtime._safe_response_summary(authoritative_response),
                 "authoritative_response_sha256": runtime._sha256_bytes(
@@ -792,9 +920,80 @@ def execute_goal_transition(
                 )
             before_state = request.expected_state
         elif before_state == request.desired_state and attempt is not None:
-            raise runtime.ExternalCodexReturnError(
-                "Goal lifecycle mutation reached its desired state without a complete durable transition proof"
+            if attempt.get("state") != "dispatched":
+                raise runtime.ExternalCodexReturnError(
+                    "Goal lifecycle mutation reached its desired state without a complete durable transition proof"
+                )
+            stored_precondition = attempt.get("precondition")
+            mutation_dispatched = attempt.get("mutation_dispatched")
+            stored_response = attempt.get("goal_response")
+            if not isinstance(stored_precondition, dict) or not isinstance(
+                mutation_dispatched, dict
+            ):
+                raise runtime.ExternalCodexReturnError(
+                    "Goal lifecycle attempt lacks dispatch reconciliation evidence"
+                )
+            transition_request = _request_frame_from_marker(mutation_dispatched)
+            if stored_response is not None and not isinstance(stored_response, dict):
+                raise runtime.ExternalCodexReturnError(
+                    "Goal lifecycle attempt mutation response is not an object"
+                )
+            if isinstance(stored_response, dict):
+                stored_goal = runtime._goal_object(
+                    stored_response, GOAL_TRANSITION_METHOD
+                )
+                runtime._validate_goal_binding(stored_goal, owner)
+                if runtime._string_at(stored_goal, ("status",)) != request.desired_state:
+                    raise runtime.ExternalCodexReturnError(
+                        "Goal lifecycle attempt mutation response did not confirm the desired state"
+                    )
+            transition_proof = _transition_proof(
+                owner=owner,
+                precondition=stored_precondition,
+                mutation_response=stored_response,
+                post_read_response=before_response,
+                request_frame=transition_request,
+                from_state=request.expected_state,
+                to_state=request.desired_state,
             )
+            attempt["state"] = "proof_recorded"
+            attempt["post_read_response"] = before_response
+            attempt["transition_request"] = transition_request
+            attempt["transition_proof"] = transition_proof
+            if attempt_path is None:
+                raise runtime.ExternalCodexReturnError(
+                    "Goal lifecycle attempt reservation path is required"
+                )
+            _write_attempt(
+                attempt_path,
+                attempt,
+                request=request,
+                decision=decision,
+                owner=owner,
+                owner_path=owner_path,
+                endpoint=endpoint,
+            )
+            mutation_response = stored_response
+            authoritative_response = before_response
+            resulting_response = authoritative_response
+            resulting_state = request.desired_state
+            status = "executed"
+            method = GOAL_TRANSITION_METHOD
+            recovery = {
+                "mode": "ambiguous_post_mutation",
+                "mutation_response_available": isinstance(stored_response, dict),
+                "reconciled_by": "thread/goal/get",
+                "authoritative": runtime._safe_response_summary(authoritative_response),
+                "authoritative_response_sha256": runtime._sha256_bytes(
+                    runtime._canonical_bytes(authoritative_response)
+                ),
+            }
+            before_response = stored_precondition.get("goal_get_response")
+            if not isinstance(before_response, dict):
+                raise runtime.ExternalCodexReturnError(
+                    "Goal lifecycle attempt lacks its original precondition response"
+                )
+            before_state = request.expected_state
         elif before_state == request.desired_state:
             resulting_response = before_response
             resulting_state = before_state
@@ -809,7 +1008,6 @@ def execute_goal_transition(
                     "Codex app-server Goal state does not match the accepted "
                     "lifecycle precondition"
                 )
-            _require_atomic_adapter(rpc)
             if attempt_path is None:
                 raise runtime.ExternalCodexReturnError(
                     "Goal lifecycle mutation requires a durable attempt reservation"
@@ -926,60 +1124,42 @@ def execute_goal_transition(
             setattr(rpc, "request_prepare_callback", record_request_prepared)
             setattr(rpc, "request_issued_callback", record_request_issued)
             try:
-                result = rpc.atomic_goal_transition(
-                    owner=owner,
-                    precondition=precondition,
-                    status=request.desired_state,
+                mutation_response = rpc.call(
+                    GOAL_TRANSITION_METHOD,
+                    {"threadId": owner["thread_id"], "status": request.desired_state},
                 )
             finally:
                 setattr(rpc, "request_prepare_callback", previous_prepare_callback)
                 setattr(rpc, "request_issued_callback", previous_issued_callback)
-            if not isinstance(result, dict):
+            if not isinstance(mutation_response, dict):
                 raise runtime.ExternalCodexReturnError(
-                    "Codex app-server Goal adapter returned a non-object transition"
+                    "Codex app-server Goal set returned a non-object response"
                 )
-            resulting_response = result.get("goal_response")
-            if not isinstance(resulting_response, dict):
+            mutation_dispatched = attempt.get("mutation_dispatched")
+            if not isinstance(mutation_dispatched, dict):
                 raise runtime.ExternalCodexReturnError(
-                    "Codex app-server Goal adapter returned no Goal response"
+                    "Goal lifecycle mutation returned without its durable dispatch marker"
                 )
-            transition_request = result.get("request_frame")
-            mutation_response = resulting_response
-            transition_proof = _validated_transition_proof(
-                result.get("transition_proof"),
-                owner=owner,
-                precondition=precondition,
-                mutation_response=mutation_response,
-                request_frame=transition_request,
-                from_state=request.expected_state,
-                to_state=request.desired_state,
+            transition_request = _request_frame_from_marker(mutation_dispatched)
+            mutation_goal = runtime._goal_object(
+                mutation_response, GOAL_TRANSITION_METHOD
             )
-            if attempt is not None and attempt_path is not None:
-                mutation_dispatched = attempt.get("mutation_dispatched")
-                if (
-                    not isinstance(mutation_dispatched, dict)
-                    or not isinstance(transition_request, dict)
-                    or mutation_dispatched.get("request_id")
-                    != transition_request.get("id")
-                    or mutation_dispatched.get("request_sha256")
-                    != transition_proof.get("request_sha256")
-                ):
-                    raise runtime.ExternalCodexReturnError(
-                        "Goal lifecycle mutation returned without its durable dispatch marker"
-                    )
-                attempt["state"] = "proof_recorded"
-                attempt["goal_response"] = resulting_response
-                attempt["transition_request"] = transition_request
-                attempt["transition_proof"] = transition_proof
-                _write_attempt(
-                    attempt_path,
-                    attempt,
-                    request=request,
-                    decision=decision,
-                    owner=owner,
-                    owner_path=owner_path,
-                    endpoint=endpoint,
+            runtime._validate_goal_binding(mutation_goal, owner)
+            if runtime._string_at(mutation_goal, ("status",)) != request.desired_state:
+                raise runtime.ExternalCodexReturnError(
+                    "Codex app-server Goal set response did not confirm the requested lifecycle state"
                 )
+            attempt["goal_response"] = mutation_response
+            attempt["transition_request"] = transition_request
+            _write_attempt(
+                attempt_path,
+                attempt,
+                request=request,
+                decision=decision,
+                owner=owner,
+                owner_path=owner_path,
+                endpoint=endpoint,
+            )
             authoritative_response = rpc.call(
                 "thread/goal/get",
                 {"threadId": owner["thread_id"]},
@@ -994,6 +1174,27 @@ def execute_goal_transition(
                     "Codex app-server authoritative Goal read did not confirm "
                     "the requested lifecycle state"
                 )
+            transition_proof = _transition_proof(
+                owner=owner,
+                precondition=precondition,
+                mutation_response=mutation_response,
+                post_read_response=authoritative_response,
+                request_frame=transition_request,
+                from_state=request.expected_state,
+                to_state=request.desired_state,
+            )
+            attempt["state"] = "proof_recorded"
+            attempt["post_read_response"] = authoritative_response
+            attempt["transition_proof"] = transition_proof
+            _write_attempt(
+                attempt_path,
+                attempt,
+                request=request,
+                decision=decision,
+                owner=owner,
+                owner_path=owner_path,
+                endpoint=endpoint,
+            )
             resulting_response = authoritative_response
             resulting_state = authoritative_state
             status = "executed"
@@ -1090,60 +1291,35 @@ def _validate_stored_transition_evidence(
     mutation_digest = lifecycle.get("mutation_response_sha256")
     request_frame = lifecycle.get("transition_request")
     proof = lifecycle.get("transition_proof")
-    expected_keys = {
-        "schema_version",
-        "kind",
-        "method",
-        "thread_id",
-        "from_status",
-        "to_status",
-        "precondition_sha256",
-        "request_id",
-        "request_sha256",
-        "goal_response_sha256",
-    }
     if (
         not runtime._is_sha256_digest(before_digest)
         or not runtime._is_sha256_digest(result_digest)
-        or not runtime._is_sha256_digest(mutation_digest)
+        or (
+            mutation_digest is not None
+            and not runtime._is_sha256_digest(mutation_digest)
+        )
         or not isinstance(request_frame, dict)
-        or set(request_frame) != {"jsonrpc", "id", "method", "params"}
-        or request_frame.get("jsonrpc") != "2.0"
-        or not isinstance(request_frame.get("id"), int)
-        or isinstance(request_frame.get("id"), bool)
-        or request_frame.get("id", 0) < 1
-        or request_frame.get("method") != GOAL_TRANSITION_METHOD
-        or not isinstance(request_frame.get("params"), dict)
-        or request_frame["params"].get("threadId") != owner["thread_id"]
-        or request_frame["params"].get("status") != request.desired_state
-        or not isinstance(proof, dict)
-        or set(proof) != expected_keys
-        or proof.get("schema_version") != GOAL_TRANSITION_PROOF_SCHEMA_VERSION
-        or proof.get("kind") != "server_compare_and_set"
-        or proof.get("method") != GOAL_TRANSITION_METHOD
-        or proof.get("thread_id") != owner["thread_id"]
-        or proof.get("from_status") != request.expected_state
-        or proof.get("to_status") != request.desired_state
-        or proof.get("request_id") != request_frame.get("id")
-        or not isinstance(proof.get("request_id"), int)
-        or isinstance(proof.get("request_id"), bool)
-        or proof.get("request_id", 0) < 1
-        or proof.get("request_sha256")
-        != runtime._sha256_bytes(runtime._canonical_bytes(request_frame))
-        or proof.get("precondition_sha256") != before_digest
-        or proof.get("goal_response_sha256") != mutation_digest
-        or not runtime._is_sha256_digest(proof.get("precondition_sha256"))
-        or not runtime._is_sha256_digest(proof.get("request_sha256"))
-        or not runtime._is_sha256_digest(proof.get("goal_response_sha256"))
     ):
         raise runtime.ExternalCodexReturnError(
             "existing Goal lifecycle receipt transition evidence is not bound to its request and response"
         )
+    _validated_transition_proof(
+        proof,
+        owner=owner,
+        precondition={"goal_response_sha256": before_digest},
+        mutation_response=None,
+        expected_mutation_response_digest=mutation_digest,
+        post_read_response=result_response,
+        request_frame=request_frame,
+        from_state=request.expected_state,
+        to_state=request.desired_state,
+    )
     recovery = lifecycle.get("recovery")
     if recovery is not None and (
         not isinstance(recovery, dict)
         or recovery.get("mode") != "ambiguous_post_mutation"
-        or recovery.get("mutation_response_available") is not True
+        or recovery.get("mutation_response_available")
+        is not (mutation_digest is not None)
         or recovery.get("reconciled_by") != "thread/goal/get"
         or not isinstance(recovery.get("authoritative"), dict)
         or not runtime._is_sha256_digest(
@@ -1209,9 +1385,25 @@ def _validate_receipt_attempt_binding(
     mutation_response = attempt.get("goal_response")
     transition_request = attempt.get("transition_request")
     transition_proof = attempt.get("transition_proof")
+    post_read_response = attempt.get("post_read_response")
+    if (
+        post_read_response is None
+        and isinstance(transition_proof, dict)
+        and transition_proof.get("schema_version")
+        == LEGACY_GOAL_TRANSITION_PROOF_SCHEMA_VERSION
+        and isinstance(mutation_response, dict)
+    ):
+        # Legacy atomic receipts had no separate post-read field; keep them
+        # replayable without reclassifying their historical proof as a new
+        # observational claim.
+        post_read_response = mutation_response
     if (
         not isinstance(precondition, dict)
-        or not isinstance(mutation_response, dict)
+        or (
+            mutation_response is not None
+            and not isinstance(mutation_response, dict)
+        )
+        or not isinstance(post_read_response, dict)
         or not isinstance(transition_request, dict)
         or not isinstance(transition_proof, dict)
     ):
@@ -1240,6 +1432,7 @@ def _validate_receipt_attempt_binding(
         owner=owner,
         precondition=precondition,
         mutation_response=mutation_response,
+        post_read_response=post_read_response,
         request_frame=transition_request,
         from_state=request.expected_state,
         to_state=request.desired_state,
@@ -1253,7 +1446,13 @@ def _validate_receipt_attempt_binding(
         lifecycle.get("before_response_sha256") != precondition_digest
         or lifecycle.get("before") != precondition_summary
         or lifecycle.get("mutation_response_sha256")
-        != runtime._sha256_bytes(runtime._canonical_bytes(mutation_response))
+        != (
+            runtime._sha256_bytes(runtime._canonical_bytes(mutation_response))
+            if mutation_response is not None
+            else None
+        )
+        or lifecycle.get("result_response_sha256")
+        != runtime._sha256_bytes(runtime._canonical_bytes(post_read_response))
         or lifecycle.get("transition_request") != transition_request
         or lifecycle.get("transition_proof") != transition_proof
     ):

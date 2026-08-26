@@ -128,14 +128,13 @@ def _decision(request: GoalLifecycleRequest):
 
 
 class FakeGoalRpc:
-    supports_atomic_goal_transition = True
-
     def __init__(self, endpoint: Path, *, status: str) -> None:
         self.endpoint = endpoint
         self.status = status
         self.calls: list[tuple[str, dict[str, object] | None]] = []
         self.counter = 0
         self.mutation_response_extra: dict[str, object] = {}
+        self.lose_goal_set_response = False
 
     def __enter__(self) -> "FakeGoalRpc":
         return self
@@ -153,49 +152,32 @@ class FakeGoalRpc:
             return {"protocolVersion": "1"}
         if method == "thread/goal/get":
             return {"goal": {"threadId": "thread:test", "status": self.status}}
+        if method == "thread/goal/set":
+            assert isinstance(params, dict)
+            request_id = self.counter
+            payload = {
+                "jsonrpc": "2.0",
+                "id": request_id,
+                "method": method,
+                "params": params,
+            }
+            prepare_callback = getattr(self, "request_prepare_callback", None)
+            if callable(prepare_callback):
+                prepare_callback(method, params, request_id, payload)
+            issued_callback = getattr(self, "request_issued_callback", None)
+            if callable(issued_callback):
+                issued_callback(method, params, request_id, payload)
+            self.status = str(params["status"])
+            response: dict[str, object] = {
+                "goal": {"threadId": "thread:test", "status": self.status}
+            }
+            response.update(self.mutation_response_extra)
+            if self.lose_goal_set_response:
+                raise RUNTIME.ExternalCodexReturnError(
+                    "simulated Goal set response loss"
+                )
+            return response
         raise AssertionError(f"unexpected non-lifecycle method: {method}")
-
-    def atomic_goal_transition(
-        self,
-        *,
-        owner: dict[str, object],
-        precondition: dict[str, object],
-        status: str,
-    ) -> dict[str, object]:
-        request_id = self.counter + 1
-        params = {"threadId": owner["thread_id"], "status": status}
-        payload = {
-            "jsonrpc": "2.0",
-            "id": request_id,
-            "method": "thread/goal/set",
-            "params": params,
-        }
-        response = {"goal": {"threadId": "thread:test", "status": status}}
-        response.update(self.mutation_response_extra)
-        prepare_callback = getattr(self, "request_prepare_callback", None)
-        if callable(prepare_callback):
-            prepare_callback("thread/goal/set", params, request_id, payload)
-        self.calls.append(("thread/goal/set", params))
-        issued_callback = getattr(self, "request_issued_callback", None)
-        if callable(issued_callback):
-            issued_callback("thread/goal/set", params, request_id, payload)
-        self.status = status
-        return {
-            "goal_response": response,
-            "request_frame": payload,
-            "transition_proof": {
-                "schema_version": ADAPTER.GOAL_TRANSITION_PROOF_SCHEMA_VERSION,
-                "kind": "server_compare_and_set",
-                "method": "thread/goal/set",
-                "thread_id": "thread:test",
-                "from_status": precondition["observed_state"],
-                "to_status": status,
-                "precondition_sha256": precondition["goal_response_sha256"],
-                "request_id": request_id,
-                "request_sha256": _digest(payload),
-                "goal_response_sha256": _digest(response),
-            },
-        }
 
 
 def _run_transition(tmp_path: Path, *, initial: str, desired: str, kind: str) -> tuple[dict[str, Any], FakeGoalRpc]:
@@ -747,14 +729,17 @@ def test_generic_adapter_rechecks_all_inputs_before_publishing_receipt(
     request_path.write_bytes(request_bytes)
     decision_path.write_bytes(decision_bytes)
     rpc = FakeGoalRpc(tmp_path / "publication-snapshot.sock", status="active")
-    original_transition = rpc.atomic_goal_transition
+    original_call = rpc.call
 
-    def mutate_request_after_mutation(**kwargs: object) -> dict[str, object]:
-        result = original_transition(**kwargs)
-        request_path.write_bytes(b"{}\n")
+    def mutate_request_after_mutation(
+        method: str, params: dict[str, object] | None = None
+    ) -> dict[str, object]:
+        result = original_call(method, params)
+        if method == "thread/goal/set":
+            request_path.write_bytes(b"{}\n")
         return result
 
-    rpc.atomic_goal_transition = mutate_request_after_mutation  # type: ignore[method-assign]
+    rpc.call = mutate_request_after_mutation  # type: ignore[method-assign]
     monkeypatch.setattr(
         RUNTIME,
         "discover_app_server_socket",
@@ -773,7 +758,9 @@ def test_generic_adapter_rechecks_all_inputs_before_publishing_receipt(
     assert not receipt_path.exists()
 
 
-def test_generic_adapter_refuses_the_current_public_non_atomic_surface(tmp_path: Path) -> None:
+def test_generic_adapter_executes_against_the_current_public_goal_set_surface(
+    tmp_path: Path,
+) -> None:
     owner_path = tmp_path / "owner.json"
     request = _request(
         observed="active",
@@ -783,23 +770,87 @@ def test_generic_adapter_refuses_the_current_public_non_atomic_surface(tmp_path:
     )
     decision = _decision(request)
 
-    class NonAtomic(FakeGoalRpc):
-        supports_atomic_goal_transition = False
-
     endpoint = tmp_path / "non-atomic.sock"
     owner = _owner(endpoint)
     owner_path.write_text(json.dumps(owner), encoding="utf-8")
-    rpc = NonAtomic(endpoint, status="active")
-    with pytest.raises(RUNTIME.ExternalCodexReturnError, match="compare-and-set"):
+    rpc = FakeGoalRpc(endpoint, status="active")
+    receipt = ADAPTER.execute_goal_transition(
+        request,
+        decision,
+        owner,
+        owner_path,
+        rpc.endpoint,
+        rpc_factory=lambda _endpoint: rpc,
+        attempt_path=tmp_path / "non-atomic.attempt.json",
+    )
+    assert receipt["status"] == "executed"
+    assert receipt["lifecycle"]["transition_proof"]["kind"] == (
+        "request_response_post_read"
+    )
+    assert [method for method, _params in rpc.calls].count("thread/goal/set") == 1
+    assert [method for method, _params in rpc.calls].count("thread/goal/get") == 2
+
+
+def test_generic_adapter_reconciles_a_lost_set_response_without_a_second_set(
+    tmp_path: Path,
+) -> None:
+    endpoint = tmp_path / "response-loss.sock"
+    owner = _owner(endpoint)
+    owner_path = tmp_path / "owner-response-loss.json"
+    owner_path.write_bytes(RUNTIME._canonical_bytes(owner) + b"\n")
+    request = _request(
+        observed="active",
+        desired="paused",
+        kind="delegation_yield",
+        request_id="request:response-loss",
+    )
+    decision = _decision(request)
+    attempt_path = tmp_path / "response-loss.attempt.json"
+    rpc = FakeGoalRpc(endpoint, status="active")
+    rpc.lose_goal_set_response = True
+
+    with pytest.raises(RUNTIME.ExternalCodexReturnError, match="response loss"):
         ADAPTER.execute_goal_transition(
             request,
             decision,
             owner,
             owner_path,
-            rpc.endpoint,
+            endpoint,
             rpc_factory=lambda _endpoint: rpc,
+            attempt_path=attempt_path,
         )
-    assert not any(method == "thread/goal/set" for method, _params in rpc.calls)
+    dispatched = json.loads(attempt_path.read_text(encoding="utf-8"))
+    assert dispatched["state"] == "dispatched"
+    assert "goal_response" not in dispatched
+
+    rpc.lose_goal_set_response = False
+    receipt = ADAPTER.execute_goal_transition(
+        request,
+        decision,
+        owner,
+        owner_path,
+        endpoint,
+        rpc_factory=lambda _endpoint: rpc,
+        attempt_path=attempt_path,
+    )
+    assert receipt["status"] == "executed"
+    assert receipt["lifecycle"]["recovery"]["mutation_response_available"] is False
+    assert receipt["lifecycle"]["transition_proof"]["kind"] == (
+        "dispatch_reconciled_post_read"
+    )
+    assert [method for method, _params in rpc.calls].count("thread/goal/set") == 1
+
+    replay = ADAPTER.execute_goal_transition(
+        request,
+        decision,
+        owner,
+        owner_path,
+        endpoint,
+        rpc_factory=lambda _endpoint: rpc,
+        attempt_path=attempt_path,
+    )
+    assert replay["lifecycle"]["recovery"]["mutation_response_available"] is False
+    assert [method for method, _params in rpc.calls].count("thread/goal/set") == 1
 
 
 @pytest.mark.parametrize("missing_marker", ("mutation_reserved", "mutation_dispatched"))

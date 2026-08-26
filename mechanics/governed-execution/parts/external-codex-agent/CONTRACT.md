@@ -129,15 +129,16 @@ Operations are:
   claims only requested/accepted/executed; delivery, semantic acceptance,
   owner acceptance, and closure remain separate.
 
-  A mutating transition requires a runtime adapter with a server-supported
-  compare-and-set/version proof bound to the precondition, exact request, and
-  returned Goal response. The installed public `ThreadGoalSetParams`
-  app-server method has no such precondition, so the current Codex adapter
-  fails closed before mutation until a protocol-capable adapter is supplied.
-  The generic receipt uses
-  `abyss_stack_external_codex_goal_transition_v1`; no terminal input, turn
-  delivery, task-specific Goal, thread, model, version, or terminal identity
-  is selected by source.
+  A mutating transition uses the installed native `ThreadGoalSetParams`
+  app-server method. The adapter binds the active precondition, exact
+  `thread/goal/set` request marker, returned Goal response when available, and
+  a bounded fresh `thread/goal/get` post-read. A response loss after dispatch
+  is reconciled only from the durable dispatch marker plus that post-read and
+  never by issuing a second lifecycle set. The generic receipt uses
+  `abyss_stack_external_codex_goal_transition_v2`; it does not claim a
+  server-side CAS/version feature or mutation causality. No terminal input,
+  turn delivery, task-specific Goal, thread, model, version, or terminal
+  identity is selected by source.
 
   `aoa-external-codex-return pause --pause-owner ... --pause-receipt ...` is a
   backwards-compatible legacy pause projection. New Masters use the generic
