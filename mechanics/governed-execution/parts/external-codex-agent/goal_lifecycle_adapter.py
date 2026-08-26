@@ -204,12 +204,17 @@ def _validate_attempt(
 ) -> dict[str, Any]:
     runtime = _runtime()
     _load_schema(value, _goal_attempt_schema_path(), "Goal lifecycle attempt")
+    content_ref_type, _decision_type, _execution_type, _request_type, _scope, _assert_receipt_scope, canonical_digest = _contract_types()
+    expected_decision_ref = _decision_ref(
+        decision, content_ref_type, canonical_digest
+    ).model_dump(mode="json")
     if (
         value.get("attempt_ref") != str(attempt_path.resolve())
         or value.get("correlation_id") != request.correlation_id
         or value.get("idempotency_key") != request.idempotency_key
         or value.get("goal_ref") != request.goal_ref.model_dump(mode="json")
         or value.get("request_ref") != decision.request_ref.model_dump(mode="json")
+        or value.get("decision_ref") != expected_decision_ref
         or value.get("owner_ref") != str(owner_path.resolve())
         or value.get("owner_sha256")
         != runtime._sha256_bytes(owner_path.read_bytes())
@@ -273,7 +278,7 @@ def _validated_transition_proof(
     *,
     owner: dict[str, Any],
     precondition: dict[str, Any],
-    goal_response: dict[str, Any],
+    mutation_response: dict[str, Any],
     request_frame: object,
     from_state: str,
     to_state: str,
@@ -291,7 +296,9 @@ def _validated_transition_proof(
         "request_sha256",
         "goal_response_sha256",
     }
-    response_digest = runtime._sha256_bytes(runtime._canonical_bytes(goal_response))
+    response_digest = runtime._sha256_bytes(
+        runtime._canonical_bytes(mutation_response)
+    )
     if not isinstance(proof, dict) or set(proof) != expected_keys:
         raise runtime.ExternalCodexReturnError(
             "Codex app-server Goal transition proof is incomplete"
@@ -357,6 +364,7 @@ def _execution_projection(
     initialize: dict[str, Any],
     before_response: dict[str, Any],
     resulting_response: dict[str, Any],
+    mutation_response: dict[str, Any] | None,
     before_state: str,
     resulting_state: str,
     status: str,
@@ -439,6 +447,11 @@ def _execution_projection(
             "result_response_sha256": runtime._sha256_bytes(
                 runtime._canonical_bytes(resulting_response)
             ),
+            "mutation_response_sha256": (
+                runtime._sha256_bytes(runtime._canonical_bytes(mutation_response))
+                if mutation_response is not None
+                else None
+            ),
             "transition_request": transition_request,
             "transition_proof": transition_proof,
         },
@@ -487,16 +500,19 @@ def execute_goal_transition(
     assert_scope(request, decision)
     owner = runtime.validate_goal_lifecycle_owner(owner)
     _load_schema(owner, _goal_owner_schema_path(), "Goal lifecycle owner")
-    if request.goal_ref.object_id != owner["goal_id"]:
+    if request.goal_ref.model_dump(mode="json") != owner.get("goal_ref"):
         raise runtime.ExternalCodexReturnError(
-            "Goal lifecycle request and transport owner name different Goals"
+            "Goal lifecycle request and transport owner Goal reference mismatch"
         )
-    if request.return_owner_ref.object_id != owner["owner_id"]:
+    if request.return_owner_ref.model_dump(mode="json") != owner.get(
+        "return_owner_ref"
+    ):
         raise runtime.ExternalCodexReturnError(
-            "Goal lifecycle request and transport owner name different return owners"
+            "Goal lifecycle request and transport owner return-owner reference mismatch"
         )
 
     rpc_factory = rpc_factory or runtime.UnixWebSocketRpc
+    mutation_response: dict[str, Any] | None = None
     with rpc_factory(endpoint) as rpc:
         initialize = runtime._initialize_rpc(rpc)
         before_response = rpc.call(
@@ -551,12 +567,14 @@ def execute_goal_transition(
                 stored_proof,
                 owner=owner,
                 precondition=stored_precondition,
-                goal_response=stored_response,
+                mutation_response=stored_response,
                 request_frame=stored_request,
                 from_state=request.expected_state,
                 to_state=request.desired_state,
             )
-            resulting_response = stored_response
+            mutation_response = stored_response
+            authoritative_response = before_response
+            resulting_response = authoritative_response
             resulting_state = request.desired_state
             status = "executed"
             method = GOAL_TRANSITION_METHOD
@@ -566,9 +584,9 @@ def execute_goal_transition(
                 "mode": "ambiguous_post_mutation",
                 "mutation_response_available": True,
                 "reconciled_by": "thread/goal/get",
-                "authoritative": runtime._safe_response_summary(before_response),
+                "authoritative": runtime._safe_response_summary(authoritative_response),
                 "authoritative_response_sha256": runtime._sha256_bytes(
-                    runtime._canonical_bytes(before_response)
+                    runtime._canonical_bytes(authoritative_response)
                 ),
             }
             before_response = stored_precondition.get("goal_get_response")
@@ -730,11 +748,12 @@ def execute_goal_transition(
                     "Codex app-server Goal adapter returned no Goal response"
                 )
             transition_request = result.get("request_frame")
+            mutation_response = resulting_response
             transition_proof = _validated_transition_proof(
                 result.get("transition_proof"),
                 owner=owner,
                 precondition=precondition,
-                goal_response=resulting_response,
+                mutation_response=mutation_response,
                 request_frame=transition_request,
                 from_state=request.expected_state,
                 to_state=request.desired_state,
@@ -793,6 +812,7 @@ def execute_goal_transition(
         initialize=initialize,
         before_response=before_response,
         resulting_response=resulting_response,
+        mutation_response=mutation_response,
         before_state=before_state,
         resulting_state=resulting_state,
         status=status,
@@ -855,6 +875,7 @@ def _validate_stored_transition_evidence(
         )
     before_digest = lifecycle.get("before_response_sha256")
     result_digest = lifecycle.get("result_response_sha256")
+    mutation_digest = lifecycle.get("mutation_response_sha256")
     request_frame = lifecycle.get("transition_request")
     proof = lifecycle.get("transition_proof")
     expected_keys = {
@@ -872,6 +893,7 @@ def _validate_stored_transition_evidence(
     if (
         not runtime._is_sha256_digest(before_digest)
         or not runtime._is_sha256_digest(result_digest)
+        or not runtime._is_sha256_digest(mutation_digest)
         or not isinstance(request_frame, dict)
         or set(request_frame) != {"jsonrpc", "id", "method", "params"}
         or request_frame.get("jsonrpc") != "2.0"
@@ -897,7 +919,7 @@ def _validate_stored_transition_evidence(
         or proof.get("request_sha256")
         != runtime._sha256_bytes(runtime._canonical_bytes(request_frame))
         or proof.get("precondition_sha256") != before_digest
-        or proof.get("goal_response_sha256") != result_digest
+        or proof.get("goal_response_sha256") != mutation_digest
         or not runtime._is_sha256_digest(proof.get("precondition_sha256"))
         or not runtime._is_sha256_digest(proof.get("request_sha256"))
         or not runtime._is_sha256_digest(proof.get("goal_response_sha256"))
@@ -915,6 +937,7 @@ def _validate_stored_transition_evidence(
         or not runtime._is_sha256_digest(
             recovery.get("authoritative_response_sha256")
         )
+        or recovery.get("authoritative_response_sha256") != result_digest
     ):
         raise runtime.ExternalCodexReturnError(
             "existing Goal lifecycle recovery evidence is incomplete"
@@ -1111,12 +1134,12 @@ def run_goal_transition(args: Any) -> dict[str, Any]:
     decision = _model(decision_value, _decision_type, "Goal lifecycle decision")
     assert_scope(request, decision)
     owner = runtime.validate_goal_lifecycle_owner(owner_value)
-    if receipt_path.resolve() in {
+    input_paths = {
         request_path.resolve(),
         decision_path.resolve(),
         owner_path.resolve(),
-        attempt_path.resolve(),
-    }:
+    }
+    if {receipt_path.resolve(), attempt_path.resolve()} & input_paths:
         raise runtime.ExternalCodexReturnError(
             "Goal lifecycle receipt must be distinct from all input artifacts"
         )

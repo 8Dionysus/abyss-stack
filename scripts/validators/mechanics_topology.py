@@ -122,6 +122,7 @@ MECHANIC_PART_REQUIRED_FILES = {
         "schemas/external-codex-actor-input-envelope.schema.json",
         "schemas/external-codex-actor-workspace-manifest.schema.json",
         "schemas/external-codex-event.schema.json",
+        "schemas/external-codex-goal-lifecycle-attempt.schema.json",
         "schemas/external-codex-goal-lifecycle-owner.schema.json",
         "schemas/external-codex-goal-lifecycle-receipt.schema.json",
         "schemas/external-codex-launch.schema.json",

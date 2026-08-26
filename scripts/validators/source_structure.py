@@ -408,6 +408,7 @@ REQUIRED_FILE_PATHS = tuple(
         "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-pause-owner.schema.json",
         "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-pause-reservation.schema.json",
         "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-pause-receipt.schema.json",
+        "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-goal-lifecycle-attempt.schema.json",
         "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-goal-lifecycle-owner.schema.json",
         "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-goal-lifecycle-receipt.schema.json",
         "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-responsibility-observation.schema.json",

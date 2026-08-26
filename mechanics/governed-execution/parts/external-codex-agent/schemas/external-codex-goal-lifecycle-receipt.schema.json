@@ -14,7 +14,7 @@
     "generated_at"
   ],
   "properties": {
-    "schema_version": {"const": "abyss_stack_external_codex_goal_lifecycle_receipt_v1"},
+    "schema_version": {"const": "abyss_stack_external_codex_goal_lifecycle_receipt_v2"},
     "execution_id": {"type": "string", "minLength": 1},
     "stage": {"const": "executed"},
     "correlation_id": {"type": "string", "minLength": 1},
@@ -58,13 +58,14 @@
     },
     "lifecycle": {
       "type": "object", "additionalProperties": false,
-      "required": ["initialize", "before", "result", "before_response_sha256", "result_response_sha256", "transition_request", "transition_proof"],
+      "required": ["initialize", "before", "result", "before_response_sha256", "result_response_sha256", "mutation_response_sha256", "transition_request", "transition_proof"],
       "properties": {
         "initialize": {"type": "object"},
         "before": {"type": "object"},
         "result": {"type": "object"},
         "before_response_sha256": {"$ref": "#/$defs/digest"},
         "result_response_sha256": {"$ref": "#/$defs/digest"},
+        "mutation_response_sha256": {"type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$"},
         "transition_request": {"type": ["object", "null"]},
         "transition_proof": {"type": ["object", "null"]},
         "recovery": {
