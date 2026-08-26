@@ -42,47 +42,58 @@
       ],
       "properties": {
         "mode": {"const": "ambiguous_post_mutation"},
-        "mutation_response_available": {"const": false},
+        "mutation_response_available": {"type": "boolean"},
         "reconciled_by": {"const": "thread/goal/get"},
         "mutation_dispatched": {"$ref": "#/$defs/mutation_dispatched"}
       }
     },
     "transition_proof": {
+      "anyOf": [
+        {"$ref": "#/$defs/transitionProof"},
+        {"$ref": "#/$defs/legacyTransitionProof"}
+      ]
+    },
+    "transitionProof": {
       "type": "object",
       "required": [
-        "schema_version",
-        "kind",
-        "method",
-        "thread_id",
-        "from_status",
-        "to_status",
-        "precondition_sha256",
-        "request_id",
-        "request_sha256",
+        "schema_version", "kind", "method", "thread_id", "from_status",
+        "to_status", "precondition_sha256", "request_id", "request_sha256",
+        "goal_response_sha256", "post_read_response_sha256", "response_available"
+      ],
+      "properties": {
+        "schema_version": {"const": "abyss_stack_external_codex_goal_transition_v2"},
+        "kind": {"enum": ["request_response_post_read", "dispatch_reconciled_post_read"]},
+        "method": {"const": "thread/goal/set"},
+        "thread_id": {"type": "string", "minLength": 1},
+        "from_status": {"const": "active"},
+        "to_status": {"const": "paused"},
+        "precondition_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "request_id": {"type": "integer", "minimum": 1},
+        "request_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "goal_response_sha256": {"type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$"},
+        "post_read_response_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "response_available": {"type": "boolean"}
+      },
+      "additionalProperties": false
+    },
+    "legacyTransitionProof": {
+      "type": "object",
+      "required": [
+        "schema_version", "kind", "method", "thread_id", "from_status",
+        "to_status", "precondition_sha256", "request_id", "request_sha256",
         "goal_response_sha256"
       ],
       "properties": {
-        "schema_version": {
-          "const": "abyss_stack_external_codex_atomic_goal_transition_v1"
-        },
+        "schema_version": {"const": "abyss_stack_external_codex_atomic_goal_transition_v1"},
         "kind": {"const": "server_compare_and_set"},
         "method": {"const": "thread/goal/set"},
         "thread_id": {"type": "string", "minLength": 1},
         "from_status": {"const": "active"},
         "to_status": {"const": "paused"},
-        "precondition_sha256": {
-          "type": "string",
-          "pattern": "^sha256:[0-9a-f]{64}$"
-        },
+        "precondition_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
         "request_id": {"type": "integer", "minimum": 1},
-        "request_sha256": {
-          "type": "string",
-          "pattern": "^sha256:[0-9a-f]{64}$"
-        },
-        "goal_response_sha256": {
-          "type": "string",
-          "pattern": "^sha256:[0-9a-f]{64}$"
-        }
+        "request_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "goal_response_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
       },
       "additionalProperties": false
     }
@@ -187,7 +198,11 @@
           "type": "string",
           "pattern": "^sha256:[0-9a-f]{64}$"
         },
-        "goal_response_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "goal_response_sha256": {"type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$"},
+        "goal_response": {"type": ["object", "null"]},
+        "post_read": {"type": "object"},
+        "post_read_response": {"type": "object"},
+        "post_read_response_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
         "precondition": {
           "type": "object",
           "required": [
@@ -239,6 +254,104 @@
   "allOf": [
     {
       "if": {
+        "required": ["lifecycle"],
+        "properties": {
+          "lifecycle": {
+            "required": ["transition_proof"],
+            "properties": {
+              "transition_proof": {
+                "properties": {
+                  "schema_version": {
+                    "const": "abyss_stack_external_codex_goal_transition_v2"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "lifecycle": {
+            "required": [
+              "post_read",
+              "post_read_response",
+              "post_read_response_sha256"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": ["lifecycle"],
+        "properties": {
+          "lifecycle": {
+            "required": ["transition_proof"],
+            "properties": {
+              "transition_proof": {
+                "properties": {
+                  "schema_version": {
+                    "const": "abyss_stack_external_codex_goal_transition_v2"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "lifecycle": {
+            "required": ["goal_response"]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": ["lifecycle"],
+        "properties": {
+          "lifecycle": {
+            "properties": {
+              "response_available": {"const": true}
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "lifecycle": {
+            "properties": {
+              "goal_response": {"type": "object"}
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": ["lifecycle"],
+        "properties": {
+          "lifecycle": {
+            "properties": {
+              "response_available": {"const": false}
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "lifecycle": {
+            "properties": {
+              "goal_response": {"type": "null"}
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
         "properties": {
           "lifecycle": {
             "required": ["response_available"],
@@ -247,17 +360,6 @@
         }
       },
       "then": {"required": ["recovery"]}
-    },
-    {
-      "if": {
-        "properties": {
-          "lifecycle": {
-            "required": ["response_available"],
-            "properties": {"response_available": {"const": true}}
-          }
-        }
-      },
-      "then": {"not": {"required": ["recovery"]}}
     }
   ]
 }

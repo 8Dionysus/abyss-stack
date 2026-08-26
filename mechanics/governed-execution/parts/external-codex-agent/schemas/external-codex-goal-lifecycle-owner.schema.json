@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://abyss.local/schemas/external-codex-goal-lifecycle-owner.schema.json",
+  "title": "Abyss external Codex Goal lifecycle owner",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "owner_id",
+    "owner_repo",
+    "goal_id",
+    "thread_id",
+    "goal_ref",
+    "return_owner_ref",
+    "runtime",
+    "transport_posture",
+    "acceptance_posture"
+  ],
+  "properties": {
+    "schema_version": {"const": "abyss_stack_external_codex_goal_lifecycle_owner_v2"},
+    "owner_id": {"type": "string", "minLength": 1},
+    "owner_repo": {"type": "string", "minLength": 1},
+    "goal_id": {"type": "string", "minLength": 1},
+    "thread_id": {"type": "string", "minLength": 1},
+    "goal_ref": {"$ref": "#/$defs/contentRef"},
+    "return_owner_ref": {"$ref": "#/$defs/contentRef"},
+    "runtime": {"const": "codex"},
+    "transport_posture": {"type": "string", "minLength": 1},
+    "acceptance_posture": {"type": "string", "minLength": 1},
+    "transport_endpoint": {"type": "string", "minLength": 1},
+    "app_server_socket": {"type": "string", "minLength": 1},
+    "transport": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "endpoint": {"type": "string", "minLength": 1},
+        "socket": {"type": "string", "minLength": 1},
+        "address": {"type": "string", "minLength": 1}
+      },
+      "minProperties": 1
+    }
+  },
+  "$defs": {
+    "contentRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["object_id", "owner_repo", "schema_version", "digest"],
+      "properties": {
+        "object_id": {"type": "string", "minLength": 1},
+        "owner_repo": {"type": "string", "minLength": 1},
+        "schema_version": {"type": "string", "minLength": 1},
+        "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      }
+    }
+  }
+}

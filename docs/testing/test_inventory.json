@@ -128,6 +128,7 @@
         "mechanics/governed-execution/parts/external-codex-agent/tests/test_external_codex_runtime_invariant_closure.py",
         "mechanics/governed-execution/parts/external-codex-agent/tests/test_external_codex_runtime_install.py",
         "mechanics/governed-execution/parts/external-codex-agent/tests/test_external_codex_return.py",
+        "mechanics/governed-execution/parts/external-codex-agent/tests/test_goal_lifecycle_adapter.py",
         "mechanics/governed-execution/parts/external-codex-agent/tests/test_visible_incarnation_home.py",
         "mechanics/governed-execution/parts/external-codex-agent/tests/test_external_codex_workspace_hygiene.py",
         "mechanics/governed-execution/parts/governed-runner/tests/governed_runner_test_support.py",
