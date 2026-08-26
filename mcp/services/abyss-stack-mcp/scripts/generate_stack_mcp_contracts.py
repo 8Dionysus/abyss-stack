@@ -37,6 +37,7 @@ from abyss_stack_mcp.admission_automation import (  # noqa: E402
 )
 from abyss_stack_mcp.system_status import MCPSystemStatus  # noqa: E402
 from abyss_stack_mcp.exposure import (  # noqa: E402
+    ExposureInvocationAuthorization,
     ExposureInvocationReceipt,
     ExposureMaterializationReceipt,
     StackExposurePlan,
@@ -410,6 +411,10 @@ def rendered_outputs() -> dict[Path, str]:
         SERVICE_ROOT / "schemas" / "progressive-exposure-invocation-receipt.schema.json": schema(
             "progressive-exposure-invocation-receipt.schema.json",
             ExposureInvocationReceipt,
+        ),
+        SERVICE_ROOT / "schemas" / "progressive-exposure-invocation-authorization.schema.json": schema(
+            "progressive-exposure-invocation-authorization.schema.json",
+            ExposureInvocationAuthorization,
         ),
         SERVICE_ROOT / "examples" / "runtime-observation.public.example.json": (
             json.dumps(

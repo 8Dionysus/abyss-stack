@@ -3,6 +3,25 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
+    "authorization_id": {
+      "anyOf": [
+        {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Authorization Id"
+    },
+    "caller_id": {
+      "maxLength": 512,
+      "minLength": 1,
+      "title": "Caller Id",
+      "type": "string"
+    },
     "contains_secrets": {
       "const": false,
       "default": false,
@@ -122,6 +141,7 @@
   "required": [
     "receipt_id",
     "request_id",
+    "caller_id",
     "materialization_receipt_id",
     "plan_id",
     "tool_id",

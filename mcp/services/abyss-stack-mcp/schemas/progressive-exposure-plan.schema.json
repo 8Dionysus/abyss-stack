@@ -1,20 +1,102 @@
 {
   "$defs": {
-    "StackExposureSnapshot": {
+    "StackExposureCapabilityBinding": {
       "additionalProperties": false,
+      "description": "Nested capability identity carried by the SDK plan ingress.",
       "properties": {
-        "expires_at": {
+        "approval_ref": {
           "anyOf": [
             {
-              "format": "date-time",
-              "type": "string"
+              "additionalProperties": true,
+              "type": "object"
             },
             {
               "type": "null"
             }
           ],
           "default": null,
-          "title": "Expires At"
+          "title": "Approval Ref"
+        },
+        "capability_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Capability Digest",
+          "type": "string"
+        },
+        "capability_id": {
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Capability Id",
+          "type": "string"
+        },
+        "effect_ceiling": {
+          "enum": [
+            "read",
+            "candidate"
+          ],
+          "title": "Effect Ceiling",
+          "type": "string"
+        },
+        "freshness": {
+          "additionalProperties": true,
+          "title": "Freshness",
+          "type": "object"
+        },
+        "organ_id": {
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Organ Id",
+          "type": "string"
+        },
+        "owners": {
+          "additionalProperties": true,
+          "title": "Owners",
+          "type": "object"
+        },
+        "qualified_capability_id": {
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Qualified Capability Id",
+          "type": "string"
+        },
+        "rollback_route": {
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Rollback Route",
+          "type": "string"
+        },
+        "schema_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Schema Digest",
+          "type": "string"
+        },
+        "source_revision": {
+          "additionalProperties": true,
+          "title": "Source Revision",
+          "type": "object"
+        }
+      },
+      "required": [
+        "organ_id",
+        "capability_id",
+        "qualified_capability_id",
+        "owners",
+        "capability_digest",
+        "schema_digest",
+        "source_revision",
+        "freshness",
+        "effect_ceiling",
+        "rollback_route"
+      ],
+      "title": "StackExposureCapabilityBinding",
+      "type": "object"
+    },
+    "StackExposureSnapshot": {
+      "additionalProperties": false,
+      "properties": {
+        "expires_at": {
+          "format": "date-time",
+          "title": "Expires At",
+          "type": "string"
         },
         "observed_at": {
           "format": "date-time",
@@ -121,7 +203,8 @@
         "rendered_schema_digest",
         "rendered_bytes",
         "token_count_posture",
-        "observed_at"
+        "observed_at",
+        "expires_at"
       ],
       "title": "StackExposureSnapshot",
       "type": "object"
@@ -223,7 +306,7 @@
   "$id": "https://8dionysus.github.io/schemas/abyss-stack-mcp/progressive-exposure-plan.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
-  "description": "Minimal normalized view of the SDK candidate consumed by stack.",
+  "description": "The nested SDK candidate shape consumed by stack.",
   "properties": {
     "activation_authorized": {
       "const": false,
@@ -231,19 +314,30 @@
       "title": "Activation Authorized",
       "type": "boolean"
     },
+    "approval_ref": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Approval Ref"
+    },
     "baseline_ready": {
       "title": "Baseline Ready",
       "type": "boolean"
     },
-    "capability_id": {
-      "maxLength": 512,
-      "minLength": 1,
-      "title": "Capability Id",
-      "type": "string"
+    "capability": {
+      "$ref": "#/$defs/StackExposureCapabilityBinding"
     },
-    "capability_schema_digest": {
-      "pattern": "^sha256:[0-9a-f]{64}$",
-      "title": "Capability Schema Digest",
+    "claim_limit": {
+      "const": "This candidate records deterministic disclosure identity and visibility accounting only. It does not authorize activation, execute a tool, prove runtime reachability, establish owner acceptance, or issue central proof.",
+      "default": "This candidate records deterministic disclosure identity and visibility accounting only. It does not authorize activation, execute a tool, prove runtime reachability, establish owner acceptance, or issue central proof.",
+      "title": "Claim Limit",
       "type": "string"
     },
     "execution_authorized": {
@@ -271,12 +365,6 @@
       "title": "Feature Enabled",
       "type": "boolean"
     },
-    "organ_id": {
-      "maxLength": 512,
-      "minLength": 1,
-      "title": "Organ Id",
-      "type": "string"
-    },
     "plan_id": {
       "pattern": "^sha256:[0-9a-f]{64}$",
       "title": "Plan Id",
@@ -288,12 +376,6 @@
         "candidate"
       ],
       "title": "Plan State",
-      "type": "string"
-    },
-    "qualified_capability_id": {
-      "maxLength": 512,
-      "minLength": 1,
-      "title": "Qualified Capability Id",
       "type": "string"
     },
     "refusal_reasons": {
@@ -365,10 +447,7 @@
     "feature_enabled",
     "baseline_ready",
     "request_id",
-    "organ_id",
-    "capability_id",
-    "qualified_capability_id",
-    "capability_schema_digest",
+    "capability",
     "requested_policy_family",
     "rendered_snapshot",
     "rollback_route",

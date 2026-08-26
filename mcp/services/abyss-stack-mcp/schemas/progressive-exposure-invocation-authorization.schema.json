@@ -1,0 +1,63 @@
+{
+  "$id": "https://8dionysus.github.io/schemas/abyss-stack-mcp/progressive-exposure-invocation-authorization.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Exact external authorization for a request that stack will not execute.",
+  "properties": {
+    "authorization_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Authorization Id",
+      "type": "string"
+    },
+    "caller_id": {
+      "maxLength": 512,
+      "minLength": 1,
+      "title": "Caller Id",
+      "type": "string"
+    },
+    "expires_at": {
+      "format": "date-time",
+      "title": "Expires At",
+      "type": "string"
+    },
+    "issued_at": {
+      "format": "date-time",
+      "title": "Issued At",
+      "type": "string"
+    },
+    "materialization_receipt_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Materialization Receipt Id",
+      "type": "string"
+    },
+    "owner": {
+      "maxLength": 512,
+      "minLength": 1,
+      "title": "Owner",
+      "type": "string"
+    },
+    "plan_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Plan Id",
+      "type": "string"
+    },
+    "tool_id": {
+      "maxLength": 512,
+      "minLength": 1,
+      "title": "Tool Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "authorization_id",
+    "owner",
+    "plan_id",
+    "materialization_receipt_id",
+    "tool_id",
+    "caller_id",
+    "issued_at",
+    "expires_at"
+  ],
+  "title": "ExposureInvocationAuthorization",
+  "type": "object"
+}

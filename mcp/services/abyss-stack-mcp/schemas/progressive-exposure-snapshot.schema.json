@@ -99,17 +99,9 @@
   "additionalProperties": false,
   "properties": {
     "expires_at": {
-      "anyOf": [
-        {
-          "format": "date-time",
-          "type": "string"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "default": null,
-      "title": "Expires At"
+      "format": "date-time",
+      "title": "Expires At",
+      "type": "string"
     },
     "observed_at": {
       "format": "date-time",
@@ -216,7 +208,8 @@
     "rendered_schema_digest",
     "rendered_bytes",
     "token_count_posture",
-    "observed_at"
+    "observed_at",
+    "expires_at"
   ],
   "title": "StackExposureSnapshot",
   "type": "object"

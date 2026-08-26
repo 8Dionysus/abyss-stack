@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 
 from abyss_stack_mcp.core import canonical_json_bytes
 from abyss_stack_mcp.exposure import (
+    ExposureInvocationAuthorization,
     ExposureRuntime,
     StackExposurePlan,
     StackExposureTool,
@@ -26,7 +27,7 @@ def _payload() -> dict:
         policy_family="read",
         input_schema_ref="owner://aoa-kag/schema/input",
         output_schema_ref="owner://aoa-kag/schema/output",
-        schema_digest=digest("d"),
+        schema_digest=digest("c"),
         effect_ceiling="read",
     )
     tools = [tool.model_dump(mode="json")]
@@ -41,7 +42,7 @@ def _payload() -> dict:
         "token_count_posture": "estimated",
         "token_count_method": "fixture-estimate-v1",
         "observed_at": NOW.isoformat().replace("+00:00", "Z"),
-        "expires_at": (NOW + timedelta(hours=1)).isoformat().replace("+00:00", "Z"),
+        "expires_at": (NOW + timedelta(minutes=5)).isoformat().replace("+00:00", "Z"),
         "refusal_reasons": [],
     }
     snapshot_body["rendered_schema_digest"] = (
@@ -53,7 +54,7 @@ def _payload() -> dict:
             "sha256:" + hashlib.sha256(canonical_json_bytes(snapshot_body)).hexdigest()
         ),
     }
-    return {
+    payload = {
         "schema_version": "aoa_organ_exposure_plan_v1",
         "plan_id": digest("a"),
         "plan_state": "candidate",
@@ -66,20 +67,49 @@ def _payload() -> dict:
             "organ_id": "aoa-kag",
             "capability_id": "knowledge-inspect",
             "qualified_capability_id": "aoa-kag:aoa-kag:knowledge-inspect",
+            "owners": {
+                "source_owner": "aoa-kag",
+                "access_owner": "aoa-kag",
+                "control_owner": "aoa-sdk",
+                "runtime_owner": "abyss-stack",
+                "proof_owner": "aoa-evals",
+                "acceptance_owner": "aoa-kag",
+            },
+            "capability_digest": digest("b"),
             "schema_digest": digest("c"),
+            "source_revision": {"revision": "source-1", "digest": digest("e")},
+            "freshness": {
+                "state": "fresh",
+                "source_ref": "owner://aoa-kag/exposure",
+                "source_digest": digest("e"),
+                "observed_at": NOW.isoformat().replace("+00:00", "Z"),
+                "expires_at": (NOW + timedelta(minutes=5)).isoformat().replace(
+                    "+00:00", "Z"
+                ),
+                "ttl_seconds": 300,
+                "provider_watermark": "exposure-1",
+                "reason_codes": [],
+            },
             "effect_ceiling": "read",
+            "approval_ref": None,
             "rollback_route": "owner://aoa-kag/rollback",
         },
         "requested_policy_family": "read",
         "requested_primitive_ids": ["inspect-knowledge"],
         "visible_tools": tools,
         "rendered_snapshot": snapshot,
+        "approval_ref": None,
         "rollback_route": "owner://aoa-kag/rollback",
         "requested_at": NOW.isoformat().replace("+00:00", "Z"),
-        "expires_at": (NOW + timedelta(hours=1)).isoformat().replace("+00:00", "Z"),
+        "expires_at": (NOW + timedelta(minutes=5)).isoformat().replace("+00:00", "Z"),
         "expansion_reasons": ["baseline_gate_satisfied"],
         "refusal_reasons": [],
     }
+    unsigned = {key: value for key, value in payload.items() if key != "plan_id"}
+    payload["plan_id"] = "sha256:" + hashlib.sha256(
+        canonical_json_bytes(unsigned)
+    ).hexdigest()
+    return payload
 
 
 def test_stack_materialization_is_default_off_and_receipt_bound() -> None:
@@ -93,6 +123,20 @@ def test_stack_materialization_is_default_off_and_receipt_bound() -> None:
     assert receipt.execution_authorized is False
     assert receipt.receipt_id.startswith("sha256:")
     assert len(runtime.recent_receipts()) == 1
+
+
+def test_admitted_runtime_requires_canonical_baseline_receipt() -> None:
+    try:
+        ExposureRuntime(
+            progressive_exposure_enabled=True,
+            baseline_admitted=True,
+            baseline_admission_ref="receipt://unrelated/baseline",
+            clock=lambda: NOW,
+        )
+    except ValueError as exc:
+        assert "canonical d0 receipt" in str(exc)
+    else:
+        raise AssertionError("non-canonical baseline admission must fail closed")
 
 
 def test_admitted_runtime_requires_explicit_invocation_authority_and_emits_receipts() -> None:
@@ -114,27 +158,86 @@ def test_admitted_runtime_requires_explicit_invocation_authority_and_emits_recei
     denied = runtime.invoke(
         materialization.receipt_id,
         request_id="invoke-denied",
+        caller_id="test-caller",
         tool_id="knowledge-inspect.inspect-knowledge",
         arguments={"query": "bounded"},
         authorization_ref=None,
-        dispatch=lambda: {"answer": "must-not-run"},
     )
     assert denied.decision == "denied"
     assert "invocation_authorization_required" in denied.reason_codes
+    assert "owner_tool_execution_not_owned_by_stack" in denied.reason_codes
 
-    allowed = runtime.invoke(
+    authorization_body = {
+        "owner": "aoa-kag",
+        "plan_id": _payload()["plan_id"],
+        "materialization_receipt_id": materialization.receipt_id,
+        "tool_id": "knowledge-inspect.inspect-knowledge",
+        "caller_id": "test-caller",
+        "issued_at": NOW.isoformat().replace("+00:00", "Z"),
+        "expires_at": (NOW + timedelta(minutes=4)).isoformat().replace(
+            "+00:00", "Z"
+        ),
+    }
+    authorization_body["authorization_id"] = "sha256:" + hashlib.sha256(
+        canonical_json_bytes(authorization_body)
+    ).hexdigest()
+    recorded = runtime.invoke(
         materialization.receipt_id,
         request_id="invoke-allowed",
+        caller_id="test-caller",
         tool_id="knowledge-inspect.inspect-knowledge",
         arguments={"query": "bounded"},
-        authorization_ref="owner://runtime/invocation-approval",
-        dispatch=lambda: {"answer": "bounded-result"},
+        authorization_ref=ExposureInvocationAuthorization.model_validate(
+            authorization_body
+        ),
     )
-    assert allowed.decision == "allowed"
-    assert allowed.invocation_authorized is True
-    assert allowed.runtime_effect_authorized is False
-    assert allowed.output_digest is not None
+    assert recorded.decision == "denied"
+    assert "owner_tool_execution_not_owned_by_stack" in recorded.reason_codes
+    assert recorded.invocation_authorized is False
+    assert recorded.runtime_effect_authorized is False
+    assert recorded.output_digest is None
+    assert recorded.authorization_id == authorization_body["authorization_id"]
     assert len(emitted) == 3
+
+    retained = runtime.recent_receipts()
+    retained[-1]["reason_codes"].append("tampered")
+    assert "tampered" not in runtime.recent_receipts()[-1]["reason_codes"]
+
+
+def test_invocation_authorization_owner_and_malformed_request_fail_closed() -> None:
+    runtime = ExposureRuntime(
+        progressive_exposure_enabled=True,
+        baseline_admitted=True,
+        baseline_admission_ref="receipt://d0/baseline-ready",
+        clock=lambda: NOW,
+    )
+    materialization = runtime.materialize(_payload())
+    authorization_body = {
+        "owner": "unrelated-owner",
+        "plan_id": _payload()["plan_id"],
+        "materialization_receipt_id": materialization.receipt_id,
+        "tool_id": "knowledge-inspect.inspect-knowledge",
+        "caller_id": "test-caller",
+        "issued_at": NOW.isoformat().replace("+00:00", "Z"),
+        "expires_at": (NOW + timedelta(minutes=4)).isoformat().replace(
+            "+00:00", "Z"
+        ),
+    }
+    authorization_body["authorization_id"] = "sha256:" + hashlib.sha256(
+        canonical_json_bytes(authorization_body)
+    ).hexdigest()
+    denied = runtime.invoke(
+        materialization.receipt_id,
+        request_id="",
+        caller_id="test-caller",
+        tool_id="knowledge-inspect.inspect-knowledge",
+        arguments={"query": "bounded"},
+        authorization_ref=authorization_body,
+    )
+    assert denied.decision == "denied"
+    assert "malformed_request_id" in denied.reason_codes
+    assert "invocation_authorization_owner_mismatch" in denied.reason_codes
+    assert "owner_tool_execution_not_owned_by_stack" in denied.reason_codes
 
 
 def test_stack_normalization_rejects_visible_tool_schema_drift() -> None:
@@ -146,3 +249,16 @@ def test_stack_normalization_rejects_visible_tool_schema_drift() -> None:
         assert "exposure plan failed stack normalization" in str(exc)
     else:
         raise AssertionError("schema drift must fail closed")
+
+
+def test_stack_normalization_rejects_plan_id_tampering() -> None:
+    payload = _payload()
+    payload["expires_at"] = (NOW + timedelta(minutes=4)).isoformat().replace(
+        "+00:00", "Z"
+    )
+    try:
+        StackExposurePlan.from_sdk_payload(payload)
+    except Exception as exc:
+        assert "exposure plan failed stack normalization" in str(exc)
+    else:
+        raise AssertionError("plan identity drift must fail closed")
