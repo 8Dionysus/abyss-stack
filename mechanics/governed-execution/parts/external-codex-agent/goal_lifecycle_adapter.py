@@ -499,7 +499,16 @@ def execute_goal_transition(
     request = _model(request, request_type, "Goal lifecycle request")
     decision = _model(decision, decision_type, "Goal lifecycle decision")
     assert_scope(request, decision)
+    owner_path = runtime._regular_file(Path(owner_path), "Goal lifecycle owner")
+    owner_artifact, _owner_bytes = runtime._load_json_file(
+        owner_path, "Goal lifecycle owner"
+    )
     owner = runtime.validate_goal_lifecycle_owner(owner)
+    owner_artifact = runtime.validate_goal_lifecycle_owner(owner_artifact)
+    if owner_artifact != owner:
+        raise runtime.ExternalCodexReturnError(
+            "Goal lifecycle owner artifact does not match the supplied owner"
+        )
     _load_schema(owner, _goal_owner_schema_path(), "Goal lifecycle owner")
     if request.goal_ref.model_dump(mode="json") != owner.get("goal_ref"):
         raise runtime.ExternalCodexReturnError(
