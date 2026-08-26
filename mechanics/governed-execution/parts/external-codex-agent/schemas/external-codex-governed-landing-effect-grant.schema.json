@@ -43,7 +43,7 @@
         },
         "revision": {
           "type": "string",
-          "pattern": "^(?:[0-9a-f]{40}|sha256:[0-9a-f]{64})$(?![\\s\\S])"
+          "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$(?![\\s\\S])"
         }
       }
     },
@@ -181,7 +181,7 @@
     },
     "digest": {
       "type": "string",
-      "pattern": "^sha256:[0-9a-f]{64}$",
+      "pattern": "^sha256:[0-9a-f]{64}$(?![\\s\\S])",
       "not": {"const": "sha256:0000000000000000000000000000000000000000000000000000000000000000"}
     },
     "ownerRef": {
@@ -201,7 +201,7 @@
         "source_ref": {"type": "string", "minLength": 1},
         "artifact_digest": {
           "type": "string",
-          "pattern": "^sha256:[0-9a-f]{64}$",
+          "pattern": "^sha256:[0-9a-f]{64}$(?![\\s\\S])",
           "not": {"const": "sha256:0000000000000000000000000000000000000000000000000000000000000000"}
         },
         "schema_ref": {"type": "string", "minLength": 1},
@@ -226,7 +226,7 @@
         "source_ref": {"type": "string", "minLength": 1},
         "artifact_digest": {
           "type": "string",
-          "pattern": "^sha256:[0-9a-f]{64}$",
+          "pattern": "^sha256:[0-9a-f]{64}$(?![\\s\\S])",
           "not": {"const": "sha256:0000000000000000000000000000000000000000000000000000000000000000"}
         },
         "schema_ref": {"type": "string", "minLength": 1},
@@ -241,7 +241,7 @@
     },
     "revision": {
       "type": "string",
-      "pattern": "^(?:[0-9a-f]{40}|sha256:[0-9a-f]{64})$(?![\\s\\S])"
+      "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$(?![\\s\\S])"
     }
   }
 }

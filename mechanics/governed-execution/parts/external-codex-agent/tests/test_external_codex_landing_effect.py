@@ -323,6 +323,59 @@ def test_exact_coordinates_reject_trailing_newlines() -> None:
         assert exc.value.code == "landing_effect_grant_schema_invalid"
 
 
+def test_owner_reference_digests_reject_trailing_newlines() -> None:
+    grant = _grant()
+    _refresh_semantic_digest(grant)
+    grant["grant_ref"]["artifact_digest"] += "\n"
+    with pytest.raises(LandingEffectGrantError) as grant_ref_exc:
+        validate_landing_effect_grant(grant)
+    assert grant_ref_exc.value.code == "landing_effect_grant_schema_invalid"
+
+    for ref_path in (
+        ("goal_ref",),
+        ("holder_ref",),
+        ("review", "reviewer_ref"),
+        ("review", "evidence_ref"),
+        ("return_posture", "owner_ref"),
+    ):
+        grant = _grant()
+        reference: dict[str, Any] = grant
+        for key in ref_path:
+            reference = reference[key]
+        reference["artifact_digest"] += "\n"
+        _refresh_semantic_digest(grant)
+
+        with pytest.raises(LandingEffectGrantError) as exc:
+            validate_landing_effect_grant(grant)
+        assert exc.value.code == "landing_effect_grant_schema_invalid"
+
+
+def test_git_object_id_coordinates_accept_bare_sha256_and_reject_prefix() -> None:
+    revision_paths = (
+        ("repository", "revision"),
+        ("target", "base_revision"),
+        ("target", "head_revision"),
+    )
+    for ref_path in revision_paths:
+        grant = _grant()
+        reference: dict[str, Any] = grant
+        for key in ref_path[:-1]:
+            reference = reference[key]
+        reference[ref_path[-1]] = "a" * 64
+        _refresh_semantic_digest(grant)
+        assert validate_landing_effect_grant(grant)[ref_path[0]]
+
+        prefixed = _grant()
+        prefixed_reference: dict[str, Any] = prefixed
+        for key in ref_path[:-1]:
+            prefixed_reference = prefixed_reference[key]
+        prefixed_reference[ref_path[-1]] = "sha256:" + ("a" * 64)
+        _refresh_semantic_digest(prefixed)
+        with pytest.raises(LandingEffectGrantError) as exc:
+            validate_landing_effect_grant(prefixed)
+        assert exc.value.code == "landing_effect_grant_schema_invalid"
+
+
 def test_commit_cannot_share_a_grant_with_downstream_effects() -> None:
     for downstream_effect in ("push", "pull_request", "merge"):
         grant = _grant(effects=["commit", downstream_effect])
