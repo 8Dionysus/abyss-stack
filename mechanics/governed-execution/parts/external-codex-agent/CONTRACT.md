@@ -116,24 +116,36 @@ Operations are:
   delivery into typed `wake_delivered` close authority;
 - `close --holder-receipt ... (--closure-authorization ... | --wake-receipt ...)
   --handoff ... --closure-receipt ...` closes only the exact bound holder.
-- `aoa-external-codex-return pause --pause-owner ... --pause-receipt ...` is the
-  canonical Goal lifecycle pause leaf. It validates a separate pause-owner
-  binding, reads the exact Goal identity first, requires the observed status to
-  be `active`, and requires an `atomic_goal_transition` adapter method that
-  performs a server-supported compare-and-set/version proof before calling
-  `thread/goal/set(status=paused)`. The installed public
-  `ThreadGoalSetParams` app-server method has no such precondition, so the
-  canonical adapter fails closed before mutation and cannot certify an
-  `active_to_paused` transition on that server. A future protocol adapter must
-  explicitly provide the typed
-  `abyss_stack_external_codex_atomic_goal_transition_v1` proof. That adapter
-  owns any version-token request fields; the runtime binds the resulting
-  request marker to the proof. The completed
-  `abyss_stack_external_codex_pause_receipt_v1` schema requires that proof and
-  binds the active precondition, exact request ID and digest, thread, method,
-  and returned Goal response digest.
+- `aoa-external-codex-return goal-transition --request ... --decision ...
+  --owner ... --receipt ...` is the generic Goal lifecycle leaf. The request
+  and accepted decision are owner-authored typed artifacts: the semantic
+  owner resolves Goal/DAG/ownership legitimacy before this adapter runs, and
+  the adapter only binds that exact decision to the current Codex
+  `thread/goal/get` and `thread/goal/set` surface. It supports the same seam
+  for `delegation_yield` (for example, active -> paused) and `accepted_return`
+  (for example, paused -> active), while state names and transition kinds stay
+  instance data. It reads the exact Goal binding first and confirms the
+  resulting state from a fresh authoritative Goal read. A successful receipt
+  claims only requested/accepted/executed; delivery, semantic acceptance,
+  owner acceptance, and closure remain separate.
 
-  The receipt is reserved before the app-server mutation and binds the owner
+  A mutating transition requires a runtime adapter with a server-supported
+  compare-and-set/version proof bound to the precondition, exact request, and
+  returned Goal response. The installed public `ThreadGoalSetParams`
+  app-server method has no such precondition, so the current Codex adapter
+  fails closed before mutation until a protocol-capable adapter is supplied.
+  The generic receipt uses
+  `abyss_stack_external_codex_goal_transition_v1`; no terminal input, turn
+  delivery, task-specific Goal, thread, model, version, or terminal identity
+  is selected by source.
+
+  `aoa-external-codex-return pause --pause-owner ... --pause-receipt ...` is a
+  backwards-compatible legacy pause projection. New Masters use the generic
+  typed route above; the legacy route remains only for replay/migration of its
+  existing `abyss_stack_external_codex_pause_receipt_v1` evidence.
+
+  The legacy projection's receipt is reserved before its app-server mutation
+  and binds the owner
   bytes, Goal/thread identities, transition proof, transport response digest,
   and separate owner/semantic-acceptance markers. It does not read or start a
   turn, deliver a handoff, authorize or close a holder, or claim semantic
