@@ -116,6 +116,7 @@ def _decision(request: GoalLifecycleRequest):
         ),
         evidence_refs=request.evidence_refs,
         observed_at=NOW,
+        valid_until=datetime(2099, 1, 1, tzinfo=timezone.utc),
         observed_by=_provenance("aoa-agents", "context/goal-dag-ownership"),
     )
     return resolve_goal_lifecycle(request, context)
