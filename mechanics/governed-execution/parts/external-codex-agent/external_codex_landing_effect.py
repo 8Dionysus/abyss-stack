@@ -28,10 +28,14 @@ SCHEMA_PATH = (
     PART_ROOT
     / "schemas/external-codex-governed-landing-effect-grant.schema.json"
 )
+WORKSPACE_MANIFEST_SCHEMA_PATH = (
+    PART_ROOT / "schemas/external-codex-workspace-manifest.schema.json"
+)
 SCHEMA_VERSION = "abyss_stack_external_codex_governed_landing_effect_grant_v1"
 CAPABILITY_ID = "governed_git_landing_v1"
 ZERO_DIGEST = "sha256:" + "0" * 64
 MAX_GRANT_BYTES = 256 * 1024
+MAX_WORKSPACE_MANIFEST_BYTES = 16 * 1024 * 1024
 GIT_EXECUTABLE = "/usr/bin/git"
 GIT_REF_VALIDATION_ENV = {
     "GIT_CONFIG_GLOBAL": os.devnull,
@@ -174,6 +178,34 @@ def _parse_json_bytes(raw: bytes) -> object:
         raise json.JSONDecodeError("invalid JSON value", text, 0) from exc
 
 
+def _workspace_manifest_digest(raw: bytes) -> str:
+    """Validate and digest the exact workspace-manifest artifact bytes."""
+
+    if len(raw) > MAX_WORKSPACE_MANIFEST_BYTES:
+        raise LandingEffectGrantError(
+            "landing_effect_grant_content_too_large",
+            "workspace manifest exceeds the bounded admission size",
+        )
+    try:
+        parsed = _parse_json_bytes(raw)
+    except (UnicodeDecodeError, json.JSONDecodeError, RecursionError) as exc:
+        raise LandingEffectGrantError(
+            "landing_effect_grant_content_invalid",
+            "workspace manifest is not UTF-8 JSON",
+        ) from exc
+    if not isinstance(parsed, Mapping):
+        raise LandingEffectGrantError(
+            "landing_effect_grant_content_invalid",
+            "workspace manifest is not a JSON object",
+        )
+    errors = _schema_errors(parsed, schema_path=WORKSPACE_MANIFEST_SCHEMA_PATH)
+    if errors:
+        raise LandingEffectGrantError(
+            "landing_effect_grant_content_invalid", errors[0]
+        )
+    return _digest_bytes(raw)
+
+
 def _copy_json(value: Mapping[str, Any]) -> dict[str, Any]:
     try:
         copied = json.loads(json.dumps(value, ensure_ascii=False))
@@ -246,9 +278,11 @@ def _now(value: datetime | None) -> datetime:
         ) from exc
 
 
-def _schema_errors(grant: Mapping[str, Any]) -> list[str]:
+def _schema_errors(
+    value: Mapping[str, Any], *, schema_path: Path = SCHEMA_PATH
+) -> list[str]:
     try:
-        schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
+        schema = json.loads(schema_path.read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise LandingEffectGrantError(
             "landing_effect_grant_schema_unavailable",
@@ -256,7 +290,7 @@ def _schema_errors(grant: Mapping[str, Any]) -> list[str]:
         ) from exc
     validator = Draft202012Validator(schema, format_checker=FormatChecker())
     return sorted(
-        error.message for error in validator.iter_errors(grant)
+        error.message for error in validator.iter_errors(value)
     )
 
 
@@ -509,6 +543,7 @@ def admit_landing_effect_grant(
     grant_raw: bytes | None = None,
     expected_artifact_digest: str | None = None,
     observed_workspace_manifest_digest: str | None = None,
+    observed_workspace_manifest_raw: bytes | None = None,
     at: datetime | None = None,
 ) -> dict[str, Any]:
     """Admit one exact grant against one exact Goal/holder/target request.
@@ -517,8 +552,9 @@ def admit_landing_effect_grant(
     Goal, holder, repository, target, effect, review, or return bindings is
     rejected instead of receiving a wildcard match.  A grant with a broader
     effect set is rejected as wider authority, even when it contains the
-    requested effect.  Commit grants additionally bind an exact workspace
-    manifest digest supplied by the effect executor.
+    requested effect.  Commit grants additionally bind exact workspace-manifest
+    artifact bytes supplied by the effect executor; admission recomputes those
+    bytes' digest before accepting the commit scope.
     """
 
     if not isinstance(request, Mapping):
@@ -671,12 +707,29 @@ def admit_landing_effect_grant(
                 "landing_effect_grant_content_unbound",
                 "commit admission requires an independent workspace manifest digest",
             )
-        if observed_workspace_manifest_digest != expected_workspace_manifest_digest:
+        if not isinstance(observed_workspace_manifest_raw, bytes):
+            raise LandingEffectGrantError(
+                "landing_effect_grant_content_unbound",
+                "commit admission requires the exact workspace manifest bytes",
+            )
+        actual_workspace_manifest_digest = _workspace_manifest_digest(
+            observed_workspace_manifest_raw
+        )
+        if actual_workspace_manifest_digest != observed_workspace_manifest_digest:
+            raise LandingEffectGrantError(
+                "landing_effect_grant_content_drift",
+                "observed workspace manifest digest differs from its exact bytes",
+            )
+        if actual_workspace_manifest_digest != expected_workspace_manifest_digest:
             raise LandingEffectGrantError(
                 "landing_effect_grant_content_drift",
                 "workspace bytes differ from the immutable commit content binding",
             )
-    elif "commit_content" in request or observed_workspace_manifest_digest is not None:
+    elif (
+        "commit_content" in request
+        or observed_workspace_manifest_digest is not None
+        or observed_workspace_manifest_raw is not None
+    ):
         raise LandingEffectGrantError(
             "landing_effect_request_invalid",
             "workspace manifest content is only valid for commit grants",
@@ -707,7 +760,7 @@ def admit_landing_effect_grant(
     }
     if "commit" in granted_effects:
         result["admission"]["workspace_manifest_digest"] = (
-            observed_workspace_manifest_digest
+            actual_workspace_manifest_digest
         )
     return result
 
@@ -719,6 +772,7 @@ def landing_effect_grant_allows(
     grant_raw: bytes | None = None,
     expected_artifact_digest: str | None = None,
     observed_workspace_manifest_digest: str | None = None,
+    observed_workspace_manifest_raw: bytes | None = None,
     at: datetime | None = None,
 ) -> bool:
     """Return whether the exact grant can be admitted; default is False."""
@@ -730,6 +784,7 @@ def landing_effect_grant_allows(
             grant_raw=grant_raw,
             expected_artifact_digest=expected_artifact_digest,
             observed_workspace_manifest_digest=observed_workspace_manifest_digest,
+            observed_workspace_manifest_raw=observed_workspace_manifest_raw,
             at=at,
         )
     except LandingEffectGrantError:

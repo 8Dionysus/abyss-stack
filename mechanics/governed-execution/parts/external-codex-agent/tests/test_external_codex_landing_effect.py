@@ -31,7 +31,33 @@ from external_codex_landing_effect import (  # noqa: E402
 AT = datetime(2026, 8, 24, 12, tzinfo=UTC)
 ZERO_DIGEST = "sha256:" + "0" * 64
 REF_DIGEST = "sha256:" + "1" * 64
-WORKSPACE_MANIFEST_DIGEST = "sha256:" + "2" * 64
+WORKSPACE_MANIFEST_RAW = (
+    json.dumps(
+        {
+            "$schema": "schemas/external-codex-workspace-manifest.schema.json",
+            "schema_version": "abyss_stack_external_codex_workspace_manifest_v1",
+            "workspace_path": "/workspace",
+            "workspace_identity": {
+                "root": {
+                    "path": "/workspace",
+                    "st_dev": 1,
+                    "st_ino": 1,
+                    "mode": 493,
+                },
+                "ancestors": [],
+            },
+            "git_head": "e" * 40,
+            "git_status_porcelain_sha256": "sha256:" + "3" * 64,
+            "git_diff_binary_sha256": "sha256:" + "4" * 64,
+            "status_entries": [],
+            "content_entries": [],
+        },
+        ensure_ascii=True,
+        sort_keys=True,
+        indent=2,
+    )
+    + "\n"
+).encode("utf-8")
 
 
 def _ref(owner: str, artifact: str, schema: str) -> dict[str, str]:
@@ -138,6 +164,9 @@ def _raw(grant: dict[str, Any]) -> bytes:
 
 def _raw_digest(raw: bytes) -> str:
     return "sha256:" + hashlib.sha256(raw).hexdigest()
+
+
+WORKSPACE_MANIFEST_DIGEST = _raw_digest(WORKSPACE_MANIFEST_RAW)
 
 
 def _refresh_semantic_digest(grant: dict[str, Any]) -> None:
@@ -327,9 +356,22 @@ def test_commit_admission_requires_and_verifies_workspace_manifest_digest() -> N
             grant_raw=raw,
             expected_artifact_digest=_raw_digest(raw),
             observed_workspace_manifest_digest="sha256:" + "3" * 64,
+            observed_workspace_manifest_raw=WORKSPACE_MANIFEST_RAW,
             at=AT,
         )
     assert drift_exc.value.code == "landing_effect_grant_content_drift"
+
+    with pytest.raises(LandingEffectGrantError) as byte_drift_exc:
+        admit_landing_effect_grant(
+            grant,
+            request,
+            grant_raw=raw,
+            expected_artifact_digest=_raw_digest(raw),
+            observed_workspace_manifest_digest=WORKSPACE_MANIFEST_DIGEST,
+            observed_workspace_manifest_raw=WORKSPACE_MANIFEST_RAW + b" ",
+            at=AT,
+        )
+    assert byte_drift_exc.value.code == "landing_effect_grant_content_drift"
 
     admitted = admit_landing_effect_grant(
         grant,
@@ -337,6 +379,7 @@ def test_commit_admission_requires_and_verifies_workspace_manifest_digest() -> N
         grant_raw=raw,
         expected_artifact_digest=_raw_digest(raw),
         observed_workspace_manifest_digest=WORKSPACE_MANIFEST_DIGEST,
+        observed_workspace_manifest_raw=WORKSPACE_MANIFEST_RAW,
         at=AT,
     )
     assert (
@@ -466,6 +509,9 @@ def test_branch_target_allows_only_single_commit_or_push_effects() -> None:
             expected_artifact_digest=_raw_digest(raw),
             observed_workspace_manifest_digest=(
                 WORKSPACE_MANIFEST_DIGEST if effect == "commit" else None
+            ),
+            observed_workspace_manifest_raw=(
+                WORKSPACE_MANIFEST_RAW if effect == "commit" else None
             ),
             at=AT,
         )
