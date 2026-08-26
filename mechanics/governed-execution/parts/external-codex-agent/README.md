@@ -179,8 +179,10 @@ and replay only through their matching legacy wake reservation. A retry after a 
   traversal components. Standalone commit grants also bind an explicit
   workspace-manifest mode: newly issued grants require the cached-index digest,
   while only an `authenticated_legacy_v1` grant with separately supplied,
-  digest-verified owner migration evidence permits the historical v1 omission.
-  The evidence binds the exact grant, repository revision, and manifest digest.
+  digest-verified owner migration evidence and its independently digest-pinned
+  owner receipt permits the historical v1 omission. The evidence and receipt
+  bind the exact grant, repository revision, and manifest digest; admission
+  verifies the receipt bytes against the evidence's owner-authentication ref.
   The owner must also supply the exact artifact-byte digest independently of the
   grant's semantic self-digest. Missing, stale, wider, contradictory,
   duplicate-member, invalid-ref, oversized, or artifact-drifted grants fail

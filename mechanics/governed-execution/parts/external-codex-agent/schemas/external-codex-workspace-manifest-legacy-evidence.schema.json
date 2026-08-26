@@ -37,7 +37,7 @@
       "const": "abyss_stack_external_codex_workspace_manifest_v1"
     },
     "workspace_manifest_digest": {"$ref": "#/$defs/digest"},
-    "owner_authentication_ref": {"$ref": "#/$defs/ownerRef"}
+    "owner_authentication_ref": {"$ref": "#/$defs/ownerAuthenticationRef"}
   },
   "$defs": {
     "coordinate": {
@@ -69,6 +69,30 @@
         "artifact_digest": {"$ref": "#/$defs/digest"},
         "schema_ref": {"type": "string", "minLength": 1},
         "schema_version": {"type": "string", "minLength": 1}
+      }
+    },
+    "ownerAuthenticationRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "owner_repo",
+        "artifact_ref",
+        "source_ref",
+        "artifact_digest",
+        "schema_ref",
+        "schema_version"
+      ],
+      "properties": {
+        "owner_repo": {"const": "abyss-stack"},
+        "artifact_ref": {"$ref": "#/$defs/coordinate"},
+        "source_ref": {"$ref": "#/$defs/coordinate"},
+        "artifact_digest": {"$ref": "#/$defs/digest"},
+        "schema_ref": {
+          "const": "schemas/external-codex-workspace-manifest-legacy-owner-receipt.schema.json"
+        },
+        "schema_version": {
+          "const": "abyss_stack_external_codex_workspace_manifest_legacy_owner_receipt_v1"
+        }
       }
     }
   }

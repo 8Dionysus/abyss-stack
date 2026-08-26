@@ -730,7 +730,8 @@ is a separate owner artifact, not a model or provider identity. It binds all of
 these exact relations in one document:
 
 The fixed-input study preparer content-addresses the grant, workspace-manifest,
-and legacy-evidence schemas beside the landing source. Each schema is repeated
+legacy-evidence, and legacy-owner-receipt schemas beside the landing source.
+Each schema is repeated
 in the writer's immutable inputs, runtime constraint refs, continuation inputs,
 and validation refs, so a prepared study cannot silently read a later schema
 revision.
@@ -745,9 +746,10 @@ revision.
   `commit_content.workspace_manifest_binding_mode`; newly issued grants use
   `cached_index_v1` and require the cached staged-diff digest, while only an
   `authenticated_legacy_v1` grant with a separately supplied,
-  owner-authenticated legacy-evidence artifact may bind a historical v1
-  manifest without the cached-index field; admission receives those bounded
-  manifest and evidence bytes, validates both schemas, enforces exact non-zero
+  owner-authenticated legacy-evidence artifact plus its separately
+  digest-pinned owner receipt may bind a historical v1 manifest without the
+  cached-index field; admission receives those bounded manifest, evidence, and
+  owner-receipt bytes, validates all three schemas, and enforces exact non-zero
   file/symlink digests and modes plus directory/missing zero-size/null-digest
   invariants, and recomputes the cached staged-diff digest when present;
 - either one exact branch target (which may bind only `commit` and `push`) or
@@ -782,8 +784,11 @@ binding, and the effect executor must supply the exact bounded
 workspace-manifest bytes plus an independently observed digest that admission
 recomputes and matches. Legacy compatibility additionally requires an
 independently expected digest and exact bytes for a typed migration-evidence
-artifact, whose grant, repository, revision, and manifest bindings admission
-rechecks. The manifest `git_head` must equal the exact authorized
+artifact, plus an independently expected digest and exact bytes for the
+owner-authenticated receipt named by that evidence. The receipt reference and
+receipt bytes must agree on their exact owner/schema coordinates, and the
+receipt, evidence, grant, repository, revision, and manifest bindings are all
+rechecked. The manifest `git_head` must equal the exact authorized
 repository revision, that repository revision must equal the branch
 `base_revision` or pull-request `head_revision`, and every status/content path
 must be canonical and unique within its array. An upgraded manifest also
@@ -791,8 +796,9 @@ carries a strict non-zero digest of `git diff --cached --binary --full-index
 HEAD`, so a partially staged index cannot change the future commit while
 preserving the ordinary worktree diff. A historical v1 manifest without that
 field is admitted only when the exact owner grant carries the
-`authenticated_legacy_v1` binding mode and the independent migration-evidence
-artifact is valid; a newly issued grant cannot select that omission implicitly.
+`authenticated_legacy_v1` binding mode, the independent migration-evidence
+artifact is valid, and its separately supplied owner receipt is valid; a newly
+issued grant cannot select that omission implicitly.
 Schema validation stops after the first error. A
 pull-request target's reviewed head revision is therefore
 immutable at admission and a commit cannot use post-review workspace bytes;

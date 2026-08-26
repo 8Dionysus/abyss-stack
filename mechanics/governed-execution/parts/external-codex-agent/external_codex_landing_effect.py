@@ -36,6 +36,10 @@ LEGACY_WORKSPACE_MANIFEST_EVIDENCE_SCHEMA_PATH = (
     PART_ROOT
     / "schemas/external-codex-workspace-manifest-legacy-evidence.schema.json"
 )
+LEGACY_WORKSPACE_MANIFEST_OWNER_RECEIPT_SCHEMA_PATH = (
+    PART_ROOT
+    / "schemas/external-codex-workspace-manifest-legacy-owner-receipt.schema.json"
+)
 SCHEMA_VERSION = "abyss_stack_external_codex_governed_landing_effect_grant_v1"
 CAPABILITY_ID = "governed_git_landing_v1"
 CURRENT_WORKSPACE_MANIFEST_BINDING_MODE = "cached_index_v1"
@@ -45,6 +49,12 @@ LEGACY_WORKSPACE_MANIFEST_EVIDENCE_SCHEMA_VERSION = (
 )
 LEGACY_WORKSPACE_MANIFEST_EVIDENCE_SCHEMA_REF = (
     "schemas/external-codex-workspace-manifest-legacy-evidence.schema.json"
+)
+LEGACY_WORKSPACE_MANIFEST_OWNER_RECEIPT_SCHEMA_VERSION = (
+    "abyss_stack_external_codex_workspace_manifest_legacy_owner_receipt_v1"
+)
+LEGACY_WORKSPACE_MANIFEST_OWNER_RECEIPT_SCHEMA_REF = (
+    "schemas/external-codex-workspace-manifest-legacy-owner-receipt.schema.json"
 )
 WORKSPACE_MANIFEST_BINDING_MODES = frozenset(
     {
@@ -387,8 +397,10 @@ def _validate_legacy_workspace_manifest_evidence(
     *,
     grant: Mapping[str, Any],
     workspace_manifest_digest: str,
-) -> str:
-    """Verify separately authenticated evidence for a historical manifest."""
+    expected_owner_receipt_digest: object,
+    owner_receipt_raw: bytes | None,
+) -> tuple[str, str]:
+    """Verify evidence and its separately authenticated owner receipt."""
 
     if not isinstance(raw, bytes) or not _is_sha256_digest(expected_digest):
         raise LandingEffectGrantError(
@@ -429,13 +441,14 @@ def _validate_legacy_workspace_manifest_evidence(
     owner_ref = parsed["owner_authentication_ref"]
     if (
         owner_ref["owner_repo"] != "abyss-stack"
-        or owner_ref["schema_ref"] != LEGACY_WORKSPACE_MANIFEST_EVIDENCE_SCHEMA_REF
+        or owner_ref["schema_ref"]
+        != LEGACY_WORKSPACE_MANIFEST_OWNER_RECEIPT_SCHEMA_REF
         or owner_ref["schema_version"]
-        != LEGACY_WORKSPACE_MANIFEST_EVIDENCE_SCHEMA_VERSION
+        != LEGACY_WORKSPACE_MANIFEST_OWNER_RECEIPT_SCHEMA_VERSION
     ):
         raise LandingEffectGrantError(
             "landing_effect_grant_content_invalid",
-            "legacy manifest evidence is not authenticated by the exact abyss-stack evidence owner",
+            "legacy manifest evidence does not name the exact owner receipt schema",
         )
     repository = grant["repository"]
     if (
@@ -448,7 +461,75 @@ def _validate_legacy_workspace_manifest_evidence(
             "landing_effect_grant_content_mismatch",
             "legacy manifest evidence is not bound to the exact grant, repository, or manifest",
         )
-    return actual_digest
+    if (
+        not _is_sha256_digest(expected_owner_receipt_digest)
+        or owner_ref["artifact_digest"] != expected_owner_receipt_digest
+    ):
+        raise LandingEffectGrantError(
+            "landing_effect_grant_content_unbound",
+            "legacy manifest admission requires the independently expected owner receipt digest",
+        )
+    if not isinstance(owner_receipt_raw, bytes):
+        raise LandingEffectGrantError(
+            "landing_effect_grant_content_unbound",
+            "legacy manifest admission requires the exact owner receipt bytes",
+        )
+    if len(owner_receipt_raw) > MAX_GRANT_BYTES:
+        raise LandingEffectGrantError(
+            "landing_effect_grant_content_too_large",
+            "legacy manifest owner receipt exceeds the bounded admission size",
+        )
+    actual_owner_receipt_digest = _digest_bytes(owner_receipt_raw)
+    if actual_owner_receipt_digest != expected_owner_receipt_digest:
+        raise LandingEffectGrantError(
+            "landing_effect_grant_content_drift",
+            "legacy manifest owner receipt differs from its independently expected digest",
+        )
+    try:
+        owner_receipt = _parse_json_bytes(owner_receipt_raw)
+    except (UnicodeDecodeError, json.JSONDecodeError, RecursionError) as exc:
+        raise LandingEffectGrantError(
+            "landing_effect_grant_content_invalid",
+            "legacy manifest owner receipt is not UTF-8 JSON",
+        ) from exc
+    if not isinstance(owner_receipt, Mapping):
+        raise LandingEffectGrantError(
+            "landing_effect_grant_content_invalid",
+            "legacy manifest owner receipt is not a JSON object",
+        )
+    errors = _schema_errors(
+        owner_receipt,
+        schema_path=LEGACY_WORKSPACE_MANIFEST_OWNER_RECEIPT_SCHEMA_PATH,
+    )
+    if errors:
+        raise LandingEffectGrantError(
+            "landing_effect_grant_content_invalid", errors[0]
+        )
+    if (
+        owner_receipt["owner_repo"] != "abyss-stack"
+        or owner_receipt["artifact_ref"] != owner_ref["artifact_ref"]
+        or owner_receipt["source_ref"] != owner_ref["source_ref"]
+        or owner_receipt["schema_ref"]
+        != LEGACY_WORKSPACE_MANIFEST_OWNER_RECEIPT_SCHEMA_REF
+        or owner_receipt["schema_version"]
+        != LEGACY_WORKSPACE_MANIFEST_OWNER_RECEIPT_SCHEMA_VERSION
+    ):
+        raise LandingEffectGrantError(
+            "landing_effect_grant_content_mismatch",
+            "legacy manifest owner receipt does not match its authenticated reference",
+        )
+    if (
+        owner_receipt["evidence_id"] != parsed["evidence_id"]
+        or owner_receipt["grant_id"] != grant["grant_id"]
+        or owner_receipt["repository_id"] != repository["repository_id"]
+        or owner_receipt["repository_revision"] != repository["revision"]
+        or owner_receipt["workspace_manifest_digest"] != workspace_manifest_digest
+    ):
+        raise LandingEffectGrantError(
+            "landing_effect_grant_content_mismatch",
+            "legacy manifest owner receipt is not bound to the exact evidence, grant, repository, or manifest",
+        )
+    return actual_digest, actual_owner_receipt_digest
 
 
 def _workspace_manifest_digest(raw: bytes) -> str:
@@ -802,6 +883,8 @@ def admit_landing_effect_grant(
     observed_workspace_manifest_raw: bytes | None = None,
     expected_legacy_workspace_manifest_evidence_digest: str | None = None,
     legacy_workspace_manifest_evidence_raw: bytes | None = None,
+    expected_legacy_workspace_manifest_owner_receipt_digest: str | None = None,
+    legacy_workspace_manifest_owner_receipt_raw: bytes | None = None,
     at: datetime | None = None,
 ) -> dict[str, Any]:
     """Admit one exact grant against one exact Goal/holder/target request.
@@ -1016,15 +1099,36 @@ def admit_landing_effect_grant(
                     "landing_effect_grant_content_unbound",
                     "legacy manifest admission requires an independently authenticated evidence digest",
                 )
-            legacy_evidence_digest = _validate_legacy_workspace_manifest_evidence(
+            expected_legacy_owner_receipt_digest = commit_content.get(
+                "legacy_workspace_manifest_owner_receipt_digest"
+            )
+            if (
+                not _is_sha256_digest(expected_legacy_owner_receipt_digest)
+                or expected_legacy_workspace_manifest_owner_receipt_digest
+                != expected_legacy_owner_receipt_digest
+            ):
+                raise LandingEffectGrantError(
+                    "landing_effect_grant_content_unbound",
+                    "legacy manifest admission requires an independently authenticated owner receipt digest",
+                )
+            (
+                legacy_evidence_digest,
+                legacy_owner_receipt_digest,
+            ) = _validate_legacy_workspace_manifest_evidence(
                 legacy_workspace_manifest_evidence_raw,
                 expected_legacy_workspace_manifest_evidence_digest,
                 grant=admitted,
                 workspace_manifest_digest=actual_workspace_manifest_digest,
+                expected_owner_receipt_digest=(
+                    expected_legacy_workspace_manifest_owner_receipt_digest
+                ),
+                owner_receipt_raw=legacy_workspace_manifest_owner_receipt_raw,
             )
         elif (
             expected_legacy_workspace_manifest_evidence_digest is not None
             or legacy_workspace_manifest_evidence_raw is not None
+            or expected_legacy_workspace_manifest_owner_receipt_digest is not None
+            or legacy_workspace_manifest_owner_receipt_raw is not None
         ):
             raise LandingEffectGrantError(
                 "landing_effect_request_invalid",
@@ -1032,12 +1136,15 @@ def admit_landing_effect_grant(
             )
         else:
             legacy_evidence_digest = None
+            legacy_owner_receipt_digest = None
     elif (
         "commit_content" in request
         or observed_workspace_manifest_digest is not None
         or observed_workspace_manifest_raw is not None
         or expected_legacy_workspace_manifest_evidence_digest is not None
         or legacy_workspace_manifest_evidence_raw is not None
+        or expected_legacy_workspace_manifest_owner_receipt_digest is not None
+        or legacy_workspace_manifest_owner_receipt_raw is not None
     ):
         raise LandingEffectGrantError(
             "landing_effect_request_invalid",
@@ -1078,6 +1185,10 @@ def admit_landing_effect_grant(
             result["admission"]["legacy_workspace_manifest_evidence_digest"] = (
                 legacy_evidence_digest
             )
+        if legacy_owner_receipt_digest is not None:
+            result["admission"][
+                "legacy_workspace_manifest_owner_receipt_digest"
+            ] = legacy_owner_receipt_digest
     return result
 
 
@@ -1091,6 +1202,8 @@ def landing_effect_grant_allows(
     observed_workspace_manifest_raw: bytes | None = None,
     expected_legacy_workspace_manifest_evidence_digest: str | None = None,
     legacy_workspace_manifest_evidence_raw: bytes | None = None,
+    expected_legacy_workspace_manifest_owner_receipt_digest: str | None = None,
+    legacy_workspace_manifest_owner_receipt_raw: bytes | None = None,
     at: datetime | None = None,
 ) -> bool:
     """Return whether the exact grant can be admitted; default is False."""
@@ -1107,6 +1220,12 @@ def landing_effect_grant_allows(
                 expected_legacy_workspace_manifest_evidence_digest
             ),
             legacy_workspace_manifest_evidence_raw=legacy_workspace_manifest_evidence_raw,
+            expected_legacy_workspace_manifest_owner_receipt_digest=(
+                expected_legacy_workspace_manifest_owner_receipt_digest
+            ),
+            legacy_workspace_manifest_owner_receipt_raw=(
+                legacy_workspace_manifest_owner_receipt_raw
+            ),
             at=at,
         )
     except LandingEffectGrantError:

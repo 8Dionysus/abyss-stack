@@ -195,20 +195,29 @@
         "workspace_manifest_binding_mode": {
           "enum": ["cached_index_v1", "authenticated_legacy_v1"]
         },
-        "legacy_workspace_manifest_evidence_digest": {"$ref": "#/$defs/digest"}
+        "legacy_workspace_manifest_evidence_digest": {"$ref": "#/$defs/digest"},
+        "legacy_workspace_manifest_owner_receipt_digest": {"$ref": "#/$defs/digest"}
       },
       "oneOf": [
         {
           "properties": {
             "workspace_manifest_binding_mode": {"const": "cached_index_v1"}
           },
-          "not": {"required": ["legacy_workspace_manifest_evidence_digest"]}
+          "not": {
+            "anyOf": [
+              {"required": ["legacy_workspace_manifest_evidence_digest"]},
+              {"required": ["legacy_workspace_manifest_owner_receipt_digest"]}
+            ]
+          }
         },
         {
           "properties": {
             "workspace_manifest_binding_mode": {"const": "authenticated_legacy_v1"}
           },
-          "required": ["legacy_workspace_manifest_evidence_digest"]
+          "required": [
+            "legacy_workspace_manifest_evidence_digest",
+            "legacy_workspace_manifest_owner_receipt_digest"
+          ]
         }
       ]
     },
