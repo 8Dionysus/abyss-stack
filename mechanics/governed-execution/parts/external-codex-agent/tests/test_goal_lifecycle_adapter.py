@@ -64,8 +64,8 @@ def _ref(object_id: str, owner: str = "codex-goal") -> ContentRef:
     )
 
 
-def _owner() -> dict[str, Any]:
-    return {
+def _owner(endpoint: Path | None = None) -> dict[str, Any]:
+    owner = {
         "schema_version": RUNTIME.GOAL_LIFECYCLE_OWNER_SCHEMA_VERSION,
         "owner_id": "holder:master:test",
         "owner_repo": "codex-goal",
@@ -77,6 +77,9 @@ def _owner() -> dict[str, Any]:
         "transport_posture": "explicit-endpoint",
         "acceptance_posture": "owner-return-pending",
     }
+    if endpoint is not None:
+        owner["transport_endpoint"] = str(endpoint)
+    return owner
 
 
 def _request(*, observed: str, desired: str, kind: str, request_id: str) -> GoalLifecycleRequest:
@@ -196,10 +199,10 @@ class FakeGoalRpc:
 
 
 def _run_transition(tmp_path: Path, *, initial: str, desired: str, kind: str) -> tuple[dict[str, Any], FakeGoalRpc]:
-    owner = _owner()
+    endpoint = tmp_path / f"{kind}.sock"
+    owner = _owner(endpoint)
     owner_path = tmp_path / f"owner-{kind}.json"
     owner_path.write_text(json.dumps(owner), encoding="utf-8")
-    endpoint = tmp_path / f"{kind}.sock"
     rpc = FakeGoalRpc(endpoint, status=initial)
     request = _request(
         observed=initial,
@@ -226,7 +229,8 @@ def _cli_fixture(
     *,
     request_id: str,
 ) -> tuple[SimpleNamespace, Path, Path, Path, FakeGoalRpc]:
-    owner = _owner()
+    endpoint = tmp_path / "cli.sock"
+    owner = _owner(endpoint)
     owner_path = tmp_path / "owner.json"
     request_path = tmp_path / "request.json"
     decision_path = tmp_path / "decision.json"
@@ -245,11 +249,11 @@ def _cli_fixture(
     decision_path.write_bytes(
         RUNTIME._canonical_bytes(decision.model_dump(mode="json")) + b"\n"
     )
-    rpc = FakeGoalRpc(tmp_path / "cli.sock", status="active")
+    rpc = FakeGoalRpc(endpoint, status="active")
     monkeypatch.setattr(
         RUNTIME,
         "discover_app_server_socket",
-        lambda _owner: (rpc.endpoint, "test-fixture"),
+        lambda _owner, **_kwargs: (rpc.endpoint, "test-fixture"),
     )
     monkeypatch.setattr(RUNTIME, "UnixWebSocketRpc", lambda _endpoint: rpc)
     args = SimpleNamespace(
@@ -499,6 +503,98 @@ def test_generic_adapter_rejects_owner_path_projection_split(
     assert rpc.calls == []
 
 
+def test_generic_adapter_binds_supplied_endpoint_before_opening_transport(
+    tmp_path: Path,
+) -> None:
+    owner = _owner()
+    owner_path = tmp_path / "owner.json"
+    owner_endpoint = tmp_path / "owner-bound.sock"
+    supplied_endpoint = tmp_path / "unrelated.sock"
+    owner["transport_endpoint"] = str(owner_endpoint)
+    owner_path.write_bytes(RUNTIME._canonical_bytes(owner) + b"\n")
+    request = _request(
+        observed="active",
+        desired="paused",
+        kind="delegation_yield",
+        request_id="request:endpoint-binding",
+    )
+    decision = _decision(request)
+    rpc = FakeGoalRpc(supplied_endpoint, status="active")
+    opened: list[Path] = []
+
+    def factory(endpoint: Path) -> FakeGoalRpc:
+        opened.append(endpoint)
+        return rpc
+
+    with pytest.raises(
+        RUNTIME.ExternalCodexReturnError,
+        match="does not match the owner-bound endpoint",
+    ):
+        ADAPTER.execute_goal_transition(
+            request,
+            decision,
+            owner,
+            owner_path,
+            supplied_endpoint,
+            rpc_factory=factory,
+        )
+
+    assert opened == []
+    assert rpc.calls == []
+
+
+def test_generic_adapter_loads_existing_attempt_before_replacing_it(
+    tmp_path: Path,
+) -> None:
+    owner_path = tmp_path / "owner.json"
+    endpoint = tmp_path / "existing-attempt.sock"
+    owner = _owner(endpoint)
+    owner_path.write_bytes(RUNTIME._canonical_bytes(owner) + b"\n")
+    attempt_path = tmp_path / "existing-attempt.json"
+    request = _request(
+        observed="active",
+        desired="paused",
+        kind="delegation_yield",
+        request_id="request:existing-attempt",
+    )
+    decision = _decision(request)
+    goal_response = {
+        "goal": {"threadId": "thread:test", "status": "active"}
+    }
+    content_ref_type, _decision_type, _execution_type, _request_type, _scope, _assert_receipt_scope, canonical_digest = ADAPTER._contract_types()
+    attempt = ADAPTER._attempt_binding(
+        request=request,
+        decision=decision,
+        owner=owner,
+        owner_path=owner_path,
+        endpoint=endpoint,
+        attempt_path=attempt_path,
+        precondition=ADAPTER._precondition(goal_response, "active"),
+        content_ref_type=content_ref_type,
+        canonical_digest=canonical_digest,
+    )
+    attempt_path.write_bytes(RUNTIME._canonical_bytes(attempt) + b"\n")
+    before = attempt_path.read_bytes()
+    rpc = FakeGoalRpc(endpoint, status="active")
+
+    with pytest.raises(
+        RUNTIME.ExternalCodexReturnError,
+        match="already has a durable attempt",
+    ):
+        ADAPTER.execute_goal_transition(
+            request,
+            decision,
+            owner,
+            owner_path,
+            endpoint,
+            rpc_factory=lambda _endpoint: rpc,
+            attempt_path=attempt_path,
+        )
+
+    assert attempt_path.read_bytes() == before
+    assert not any(method == "thread/goal/set" for method, _params in rpc.calls)
+
+
 @pytest.mark.parametrize(
     ("reference_key", "reference_id", "owner_key"),
     (
@@ -538,10 +634,10 @@ def test_generic_owner_binds_reference_repositories_to_owner_repository(
 def test_generic_adapter_rejects_recovery_under_a_different_decision(
     tmp_path: Path,
 ) -> None:
-    owner = _owner()
     owner_path = tmp_path / "owner.json"
-    owner_path.write_bytes(RUNTIME._canonical_bytes(owner) + b"\n")
     endpoint = tmp_path / "decision-recovery.sock"
+    owner = _owner(endpoint)
+    owner_path.write_bytes(RUNTIME._canonical_bytes(owner) + b"\n")
     attempt_path = tmp_path / "decision-recovery.attempt.json"
     request = _request(
         observed="active",
@@ -612,7 +708,7 @@ def test_generic_adapter_rechecks_all_inputs_before_publishing_receipt(
     monkeypatch.setattr(
         RUNTIME,
         "discover_app_server_socket",
-        lambda _owner: (rpc.endpoint, "test-fixture"),
+        lambda _owner, **_kwargs: (rpc.endpoint, "test-fixture"),
     )
     monkeypatch.setattr(RUNTIME, "UnixWebSocketRpc", lambda _endpoint: rpc)
     args = SimpleNamespace(
@@ -628,9 +724,7 @@ def test_generic_adapter_rechecks_all_inputs_before_publishing_receipt(
 
 
 def test_generic_adapter_refuses_the_current_public_non_atomic_surface(tmp_path: Path) -> None:
-    owner = _owner()
     owner_path = tmp_path / "owner.json"
-    owner_path.write_text(json.dumps(owner), encoding="utf-8")
     request = _request(
         observed="active",
         desired="paused",
@@ -642,7 +736,10 @@ def test_generic_adapter_refuses_the_current_public_non_atomic_surface(tmp_path:
     class NonAtomic(FakeGoalRpc):
         supports_atomic_goal_transition = False
 
-    rpc = NonAtomic(tmp_path / "non-atomic.sock", status="active")
+    endpoint = tmp_path / "non-atomic.sock"
+    owner = _owner(endpoint)
+    owner_path.write_text(json.dumps(owner), encoding="utf-8")
+    rpc = NonAtomic(endpoint, status="active")
     with pytest.raises(RUNTIME.ExternalCodexReturnError, match="compare-and-set"):
         ADAPTER.execute_goal_transition(
             request,
@@ -653,3 +750,43 @@ def test_generic_adapter_refuses_the_current_public_non_atomic_surface(tmp_path:
             rpc_factory=lambda _endpoint: rpc,
         )
     assert not any(method == "thread/goal/set" for method, _params in rpc.calls)
+
+
+@pytest.mark.parametrize("missing_marker", ("mutation_reserved", "mutation_dispatched"))
+def test_generic_adapter_requires_both_dispatch_markers_for_recovery(
+    tmp_path: Path, missing_marker: str
+) -> None:
+    _receipt, rpc = _run_transition(
+        tmp_path, initial="active", desired="paused", kind="delegation_yield"
+    )
+    endpoint = tmp_path / "delegation_yield.sock"
+    owner = _owner(endpoint)
+    owner_path = tmp_path / "owner-delegation_yield.json"
+    attempt_path = tmp_path / "delegation_yield.attempt.json"
+    attempt = json.loads(attempt_path.read_text(encoding="utf-8"))
+    attempt.pop(missing_marker)
+    attempt_path.write_bytes(RUNTIME._canonical_bytes(attempt) + b"\n")
+    before_calls = list(rpc.calls)
+    request = _request(
+        observed="active",
+        desired="paused",
+        kind="delegation_yield",
+        request_id="request:delegation_yield",
+    )
+    decision = _decision(request)
+
+    with pytest.raises(
+        RUNTIME.ExternalCodexReturnError,
+        match="(schema mismatch|dispatch marker)",
+    ):
+        ADAPTER.execute_goal_transition(
+            request,
+            decision,
+            owner,
+            owner_path,
+            endpoint,
+            rpc_factory=lambda _endpoint: rpc,
+            attempt_path=attempt_path,
+        )
+
+    assert rpc.calls == before_calls

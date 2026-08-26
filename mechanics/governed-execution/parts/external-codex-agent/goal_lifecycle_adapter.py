@@ -192,6 +192,135 @@ def _attempt_binding(
     }
 
 
+def _validate_attempt_marker(
+    value: object,
+    *,
+    label: str,
+    attempt_id: str,
+    owner: dict[str, Any],
+    desired_state: str,
+    timestamp_key: str,
+) -> dict[str, Any]:
+    """Validate a durable request marker before trusting a recovery attempt."""
+
+    runtime = _runtime()
+    if not isinstance(value, dict):
+        raise runtime.ExternalCodexReturnError(
+            f"Goal lifecycle {label} dispatch marker is missing"
+        )
+    expected_keys = {
+        "attempt_id",
+        "method",
+        "request_id",
+        "params",
+        "params_sha256",
+        "request_sha256",
+        timestamp_key,
+    }
+    if set(value) != expected_keys:
+        raise runtime.ExternalCodexReturnError(
+            f"Goal lifecycle {label} dispatch marker is incomplete"
+        )
+    request_id = value.get("request_id")
+    params = value.get("params")
+    if (
+        value.get("attempt_id") != attempt_id
+        or value.get("method") != GOAL_TRANSITION_METHOD
+        or not isinstance(request_id, int)
+        or isinstance(request_id, bool)
+        or request_id < 1
+        or not isinstance(params, dict)
+        or params.get("threadId") != owner["thread_id"]
+        or params.get("status") != desired_state
+        or not isinstance(value.get(timestamp_key), str)
+        or not value.get(timestamp_key)
+        or not runtime._is_sha256_digest(value.get("params_sha256"))
+        or value.get("params_sha256")
+        != runtime._sha256_bytes(runtime._canonical_bytes(params))
+    ):
+        raise runtime.ExternalCodexReturnError(
+            f"Goal lifecycle {label} dispatch marker is not bound to the requested Goal"
+        )
+    request_frame = {
+        "jsonrpc": "2.0",
+        "id": request_id,
+        "method": GOAL_TRANSITION_METHOD,
+        "params": params,
+    }
+    if (
+        not runtime._is_sha256_digest(value.get("request_sha256"))
+        or value.get("request_sha256")
+        != runtime._sha256_bytes(runtime._canonical_bytes(request_frame))
+    ):
+        raise runtime.ExternalCodexReturnError(
+            f"Goal lifecycle {label} dispatch marker request digest is not bound"
+        )
+    return value
+
+
+def _validate_attempt_markers(
+    value: dict[str, Any],
+    *,
+    owner: dict[str, Any],
+    desired_state: str,
+) -> None:
+    """Enforce marker presence and identity for each durable attempt state."""
+
+    runtime = _runtime()
+    state = value.get("state")
+    attempt_id = value.get("attempt_id")
+    if not isinstance(attempt_id, str) or not attempt_id:
+        raise runtime.ExternalCodexReturnError(
+            "Goal lifecycle attempt reservation lacks an attempt identity"
+        )
+    reserved = value.get("mutation_reserved")
+    dispatched = value.get("mutation_dispatched")
+    if state == "reserved":
+        if dispatched is not None:
+            raise runtime.ExternalCodexReturnError(
+                "Goal lifecycle reserved attempt contains a dispatch marker"
+            )
+        if reserved is not None:
+            _validate_attempt_marker(
+                reserved,
+                label="reservation",
+                attempt_id=attempt_id,
+                owner=owner,
+                desired_state=desired_state,
+                timestamp_key="reserved_at",
+            )
+        return
+    if state not in {"dispatched", "proof_recorded"}:
+        raise runtime.ExternalCodexReturnError(
+            "Goal lifecycle attempt reservation has an unsupported state"
+        )
+    reserved_marker = _validate_attempt_marker(
+        reserved,
+        label="reservation",
+        attempt_id=attempt_id,
+        owner=owner,
+        desired_state=desired_state,
+        timestamp_key="reserved_at",
+    )
+    dispatched_marker = _validate_attempt_marker(
+        dispatched,
+        label="issued",
+        attempt_id=attempt_id,
+        owner=owner,
+        desired_state=desired_state,
+        timestamp_key="issued_at",
+    )
+    for key in ("request_id", "params_sha256", "request_sha256"):
+        if reserved_marker.get(key) != dispatched_marker.get(key):
+            raise runtime.ExternalCodexReturnError(
+                "Goal lifecycle dispatch markers do not describe the same request"
+            )
+    if reserved_marker.get("params") != dispatched_marker.get("params"):
+        raise runtime.ExternalCodexReturnError(
+            "Goal lifecycle dispatch markers do not describe the same parameters"
+        )
+
+
 def _validate_attempt(
     value: dict[str, Any],
     *,
@@ -233,6 +362,11 @@ def _validate_attempt(
         raise runtime.ExternalCodexReturnError(
             "Goal lifecycle attempt reservation endpoint mismatch"
         )
+    _validate_attempt_markers(
+        value,
+        owner=owner,
+        desired_state=request.desired_state,
+    )
     return value
 
 
@@ -352,6 +486,31 @@ def _decision_ref(decision: Any, content_ref_type: Any, canonical_digest: Callab
         schema_version=decision.schema_version,
         digest=canonical_digest(decision),
     )
+
+
+def _resolve_owner_endpoint(
+    owner: dict[str, Any],
+    supplied_endpoint: Path,
+    *,
+    rpc_factory: Callable[[Path], Any] | None,
+) -> Path:
+    """Resolve and bind the transport endpoint before opening any RPC."""
+
+    runtime = _runtime()
+    supplied = runtime._socket_path(str(supplied_endpoint))
+    owner_endpoint = runtime._endpoint_from_owner(owner)
+    if owner_endpoint is not None:
+        resolved = runtime._socket_path(owner_endpoint)
+        if supplied != resolved:
+            raise runtime.ExternalCodexReturnError(
+                "Goal lifecycle supplied endpoint does not match the owner-bound endpoint"
+            )
+        return resolved
+    resolved, _resolution = runtime.discover_app_server_socket(
+        owner,
+        rpc_factory=rpc_factory,
+    )
+    return runtime._socket_path(str(resolved))
 
 
 def _execution_projection(
@@ -521,6 +680,44 @@ def execute_goal_transition(
             "Goal lifecycle request and transport owner return-owner reference mismatch"
         )
 
+    endpoint = _resolve_owner_endpoint(
+        owner,
+        Path(endpoint),
+        rpc_factory=rpc_factory,
+    )
+    if attempt_path is not None:
+        attempt_path = runtime._validate_output_path(
+            attempt_path, "Goal lifecycle attempt reservation"
+        )
+        if attempt_path.exists():
+            stored_attempt, stored_raw = runtime._load_json_file(
+                attempt_path, "existing Goal lifecycle attempt reservation"
+            )
+            if stored_raw != runtime._canonical_bytes(stored_attempt) + b"\n":
+                raise runtime.ExternalCodexReturnError(
+                    "existing Goal lifecycle attempt reservation is not canonically encoded"
+                )
+            if attempt is None:
+                attempt = stored_attempt
+            elif attempt != stored_attempt:
+                raise runtime.ExternalCodexReturnError(
+                    "supplied Goal lifecycle attempt does not match its durable artifact"
+                )
+    if attempt is not None:
+        if attempt_path is None:
+            raise runtime.ExternalCodexReturnError(
+                "Goal lifecycle attempt reservation path is required"
+            )
+        _validate_attempt(
+            attempt,
+            request=request,
+            decision=decision,
+            owner=owner,
+            owner_path=owner_path,
+            endpoint=endpoint,
+            attempt_path=attempt_path,
+        )
+
     rpc_factory = rpc_factory or runtime.UnixWebSocketRpc
     mutation_response: dict[str, Any] | None = None
     with rpc_factory(endpoint) as rpc:
@@ -537,24 +734,6 @@ def execute_goal_transition(
                 "Codex app-server Goal read did not expose a state"
             )
         precondition = _precondition(before_response, before_state)
-        if attempt_path is not None:
-            attempt_path = runtime._validate_output_path(
-                attempt_path, "Goal lifecycle attempt reservation"
-            )
-        if attempt is not None:
-            if attempt_path is None:
-                raise runtime.ExternalCodexReturnError(
-                    "Goal lifecycle attempt reservation path is required"
-                )
-            _validate_attempt(
-                attempt,
-                request=request,
-                decision=decision,
-                owner=owner,
-                owner_path=owner_path,
-                endpoint=endpoint,
-                attempt_path=attempt_path,
-            )
         if (
             before_state == request.desired_state
             and attempt is not None
