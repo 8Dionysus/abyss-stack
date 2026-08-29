@@ -9,13 +9,13 @@
     "observation_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]+$"},
     "observed_at": {"type": "string", "format": "date-time"},
     "finished_at": {"type": "string", "format": "date-time"},
-    "python_sdk": {"const": {"commit": "6f69a3758ebf2ee55ce050f58b470ce11af71133", "version": "2.0.0"}},
+    "python_sdk": {"enum": [{"commit": "6f69a3758ebf2ee55ce050f58b470ce11af71133", "version": "2.0.0"}, {"commit": "0921d94a74db900dccd2d534842aa7b6160542d2", "version": "2.1.1"}]},
     "source_revisions": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
         "abyss_stack": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
-        "aoa_kag": {"const": "ba7805190527a635ff5c515701be29379af8277f"},
+        "aoa_kag": {"enum": ["ba7805190527a635ff5c515701be29379af8277f", "578e4cea9a04b76a881bde240d5479efceea4926"]},
         "stack_runtime_current_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
       },
       "required": ["abyss_stack", "aoa_kag", "stack_runtime_current_digest"]

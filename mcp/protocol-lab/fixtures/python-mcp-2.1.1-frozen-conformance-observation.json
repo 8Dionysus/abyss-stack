@@ -1,0 +1,80 @@
+{
+  "claim_limits": [
+    "This proves the exact Python MCP 2.1.1 SDK against frozen 2026-07-28 requirements only.",
+    "All scored client and server checks passed without an expected-failure baseline.",
+    "Extension and pending scenarios still ran for visibility and their failures remain explicit but do not redefine conformance retroactively.",
+    "The prior json-schema-2020-12-preservation mismatch is classified added-after-release by the official requirements manifest, not hidden or baselined away.",
+    "SDK conformance does not prove Codex, an Abyss owner adapter, admission, Tasks readiness, cancellation, or production cutover."
+  ],
+  "conformance_harness": {
+    "commit": "c321dd32035556e6769d3724a8ee97d87c3faaac",
+    "package_version": "0.2.0-alpha.11",
+    "requirements_anchor": "0.2.0-alpha.10",
+    "requirements_commit": "232a9014457eaf4c59559916e3d616d2f7f28f05",
+    "source_checkout_clean": true
+  },
+  "directions": {
+    "client": {
+      "info_checks": 500,
+      "manifest_sha256": "f9f0a03bf72392dd8fa2ed8b0201b087d7db343cd209e129fd98e20e0360c05c",
+      "raw_result_ref": "local:///srv/abyss-machine/tmp/mcp-211-lab.SMGqtq/conformance-run/client",
+      "scored_failed_checks": 0,
+      "scored_failure_ids": [],
+      "scored_scenario_count": 32,
+      "scored_success_checks": 372,
+      "skipped_checks": 14,
+      "status": "passed",
+      "suite": "requirements:2026-07-28",
+      "visibility": {
+        "failed_checks": 9,
+        "failure_scenarios": [
+          "auth/dpop",
+          "auth/dpop-nonce",
+          "auth/wif-jwt-bearer"
+        ],
+        "not_scored_scenario_count": 7,
+        "success_checks": 59
+      }
+    },
+    "server": {
+      "info_checks": 1,
+      "manifest_sha256": "ab71be41f6b00a25b447d913ef0a3854618fb8fed5891589b4639999edee75b0",
+      "raw_result_ref": "local:///srv/abyss-machine/tmp/mcp-211-lab.SMGqtq/conformance-run/server",
+      "scored_failed_checks": 0,
+      "scored_failure_ids": [],
+      "scored_scenario_count": 37,
+      "scored_success_checks": 119,
+      "skipped_checks": 1,
+      "status": "passed",
+      "suite": "requirements:2026-07-28",
+      "visibility": {
+        "failed_checks": 25,
+        "failure_scenarios": [
+          "tasks-capability-negotiation",
+          "tasks-dispatch-and-envelope",
+          "tasks-lifecycle",
+          "tasks-mrtr-composition",
+          "tasks-mrtr-input",
+          "tasks-request-headers",
+          "tasks-request-state-removal",
+          "tasks-required-task-error",
+          "tasks-wire-fields"
+        ],
+        "not_scored_scenario_count": 13,
+        "success_checks": 49
+      }
+    }
+  },
+  "finished_at": "2026-08-29T07:30:05.324897Z",
+  "observation_id": "python-mcp-2.1.1-frozen-2026-07-28-conformance-20260829",
+  "observed_at": "2026-08-29T07:29:42.195017Z",
+  "python_sdk": {
+    "commit": "0921d94a74db900dccd2d534842aa7b6160542d2",
+    "source_checkout_clean": true,
+    "version": "2.1.1"
+  },
+  "requirements_revision": "2026-07-28",
+  "schema_version": "abyss_mcp_protocol_frozen_conformance_observation_v1",
+  "spec_version": "2026-07-28",
+  "verdict": "sdk_pair_passed_frozen_2026_07_28_requirements"
+}

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run exact Python MCP 2.0.0 client/server conformance for 2026-07-28."""
+"""Run exact Python MCP 2.1.1 client/server conformance for 2026-07-28."""
 
 from __future__ import annotations
 
@@ -18,8 +18,8 @@ from typing import Any
 
 CONFORMANCE_COMMIT = "c321dd32035556e6769d3724a8ee97d87c3faaac"
 CONFORMANCE_VERSION = "0.2.0-alpha.11"
-PYTHON_SDK_COMMIT = "6f69a3758ebf2ee55ce050f58b470ce11af71133"
-PYTHON_SDK_VERSION = "2.0.0"
+PYTHON_SDK_COMMIT = "0921d94a74db900dccd2d534842aa7b6160542d2"
+PYTHON_SDK_VERSION = "2.1.1"
 REQUIREMENTS_REVISION = "2026-07-28"
 
 
@@ -106,7 +106,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     if _git_head(conformance_root) != CONFORMANCE_COMMIT:
         raise RuntimeError("conformance checkout does not match the exact current commit")
     if _git_head(sdk_root) != PYTHON_SDK_COMMIT:
-        raise RuntimeError("Python SDK checkout does not match v2.0.0")
+        raise RuntimeError("Python SDK checkout does not match v2.1.1")
     package = json.loads((conformance_root / "package.json").read_text())
     if package.get("version") != CONFORMANCE_VERSION:
         raise RuntimeError("conformance package version drifted")

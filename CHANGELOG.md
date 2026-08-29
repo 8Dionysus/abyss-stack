@@ -787,6 +787,11 @@ Tracking starts with the community-docs baseline for this repository.
   `2026.3`, plus refreshed Python/Node base-image digests. Stateful services
   remain same-major/minor and require backup, one-at-a-time rollout, health
   checks, and previous-pin rollback.
+- Refresh the source-side MCP candidate to Python `2.1.1` across all fifteen
+  stack-owned service packages, lockfiles, protocol-lab runners, schemas, and
+  source-bound compatibility receipts. The isolated conformance, KAG, and
+  Codex pair passes do not promote production: deployment-bound MCP `2.0.0`
+  receipts remain historical until a separate deployment proof is completed.
 - The complete `tests` and `release` pytest selection now uses a four-process,
   file-aware work-stealing DAG with exact baseline, disjoint-union, observed
   selection, and final-verdict proofs. Duration hints affect order only; the

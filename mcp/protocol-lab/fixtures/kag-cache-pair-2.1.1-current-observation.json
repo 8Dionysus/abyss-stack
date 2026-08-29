@@ -1,0 +1,73 @@
+{
+  "cache": {
+    "scope": "private",
+    "ttl_ms": 30000,
+    "within_ttl_repeat_server_fetches": 1
+  },
+  "checks": {
+    "explicit_refresh_replaces_stale_entry": true,
+    "no_subscription_no_replay": true,
+    "stale_catalog_cannot_authorize_removed_tool": true,
+    "subscription_addition_invalidation": true,
+    "subscription_removal_revocation": true,
+    "ttl_expiry_refetch": true
+  },
+  "claim_limits": [
+    "This receipt proves isolated KAG catalog cache behavior, not Codex next-wire support.",
+    "A cached catalog is discovery data and never grants tool authorization.",
+    "Subscription invalidation is process-local in this proof; replica fan-out requires a production bus receipt.",
+    "No subscription replay exists; reconnecting consumers must refetch.",
+    "The adapter was not registered, deployed, admitted, or granted owner authority.",
+    "No candidate, memory, source mutation, or external effect was performed."
+  ],
+  "finished_at": "2026-08-29T07:31:20.150158Z",
+  "inventories": {
+    "after_explicit_refresh": [
+      "kag_discover"
+    ],
+    "after_subscription_add": [
+      "kag_discover",
+      "kag_transient_probe"
+    ],
+    "after_subscription_remove": [
+      "kag_discover"
+    ],
+    "after_ttl_expiry": [
+      "kag_discover",
+      "kag_stale_probe"
+    ],
+    "initial": [
+      "kag_discover"
+    ],
+    "stale_after_removal": [
+      "kag_discover",
+      "kag_stale_probe"
+    ],
+    "stale_before_expiry": [
+      "kag_discover"
+    ]
+  },
+  "observation_id": "aoa-kag-cache-pair-2.1.1-20260829",
+  "observed_at": "2026-08-29T07:31:19.726835Z",
+  "python_sdk": {
+    "commit": "0921d94a74db900dccd2d534842aa7b6160542d2",
+    "version": "2.1.1"
+  },
+  "raw_receipt": {
+    "mode": "0600",
+    "ref": "local:///srv/abyss-machine/tmp/mcp-211-lab.SMGqtq/kag-cache-pair-2.1.1.json",
+    "sha256": "ce37647393c9274e53bd9853e8765b3863bafaa5c2ba502f7e43293d6a412397"
+  },
+  "schema_version": "abyss_mcp_kag_cache_pair_observation_v1",
+  "source_revisions": {
+    "abyss_stack": "c22ec7626d07ec66ff32569a2cc1b1b82e45f7b4",
+    "aoa_kag": "578e4cea9a04b76a881bde240d5479efceea4926"
+  },
+  "stable_registration_unchanged": true,
+  "subscription": {
+    "events_consumed": 2,
+    "tools_list_changed_honored": true
+  },
+  "verdict": "cache_pair_passed",
+  "wire_version": "2026-07-28"
+}

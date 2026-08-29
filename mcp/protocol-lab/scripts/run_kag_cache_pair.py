@@ -406,9 +406,9 @@ def main() -> int:
         "exact_inputs": {
             "aoa_kag_source_revision": _git_head(args.aoa_kag_root),
             "python_mcp_commit": (
-                "6f69a3758ebf2ee55ce050f58b470ce11af71133"
+                "0921d94a74db900dccd2d534842aa7b6160542d2"
             ),
-            "python_mcp_version": "2.0.0",
+            "python_mcp_version": "2.1.1",
             "spec_version": NEXT_WIRE_VERSION,
             "stack_source_revision": _git_head(args.stack_source_root),
         },

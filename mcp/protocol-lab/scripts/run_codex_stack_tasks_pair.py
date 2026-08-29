@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Exercise Codex Tasks against the real abyss-stack MCP 2.0 server."""
+"""Exercise Codex Tasks against the configured abyss-stack MCP server."""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ import json
 import os
 import secrets
 import socket
+import subprocess
 import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
@@ -28,6 +29,29 @@ LIVE_BEARER_FILE = Path(
 )
 PYTHON = Path("/srv/abyss-machine/cache/mcp-modern-fleet-20260809/venv/bin/python")
 OBSERVATION = Path("/srv/AbyssOS/abyss-stack/Logs/mcp/observations/current.json")
+
+
+def installed_mcp_version(python: Path) -> str:
+    result = subprocess.run(
+        [
+            str(python),
+            "-I",
+            "-c",
+            "import importlib.metadata; print(importlib.metadata.version('mcp'))",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"cannot resolve MCP SDK version from {python}: "
+            f"{result.stderr.strip()[-400:]}"
+        )
+    version = result.stdout.strip()
+    if not version:
+        raise RuntimeError(f"MCP SDK version lookup returned empty output for {python}")
+    return version
 
 
 class AppClient:
@@ -343,7 +367,7 @@ async def main() -> None:
             "observed_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
             "protocol_version": PROTOCOL,
             "server": "abyss-stack-mcp/0.5.2",
-            "mcp_sdk": "2.0.0",
+            "mcp_sdk": installed_mcp_version(PYTHON),
             "codex_runtime": args.runtime.parents[1].name,
             "codex_runtime_sha256": hashlib.sha256(
                 args.runtime.parent.joinpath("codex").read_bytes()

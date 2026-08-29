@@ -31,6 +31,8 @@ Production migration is allowed only when:
 - every admitted production unit has an exact production process identity,
   deployment-bound canary, current registry record, modern-only negative wire
   proof, and zero bootstrap identity;
+- deployment-bound receipts must match the candidate SDK version and remain
+  current; an isolated source candidate never upgrades a production claim;
 - no executable legacy template or enabled legacy instance remains.
 
 The derived status reports five separate verdicts:
@@ -66,7 +68,7 @@ consumer recovery path. A tool removed at the server must remain uncallable
 even while an old catalog entry is still warm. Cross-replica invalidation
 requires its own production subscription-bus receipt.
 
-Tasks remains a separately versioned extension gate. Python MCP `2.0.0` does
+Tasks remains a separately versioned extension gate. Python MCP `2.1.1` does
 not implement the Tasks client extension, and upstream Codex `0.147.0` does
 not advertise it. The bounded OS Abyss derivative does advertise
 `io.modelcontextprotocol/tasks` on the real production pair and passes
@@ -97,9 +99,10 @@ OS Abyss Codex production-pair verdict.
 
 ## Dual support and rollback
 
-`aoa_kag_next_lab` remains a historical removable precursor proof. Production
-now uses owner-specific registrations and credentials on the admitted modern
-wire. Rollback is a coherent source/runtime restore followed by fresh canary,
+`aoa_kag_next_lab` remains a removable isolated candidate contour. The current
+source candidate uses Python MCP `2.1.1`, while deployment-bound production
+receipts remain explicitly on MCP `2.0.0` until a separate deployment proof.
+Rollback is a coherent source/runtime restore followed by fresh canary,
 registry, preflight, and production-wire proof; mixed-era source/runtime states
 are invalid. The cold MCP 1 runtime is never an active compatibility route.
 

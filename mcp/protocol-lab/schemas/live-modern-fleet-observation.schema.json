@@ -10,7 +10,7 @@
     "expires_at": {"type": "string", "format": "date-time"},
     "source_revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
     "protocol_version": {"const": "2026-07-28"},
-    "mcp_sdk": {"const": "2.0.0"},
+    "mcp_sdk": {"enum": ["2.0.0", "2.1.1"]},
     "read_fleet": {
       "type": "object",
       "additionalProperties": false,

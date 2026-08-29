@@ -27,8 +27,8 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "version": {"const": "2.0.0"},
-        "commit": {"const": "6f69a3758ebf2ee55ce050f58b470ce11af71133"},
+        "version": {"enum": ["2.0.0", "2.1.1"]},
+        "commit": {"enum": ["6f69a3758ebf2ee55ce050f58b470ce11af71133", "0921d94a74db900dccd2d534842aa7b6160542d2"]},
         "source_checkout_clean": {"const": true}
       },
       "required": ["version", "commit", "source_checkout_clean"]

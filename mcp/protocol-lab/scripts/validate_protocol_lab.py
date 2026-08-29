@@ -18,6 +18,10 @@ WATCH_PLAN_SCHEMA_PATH = LAB_ROOT / "schemas" / "protocol-watch-plan.schema.json
 TASKS_MATRIX_PATH = LAB_ROOT / "tasks-compatibility-matrix.v1.json"
 TASKS_MATRIX_SCHEMA_PATH = LAB_ROOT / "schemas" / "tasks-compatibility-matrix.schema.json"
 EXPECTED_GATE_IDS = tuple(f"P1-{index:02d}" for index in range(1, 15))
+EXPECTED_PYTHON_MCP_VERSION = "2.1.1"
+EXPECTED_PYTHON_MCP_COMMIT = "0921d94a74db900dccd2d534842aa7b6160542d2"
+EXPECTED_AOA_KAG_COMMIT = "578e4cea9a04b76a881bde240d5479efceea4926"
+EXPECTED_STACK_SOURCE_COMMIT = "c22ec7626d07ec66ff32569a2cc1b1b82e45f7b4"
 FIXTURES = {
     "wire": (
         "codex-0.146.0-wire-observation.json",
@@ -28,23 +32,23 @@ FIXTURES = {
         "protocol-production-pair-observation.schema.json",
     ),
     "conformance": (
-        "python-mcp-2.0.0-frozen-conformance-observation.json",
+        "python-mcp-2.1.1-frozen-conformance-observation.json",
         "protocol-frozen-conformance-observation.schema.json",
     ),
     "adapter": (
-        "kag-next-cancellable-pair-observation.json",
+        "kag-next-cancellable-pair-2.1.1-observation.json",
         "kag-next-cancellable-pair-observation.schema.json",
     ),
     "handle": (
-        "kag-handle-pair-current-observation.json",
+        "kag-handle-pair-2.1.1-current-observation.json",
         "kag-handle-pair-current-observation.schema.json",
     ),
     "cache": (
-        "kag-cache-pair-current-observation.json",
+        "kag-cache-pair-2.1.1-current-observation.json",
         "kag-cache-pair-current-observation.schema.json",
     ),
     "codex_lab": (
-        "codex-0.147.0-stable-kag-next-lab-observation.json",
+        "codex-0.147.0-stable-kag-next-lab-2.1.1-observation.json",
         "codex-kag-next-stable-observation.schema.json",
     ),
     "stable_rollback": (
@@ -140,10 +144,6 @@ def validate(checked_at: datetime | None = None) -> list[str]:
     for label, payload in (
         ("protocol compatibility matrix", matrix),
         ("Codex stable modern lab observation", fixtures["codex_lab"]),
-        ("stable KAG post-rollback observation", fixtures["stable_rollback"]),
-        ("Tasks compatibility matrix", tasks_matrix),
-        ("live modern fleet observation", fixtures["live_modern_fleet"]),
-        ("Codex Tasks production pair", fixtures["codex_tasks_production_pair"]),
     ):
         expiry = _expiry_error(label, payload, checked_at)
         if expiry is not None:
@@ -151,12 +151,8 @@ def validate(checked_at: datetime | None = None) -> list[str]:
     if status["evidence_expires_at"] != min(
         matrix["expires_at"],
         fixtures["codex_lab"]["expires_at"],
-        fixtures["stable_rollback"]["expires_at"],
-        tasks_matrix["expires_at"],
-        fixtures["live_modern_fleet"]["expires_at"],
-        fixtures["codex_tasks_production_pair"]["expires_at"],
     ):
-        errors.append("generated status lost the earliest current evidence expiry")
+        errors.append("generated status lost the earliest candidate evidence expiry")
 
     expected_render = json.dumps(status, indent=2, ensure_ascii=True, sort_keys=True) + "\n"
     if not builder.OUTPUT_PATH.is_file() or builder.OUTPUT_PATH.read_text() != expected_render:
@@ -166,10 +162,10 @@ def validate(checked_at: datetime | None = None) -> list[str]:
         errors.append("P1 gates must remain ordered P1-01 through P1-14")
     gate_status = {gate["gate_id"]: gate["status"] for gate in matrix["migration_gates"]}
     if any(state != "passed" for state in gate_status.values()):
-        errors.append("all P1 core and bounded Tasks gates must pass after production cutover")
+        errors.append("all P1 compatibility gates must pass for their stated evidence")
     p113 = next(gate for gate in matrix["migration_gates"] if gate["gate_id"] == "P1-13")
     if p113["evidence_refs"] != [
-        "mcp/protocol-lab/fixtures/codex-0.147.0-stable-kag-next-lab-observation.json"
+        "mcp/protocol-lab/fixtures/codex-0.147.0-stable-kag-next-lab-2.1.1-observation.json"
     ]:
         errors.append("P1-13 text and evidence must bind the actual modern Codex canary")
 
@@ -228,8 +224,12 @@ def validate(checked_at: datetime | None = None) -> list[str]:
     }:
         errors.append("final 2026-07-28 specification pin drifted")
     sdk_by_id = {sdk["sdk_id"]: sdk for sdk in matrix["sdk_lines"]}
-    if sdk_by_id["python-next"]["commit"] != "6f69a3758ebf2ee55ce050f58b470ce11af71133":
-        errors.append("Python MCP 2.0.0 pin drifted")
+    if (
+        sdk_by_id["python-next"]["commit"] != EXPECTED_PYTHON_MCP_COMMIT
+        or sdk_by_id["python-next"]["version"] != EXPECTED_PYTHON_MCP_VERSION
+        or sdk_by_id["python-next"]["stack_pin"] != EXPECTED_PYTHON_MCP_VERSION
+    ):
+        errors.append("Python MCP 2.1.1 pin drifted")
     if sdk_by_id["typescript-next"]["commit"] != "cc4b41617ce3601b1290d67216ea0b194a3cd9ac":
         errors.append("TypeScript MCP 2.0.0 pin drifted")
 
@@ -237,6 +237,8 @@ def validate(checked_at: datetime | None = None) -> list[str]:
     if (
         matrix["official_conformance"]["commit"] != "c321dd32035556e6769d3724a8ee97d87c3faaac"
         or conformance["conformance_harness"]["commit"] != matrix["official_conformance"]["commit"]
+        or conformance["python_sdk"]["commit"] != EXPECTED_PYTHON_MCP_COMMIT
+        or conformance["python_sdk"]["version"] != EXPECTED_PYTHON_MCP_VERSION
         or conformance["requirements_revision"] != "2026-07-28"
         or conformance["directions"]["client"]["scored_scenario_count"] != 32
         or conformance["directions"]["client"]["scored_success_checks"] != 372
@@ -246,7 +248,7 @@ def validate(checked_at: datetime | None = None) -> list[str]:
         or conformance["directions"]["server"]["scored_failed_checks"] != 0
         or conformance["verdict"] != "sdk_pair_passed_frozen_2026_07_28_requirements"
     ):
-        errors.append("frozen 2026-07-28 conformance observation drifted")
+        errors.append("frozen 2026-07-28 conformance observation for MCP 2.1.1 drifted")
 
     production = _consumer(matrix, "codex-cli-os-abyss")
     stable = _consumer(matrix, "codex-cli")
@@ -288,11 +290,16 @@ def validate(checked_at: datetime | None = None) -> list[str]:
         or codex_lab["wire"]["input_limit_bytes"] != 16384
         or codex_lab["wire"]["output_limit_bytes"] != 262144
         or codex_lab["wire"]["oversized_input_denied_code"] != -32602
+        or codex_lab["server"]["python_mcp_version"] != EXPECTED_PYTHON_MCP_VERSION
+        or codex_lab["server"]["source_revisions"]["abyss_stack"]
+        != EXPECTED_STACK_SOURCE_COMMIT
+        or codex_lab["server"]["source_revisions"]["aoa_kag"]
+        != EXPECTED_AOA_KAG_COMMIT
         or codex_lab["server"]["source_artifacts"]
         != {
-            "adapter_harness_sha256": "c2bff51463f47d526993a8096867e88ff1fe4ae47f51d22067bfd301883b1bbb",
-            "adapter_package_tree_sha256": "92dc85946802fc917bc832c9ab59d78a08494c5819b2e22abca769223d754cd3",
-            "driver_sha256": "7c4d0ea5e0393314cfda5bcb0c59ffb8c34632df19e03f85ba9b933f75e43677",
+            "adapter_harness_sha256": "81467ae1690efdb07360de63e05fcf1a1c5c8d69eed0132f94ac165e81000608",
+            "adapter_package_tree_sha256": "b5b66741f8c206964493c9cfc73a949d5f822a2493f4b129cf9974412968b4ba",
+            "driver_sha256": "d3341cd48e4e473e80794af86af83582268831cb30f1cd42f05b90934b539c12",
         }
         or not codex_lab["stable_registration"]["unchanged"]
         or codex_lab["wire"]["tasks_extension_advertised"]
@@ -401,6 +408,13 @@ def validate(checked_at: datetime | None = None) -> list[str]:
     ):
         errors.append("live modern-only production fleet evidence drifted")
     if (
+        live_modern_fleet["mcp_sdk"] != "2.0.0"
+        or codex_tasks_production_pair["mcp_sdk"] != "2.0.0"
+    ):
+        errors.append(
+            "deployment-bound production receipts must remain explicitly pinned to MCP 2.0.0"
+        )
+    if (
         codex_tasks_production_pair["verdict"] != "eligible_for_bounded_production"
         or not codex_tasks_production_pair["production_pair"]
         or not codex_tasks_production_pair["lifecycle"]["create_passed"]
@@ -421,8 +435,22 @@ def validate(checked_at: datetime | None = None) -> list[str]:
         or handle["handle_checks"]["key_retirement_revocation"] != "denied"
     ):
         errors.append("requestState isolation, expiry, replay or revocation proof drifted")
+    if (
+        handle["python_sdk"]
+        != {"commit": EXPECTED_PYTHON_MCP_COMMIT, "version": EXPECTED_PYTHON_MCP_VERSION}
+        or handle["source_revisions"]["abyss_stack"] != EXPECTED_STACK_SOURCE_COMMIT
+        or handle["source_revisions"]["aoa_kag"] != EXPECTED_AOA_KAG_COMMIT
+    ):
+        errors.append("MCP 2.1.1 requestState receipt is not bound to its source revisions")
     if not all(cache["checks"].values()):
         errors.append("private cache TTL, invalidation or removal proof drifted")
+    if (
+        cache["python_sdk"]
+        != {"commit": EXPECTED_PYTHON_MCP_COMMIT, "version": EXPECTED_PYTHON_MCP_VERSION}
+        or cache["source_revisions"]["abyss_stack"] != EXPECTED_STACK_SOURCE_COMMIT
+        or cache["source_revisions"]["aoa_kag"] != EXPECTED_AOA_KAG_COMMIT
+    ):
+        errors.append("MCP 2.1.1 cache receipt is not bound to its source revisions")
     adapter = fixtures["adapter"]
     if (
         adapter["owner_canary"]["freshness_state"] != "current"
@@ -434,6 +462,13 @@ def validate(checked_at: datetime | None = None) -> list[str]:
         }
     ):
         errors.append("current owner freshness or cancellation propagation proof drifted")
+    if (
+        adapter["python_sdk"]
+        != {"commit": EXPECTED_PYTHON_MCP_COMMIT, "version": EXPECTED_PYTHON_MCP_VERSION}
+        or adapter["source_revisions"]["abyss_stack"] != EXPECTED_STACK_SOURCE_COMMIT
+        or adapter["source_revisions"]["aoa_kag"] != EXPECTED_AOA_KAG_COMMIT
+    ):
+        errors.append("MCP 2.1.1 adapter receipt is not bound to its source revisions")
 
     if (
         observation["official_conformance"]["status"] != "passed"
@@ -448,10 +483,10 @@ def validate(checked_at: datetime | None = None) -> list[str]:
     if (
         not status["read_only_pilot_allowed"]
         or not status["read_only_pilot_completed"]
-        or not status["core_read_migration_allowed"]
-        or not status["tasks_extension_allowed"]
+        or status["core_read_migration_allowed"]
+        or status["tasks_extension_allowed"]
         or not status["candidate_protocol_ready"]
-        or not status["internal_effect_protocol_ready"]
+        or status["internal_effect_protocol_ready"]
         or status["candidate_migration_allowed"]
         or status["internal_effect_migration_allowed"]
         or status["external_effect_migration_allowed"]
@@ -459,8 +494,10 @@ def validate(checked_at: datetime | None = None) -> list[str]:
         errors.append("split migration verdicts no longer match exact evidence")
     if status["remaining_core_gate_ids"] or status["remaining_tasks_gate_ids"]:
         errors.append("completed core-read and bounded Tasks gates must have no remainder")
-    if status["production_cutover_blockers"]:
-        errors.append("production cutover blockers drifted")
+    if status["production_cutover_blockers"] != [
+        "deployment_bound_evidence_not_refreshed_for_mcp_2_1_1"
+    ]:
+        errors.append("production cutover blocker must identify the unrefreshed MCP 2.1.1 deployment evidence")
 
     service_pyprojects = sorted((REPO_ROOT / "mcp" / "services").glob("*/pyproject.toml"))
     constraints: list[str] = []
@@ -468,8 +505,8 @@ def validate(checked_at: datetime | None = None) -> list[str]:
         match = re.search(r'"mcp==([^"]+)"', path.read_text())
         if match is not None:
             constraints.append(match.group(1))
-    if not constraints or any(value != "2.0.0" for value in constraints):
-        errors.append("all stack MCP service packages must pin exact mcp==2.0.0")
+    if not constraints or any(value != EXPECTED_PYTHON_MCP_VERSION for value in constraints):
+        errors.append("all stack MCP service packages must pin exact mcp==2.1.1")
     return errors
 
 
@@ -481,8 +518,9 @@ def main() -> int:
             print(f"- {error}")
         return 1
     print(
-        "MCP protocol lab validation passed: the admitted read fleet is modern-only, "
-        "bounded Codex Tasks is production-proven, and non-read authority remains separate."
+        "MCP protocol lab validation passed: the isolated MCP 2.1.1 candidate is "
+        "source-bound, deployment-bound MCP 2.0.0 evidence is retained, and cutover "
+        "remains fail-closed."
     )
     return 0
 

@@ -51,7 +51,7 @@ SUBJECT = "codex-kag-next-lab"
 TRACEPARENT = "00-7d6f4bfe66cc42c7be4dfe186f08bd47-e0ad439d3c018890-01"
 CODEX_VERSION = "codex-cli 0.147.0"
 CODEX_SHA256 = "cb0a15567e9a60a5820d54b0f6ae86d504dc3805c1eab21a47f70e3eb7b73a40"
-PYTHON_MCP_VERSION = "2.0.0"
+PYTHON_MCP_VERSION = "2.1.1"
 
 
 def _utc_now() -> str:

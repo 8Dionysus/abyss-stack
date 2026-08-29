@@ -39,7 +39,7 @@
       "uniqueItems": true
     },
     "candidate_protocol_ready": {"const": true},
-    "internal_effect_protocol_ready": {"const": true},
+    "internal_effect_protocol_ready": {"type": "boolean"},
     "candidate_migration_allowed": {"const": false},
     "internal_effect_migration_allowed": {"const": false},
     "external_effect_migration_allowed": {"const": false},

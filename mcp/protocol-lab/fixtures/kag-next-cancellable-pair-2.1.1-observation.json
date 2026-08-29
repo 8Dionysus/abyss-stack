@@ -1,0 +1,75 @@
+{
+  "claim_limits": [
+    "This proves one isolated Python MCP 2.1.1 KAG read pair and cancellation path, not Codex cancellation or production cutover.",
+    "The SSE response mode is required because the isolated Python MCP 2.1.1 server observes client disconnects through the stream.",
+    "The cancelled dispatch did not complete after client disconnect in this bounded probe.",
+    "KAG output remains navigation evidence and owner sources retain authority.",
+    "No registration, candidate, memory, proof acceptance, source mutation, or effect occurred."
+  ],
+  "denials": {
+    "effect_like_tool_code": -32601,
+    "legacy_client_code": -32022
+  },
+  "finished_at": "2026-08-29T07:28:13.779756Z",
+  "observation_id": "aoa-kag-next-cancellable-pair-2.1.1-20260829",
+  "observed_at": "2026-08-29T07:27:34.798749Z",
+  "owner_canary": {
+    "degradation": [],
+    "freshness_state": "current",
+    "owner": "abyss-stack",
+    "projection_exact_state": "current",
+    "runtime_source_digest": "9854a5989531f3afaa52af2d8b2836fe03c03ed1566e164f48cae35d5886a5e6",
+    "schema_version": "aoa-kag-mcp-capabilities-v1"
+  },
+  "pair": {
+    "cache": {
+      "repeat_tools_list_wire_fetches": 1,
+      "scope": "private",
+      "ttl_ms": 30000
+    },
+    "cancellation": {
+      "client_request_cancelled": true,
+      "server_dispatch_cancelled": true,
+      "server_dispatch_completed_after_client_cancel": false
+    },
+    "independent_clients": 2,
+    "resource_inventory": [
+      "aoa-kag-next://capabilities"
+    ],
+    "self_describing_dispatches": 13,
+    "server_discover_observed": true,
+    "server_request_backchannel_observed": false,
+    "session_header_observed": false,
+    "supported_versions": [
+      "2026-07-28"
+    ],
+    "tool_inventory": [
+      "kag_discover"
+    ],
+    "trace_observed": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+    "trace_sent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+    "transport_response_mode": "sse_disconnect_cancellable",
+    "wire_version": "2026-07-28"
+  },
+  "python_sdk": {
+    "commit": "0921d94a74db900dccd2d534842aa7b6160542d2",
+    "version": "2.1.1"
+  },
+  "raw_receipt": {
+    "mode": "0600",
+    "ref": "local:///srv/abyss-machine/tmp/mcp-211-lab.SMGqtq/kag-next-pair-2.1.1.json",
+    "sha256": "676f6ad95910b31adb8ec0a44e7cf3f6e8a17514028520e12eb295eabfa51b20"
+  },
+  "schema_version": "abyss_mcp_kag_next_cancellable_pair_observation_v1",
+  "source_revisions": {
+    "abyss_stack": "c22ec7626d07ec66ff32569a2cc1b1b82e45f7b4",
+    "aoa_kag": "578e4cea9a04b76a881bde240d5479efceea4926",
+    "stack_runtime_current_digest": "sha256:9e5f45ff79c40776ff9c471c69ee978e84de41ddbae52b3cbedab8d33a3b0038"
+  },
+  "stable_registration": {
+    "config_digest_after": "sha256:7dd18cc02de8a7ac9227c50957ab169f51d853b327583270b567b64c8c2bf98b",
+    "config_digest_before": "sha256:7dd18cc02de8a7ac9227c50957ab169f51d853b327583270b567b64c8c2bf98b",
+    "unchanged": true
+  },
+  "verdict": "adapter_pair_passed_with_cancellation"
+}

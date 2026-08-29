@@ -16,7 +16,7 @@ MATRIX_PATH = LAB_ROOT / "protocol-compatibility-matrix.v1.json"
 OBSERVATION_PATH = LAB_ROOT / "fixtures" / "current-pair-observation.json"
 OUTPUT_PATH = LAB_ROOT / "generated" / "protocol-lab-status.json"
 PRODUCTION_OBSERVATION_PATH = LAB_ROOT / "fixtures" / "codex-0.146.0-production-pair-observation.json"
-CODEX_LAB_OBSERVATION_PATH = LAB_ROOT / "fixtures" / "codex-0.147.0-stable-kag-next-lab-observation.json"
+CODEX_LAB_OBSERVATION_PATH = LAB_ROOT / "fixtures" / "codex-0.147.0-stable-kag-next-lab-2.1.1-observation.json"
 STABLE_ROLLBACK_OBSERVATION_PATH = LAB_ROOT / "fixtures" / "codex-0.147.0-stable-kag-post-rollback-observation.json"
 TASKS_MATRIX_PATH = LAB_ROOT / "tasks-compatibility-matrix.v1.json"
 TASKS_PILOT_PATH = LAB_ROOT / "fixtures" / "tasks-adapter-pilot-20260808.json"
@@ -130,6 +130,10 @@ def build_status(
     remaining_tasks_gate_ids = [gate_id for gate_id in remaining_gate_ids if gate_id == "P1-11"]
 
     next_version = matrix["next_spec"]["wire_version"]
+    next_sdk = next(
+        sdk for sdk in matrix["sdk_lines"] if sdk["sdk_id"] == "python-next"
+    )
+    candidate_sdk_version = next_sdk["version"]
     next_sdk_ready = any(
         sdk["release_status"] == "stable"
         and sdk["production_allowed"]
@@ -160,6 +164,12 @@ def build_status(
         and _passed(observation, "abyss_pair_conformance")
         and matrix["pilot"]["state"] == "passed"
     )
+    deployment_evidence_current = all(
+        (
+            live_modern_fleet["mcp_sdk"] == candidate_sdk_version,
+            codex_tasks_production_pair["mcp_sdk"] == candidate_sdk_version,
+        )
+    )
     production_pair_ready = all(
         (
             production_consumer["next_wire_pair_observed"],
@@ -177,6 +187,7 @@ def build_status(
             live_modern_fleet["read_fleet"]["admitted_units"] == 11,
             live_modern_fleet["read_fleet"]["bootstrap_identities"] == 0,
             live_modern_fleet["rollback"]["active_legacy_units"] == 0,
+            deployment_evidence_current,
         )
     )
     tasks_extension_allowed = bool(
@@ -192,6 +203,10 @@ def build_status(
         production_cutover_blockers.append("current_conformance_fixture_mismatch")
     if observation["abyss_pair_conformance"]["status"] != "passed":
         production_cutover_blockers.append("modern_cancellation_not_propagated")
+    if not deployment_evidence_current:
+        production_cutover_blockers.append(
+            "deployment_bound_evidence_not_refreshed_for_mcp_2_1_1"
+        )
 
     unsigned = {
         "schema_version": "abyss_mcp_protocol_lab_status_v2",
@@ -199,10 +214,6 @@ def build_status(
         "evidence_expires_at": min(
             matrix["expires_at"],
             codex_lab_observation["expires_at"],
-            stable_rollback_observation["expires_at"],
-            tasks_matrix["expires_at"],
-            live_modern_fleet["expires_at"],
-            codex_tasks_production_pair["expires_at"],
         ),
         "matrix_digest": canonical_digest(matrix),
         "observation_digest": canonical_digest(observation),
@@ -245,10 +256,16 @@ def build_status(
             "tasks_notifications_unproved",
             "distributed_poll_limit_unproved",
         ],
-        "candidate_protocol_ready": live_modern_fleet["nonread_protocol"]
-        ["modern_discovery_passed"],
-        "internal_effect_protocol_ready": live_modern_fleet["nonread_protocol"]
-        ["modern_discovery_passed"],
+        "candidate_protocol_ready": bool(
+            matrix["next_spec"]["final_published"]
+            and next_sdk_ready
+            and lab_consumer["next_wire_pair_observed"]
+            and lab_consumer["server_discover_observed"]
+            and codex_lab_observation["wire"]["server_discover_observed"]
+            and codex_lab_observation["wire"]["version"] == next_version
+            and not codex_lab_observation["consumer"]["production_authority"]
+        ),
+        "internal_effect_protocol_ready": False,
         "candidate_migration_allowed": False,
         "internal_effect_migration_allowed": False,
         "external_effect_migration_allowed": False,
@@ -266,9 +283,9 @@ def build_status(
         "production_cutover_blockers": production_cutover_blockers,
         "reason_codes": observation["reason_codes"],
         "next_action": (
-            "Maintain the admitted modern-only read fleet, refresh expiring registry "
-            "evidence automatically, and keep candidate/effect authority disabled "
-            "until those contours receive separate owner admission."
+            "Keep production on its evidenced MCP 2.0.0 deployment; refresh the "
+            "deployment-bound 2.1.1 pair, rollback, and Tasks receipts before any "
+            "production cutover or non-read admission."
         ),
         "claim_limits": matrix["claim_limits"],
     }

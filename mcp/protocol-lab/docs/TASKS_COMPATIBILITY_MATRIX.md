@@ -23,8 +23,9 @@ of those evidence levels substitutes for another.
   against the strict Abyss adapter: its raw `tasks/get` sends `Mcp-Method` and
   the extension envelope but omits required `Mcp-Name=taskId`. The adapter
   correctly returns `-32020` / HTTP `400`.
-- Python `2.0.0`, TypeScript `2.0.0`, and Go `1.7.0` do not provide a released
-  modern Tasks implementation. TypeScript explicitly excludes the extension;
+- Python `2.1.1` (the current source candidate), TypeScript `2.0.0`, and Go
+  `1.7.0` do not provide a released modern Tasks implementation. TypeScript
+  explicitly excludes the extension;
   Inspector works around that exclusion locally.
 - C# `2.1.0` has the most complete released source/test surface, including the
   task routing header, but no local .NET runtime was available for an Abyss
@@ -37,8 +38,9 @@ The `abyss-stack` read adapter enables Tasks explicitly; other organ adapters
 do not inherit it. The TaskStore remains protocol-independent and owner-bound.
 `rmcp` remains a replaceable reference witness, not a new owner and not a
 reason to migrate organ authority into Rust. Core-read MCP migration and Tasks
-admission remain independently derived even though both now pass for their
-exact scopes.
+admission remain independently derived. The Tasks production receipt is
+deployment-bound to the historical MCP `2.0.0` runtime and is not re-admitted
+for the source candidate until its pair is refreshed.
 
 Production Tasks is true only for the proved bounded lifecycle. Update and
 input-required remain source-present but live-unpaired. Notifications remain
