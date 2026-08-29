@@ -39,6 +39,19 @@ def _load_validator() -> Any:
     return module
 
 
+def _load_tasks_runner() -> Any:
+    runner_path = LAB_ROOT / "scripts" / "run_codex_stack_tasks_pair.py"
+    spec = importlib.util.spec_from_file_location(
+        "codex_stack_tasks_pair_under_test",
+        runner_path,
+    )
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def _load(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
@@ -67,7 +80,10 @@ def test_current_status_is_deterministic_and_keeps_deployment_cutover_blocked(
     second = builder.build_status(copy.deepcopy(matrix), copy.deepcopy(observation))
 
     assert first == second
-    assert first["evidence_expires_at"] > first["tasks_evidence_expires_at"]
+    assert first["evidence_expires_at"] == "2026-08-15T08:33:46.547214Z"
+    assert first["candidate_evidence_expires_at"] == "2026-09-05T07:32:30.866342Z"
+    assert first["deployment_evidence_expires_at"] == "2026-08-15T08:33:46.547214Z"
+    assert first["deployment_evidence_current"] is False
     assert first["gate_counts"] == {"passed": 14, "blocked": 0, "pending": 0}
     assert first["passed_gate_ids"] == [f"P1-{index:02d}" for index in range(1, 15)]
     assert first["core_read_migration_allowed"] is False
@@ -178,6 +194,28 @@ def test_production_pair_receipt_is_public_safe_and_bounded(builder: Any) -> Non
     assert receipt["call"]["is_error"] is False
     assert receipt["secrets_included"] is False
     assert "does not prove a 2026-07-28" in " ".join(receipt["claim_limits"])
+
+
+def test_codex_tasks_receipt_uses_the_serving_server_identity() -> None:
+    runner = _load_tasks_runner()
+    observation_digest = "sha256:" + ("a" * 64)
+    terminal = {
+        "result": {
+            "structuredContent": {
+                "metadata": {
+                    "mcp_sdk": "2.1.1",
+                    "observation_digest": observation_digest,
+                }
+            }
+        }
+    }
+
+    assert runner.server_runtime_identity(terminal) == (
+        "2.1.1",
+        observation_digest,
+    )
+    with pytest.raises(RuntimeError, match="serving MCP task result"):
+        runner.server_runtime_identity({"result": {}})
 
 
 def test_expired_production_pair_receipt_is_rejected() -> None:
@@ -443,15 +481,36 @@ def test_deployment_receipts_must_match_candidate_sdk_for_migration(
     tasks_pair = _load(
         LAB_ROOT / "fixtures" / "codex-tasks-production-pair-20260809.json"
     )
+    stable_rollback = _load(
+        LAB_ROOT / "fixtures" / "codex-0.147.0-stable-kag-post-rollback-observation.json"
+    )
+    tasks_matrix = _load(LAB_ROOT / "tasks-compatibility-matrix.v1.json")
     deployment["mcp_sdk"] = "2.1.1"
     tasks_pair["mcp_sdk"] = "2.1.1"
 
-    admitted = builder.build_status(
+    stale = builder.build_status(
         candidate,
         pair,
+        stable_rollback_observation=stable_rollback,
+        tasks_matrix=tasks_matrix,
         live_modern_fleet=deployment,
         codex_tasks_production_pair=tasks_pair,
     )
+    assert stale["deployment_evidence_current"] is False
+    assert stale["core_read_migration_allowed"] is False
+
+    future = "2026-09-05T07:32:30.866342Z"
+    for payload in (deployment, tasks_pair, stable_rollback, tasks_matrix):
+        payload["expires_at"] = future
+    admitted = builder.build_status(
+        candidate,
+        pair,
+        stable_rollback_observation=stable_rollback,
+        tasks_matrix=tasks_matrix,
+        live_modern_fleet=deployment,
+        codex_tasks_production_pair=tasks_pair,
+    )
+    assert admitted["deployment_evidence_current"] is True
     assert admitted["core_read_migration_allowed"] is True
     assert admitted["read_only_pilot_allowed"] is True
     assert admitted["internal_effect_migration_allowed"] is False
@@ -460,6 +519,8 @@ def test_deployment_receipts_must_match_candidate_sdk_for_migration(
     rejected = builder.build_status(
         candidate,
         pair,
+        stable_rollback_observation=stable_rollback,
+        tasks_matrix=tasks_matrix,
         live_modern_fleet=deployment,
         codex_tasks_production_pair=tasks_pair,
     )

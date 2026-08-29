@@ -10,7 +10,6 @@ import json
 import os
 import secrets
 import socket
-import subprocess
 import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
@@ -31,27 +30,27 @@ PYTHON = Path("/srv/abyss-machine/cache/mcp-modern-fleet-20260809/venv/bin/pytho
 OBSERVATION = Path("/srv/AbyssOS/abyss-stack/Logs/mcp/observations/current.json")
 
 
-def installed_mcp_version(python: Path) -> str:
-    result = subprocess.run(
-        [
-            str(python),
-            "-I",
-            "-c",
-            "import importlib.metadata; print(importlib.metadata.version('mcp'))",
-        ],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode != 0:
+def server_runtime_identity(terminal: dict[str, Any]) -> tuple[str, str]:
+    """Return SDK and observation identities emitted by the serving process."""
+    try:
+        metadata = terminal["result"]["structuredContent"]["metadata"]
+        sdk = metadata["mcp_sdk"]
+        observation_digest = metadata["observation_digest"]
+    except (KeyError, TypeError) as exc:
         raise RuntimeError(
-            f"cannot resolve MCP SDK version from {python}: "
-            f"{result.stderr.strip()[-400:]}"
+            "the serving MCP task result omitted its SDK or observation identity"
+        ) from exc
+    if not isinstance(sdk, str) or not sdk:
+        raise RuntimeError("the serving MCP task result returned an empty SDK identity")
+    if (
+        not isinstance(observation_digest, str)
+        or not observation_digest.startswith("sha256:")
+        or len(observation_digest) != 71
+    ):
+        raise RuntimeError(
+            "the serving MCP task result returned an invalid observation digest"
         )
-    version = result.stdout.strip()
-    if not version:
-        raise RuntimeError(f"MCP SDK version lookup returned empty output for {python}")
-    return version
+    return sdk, observation_digest
 
 
 class AppClient:
@@ -361,13 +360,15 @@ async def main() -> None:
         terminal = pair["completed"]
         task_id = pair["completed_task_id"]
         rejected = pair["missing_extension"]
+        mcp_sdk, runtime_observation_digest = server_runtime_identity(terminal)
 
         receipt = {
             "schema_version": "codex_real_abyss_stack_tasks_pair_v1",
             "observed_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
             "protocol_version": PROTOCOL,
             "server": "abyss-stack-mcp/0.5.2",
-            "mcp_sdk": installed_mcp_version(PYTHON),
+            "mcp_sdk": mcp_sdk,
+            "runtime_observation_digest": runtime_observation_digest,
             "codex_runtime": args.runtime.parents[1].name,
             "codex_runtime_sha256": hashlib.sha256(
                 args.runtime.parent.joinpath("codex").read_bytes()

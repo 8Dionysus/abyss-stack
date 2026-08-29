@@ -148,11 +148,25 @@ def validate(checked_at: datetime | None = None) -> list[str]:
         expiry = _expiry_error(label, payload, checked_at)
         if expiry is not None:
             errors.append(expiry)
-    if status["evidence_expires_at"] != min(
+    expected_candidate_expiry = min(
         matrix["expires_at"],
         fixtures["codex_lab"]["expires_at"],
-    ):
+    )
+    expected_deployment_expiry = min(
+        fixtures["stable_rollback"]["expires_at"],
+        tasks_matrix["expires_at"],
+        fixtures["live_modern_fleet"]["expires_at"],
+        fixtures["codex_tasks_production_pair"]["expires_at"],
+    )
+    if status["candidate_evidence_expires_at"] != expected_candidate_expiry:
         errors.append("generated status lost the earliest candidate evidence expiry")
+    if status["deployment_evidence_expires_at"] != expected_deployment_expiry:
+        errors.append("generated status lost a deployment-bound evidence expiry")
+    if status["evidence_expires_at"] != min(
+        expected_candidate_expiry,
+        expected_deployment_expiry,
+    ):
+        errors.append("generated status lost the overall earliest evidence expiry")
 
     expected_render = json.dumps(status, indent=2, ensure_ascii=True, sort_keys=True) + "\n"
     if not builder.OUTPUT_PATH.is_file() or builder.OUTPUT_PATH.read_text() != expected_render:
@@ -485,6 +499,7 @@ def validate(checked_at: datetime | None = None) -> list[str]:
         or not status["read_only_pilot_completed"]
         or status["core_read_migration_allowed"]
         or status["tasks_extension_allowed"]
+        or status["deployment_evidence_current"]
         or not status["candidate_protocol_ready"]
         or status["internal_effect_protocol_ready"]
         or status["candidate_migration_allowed"]

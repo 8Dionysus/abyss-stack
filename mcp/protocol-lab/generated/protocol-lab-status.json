@@ -1,5 +1,6 @@
 {
   "authority_move_combined": false,
+  "candidate_evidence_expires_at": "2026-09-05T07:32:30.866342Z",
   "candidate_migration_allowed": false,
   "candidate_protocol_ready": true,
   "claim_limits": [
@@ -13,8 +14,10 @@
   "codex_lab_observation_digest": "sha256:064bf934d553bcc978005215d9f1a6c3757b63be50c537339b88136aecc3d06b",
   "codex_tasks_production_pair_digest": "sha256:5a7c3f00872f5afff9a4c3291975cd4c05cf78e1c0411c05b8203e7920880610",
   "core_read_migration_allowed": false,
+  "deployment_evidence_current": false,
+  "deployment_evidence_expires_at": "2026-08-15T08:33:46.547214Z",
   "evaluated_at": "2026-08-29T07:33:01.750250Z",
-  "evidence_expires_at": "2026-09-05T07:32:30.866342Z",
+  "evidence_expires_at": "2026-08-15T08:33:46.547214Z",
   "external_effect_migration_allowed": false,
   "gate_counts": {
     "blocked": 0,
@@ -67,7 +70,7 @@
   "schema_version": "abyss_mcp_protocol_lab_status_v2",
   "stable_registration_retained": true,
   "stable_rollback_observation_digest": "sha256:eeba4f8f37eacf249d3ead0e9552eaa68a05848a86f51f1fc50304210295ed1f",
-  "status_digest": "sha256:edb21171075dbe848268cbdbb3dc3045dadc10d20a055f886f0fb5561588e881",
+  "status_digest": "sha256:50251599345eced80da5d23b3c11f05f9a4e08fb59116575612b32715a59e191",
   "tasks_blockers": [
     "input_required_update_live_pair_unproved",
     "tasks_notifications_unproved",

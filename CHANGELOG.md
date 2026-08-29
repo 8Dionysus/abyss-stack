@@ -9,6 +9,11 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Keep protocol-lab readiness fail-closed when deployment-bound rollback,
+  Tasks-matrix, live-fleet, or Codex Tasks evidence expires; expose separate
+  candidate/deployment deadlines and derive live Tasks receipts from the
+  serving MCP process identity and runtime-observation digest rather than a
+  fixed cache environment.
 - Add the source-only, default-off provider-neutral programmatic execution
   runtime seam with explicit admission, independent Codex/local adapter
   boundaries, validated observation handoff, and distinct adapter versus

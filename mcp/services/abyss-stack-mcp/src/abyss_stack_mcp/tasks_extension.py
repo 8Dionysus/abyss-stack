@@ -13,6 +13,7 @@ import json
 import os
 import secrets
 from collections.abc import Mapping, Sequence
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any, Literal
 
@@ -121,6 +122,14 @@ def tasks_enabled_from_environment() -> bool:
 
 def task_root_from_environment() -> Path:
     return Path(os.environ.get("ABYSS_STACK_MCP_TASK_ROOT", str(DEFAULT_TASK_ROOT)))
+
+
+def running_mcp_sdk_version() -> str:
+    """Read the SDK identity from the server process serving the task."""
+    try:
+        return version("mcp")
+    except PackageNotFoundError as exc:
+        raise RuntimeError("the serving MCP SDK package is not installed") from exc
 
 
 class StackReadTasksExtension(Extension):
@@ -292,6 +301,16 @@ class StackReadTasksExtension(Extension):
     ) -> None:
         try:
             owner_payload = await asyncio.to_thread(self.application.inspect, **arguments)
+            metadata = owner_payload.get("metadata")
+            if not isinstance(metadata, dict):
+                raise RuntimeError("owner inspection omitted result metadata")
+            owner_payload = {
+                **owner_payload,
+                "metadata": {
+                    **metadata,
+                    "mcp_sdk": running_mcp_sdk_version(),
+                },
+            }
             result = {
                 "content": [
                     {

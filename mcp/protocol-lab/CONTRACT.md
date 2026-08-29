@@ -32,7 +32,10 @@ Production migration is allowed only when:
   deployment-bound canary, current registry record, modern-only negative wire
   proof, and zero bootstrap identity;
 - deployment-bound receipts must match the candidate SDK version and remain
-  current; an isolated source candidate never upgrades a production claim;
+  current through their individual expiry deadlines; the derived overall
+  evidence deadline includes the stable rollback, Tasks matrix, live-fleet,
+  and production-Tasks receipts, and an isolated source candidate never
+  upgrades a production claim;
 - no executable legacy template or enabled legacy instance remains.
 
 The derived status reports five separate verdicts:
@@ -102,7 +105,9 @@ OS Abyss Codex production-pair verdict.
 `aoa_kag_next_lab` remains a removable isolated candidate contour. The current
 source candidate uses Python MCP `2.1.1`, while deployment-bound production
 receipts remain explicitly on MCP `2.0.0` until a separate deployment proof.
-Rollback is a coherent source/runtime restore followed by fresh canary,
+Expired deployment receipts remain historical and cannot be made current by
+changing their recorded SDK label. Rollback is a coherent source/runtime
+restore followed by fresh canary,
 registry, preflight, and production-wire proof; mixed-era source/runtime states
 are invalid. The cold MCP 1 runtime is never an active compatibility route.
 

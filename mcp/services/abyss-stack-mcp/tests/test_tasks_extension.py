@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from importlib.metadata import version
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -106,6 +107,10 @@ def test_task_completes_and_survives_extension_restart(
         assert result["result"]["structuredContent"]["owner_payload"][
             "organ_id"
         ] == "aoa-kag"
+        assert (
+            result["result"]["structuredContent"]["metadata"]["mcp_sdk"]
+            == version("mcp")
+        )
 
     asyncio.run(scenario())
 

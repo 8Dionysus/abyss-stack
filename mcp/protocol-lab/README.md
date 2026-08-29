@@ -77,6 +77,9 @@ Current posture after the 2026-07-28 final release:
 - isolated read-only MCP `2.1.1` modern pair and rollback: passed;
 - production core-read migration: blocked until deployment-bound MCP `2.1.1`
   pair evidence is refreshed;
+- derived status keeps candidate and deployment evidence deadlines separate;
+  the overall deadline is the earliest of both, and expired deployment-bound
+  receipts remain a hard blocker even if their recorded SDK labels are edited;
 - bounded production Tasks lifecycle: retained as historical MCP `2.0.0`
   deployment evidence and not re-admitted for the source candidate;
 - candidate protocol readiness: passed; internal-effect readiness and all
@@ -149,7 +152,7 @@ can execute.
 | `fixtures/rmcp-3.1.2-tasks-adapter-pair-20260808.json` | released Rust reference-client proof against the strict feature-gated Abyss adapter |
 | `fixtures/inspector-2.1.0-tasks-strict-pair-blocked-20260808.json` | exact Inspector strict-pair blocker without weakening task-bound routing |
 | `fixtures/live-modern-fleet-20260809.json` | compact production read-fleet, automation, rollback, and non-read protocol observation |
-| `fixtures/codex-tasks-production-pair-20260809.json` | bounded OS Abyss Codex Tasks production-pair receipt |
+| `fixtures/codex-tasks-production-pair-20260809.json` | bounded OS Abyss Codex Tasks production-pair receipt; historical deployment-bound evidence |
 | `scripts/run_kag_next_pair.py` | private raw-receipt runner for the isolated KAG adapter |
 | `scripts/run_kag_handle_pair.py` | private raw-receipt runner for bearer-bound KAG requestState handles |
 | `scripts/run_kag_cache_pair.py` | private raw-receipt runner for KAG catalog cache behavior |

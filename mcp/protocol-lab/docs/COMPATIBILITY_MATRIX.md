@@ -64,8 +64,11 @@ notifications, and distributed poll enforcement remain outside that subset.
 
 The isolated MCP `2.1.1` core-read candidate is protocol-ready, but production
 core-read migration remains blocked until the deployment-bound fleet, rollback,
-and Tasks receipts are refreshed against the candidate SDK. Three candidate
-contours and one internal-effect contour remain inactive and unadmitted.
+and Tasks receipts are refreshed against the candidate SDK and rechecked for
+currentness. Candidate and deployment deadlines remain separate; the overall
+deadline is the earliest of both, and changing a stale receipt's SDK label
+cannot revive it. Three candidate contours and one internal-effect contour
+remain inactive and unadmitted.
 External effects remain outside this decision.
 
 ## Supporting behavior receipts

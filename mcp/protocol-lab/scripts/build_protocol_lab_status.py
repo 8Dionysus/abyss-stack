@@ -5,6 +5,7 @@ import argparse
 import hashlib
 import json
 from collections import Counter
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -50,6 +51,21 @@ def canonical_digest(value: dict[str, Any]) -> str:
         sort_keys=True,
     ).encode("utf-8")
     return f"sha256:{hashlib.sha256(encoded).hexdigest()}"
+
+
+def _timestamp(value: str) -> datetime:
+    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise ValueError(f"timestamp must be timezone-aware: {value}")
+    return parsed.astimezone(UTC)
+
+
+def _earliest_expiry(*payloads: dict[str, Any]) -> str:
+    return min(payload["expires_at"] for payload in payloads)
+
+
+def _evidence_is_current(payload: dict[str, Any], evaluated_at: str) -> bool:
+    return _timestamp(payload["expires_at"]) > _timestamp(evaluated_at)
 
 
 def validate_payload(payload: dict[str, Any], schema_path: Path) -> None:
@@ -164,10 +180,23 @@ def build_status(
         and _passed(observation, "abyss_pair_conformance")
         and matrix["pilot"]["state"] == "passed"
     )
+    candidate_evidence = (matrix, codex_lab_observation)
+    deployment_evidence = (
+        stable_rollback_observation,
+        tasks_matrix,
+        live_modern_fleet,
+        codex_tasks_production_pair,
+    )
+    candidate_evidence_expires_at = _earliest_expiry(*candidate_evidence)
+    deployment_evidence_expires_at = _earliest_expiry(*deployment_evidence)
     deployment_evidence_current = all(
         (
             live_modern_fleet["mcp_sdk"] == candidate_sdk_version,
             codex_tasks_production_pair["mcp_sdk"] == candidate_sdk_version,
+            *(
+                _evidence_is_current(payload, observation["observed_at"])
+                for payload in deployment_evidence
+            ),
         )
     )
     production_pair_ready = all(
@@ -211,9 +240,12 @@ def build_status(
     unsigned = {
         "schema_version": "abyss_mcp_protocol_lab_status_v2",
         "evaluated_at": observation["observed_at"],
+        "candidate_evidence_expires_at": candidate_evidence_expires_at,
+        "deployment_evidence_expires_at": deployment_evidence_expires_at,
+        "deployment_evidence_current": deployment_evidence_current,
         "evidence_expires_at": min(
-            matrix["expires_at"],
-            codex_lab_observation["expires_at"],
+            candidate_evidence_expires_at,
+            deployment_evidence_expires_at,
         ),
         "matrix_digest": canonical_digest(matrix),
         "observation_digest": canonical_digest(observation),

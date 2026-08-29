@@ -15,6 +15,7 @@
     "codex_artifact_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
     "server": {"const": "abyss-stack-mcp/0.5.2"},
     "mcp_sdk": {"enum": ["2.0.0", "2.1.1"]},
+    "runtime_observation_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
     "production_pair": {"const": true},
     "lifecycle": {
       "type": "object",
