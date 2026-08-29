@@ -781,6 +781,12 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Changed
 
+- Refresh easy runtime dependency pins: Neo4j `5.26.30`, Qdrant `1.18.3`,
+  PostgreSQL `16.15`, Redis `7.4.11`, Ollama `0.33.2`, cAdvisor `0.60.5`,
+  Loki `3.7.7`, Playwright `1.62.0`, Gunicorn `26.2.0`, and OVMS/OpenVINO
+  `2026.3`, plus refreshed Python/Node base-image digests. Stateful services
+  remain same-major/minor and require backup, one-at-a-time rollout, health
+  checks, and previous-pin rollback.
 - The complete `tests` and `release` pytest selection now uses a four-process,
   file-aware work-stealing DAG with exact baseline, disjoint-union, observed
   selection, and final-verdict proofs. Duration hints affect order only; the
