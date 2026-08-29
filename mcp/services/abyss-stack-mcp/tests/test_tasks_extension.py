@@ -14,6 +14,7 @@ from abyss_stack_mcp.tasks_extension import (
     TASK_TOOL,
     StackReadTasksExtension,
     _TaskGetParams,
+    running_mcp_sdk_identity,
 )
 
 
@@ -83,6 +84,9 @@ def test_task_completes_and_survives_extension_restart(
         "abyss_stack_mcp.tasks_extension.get_access_token",
         lambda: SimpleNamespace(client_id="codex-main"),
     )
+    expected_sdk, expected_source_revision, expected_artifact_digest = (
+        running_mcp_sdk_identity()
+    )
 
     async def scenario() -> None:
         extension = StackReadTasksExtension(_Application(), tmp_path)
@@ -110,17 +114,18 @@ def test_task_completes_and_survives_extension_restart(
         assert result["result"]["structuredContent"]["owner_payload"][
             "organ_id"
         ] == "aoa-kag"
-        assert result["result"]["structuredContent"]["metadata"]["mcp_sdk"] == "2.1.1"
+        assert (
+            result["result"]["structuredContent"]["metadata"]["mcp_sdk"]
+            == expected_sdk
+        )
         assert (
             result["result"]["structuredContent"]["metadata"]["mcp_sdk_source_revision"]
-            == "0921d94a74db900dccd2d534842aa7b6160542d2"
+            == expected_source_revision
         )
         artifact_digest = result["result"]["structuredContent"]["metadata"][
             "mcp_sdk_artifact_digest"
         ]
-        assert artifact_digest == (
-            "sha256:1ef71b1a3cfb3daba29b61d9f280896b35bdc1038474285cc8295071418b01e5"
-        )
+        assert artifact_digest == expected_artifact_digest
 
     asyncio.run(scenario())
 
