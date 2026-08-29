@@ -25,6 +25,7 @@ from mcp_types import Implementation, ToolAnnotations
 
 from aoa_kag_mcp.core import AoAKagMCPState
 from aoa_kag_mcp.runtime import build_application
+from _mcp_sdk_identity import installed_mcp_identity
 
 
 NEXT_WIRE_VERSION = "2026-07-28"
@@ -608,9 +609,11 @@ def main() -> int:
     parser.add_argument("--stack-runtime-root", required=True, type=Path)
     parser.add_argument("--stack-source-root", required=True, type=Path)
     parser.add_argument("--stable-codex-config", required=True, type=Path)
+    parser.add_argument("--python-sdk-root", required=True, type=Path)
     args = parser.parse_args()
 
     started_at = _utc_now()
+    sdk_identity = installed_mcp_identity(args.python_sdk_root)
     stable_before = _digest(args.stable_codex_config)
     state = AoAKagMCPState.discover(
         workspace_root=args.workspace_root,
@@ -637,10 +640,8 @@ def main() -> int:
         "finished_at": _utc_now(),
         "exact_inputs": {
             "spec_version": NEXT_WIRE_VERSION,
-            "python_mcp_version": "2.1.1",
-            "python_mcp_commit": (
-                "0921d94a74db900dccd2d534842aa7b6160542d2"
-            ),
+            "python_mcp_version": sdk_identity["version"],
+            "python_mcp_commit": sdk_identity["commit"],
             "stack_source_revision": _git_head(args.stack_source_root),
             "aoa_kag_source_revision": _git_head(args.aoa_kag_root),
             "stack_runtime_current_digest": _digest(

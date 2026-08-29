@@ -28,20 +28,29 @@ LIVE_BEARER_FILE = Path(
 )
 PYTHON = Path("/srv/abyss-machine/cache/mcp-modern-fleet-20260809/venv/bin/python")
 OBSERVATION = Path("/srv/AbyssOS/abyss-stack/Logs/mcp/observations/current.json")
+MCP_SDK_SOURCE_REVISIONS = {
+    "2.0.0": "6f69a3758ebf2ee55ce050f58b470ce11af71133",
+    "2.1.1": "0921d94a74db900dccd2d534842aa7b6160542d2",
+}
 
 
-def server_runtime_identity(terminal: dict[str, Any]) -> tuple[str, str]:
+def server_runtime_identity(terminal: dict[str, Any]) -> tuple[str, str, str]:
     """Return SDK and observation identities emitted by the serving process."""
     try:
         metadata = terminal["result"]["structuredContent"]["metadata"]
         sdk = metadata["mcp_sdk"]
+        sdk_source_revision = metadata["mcp_sdk_source_revision"]
         observation_digest = metadata["observation_digest"]
     except (KeyError, TypeError) as exc:
         raise RuntimeError(
-            "the serving MCP task result omitted its SDK or observation identity"
+            "the serving MCP task result omitted its SDK, source, or observation identity"
         ) from exc
     if not isinstance(sdk, str) or not sdk:
         raise RuntimeError("the serving MCP task result returned an empty SDK identity")
+    if MCP_SDK_SOURCE_REVISIONS.get(sdk) != sdk_source_revision:
+        raise RuntimeError(
+            "the serving MCP task result returned an unattested SDK source identity"
+        )
     if (
         not isinstance(observation_digest, str)
         or not observation_digest.startswith("sha256:")
@@ -50,7 +59,7 @@ def server_runtime_identity(terminal: dict[str, Any]) -> tuple[str, str]:
         raise RuntimeError(
             "the serving MCP task result returned an invalid observation digest"
         )
-    return sdk, observation_digest
+    return sdk, sdk_source_revision, observation_digest
 
 
 class AppClient:
@@ -360,7 +369,11 @@ async def main() -> None:
         terminal = pair["completed"]
         task_id = pair["completed_task_id"]
         rejected = pair["missing_extension"]
-        mcp_sdk, runtime_observation_digest = server_runtime_identity(terminal)
+        (
+            mcp_sdk,
+            mcp_sdk_source_revision,
+            runtime_observation_digest,
+        ) = server_runtime_identity(terminal)
 
         receipt = {
             "schema_version": "codex_real_abyss_stack_tasks_pair_v1",
@@ -368,6 +381,7 @@ async def main() -> None:
             "protocol_version": PROTOCOL,
             "server": "abyss-stack-mcp/0.5.2",
             "mcp_sdk": mcp_sdk,
+            "mcp_sdk_source_revision": mcp_sdk_source_revision,
             "runtime_observation_digest": runtime_observation_digest,
             "codex_runtime": args.runtime.parents[1].name,
             "codex_runtime_sha256": hashlib.sha256(

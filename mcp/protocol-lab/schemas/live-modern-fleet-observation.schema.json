@@ -11,6 +11,7 @@
     "source_revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
     "protocol_version": {"const": "2026-07-28"},
     "mcp_sdk": {"enum": ["2.0.0", "2.1.1"]},
+    "mcp_sdk_source_revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
     "read_fleet": {
       "type": "object",
       "additionalProperties": false,
@@ -64,5 +65,5 @@
     "verdict": {"const": "production_modern_only_passed"},
     "claim_limits": {"type": "array", "minItems": 2, "items": {"type": "string", "minLength": 12}}
   },
-  "required": ["schema_version", "observed_at", "expires_at", "source_revision", "protocol_version", "mcp_sdk", "read_fleet", "nonread_protocol", "automation", "rollback", "verdict", "claim_limits"]
+  "required": ["schema_version", "observed_at", "expires_at", "source_revision", "protocol_version", "mcp_sdk", "mcp_sdk_source_revision", "read_fleet", "nonread_protocol", "automation", "rollback", "verdict", "claim_limits"]
 }

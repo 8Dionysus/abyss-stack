@@ -11,6 +11,8 @@
     "finished_at": {"type": "string", "format": "date-time"},
     "expires_at": {"type": "string", "format": "date-time"},
     "verdict": {"const": "stable_production_route_passed_after_lab_rollback"},
+    "mcp_sdk": {"enum": ["2.0.0", "2.1.1"]},
+    "mcp_sdk_source_revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
     "consumer": {"const": {"actual_operator_config": true, "binary_sha256": "cb0a15567e9a60a5820d54b0f6ae86d504dc3805c1eab21a47f70e3eb7b73a40", "registration": "aoa_kag", "version": "0.147.0"}},
     "canary": {"const": {"is_error": false, "owner": "abyss-stack", "result_schema": "aoa-kag-mcp-capabilities-v1", "tool": "kag_discover"}},
     "stable_registration": {
@@ -36,5 +38,5 @@
     "secrets_included": {"const": false},
     "claim_limits": {"type": "array", "items": {"type": "string", "minLength": 3}, "minItems": 3}
   },
-  "required": ["schema_version", "observation_id", "observed_at", "finished_at", "expires_at", "verdict", "consumer", "canary", "stable_registration", "process_stopped", "private_receipt", "secrets_included", "claim_limits"]
+  "required": ["schema_version", "observation_id", "observed_at", "finished_at", "expires_at", "verdict", "mcp_sdk", "mcp_sdk_source_revision", "consumer", "canary", "stable_registration", "process_stopped", "private_receipt", "secrets_included", "claim_limits"]
 }

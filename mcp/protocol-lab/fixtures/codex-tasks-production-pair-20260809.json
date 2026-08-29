@@ -9,6 +9,7 @@
   "codex_artifact_digest": "sha256:49a5f3509ff395168c967b1cfd28646f35ecf2bb902cffdaeb0a7d7e16b6d77b",
   "server": "abyss-stack-mcp/0.5.2",
   "mcp_sdk": "2.0.0",
+  "mcp_sdk_source_revision": "6f69a3758ebf2ee55ce050f58b470ce11af71133",
   "production_pair": true,
   "lifecycle": {
     "extension_advertised": true,

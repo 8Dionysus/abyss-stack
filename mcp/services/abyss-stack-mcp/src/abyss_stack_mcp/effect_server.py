@@ -160,10 +160,10 @@ def build_effect_server() -> Any:
     )
     _bind_server_info_version(mcp)
     annotations = ToolAnnotations(
-        readOnlyHint=False,
-        destructiveHint=True,
-        idempotentHint=True,
-        openWorldHint=False,
+        read_only_hint=False,
+        destructive_hint=True,
+        idempotent_hint=True,
+        open_world_hint=False,
     )
 
     @mcp.tool(annotations=annotations, structured_output=True)

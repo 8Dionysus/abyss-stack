@@ -204,6 +204,7 @@ def test_codex_tasks_receipt_uses_the_serving_server_identity() -> None:
             "structuredContent": {
                 "metadata": {
                     "mcp_sdk": "2.1.1",
+                    "mcp_sdk_source_revision": "0921d94a74db900dccd2d534842aa7b6160542d2",
                     "observation_digest": observation_digest,
                 }
             }
@@ -212,6 +213,7 @@ def test_codex_tasks_receipt_uses_the_serving_server_identity() -> None:
 
     assert runner.server_runtime_identity(terminal) == (
         "2.1.1",
+        "0921d94a74db900dccd2d534842aa7b6160542d2",
         observation_digest,
     )
     with pytest.raises(RuntimeError, match="serving MCP task result"):
@@ -502,6 +504,21 @@ def test_deployment_receipts_must_match_candidate_sdk_for_migration(
     future = "2026-09-05T07:32:30.866342Z"
     for payload in (deployment, tasks_pair, stable_rollback, tasks_matrix):
         payload["expires_at"] = future
+    still_stale = builder.build_status(
+        candidate,
+        pair,
+        stable_rollback_observation=stable_rollback,
+        tasks_matrix=tasks_matrix,
+        live_modern_fleet=deployment,
+        codex_tasks_production_pair=tasks_pair,
+    )
+    assert still_stale["deployment_evidence_current"] is False
+    assert still_stale["core_read_migration_allowed"] is False
+
+    candidate_commit = "0921d94a74db900dccd2d534842aa7b6160542d2"
+    for payload in (deployment, tasks_pair, stable_rollback, tasks_matrix):
+        payload["mcp_sdk"] = "2.1.1"
+        payload["mcp_sdk_source_revision"] = candidate_commit
     admitted = builder.build_status(
         candidate,
         pair,

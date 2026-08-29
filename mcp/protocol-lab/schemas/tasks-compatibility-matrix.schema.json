@@ -9,6 +9,8 @@
     "observed_at": {"type": "string", "format": "date-time"},
     "expires_at": {"type": "string", "format": "date-time"},
     "protocol_version": {"const": "2026-07-28"},
+    "mcp_sdk": {"enum": ["2.0.0", "2.1.1"]},
+    "mcp_sdk_source_revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
     "extension_id": {"const": "io.modelcontextprotocol/tasks"},
     "extension_maturity": {"const": "experimental"},
     "core_read_migration_independent": {"const": true},
@@ -29,7 +31,7 @@
     },
     "known_risks": {"type": "array", "minItems": 5, "items": {"type": "string", "minLength": 12}}
   },
-  "required": ["schema_version", "observed_at", "expires_at", "protocol_version", "extension_id", "extension_maturity", "core_read_migration_independent", "production_tasks_allowed", "reference_pair", "consumers", "known_risks"],
+  "required": ["schema_version", "observed_at", "expires_at", "protocol_version", "mcp_sdk", "mcp_sdk_source_revision", "extension_id", "extension_maturity", "core_read_migration_independent", "production_tasks_allowed", "reference_pair", "consumers", "known_risks"],
   "$defs": {
     "feature_state": {
       "enum": ["wire_pass", "wire_absent", "wire_blocked", "upstream_test_pass", "source_present_unpaired", "source_absent", "unproved", "not_applicable"]

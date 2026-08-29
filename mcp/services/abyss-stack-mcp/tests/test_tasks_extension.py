@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-from importlib.metadata import version
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -77,6 +76,10 @@ def test_task_completes_and_survives_extension_restart(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(
+        "abyss_stack_mcp.tasks_extension.running_mcp_sdk_version",
+        lambda: "2.1.1",
+    )
+    monkeypatch.setattr(
         "abyss_stack_mcp.tasks_extension.get_access_token",
         lambda: SimpleNamespace(client_id="codex-main"),
     )
@@ -107,12 +110,26 @@ def test_task_completes_and_survives_extension_restart(
         assert result["result"]["structuredContent"]["owner_payload"][
             "organ_id"
         ] == "aoa-kag"
+        assert result["result"]["structuredContent"]["metadata"]["mcp_sdk"] == "2.1.1"
         assert (
-            result["result"]["structuredContent"]["metadata"]["mcp_sdk"]
-            == version("mcp")
+            result["result"]["structuredContent"]["metadata"]["mcp_sdk_source_revision"]
+            == "0921d94a74db900dccd2d534842aa7b6160542d2"
         )
 
     asyncio.run(scenario())
+
+
+def test_tasks_identity_rejects_unattested_sdk(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "abyss_stack_mcp.tasks_extension.running_mcp_sdk_version",
+        lambda: "local-patched-build",
+    )
+    from abyss_stack_mcp.tasks_extension import running_mcp_sdk_identity
+
+    with pytest.raises(RuntimeError, match="no reviewed source attestation"):
+        running_mcp_sdk_identity()
 
 
 def test_tasks_fail_closed_without_capability_or_matching_headers(

@@ -15,6 +15,7 @@
     "codex_artifact_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
     "server": {"const": "abyss-stack-mcp/0.5.2"},
     "mcp_sdk": {"enum": ["2.0.0", "2.1.1"]},
+    "mcp_sdk_source_revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
     "runtime_observation_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
     "production_pair": {"const": true},
     "lifecycle": {
@@ -37,5 +38,5 @@
     "verdict": {"const": "eligible_for_bounded_production"},
     "claim_limits": {"type": "array", "minItems": 2, "items": {"type": "string", "minLength": 12}}
   },
-  "required": ["schema_version", "observed_at", "expires_at", "protocol_version", "extension_id", "codex_runtime", "codex_source_revision", "codex_artifact_digest", "server", "mcp_sdk", "production_pair", "lifecycle", "verdict", "claim_limits"]
+  "required": ["schema_version", "observed_at", "expires_at", "protocol_version", "extension_id", "codex_runtime", "codex_source_revision", "codex_artifact_digest", "server", "mcp_sdk", "mcp_sdk_source_revision", "production_pair", "lifecycle", "verdict", "claim_limits"]
 }

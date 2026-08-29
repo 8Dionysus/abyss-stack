@@ -150,6 +150,10 @@ def build_status(
         sdk for sdk in matrix["sdk_lines"] if sdk["sdk_id"] == "python-next"
     )
     candidate_sdk_version = next_sdk["version"]
+    candidate_sdk_identity = {
+        "mcp_sdk": candidate_sdk_version,
+        "mcp_sdk_source_revision": next_sdk["commit"],
+    }
     next_sdk_ready = any(
         sdk["release_status"] == "stable"
         and sdk["production_allowed"]
@@ -191,12 +195,11 @@ def build_status(
     deployment_evidence_expires_at = _earliest_expiry(*deployment_evidence)
     deployment_evidence_current = all(
         (
-            live_modern_fleet["mcp_sdk"] == candidate_sdk_version,
-            codex_tasks_production_pair["mcp_sdk"] == candidate_sdk_version,
-            *(
-                _evidence_is_current(payload, observation["observed_at"])
-                for payload in deployment_evidence
-            ),
+            payload.get("mcp_sdk") == candidate_sdk_identity["mcp_sdk"]
+            and payload.get("mcp_sdk_source_revision")
+            == candidate_sdk_identity["mcp_sdk_source_revision"]
+            and _evidence_is_current(payload, observation["observed_at"])
+            for payload in deployment_evidence
         )
     )
     production_pair_ready = all(

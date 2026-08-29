@@ -3,6 +3,8 @@
   "observed_at": "2026-08-09T13:53:36.813735Z",
   "expires_at": "2026-08-16T13:53:36.813735Z",
   "protocol_version": "2026-07-28",
+  "mcp_sdk": "2.0.0",
+  "mcp_sdk_source_revision": "6f69a3758ebf2ee55ce050f58b470ce11af71133",
   "extension_id": "io.modelcontextprotocol/tasks",
   "extension_maturity": "experimental",
   "core_read_migration_independent": true,

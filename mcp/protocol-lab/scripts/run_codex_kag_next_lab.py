@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import importlib.metadata
 import json
 import os
 import secrets
@@ -39,6 +38,7 @@ from run_kag_next_pair import (
     AccessRecorder,
     build_next_server,
 )
+from _mcp_sdk_identity import installed_mcp_identity
 
 
 WIRE_VERSION = "2026-07-28"
@@ -51,7 +51,10 @@ SUBJECT = "codex-kag-next-lab"
 TRACEPARENT = "00-7d6f4bfe66cc42c7be4dfe186f08bd47-e0ad439d3c018890-01"
 CODEX_VERSION = "codex-cli 0.147.0"
 CODEX_SHA256 = "cb0a15567e9a60a5820d54b0f6ae86d504dc3805c1eab21a47f70e3eb7b73a40"
-PYTHON_MCP_VERSION = "2.1.1"
+MCP_SDK_SOURCE_REVISIONS = {
+    "2.0.0": "6f69a3758ebf2ee55ce050f58b470ce11af71133",
+    "2.1.1": "0921d94a74db900dccd2d534842aa7b6160542d2",
+}
 
 
 def _utc_now() -> str:
@@ -175,6 +178,7 @@ class PersistentAccessRecorder(AccessRecorder):
 
 
 def _serve(args: argparse.Namespace) -> int:
+    installed_mcp_identity(args.python_sdk_root)
     raw_token = os.environ.get(TOKEN_ENV)
     if raw_token is None or len(raw_token) < 32:
         raise RuntimeError(f"{TOKEN_ENV} is missing or too short")
@@ -358,6 +362,22 @@ def _assert_call_result(result: dict[str, Any]) -> dict[str, Any]:
     return structured
 
 
+def _deployment_sdk_identity(path: Path) -> tuple[str, str]:
+    """Read an SDK identity from a passing live-fleet observation."""
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        sdk = payload["mcp_sdk"]
+        source_revision = payload["mcp_sdk_source_revision"]
+        verdict = payload["verdict"]
+    except (OSError, json.JSONDecodeError, KeyError, TypeError) as exc:
+        raise RuntimeError("the live fleet receipt omitted a usable SDK identity") from exc
+    if verdict not in {"production_modern_only_passed", "passed"}:
+        raise RuntimeError("the live fleet receipt is not a passing deployment observation")
+    if MCP_SDK_SOURCE_REVISIONS.get(sdk) != source_revision:
+        raise RuntimeError("the live fleet receipt returned an unattested SDK identity")
+    return sdk, source_revision
+
+
 def _direct_modern_request(url: str, bearer: str, method: str, params: dict[str, Any]) -> tuple[int, dict[str, Any] | None]:
     payload = json.dumps(
         {"jsonrpc": "2.0", "id": 1, "method": method, "params": params},
@@ -390,6 +410,7 @@ def _direct_modern_request(url: str, bearer: str, method: str, params: dict[str,
 
 def _run(args: argparse.Namespace) -> int:
     started_at = _utc_now()
+    sdk_identity = installed_mcp_identity(args.python_sdk_root)
     binary = args.codex_binary.resolve()
     if _sha256(binary) != CODEX_SHA256:
         raise RuntimeError("isolated Codex binary digest drifted")
@@ -401,9 +422,6 @@ def _run(args: argparse.Namespace) -> int:
     ).stdout.strip()
     if observed_version != CODEX_VERSION:
         raise RuntimeError(f"isolated Codex version drifted: {observed_version}")
-    observed_python_mcp = importlib.metadata.version("mcp")
-    if observed_python_mcp != PYTHON_MCP_VERSION:
-        raise RuntimeError(f"Python MCP SDK drifted: {observed_python_mcp}")
     if _port_is_open(args.port):
         raise RuntimeError(f"dedicated lab port {args.port} is already in use")
 
@@ -445,6 +463,8 @@ def _run(args: argparse.Namespace) -> int:
         str(args.aoa_kag_root),
         "--stack-runtime-root",
         str(args.stack_runtime_root),
+        "--python-sdk-root",
+        str(args.python_sdk_root),
     ]
     environment = dict(os.environ)
     environment[TOKEN_ENV] = raw_token
@@ -620,7 +640,8 @@ def _run(args: argparse.Namespace) -> int:
             "registration": REGISTRATION,
             "endpoint": url,
             "process_pid": record["pid"],
-            "python_mcp_version": observed_python_mcp,
+            "python_mcp_version": sdk_identity["version"],
+            "python_mcp_commit": sdk_identity["commit"],
             "source_revisions": {
                 "abyss_stack": _git_head(args.stack_source_root),
                 "aoa_kag": _git_head(args.aoa_kag_root),
@@ -708,6 +729,9 @@ def _stable_canary(args: argparse.Namespace) -> int:
     if raw_token is None or len(raw_token) < 32:
         raise RuntimeError("stable KAG bearer is unavailable in the caller environment")
     config_before = _sha256(args.stable_codex_config)
+    mcp_sdk, mcp_sdk_source_revision = _deployment_sdk_identity(
+        args.live_fleet_receipt
+    )
     binary = args.stable_codex_binary.resolve()
     version = subprocess.run(
         [str(binary), "--version"],
@@ -792,6 +816,8 @@ def _stable_canary(args: argparse.Namespace) -> int:
         "observed_at": started_at,
         "finished_at": _utc_now(),
         "verdict": "stable_production_route_passed_after_lab_rollback",
+        "mcp_sdk": mcp_sdk,
+        "mcp_sdk_source_revision": mcp_sdk_source_revision,
         "consumer": {
             "version": version,
             "binary_sha256": _sha256(binary),
@@ -836,6 +862,7 @@ def main() -> int:
     serve.add_argument("--workspace-root", required=True, type=Path)
     serve.add_argument("--aoa-kag-root", required=True, type=Path)
     serve.add_argument("--stack-runtime-root", required=True, type=Path)
+    serve.add_argument("--python-sdk-root", required=True, type=Path)
 
     run = subparsers.add_parser("run")
     run.add_argument("--output", required=True, type=Path)
@@ -847,11 +874,13 @@ def main() -> int:
     run.add_argument("--stack-runtime-root", required=True, type=Path)
     run.add_argument("--stack-source-root", required=True, type=Path)
     run.add_argument("--stable-codex-config", required=True, type=Path)
+    run.add_argument("--python-sdk-root", required=True, type=Path)
     stable = subparsers.add_parser("stable-canary")
     stable.add_argument("--output", required=True, type=Path)
     stable.add_argument("--stable-codex-binary", required=True, type=Path)
     stable.add_argument("--stable-codex-config", required=True, type=Path)
     stable.add_argument("--workspace-root", required=True, type=Path)
+    stable.add_argument("--live-fleet-receipt", required=True, type=Path)
     args = parser.parse_args()
     if args.command == "serve":
         return _serve(args)

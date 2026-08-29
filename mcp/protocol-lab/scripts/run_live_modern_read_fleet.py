@@ -20,6 +20,10 @@ PROTOCOL = "2026-07-28"
 STACK = Path("/srv/AbyssOS/abyss-stack")
 REGISTRY = Path("/srv/AbyssOS/.aoa/organ-access/organ-registry.v2.source.json")
 RUNTIME_PYTHON = STACK / "Services/abyss-stack-mcp/venv/bin/python"
+MCP_SDK_SOURCE_REVISIONS = {
+    "2.0.0": "6f69a3758ebf2ee55ce050f58b470ce11af71133",
+    "2.1.1": "0921d94a74db900dccd2d534842aa7b6160542d2",
+}
 SERVERS = (
     ("abyss-stack", 5431, "abyss-stack-mcp-read.service", "abyss-stack-mcp-read-bearer-token"),
     ("abyss-machine", 5423, "aoa-organ-mcp-read@abyss-machine.service", "abyss-machine-mcp-read-bearer-token"),
@@ -209,11 +213,19 @@ def main() -> int:
         capture_output=True,
         text=True,
     ).stdout.strip()
+    try:
+        sdk_source_revision = MCP_SDK_SOURCE_REVISIONS[sdk]
+    except KeyError as exc:
+        raise RuntimeError(
+            "the installed production MCP SDK has no reviewed source attestation: "
+            f"{sdk}"
+        ) from exc
     receipt = {
         "schema_version": "abyss_live_modern_read_fleet_v1",
         "observed_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         "protocol_version": PROTOCOL,
         "mcp_sdk": sdk,
+        "mcp_sdk_source_revision": sdk_source_revision,
         "production_unit_count": len(rows),
         "registry": registry,
         "servers": rows,

@@ -221,14 +221,14 @@ def main() -> None:
     if not read_tools or not candidate_tools:
         raise SystemExit("evals MCP contour tool catalog is empty")
     if any(
-        annotations.readOnlyHint is not True
-        or annotations.destructiveHint is not False
+        annotations.read_only_hint is not True
+        or annotations.destructive_hint is not False
         for annotations in read_tools.values()
     ):
         raise SystemExit("evals read tool annotations drifted")
     if any(
-        annotations.readOnlyHint is not False
-        or annotations.destructiveHint is not True
+        annotations.read_only_hint is not False
+        or annotations.destructive_hint is not True
         for annotations in candidate_tools.values()
     ):
         raise SystemExit("evals candidate tool annotations drifted")

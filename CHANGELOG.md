@@ -9,6 +9,10 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Bind MCP 2.1.1 protocol-lab and KAG receipts to the actually imported SDK
+  from a clean attested checkout and source revision; carry the same identity
+  through deployment-bound evidence and use the SDK's typed snake-case
+  annotation fields across all stack-owned MCP service validators.
 - Keep protocol-lab readiness fail-closed when deployment-bound rollback,
   Tasks-matrix, live-fleet, or Codex Tasks evidence expires; expose separate
   candidate/deployment deadlines and derive live Tasks receipts from the

@@ -20,6 +20,8 @@ TASKS_MATRIX_SCHEMA_PATH = LAB_ROOT / "schemas" / "tasks-compatibility-matrix.sc
 EXPECTED_GATE_IDS = tuple(f"P1-{index:02d}" for index in range(1, 15))
 EXPECTED_PYTHON_MCP_VERSION = "2.1.1"
 EXPECTED_PYTHON_MCP_COMMIT = "0921d94a74db900dccd2d534842aa7b6160542d2"
+EXPECTED_DEPLOYMENT_MCP_VERSION = "2.0.0"
+EXPECTED_DEPLOYMENT_MCP_COMMIT = "6f69a3758ebf2ee55ce050f58b470ce11af71133"
 EXPECTED_AOA_KAG_COMMIT = "578e4cea9a04b76a881bde240d5479efceea4926"
 EXPECTED_STACK_SOURCE_COMMIT = "c22ec7626d07ec66ff32569a2cc1b1b82e45f7b4"
 FIXTURES = {
@@ -305,6 +307,7 @@ def validate(checked_at: datetime | None = None) -> list[str]:
         or codex_lab["wire"]["output_limit_bytes"] != 262144
         or codex_lab["wire"]["oversized_input_denied_code"] != -32602
         or codex_lab["server"]["python_mcp_version"] != EXPECTED_PYTHON_MCP_VERSION
+        or codex_lab["server"]["python_mcp_commit"] != EXPECTED_PYTHON_MCP_COMMIT
         or codex_lab["server"]["source_revisions"]["abyss_stack"]
         != EXPECTED_STACK_SOURCE_COMMIT
         or codex_lab["server"]["source_revisions"]["aoa_kag"]
@@ -323,6 +326,8 @@ def validate(checked_at: datetime | None = None) -> list[str]:
         errors.append("isolated Codex KAG modern-pair proof drifted")
     if (
         stable_rollback["verdict"] != "stable_production_route_passed_after_lab_rollback"
+        or stable_rollback["mcp_sdk"] != EXPECTED_DEPLOYMENT_MCP_VERSION
+        or stable_rollback["mcp_sdk_source_revision"] != EXPECTED_DEPLOYMENT_MCP_COMMIT
         or stable_rollback["canary"]["is_error"]
         or not stable_rollback["stable_registration"]["unchanged"]
         or stable_rollback["secrets_included"]
@@ -423,10 +428,15 @@ def validate(checked_at: datetime | None = None) -> list[str]:
         errors.append("live modern-only production fleet evidence drifted")
     if (
         live_modern_fleet["mcp_sdk"] != "2.0.0"
+        or live_modern_fleet["mcp_sdk_source_revision"] != EXPECTED_DEPLOYMENT_MCP_COMMIT
         or codex_tasks_production_pair["mcp_sdk"] != "2.0.0"
+        or codex_tasks_production_pair["mcp_sdk_source_revision"]
+        != EXPECTED_DEPLOYMENT_MCP_COMMIT
+        or tasks_matrix["mcp_sdk"] != EXPECTED_DEPLOYMENT_MCP_VERSION
+        or tasks_matrix["mcp_sdk_source_revision"] != EXPECTED_DEPLOYMENT_MCP_COMMIT
     ):
         errors.append(
-            "deployment-bound production receipts must remain explicitly pinned to MCP 2.0.0"
+            "all deployment-bound production receipts must remain explicitly pinned to MCP 2.0.0 and its source revision"
         )
     if (
         codex_tasks_production_pair["verdict"] != "eligible_for_bounded_production"

@@ -40,6 +40,10 @@ TASK_TOOL = "stack_runtime_inspect_task"
 DEFAULT_TASK_ROOT = Path(
     "/srv/AbyssOS/abyss-stack/Logs/mcp/tasks/abyss-stack-read"
 )
+MCP_SDK_SOURCE_REVISIONS = {
+    "2.0.0": "6f69a3758ebf2ee55ce050f58b470ce11af71133",
+    "2.1.1": "0921d94a74db900dccd2d534842aa7b6160542d2",
+}
 
 
 class _TaskGetParams(RequestParams):
@@ -125,11 +129,24 @@ def task_root_from_environment() -> Path:
 
 
 def running_mcp_sdk_version() -> str:
-    """Read the SDK identity from the server process serving the task."""
+    """Read the installed SDK version from the process serving the task."""
     try:
         return version("mcp")
     except PackageNotFoundError as exc:
         raise RuntimeError("the serving MCP SDK package is not installed") from exc
+
+
+def running_mcp_sdk_identity() -> tuple[str, str]:
+    """Return the installed SDK version and its reviewed source attestation."""
+    sdk_version = running_mcp_sdk_version()
+    try:
+        source_revision = MCP_SDK_SOURCE_REVISIONS[sdk_version]
+    except KeyError as exc:
+        raise RuntimeError(
+            "the serving MCP SDK version has no reviewed source attestation: "
+            f"{sdk_version}"
+        ) from exc
+    return sdk_version, source_revision
 
 
 class StackReadTasksExtension(Extension):
@@ -180,10 +197,10 @@ class StackReadTasksExtension(Extension):
             raise RuntimeError("Tasks-aware tools/call interceptor was bypassed")
 
         annotations = ToolAnnotations(
-            readOnlyHint=True,
-            destructiveHint=False,
-            idempotentHint=True,
-            openWorldHint=False,
+            read_only_hint=True,
+            destructive_hint=False,
+            idempotent_hint=True,
+            open_world_hint=False,
         )
         return (
             ToolBinding(
@@ -300,6 +317,7 @@ class StackReadTasksExtension(Extension):
         arguments: dict[str, Any],
     ) -> None:
         try:
+            mcp_sdk, mcp_sdk_source_revision = running_mcp_sdk_identity()
             owner_payload = await asyncio.to_thread(self.application.inspect, **arguments)
             metadata = owner_payload.get("metadata")
             if not isinstance(metadata, dict):
@@ -308,7 +326,8 @@ class StackReadTasksExtension(Extension):
                 **owner_payload,
                 "metadata": {
                     **metadata,
-                    "mcp_sdk": running_mcp_sdk_version(),
+                    "mcp_sdk": mcp_sdk,
+                    "mcp_sdk_source_revision": mcp_sdk_source_revision,
                 },
             }
             result = {
