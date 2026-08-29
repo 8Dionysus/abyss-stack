@@ -115,6 +115,12 @@ def test_task_completes_and_survives_extension_restart(
             result["result"]["structuredContent"]["metadata"]["mcp_sdk_source_revision"]
             == "0921d94a74db900dccd2d534842aa7b6160542d2"
         )
+        artifact_digest = result["result"]["structuredContent"]["metadata"][
+            "mcp_sdk_artifact_digest"
+        ]
+        assert artifact_digest == (
+            "sha256:1ef71b1a3cfb3daba29b61d9f280896b35bdc1038474285cc8295071418b01e5"
+        )
 
     asyncio.run(scenario())
 

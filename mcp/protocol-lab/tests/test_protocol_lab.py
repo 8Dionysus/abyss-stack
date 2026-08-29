@@ -198,6 +198,7 @@ def test_production_pair_receipt_is_public_safe_and_bounded(builder: Any) -> Non
 
 def test_codex_tasks_receipt_uses_the_serving_server_identity() -> None:
     runner = _load_tasks_runner()
+    artifact_digest = "sha256:" + ("b" * 64)
     observation_digest = "sha256:" + ("a" * 64)
     terminal = {
         "result": {
@@ -205,6 +206,7 @@ def test_codex_tasks_receipt_uses_the_serving_server_identity() -> None:
                 "metadata": {
                     "mcp_sdk": "2.1.1",
                     "mcp_sdk_source_revision": "0921d94a74db900dccd2d534842aa7b6160542d2",
+                    "mcp_sdk_artifact_digest": artifact_digest,
                     "observation_digest": observation_digest,
                 }
             }
@@ -214,10 +216,33 @@ def test_codex_tasks_receipt_uses_the_serving_server_identity() -> None:
     assert runner.server_runtime_identity(terminal) == (
         "2.1.1",
         "0921d94a74db900dccd2d534842aa7b6160542d2",
+        artifact_digest,
         observation_digest,
     )
     with pytest.raises(RuntimeError, match="serving MCP task result"):
         runner.server_runtime_identity({"result": {}})
+
+
+def test_tasks_production_schema_requires_new_runtime_identity_fields(
+    builder: Any,
+) -> None:
+    schema_path = LAB_ROOT / "schemas" / "codex-tasks-production-pair.schema.json"
+    historical = _load(
+        LAB_ROOT / "fixtures" / "codex-tasks-production-pair-20260809.json"
+    )
+    builder.validate_payload(historical, schema_path)
+
+    candidate = copy.deepcopy(historical)
+    candidate["mcp_sdk"] = "2.1.1"
+    candidate["mcp_sdk_source_revision"] = (
+        "0921d94a74db900dccd2d534842aa7b6160542d2"
+    )
+    candidate["mcp_sdk_artifact_digest"] = "sha256:" + ("b" * 64)
+    with pytest.raises(ValueError, match="runtime_observation_digest"):
+        builder.validate_payload(candidate, schema_path)
+
+    candidate["runtime_observation_digest"] = "sha256:" + ("a" * 64)
+    builder.validate_payload(candidate, schema_path)
 
 
 def test_expired_production_pair_receipt_is_rejected() -> None:
@@ -489,6 +514,8 @@ def test_deployment_receipts_must_match_candidate_sdk_for_migration(
     tasks_matrix = _load(LAB_ROOT / "tasks-compatibility-matrix.v1.json")
     deployment["mcp_sdk"] = "2.1.1"
     tasks_pair["mcp_sdk"] = "2.1.1"
+    tasks_pair["mcp_sdk_artifact_digest"] = "sha256:" + ("b" * 64)
+    tasks_pair["runtime_observation_digest"] = "sha256:" + ("a" * 64)
 
     stale = builder.build_status(
         candidate,

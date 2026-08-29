@@ -34,22 +34,32 @@ MCP_SDK_SOURCE_REVISIONS = {
 }
 
 
-def server_runtime_identity(terminal: dict[str, Any]) -> tuple[str, str, str]:
-    """Return SDK and observation identities emitted by the serving process."""
+def server_runtime_identity(terminal: dict[str, Any]) -> tuple[str, str, str, str]:
+    """Return SDK, artifact, and observation identities emitted by the server."""
     try:
         metadata = terminal["result"]["structuredContent"]["metadata"]
         sdk = metadata["mcp_sdk"]
         sdk_source_revision = metadata["mcp_sdk_source_revision"]
+        sdk_artifact_digest = metadata["mcp_sdk_artifact_digest"]
         observation_digest = metadata["observation_digest"]
     except (KeyError, TypeError) as exc:
         raise RuntimeError(
-            "the serving MCP task result omitted its SDK, source, or observation identity"
+            "the serving MCP task result omitted its SDK, source, artifact, or observation identity"
         ) from exc
     if not isinstance(sdk, str) or not sdk:
         raise RuntimeError("the serving MCP task result returned an empty SDK identity")
     if MCP_SDK_SOURCE_REVISIONS.get(sdk) != sdk_source_revision:
         raise RuntimeError(
             "the serving MCP task result returned an unattested SDK source identity"
+        )
+    if (
+        not isinstance(sdk_artifact_digest, str)
+        or not sdk_artifact_digest.startswith("sha256:")
+        or len(sdk_artifact_digest) != 71
+        or any(char not in "0123456789abcdef" for char in sdk_artifact_digest[7:])
+    ):
+        raise RuntimeError(
+            "the serving MCP task result returned an invalid SDK artifact digest"
         )
     if (
         not isinstance(observation_digest, str)
@@ -59,7 +69,7 @@ def server_runtime_identity(terminal: dict[str, Any]) -> tuple[str, str, str]:
         raise RuntimeError(
             "the serving MCP task result returned an invalid observation digest"
         )
-    return sdk, sdk_source_revision, observation_digest
+    return sdk, sdk_source_revision, sdk_artifact_digest, observation_digest
 
 
 class AppClient:
@@ -372,6 +382,7 @@ async def main() -> None:
         (
             mcp_sdk,
             mcp_sdk_source_revision,
+            mcp_sdk_artifact_digest,
             runtime_observation_digest,
         ) = server_runtime_identity(terminal)
 
@@ -382,6 +393,7 @@ async def main() -> None:
             "server": "abyss-stack-mcp/0.5.2",
             "mcp_sdk": mcp_sdk,
             "mcp_sdk_source_revision": mcp_sdk_source_revision,
+            "mcp_sdk_artifact_digest": mcp_sdk_artifact_digest,
             "runtime_observation_digest": runtime_observation_digest,
             "codex_runtime": args.runtime.parents[1].name,
             "codex_runtime_sha256": hashlib.sha256(
