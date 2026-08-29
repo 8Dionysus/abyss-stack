@@ -319,6 +319,126 @@ PY
 resolve_layer_source_rel() {
   local layer="$1"
   local rel_path="$2"
+  if [[ "$layer" == "aoa-kag" ]]; then
+    case "$rel_path" in
+      docs/REASONING_HANDOFF.md)
+        printf '%s\n' "mechanics/checkpoint/parts/reasoning-handoff/docs/reasoning-handoff.md"
+        return 0
+        ;;
+      docs/REASONING_HANDOFF_PACK.md)
+        printf '%s\n' "mechanics/checkpoint/parts/reasoning-handoff/docs/reasoning-handoff-pack.md"
+        return 0
+        ;;
+      docs/RECURRENCE_REGROUNDING.md)
+        printf '%s\n' "mechanics/recurrence/parts/return-regrounding/docs/recurrence-regrounding.md"
+        return 0
+        ;;
+      docs/FEDERATION_KAG_READINESS.md)
+        printf '%s\n' "mechanics/boundary-bridge/parts/source-owned-export/docs/federation-kag-readiness.md"
+        return 0
+        ;;
+      docs/COUNTERPART_CONSUMER_CONTRACT.md)
+        printf '%s\n' "mechanics/boundary-bridge/parts/counterpart-edge/docs/counterpart-consumer-contract.md"
+        return 0
+        ;;
+      docs/TOS_RETRIEVAL_AXIS_PACK.md)
+        printf '%s\n' "mechanics/boundary-bridge/parts/tos-retrieval-axis/docs/tos-retrieval-axis-pack.md"
+        return 0
+        ;;
+      docs/TOS_ZARATHUSTRA_ROUTE_RETRIEVAL_PACK.md)
+        printf '%s\n' "mechanics/boundary-bridge/parts/tos-retrieval-axis/docs/tos-zarathustra-route-retrieval-pack.md"
+        return 0
+        ;;
+      generated/federation_spine.min.json)
+        printf '%s\n' "mechanics/boundary-bridge/parts/federation-spine/generated/federation_spine.min.json"
+        return 0
+        ;;
+      generated/tiny_consumer_bundle.min.json)
+        printf '%s\n' "mechanics/boundary-bridge/parts/tiny-consumer-bundle/generated/tiny_consumer_bundle.min.json"
+        return 0
+        ;;
+      generated/reasoning_handoff_pack.min.json)
+        printf '%s\n' "mechanics/checkpoint/parts/reasoning-handoff/generated/reasoning_handoff_pack.min.json"
+        return 0
+        ;;
+      generated/return_regrounding_pack.min.json)
+        printf '%s\n' "mechanics/recurrence/parts/return-regrounding/generated/return_regrounding_pack.min.json"
+        return 0
+        ;;
+      generated/technique_lift_pack.min.json)
+        printf '%s\n' "mechanics/distillation/parts/technique-lift/generated/technique_lift_pack.min.json"
+        return 0
+        ;;
+      generated/tos_retrieval_axis_pack.min.json)
+        printf '%s\n' "mechanics/boundary-bridge/parts/tos-retrieval-axis/generated/tos_retrieval_axis_pack.min.json"
+        return 0
+        ;;
+      generated/tos_text_chunk_map.min.json)
+        printf '%s\n' "mechanics/distillation/parts/tos-text-chunk-map/generated/tos_text_chunk_map.min.json"
+        return 0
+        ;;
+      generated/cross_source_node_projection.min.json)
+        printf '%s\n' "mechanics/boundary-bridge/parts/cross-source-projection/generated/cross_source_node_projection.min.json"
+        return 0
+        ;;
+      generated/counterpart_federation_exposure_review.min.json)
+        printf '%s\n' "mechanics/audit/parts/exposure-review/generated/counterpart_federation_exposure_review.min.json"
+        return 0
+        ;;
+      generated/tos_zarathustra_route_retrieval_pack.min.json)
+        printf '%s\n' "mechanics/boundary-bridge/parts/tos-retrieval-axis/generated/tos_zarathustra_route_retrieval_pack.min.json"
+        return 0
+        ;;
+      schemas/federation-spine.schema.json)
+        printf '%s\n' "mechanics/boundary-bridge/parts/federation-spine/schemas/federation-spine.schema.json"
+        return 0
+        ;;
+      schemas/tiny-consumer-bundle.schema.json)
+        printf '%s\n' "mechanics/boundary-bridge/parts/tiny-consumer-bundle/schemas/tiny-consumer-bundle.schema.json"
+        return 0
+        ;;
+      schemas/reasoning-handoff-pack.schema.json)
+        printf '%s\n' "mechanics/checkpoint/parts/reasoning-handoff/schemas/reasoning-handoff-pack.schema.json"
+        return 0
+        ;;
+      schemas/return-regrounding-pack.schema.json)
+        printf '%s\n' "mechanics/recurrence/parts/return-regrounding/schemas/return-regrounding-pack.schema.json"
+        return 0
+        ;;
+      schemas/technique-lift-pack.schema.json)
+        printf '%s\n' "mechanics/distillation/parts/technique-lift/schemas/technique-lift-pack.schema.json"
+        return 0
+        ;;
+      schemas/tos-retrieval-axis-pack.schema.json)
+        printf '%s\n' "mechanics/boundary-bridge/parts/tos-retrieval-axis/schemas/tos-retrieval-axis-pack.schema.json"
+        return 0
+        ;;
+      schemas/tos-text-chunk-map.schema.json)
+        printf '%s\n' "mechanics/distillation/parts/tos-text-chunk-map/schemas/tos-text-chunk-map.schema.json"
+        return 0
+        ;;
+      schemas/cross-source-node-projection.schema.json)
+        printf '%s\n' "mechanics/boundary-bridge/parts/cross-source-projection/schemas/cross-source-node-projection.schema.json"
+        return 0
+        ;;
+      schemas/counterpart-federation-exposure-review.schema.json)
+        printf '%s\n' "mechanics/audit/parts/exposure-review/schemas/counterpart-federation-exposure-review.schema.json"
+        return 0
+        ;;
+      schemas/tos-zarathustra-route-retrieval-pack.schema.json)
+        printf '%s\n' "mechanics/boundary-bridge/parts/tos-retrieval-axis/schemas/tos-zarathustra-route-retrieval-pack.schema.json"
+        return 0
+        ;;
+      schemas/counterpart-consumer-contract.schema.json)
+        printf '%s\n' "mechanics/boundary-bridge/parts/counterpart-edge/schemas/counterpart-consumer-contract.schema.json"
+        return 0
+        ;;
+      schemas/bridge-envelope.schema.json)
+        printf '%s\n' "mechanics/boundary-bridge/parts/tos-retrieval-axis/schemas/bridge-envelope.schema.json"
+        return 0
+        ;;
+    esac
+  fi
   if [[ "$layer" == "aoa-evals" ]]; then
     case "$rel_path" in
       docs/TRACE_EVAL_BRIDGE.md)

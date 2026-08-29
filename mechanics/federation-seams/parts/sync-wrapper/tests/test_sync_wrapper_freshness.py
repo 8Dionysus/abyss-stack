@@ -14,6 +14,95 @@ import yaml
 REPO_ROOT = Path(__file__).resolve().parents[5]
 SCRIPT = REPO_ROOT / "scripts" / "aoa-sync-federation-surfaces"
 ROUTING_CONFIG = REPO_ROOT / "config-templates" / "Configs" / "federation" / "aoa-routing.yaml"
+AOA_KAG_SOURCE_PATHS = {
+    "docs/REASONING_HANDOFF.md": (
+        "mechanics/checkpoint/parts/reasoning-handoff/docs/reasoning-handoff.md"
+    ),
+    "docs/REASONING_HANDOFF_PACK.md": (
+        "mechanics/checkpoint/parts/reasoning-handoff/docs/reasoning-handoff-pack.md"
+    ),
+    "docs/RECURRENCE_REGROUNDING.md": (
+        "mechanics/recurrence/parts/return-regrounding/docs/recurrence-regrounding.md"
+    ),
+    "docs/FEDERATION_KAG_READINESS.md": (
+        "mechanics/boundary-bridge/parts/source-owned-export/docs/federation-kag-readiness.md"
+    ),
+    "docs/COUNTERPART_CONSUMER_CONTRACT.md": (
+        "mechanics/boundary-bridge/parts/counterpart-edge/docs/counterpart-consumer-contract.md"
+    ),
+    "docs/TOS_RETRIEVAL_AXIS_PACK.md": (
+        "mechanics/boundary-bridge/parts/tos-retrieval-axis/docs/tos-retrieval-axis-pack.md"
+    ),
+    "docs/TOS_ZARATHUSTRA_ROUTE_RETRIEVAL_PACK.md": (
+        "mechanics/boundary-bridge/parts/tos-retrieval-axis/docs/tos-zarathustra-route-retrieval-pack.md"
+    ),
+    "generated/federation_spine.min.json": (
+        "mechanics/boundary-bridge/parts/federation-spine/generated/federation_spine.min.json"
+    ),
+    "generated/tiny_consumer_bundle.min.json": (
+        "mechanics/boundary-bridge/parts/tiny-consumer-bundle/generated/tiny_consumer_bundle.min.json"
+    ),
+    "generated/reasoning_handoff_pack.min.json": (
+        "mechanics/checkpoint/parts/reasoning-handoff/generated/reasoning_handoff_pack.min.json"
+    ),
+    "generated/return_regrounding_pack.min.json": (
+        "mechanics/recurrence/parts/return-regrounding/generated/return_regrounding_pack.min.json"
+    ),
+    "generated/technique_lift_pack.min.json": (
+        "mechanics/distillation/parts/technique-lift/generated/technique_lift_pack.min.json"
+    ),
+    "generated/tos_retrieval_axis_pack.min.json": (
+        "mechanics/boundary-bridge/parts/tos-retrieval-axis/generated/tos_retrieval_axis_pack.min.json"
+    ),
+    "generated/tos_text_chunk_map.min.json": (
+        "mechanics/distillation/parts/tos-text-chunk-map/generated/tos_text_chunk_map.min.json"
+    ),
+    "generated/cross_source_node_projection.min.json": (
+        "mechanics/boundary-bridge/parts/cross-source-projection/generated/cross_source_node_projection.min.json"
+    ),
+    "generated/counterpart_federation_exposure_review.min.json": (
+        "mechanics/audit/parts/exposure-review/generated/counterpart_federation_exposure_review.min.json"
+    ),
+    "generated/tos_zarathustra_route_retrieval_pack.min.json": (
+        "mechanics/boundary-bridge/parts/tos-retrieval-axis/generated/tos_zarathustra_route_retrieval_pack.min.json"
+    ),
+    "schemas/federation-spine.schema.json": (
+        "mechanics/boundary-bridge/parts/federation-spine/schemas/federation-spine.schema.json"
+    ),
+    "schemas/tiny-consumer-bundle.schema.json": (
+        "mechanics/boundary-bridge/parts/tiny-consumer-bundle/schemas/tiny-consumer-bundle.schema.json"
+    ),
+    "schemas/reasoning-handoff-pack.schema.json": (
+        "mechanics/checkpoint/parts/reasoning-handoff/schemas/reasoning-handoff-pack.schema.json"
+    ),
+    "schemas/return-regrounding-pack.schema.json": (
+        "mechanics/recurrence/parts/return-regrounding/schemas/return-regrounding-pack.schema.json"
+    ),
+    "schemas/technique-lift-pack.schema.json": (
+        "mechanics/distillation/parts/technique-lift/schemas/technique-lift-pack.schema.json"
+    ),
+    "schemas/tos-retrieval-axis-pack.schema.json": (
+        "mechanics/boundary-bridge/parts/tos-retrieval-axis/schemas/tos-retrieval-axis-pack.schema.json"
+    ),
+    "schemas/tos-text-chunk-map.schema.json": (
+        "mechanics/distillation/parts/tos-text-chunk-map/schemas/tos-text-chunk-map.schema.json"
+    ),
+    "schemas/cross-source-node-projection.schema.json": (
+        "mechanics/boundary-bridge/parts/cross-source-projection/schemas/cross-source-node-projection.schema.json"
+    ),
+    "schemas/counterpart-federation-exposure-review.schema.json": (
+        "mechanics/audit/parts/exposure-review/schemas/counterpart-federation-exposure-review.schema.json"
+    ),
+    "schemas/tos-zarathustra-route-retrieval-pack.schema.json": (
+        "mechanics/boundary-bridge/parts/tos-retrieval-axis/schemas/tos-zarathustra-route-retrieval-pack.schema.json"
+    ),
+    "schemas/counterpart-consumer-contract.schema.json": (
+        "mechanics/boundary-bridge/parts/counterpart-edge/schemas/counterpart-consumer-contract.schema.json"
+    ),
+    "schemas/bridge-envelope.schema.json": (
+        "mechanics/boundary-bridge/parts/tos-retrieval-axis/schemas/bridge-envelope.schema.json"
+    ),
+}
 CUTOVER_TEST_HELPERS_PATH = Path(__file__).with_name(
     "test_routing_cutover.py"
 )
@@ -153,3 +242,34 @@ def test_routing_check_rejects_drift_without_checkout_repair(
     assert mirrored_router.read_text(encoding="utf-8") == (
         '{"tampered":true}\n'
     )
+
+
+def test_aoa_kag_sync_maps_mechanic_owned_sources(
+    tmp_path: Path,
+) -> None:
+    kag_config = REPO_ROOT / "config-templates" / "Configs" / "federation" / "aoa-kag.yaml"
+    payload = yaml.safe_load(kag_config.read_text(encoding="utf-8"))
+    source_root = tmp_path / "aoa-kag"
+    stack_root = tmp_path / "abyss-stack"
+    expected: dict[str, str] = {}
+
+    for mirror_rel in payload["required_files"]:
+        source_rel = AOA_KAG_SOURCE_PATHS.get(mirror_rel, mirror_rel)
+        source_path = source_root / source_rel
+        source_path.parent.mkdir(parents=True, exist_ok=True)
+        marker = f"source:{source_rel}\n"
+        source_path.write_text(marker, encoding="utf-8")
+        expected[mirror_rel] = marker
+
+    env = {
+        **os.environ,
+        "AOA_KAG_ROOT": str(source_root),
+        "AOA_STACK_ROOT": str(stack_root),
+    }
+    result = run_sync(["--layer", "aoa-kag"], env=env)
+
+    assert result.returncode == 0, result.stderr + result.stdout
+    mirror_root = stack_root / "Knowledge" / "federation" / "aoa-kag"
+    for mirror_rel, marker in expected.items():
+        assert (mirror_root / mirror_rel).read_text(encoding="utf-8") == marker
+    assert not (source_root / "docs" / "REASONING_HANDOFF.md").exists()
