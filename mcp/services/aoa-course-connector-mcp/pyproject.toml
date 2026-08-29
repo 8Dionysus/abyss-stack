@@ -9,7 +9,7 @@ description = "Filtered read-only OS access to the owner aoa-course MCP API"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-  "mcp==2.0.0",
+  "mcp==2.1.1",
 ]
 
 [project.scripts]

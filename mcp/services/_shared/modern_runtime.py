@@ -15,7 +15,7 @@ from mcp.server import MCPServer
 
 
 PROTOCOL_VERSION = "2026-07-28"
-SUPPORTED_MCP_SDK = "2.0.0"
+SUPPORTED_MCP_SDK = "2.1.1"
 
 
 class _ModernOnlyHTTPApp:

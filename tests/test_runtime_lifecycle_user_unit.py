@@ -4787,7 +4787,7 @@ esac
 class McpLoopbackLifecycleTests(unittest.TestCase):
     def test_release_dependencies_retain_the_tested_mcp_auth_api(self) -> None:
         requirements = (REPO_ROOT / "requirements-dev.txt").read_text(encoding="utf-8")
-        self.assertIn("mcp==2.0.0", requirements.splitlines())
+        self.assertIn("mcp==2.1.1", requirements.splitlines())
 
     def test_all_standalone_packages_require_the_tested_mcp_auth_api(self) -> None:
         for directory, _ in MCP_SERVER_PACKAGES.values():
@@ -4795,7 +4795,7 @@ class McpLoopbackLifecycleTests(unittest.TestCase):
                 pyproject = (
                     REPO_ROOT / "mcp" / "services" / directory / "pyproject.toml"
                 ).read_text(encoding="utf-8")
-                self.assertIn('"mcp==2.0.0",', pyproject)
+                self.assertIn('"mcp==2.1.1",', pyproject)
 
     def test_generated_http_auth_helpers_are_current(self) -> None:
         result = subprocess.run(
