@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://abyss-stack/schemas/machine-code-intelligence-gate.schema.json",
+  "title": "abyss-machine content-addressed code-intelligence admission gate",
+  "description": "A registry record plus detached owner signature. The inner evidence record is never an authority without this gate and an out-of-band machine trust anchor.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "registry", "evidence", "gate", "bundle_digest"],
+  "properties": {
+    "schema_version": {"const": "abyss-stack-machine-code-intelligence-gate-v1"},
+    "registry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "owner", "record_ref", "record_digest", "gate_ref", "gate_digest"],
+      "properties": {
+        "schema_version": {"const": "abyss-machine-content-addressed-registry-record-v1"},
+        "owner": {"const": "abyss-machine"},
+        "record_ref": {"type": "string", "pattern": "^cas://sha256:[0-9a-f]{64}$"},
+        "record_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "gate_ref": {"type": "string", "pattern": "^cas://sha256:[0-9a-f]{64}$"},
+        "gate_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      }
+    },
+    "evidence": {"$ref": "machine-code-intelligence-evidence.schema.json"},
+    "gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "owner", "state", "algorithm", "verification_method", "key_id", "key_digest", "gate_id", "verification_ref", "subject_digest", "signed_payload", "signature", "gate_digest"],
+      "properties": {
+        "schema_version": {"const": "abyss-machine-admission-gate-v1"},
+        "owner": {"const": "abyss-machine"},
+        "state": {"const": "authenticated"},
+        "algorithm": {"const": "ed25519"},
+        "verification_method": {"const": "ed25519-owner-signature-v1"},
+        "key_id": {"type": "string", "minLength": 1},
+        "key_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "gate_id": {"type": "string", "minLength": 1},
+        "verification_ref": {"type": "string", "pattern": "^cas://sha256:[0-9a-f]{64}$"},
+        "subject_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "signed_payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["schema_version", "owner", "gate_id", "state", "algorithm", "verification_method", "key_id", "key_digest", "verification_ref", "registry_record_ref", "registry_record_digest", "evidence_digest", "subject_digest", "provider_source_digest", "config_digest", "claim_limits_digest"],
+          "properties": {
+            "schema_version": {"const": "abyss-machine-admission-gate-signed-payload-v1"},
+            "owner": {"const": "abyss-machine"},
+            "gate_id": {"type": "string", "minLength": 1},
+            "state": {"const": "authenticated"},
+            "algorithm": {"const": "ed25519"},
+            "verification_method": {"const": "ed25519-owner-signature-v1"},
+            "key_id": {"type": "string", "minLength": 1},
+            "key_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+            "verification_ref": {"type": "string", "pattern": "^cas://sha256:[0-9a-f]{64}$"},
+            "registry_record_ref": {"type": "string", "pattern": "^cas://sha256:[0-9a-f]{64}$"},
+            "registry_record_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+            "evidence_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+            "subject_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+            "provider_source_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+            "config_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+            "claim_limits_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+          }
+        },
+        "signature": {"type": "string", "minLength": 1},
+        "gate_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      }
+    },
+    "bundle_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  }
+}

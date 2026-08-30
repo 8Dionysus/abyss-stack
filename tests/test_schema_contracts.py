@@ -379,6 +379,18 @@ EXPECTED_ACTIVE_SCHEMA_PATHS = {
         "mechanics/runtime-lifecycle/parts/status-readouts/schemas/runtime-usage-snapshot.schema.json"
     ),
     Path(
+        "mechanics/runtime-lifecycle/parts/live-code-intelligence/config/schemas/live-code-intelligence-provider.schema.json"
+    ),
+    Path(
+        "mechanics/runtime-lifecycle/parts/live-code-intelligence/config/schemas/machine-code-intelligence-evidence.schema.json"
+    ),
+    Path(
+        "mechanics/runtime-lifecycle/parts/live-code-intelligence/config/schemas/machine-code-intelligence-gate-public-key.schema.json"
+    ),
+    Path(
+        "mechanics/runtime-lifecycle/parts/live-code-intelligence/config/schemas/machine-code-intelligence-gate.schema.json"
+    ),
+    Path(
         "mechanics/runtime-repair/parts/a2a-return-dry-run/schemas/runtime-a2a-return-closeout-dry-run.schema.json"
     ),
     Path(

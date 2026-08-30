@@ -1,0 +1,413 @@
+{
+  "schema_version": "abyss_stack_external_codex_model_report_v1",
+  "goal_id": "01a02fec-b609-7120-b11c-fa80d34ee86a",
+  "direction": "LIVE",
+  "generation": 63,
+  "task_id": "actor-task:code-intelligence.live-code-intelligence-direction.01a02fec-b609-7120-b11c-fa80d34ee86a.g63.whole-continuation",
+  "continuation_id": "continuation:code-intelligence.live-code-intelligence-direction.01a02fec-b609-7120-b11c-fa80d34ee86a.g63.whole-continuation",
+  "correlation_id": "actor-route:code-intelligence.live-code-intelligence-direction.01a02fec-b609-7120-b11c-fa80d34ee86a.g63.whole-continuation",
+  "incarnation_id": "incarnation:code-intelligence.live-code-intelligence-direction.01a02fec-b609-7120-b11c-fa80d34ee86a.g63.whole-continuation",
+  "holder_id": "actor:code-intelligence:live-code-intelligence-direction:g63",
+  "owner": "abyss-stack",
+  "artifact_paths": [
+    "reports/live-code-intelligence-direction-completion.json",
+    "reports/live-code-intelligence-direction-completion.md"
+  ],
+  "derived_owner_family_refresh": {
+    "generator_ref": "aoa-kag@72cea62c76ee8b32304c7c358734276c47833b9a",
+    "history_ref": "acee6d7684959ceaace27464c81f1ba23a4f03ea",
+    "event_history_ref": "acee6d7684959ceaace27464c81f1ba23a4f03ea",
+    "budget_base_ref": "acee6d7684959ceaace27464c81f1ba23a4f03ea",
+    "receipt_status": "accepted_measured_exceedance",
+    "standing_budget_raised": false,
+    "surfaces": [
+      "kag/indexes/index_family.manifest.json",
+      "kag/indexes/shards/**",
+      "kag/receipts/index_family_budget/<family-digest>.json"
+    ],
+    "claim_limit": "Derived repository navigation only; it does not establish authored source authority, provider trust, consumer admission, deployment, runtime observation, semantic acceptance, proof/eval, or owner acceptance."
+  },
+  "changed_source_paths": [
+    "CHANGELOG.md",
+    "docs/testing/test_inventory.json",
+    "tests/test_schema_contracts.py",
+    "mechanics/runtime-lifecycle/DIRECTION.md",
+    "mechanics/runtime-lifecycle/LANDING_LOG.md",
+    "mechanics/runtime-lifecycle/PARTS.md",
+    "mechanics/runtime-lifecycle/PROVENANCE.md",
+    "mechanics/runtime-lifecycle/README.md",
+    "mechanics/runtime-lifecycle/ROADMAP.md",
+    "mechanics/runtime-lifecycle/parts/README.md",
+    "mechanics/runtime-lifecycle/parts/live-code-intelligence/README.md",
+    "mechanics/runtime-lifecycle/parts/live-code-intelligence/config/python-ast-live-provider.json",
+    "mechanics/runtime-lifecycle/parts/live-code-intelligence/config/schemas/live-code-intelligence-provider.schema.json",
+    "mechanics/runtime-lifecycle/parts/live-code-intelligence/config/schemas/machine-code-intelligence-evidence.schema.json",
+    "mechanics/runtime-lifecycle/parts/live-code-intelligence/config/schemas/machine-code-intelligence-gate-public-key.schema.json",
+    "mechanics/runtime-lifecycle/parts/live-code-intelligence/config/schemas/machine-code-intelligence-gate.schema.json",
+    "mechanics/runtime-lifecycle/parts/live-code-intelligence/live_code_intelligence.py",
+    "mechanics/runtime-lifecycle/parts/live-code-intelligence/tests/test_live_code_intelligence.py"
+  ],
+  "changed_source_evidence": [
+    {
+      "path": "CHANGELOG.md",
+      "lines": 1601,
+      "sha256": "436dcee3230332d73435b6796609506184bd58296b72dd9ca6f3124fef4e5381"
+    },
+    {
+      "path": "docs/testing/test_inventory.json",
+      "lines": 233,
+      "sha256": "6ba51f6d3e05ff6c382f04b85d0a19c0e80498a919b6bdf1a4ac1f74d02ba6b5"
+    },
+    {
+      "path": "tests/test_schema_contracts.py",
+      "lines": 944,
+      "sha256": "375ce4b74816b03f6019a49b40856c84b624eec2873604ff655e9085340ba21d"
+    },
+    {
+      "path": "mechanics/runtime-lifecycle/DIRECTION.md",
+      "lines": 23,
+      "sha256": "fadcb2fd197268cb0901ba20c65886912140fb62d42e4357a5ac3cc8d4c19763"
+    },
+    {
+      "path": "mechanics/runtime-lifecycle/LANDING_LOG.md",
+      "lines": 67,
+      "sha256": "4067b0d9ee2278a96a91f7a1ab67ae0f6b39ffeebf628d14bea36e1a4ff6934f"
+    },
+    {
+      "path": "mechanics/runtime-lifecycle/PARTS.md",
+      "lines": 16,
+      "sha256": "3f79dbe1bdb242d22398c1a4c1dc4788a6ca65fb814fffdb28b28da8730a1fcf"
+    },
+    {
+      "path": "mechanics/runtime-lifecycle/PROVENANCE.md",
+      "lines": 37,
+      "sha256": "9262495a43fac83ca869ccf01dd95ba7a44048e2231527de93ef4c5eac18a371"
+    },
+    {
+      "path": "mechanics/runtime-lifecycle/README.md",
+      "lines": 132,
+      "sha256": "2143691d30ae7f1397109d9f3b59a2a625874419889b42f9fe4106ccbb803e41"
+    },
+    {
+      "path": "mechanics/runtime-lifecycle/ROADMAP.md",
+      "lines": 30,
+      "sha256": "a72710dcc4847f0ea853266f0fddc39fd7a57af231b2fda1cefb054563fec0fe"
+    },
+    {
+      "path": "mechanics/runtime-lifecycle/parts/README.md",
+      "lines": 19,
+      "sha256": "3bf16d72a496d4079ab2998497c60b14aa51471de6853c156ae4052ef7126805"
+    },
+    {
+      "path": "mechanics/runtime-lifecycle/parts/live-code-intelligence/README.md",
+      "lines": 177,
+      "sha256": "79b46fe95bff23c07520f94cc552d2919bbc6c65bc9eaf96ad871e84b96e34a7"
+    },
+    {
+      "path": "mechanics/runtime-lifecycle/parts/live-code-intelligence/config/python-ast-live-provider.json",
+      "lines": 51,
+      "sha256": "7c6d8b625c319e48664b6c3e66913f9e131ef34d00c417b008300212decdca26"
+    },
+    {
+      "path": "mechanics/runtime-lifecycle/parts/live-code-intelligence/config/schemas/live-code-intelligence-provider.schema.json",
+      "lines": 110,
+      "sha256": "5fc57c462b8fec63209939331609144a31d96135938522ec9d161eb202d11689"
+    },
+    {
+      "path": "mechanics/runtime-lifecycle/parts/live-code-intelligence/config/schemas/machine-code-intelligence-evidence.schema.json",
+      "lines": 233,
+      "sha256": "77f2311d267273598960cf6d0ac90318717ee2d3e0a792b986d152aa4bae984e"
+    },
+    {
+      "path": "mechanics/runtime-lifecycle/parts/live-code-intelligence/config/schemas/machine-code-intelligence-gate-public-key.schema.json",
+      "lines": 16,
+      "sha256": "8a2d5582836d498875da242f19467ff405cfeb5c4eaa47739c17dd9ae6648c68"
+    },
+    {
+      "path": "mechanics/runtime-lifecycle/parts/live-code-intelligence/config/schemas/machine-code-intelligence-gate.schema.json",
+      "lines": 69,
+      "sha256": "9c4029a7c27e84b3de5f5dc3cedc7ea07dd0199c3a1e34615a2c9e83eefdb7e5"
+    },
+    {
+      "path": "mechanics/runtime-lifecycle/parts/live-code-intelligence/live_code_intelligence.py",
+      "lines": 5910,
+      "sha256": "9c6c8571899126e0948e379106759b3090709ef40eaccf3d4158aab978d374a0"
+    },
+    {
+      "path": "mechanics/runtime-lifecycle/parts/live-code-intelligence/tests/test_live_code_intelligence.py",
+      "lines": 1975,
+      "sha256": "195fb8d70684d2147dbb4a20ecb964b45e4433ffce32e5ef4e73ea0ace6a1384"
+    }
+  ],
+  "baseline_continuation_source_paths": [
+    "mechanics/runtime-lifecycle/parts/live-code-intelligence/config/python-ast-live-provider.json",
+    "mechanics/runtime-lifecycle/parts/live-code-intelligence/config/schemas/live-code-intelligence-provider.schema.json",
+    "mechanics/runtime-lifecycle/parts/live-code-intelligence/live_code_intelligence.py",
+    "mechanics/runtime-lifecycle/parts/live-code-intelligence/tests/test_live_code_intelligence.py"
+  ],
+  "preexisting_dirty_paths_preserved": [],
+  "source_basis": {
+    "workspace": ".",
+    "branch": "goal-01a02fec-g62-live",
+    "base_ref": "origin/main",
+    "base_commit": "acee6d7684959ceaace27464c81f1ba23a4f03ea",
+    "fresh_authored_source_work": true,
+    "source_only_effect_scope": "owner_source_landing",
+    "g42_indexed_input": "not_used_no_exact_later_master_disposition_supplied",
+    "source_claim_limit": "The source is a review-required candidate contract. It does not establish machine registry promotion, consumer admission, provider installation, deployment, runtime observation, transport, semantic acceptance, proof/eval, or owner acceptance."
+  },
+  "implementation": {
+    "summary": "Continued the whole LIVE code-intelligence source direction in the canonical runtime-lifecycle part, repaired persisted-state currentness boundaries and review-identified LSP/parser/query freshness gaps, made the promised restart/last-good/canary/rollback lifecycle route executable with bounded receipts, closed generic LSP URI/cwd/interpreter/document-content boundaries, sanitized the LSP child environment, bound LSP runtime dependencies and opened bytes to signed manifests, eliminated POSIX parent-symlink source reads, serialized state readers and concurrent LSP starts, synchronized the active-schema discovery contract, refreshed the derived owner family, and reconciled its parent routes, validation inventory, and changelog.",
+    "source_changes": [
+      "Added a Python-AST source-local provider with source epochs, import/definition/reference/call observations, deterministic bounded provider work queue, and candidate/current/last-good refresh transitions.",
+      "Added the exact G59 provider-neutral MACHINE consumer ABI and machine evidence/gate/public-key schemas while preserving existing-root-owned-anchor-only posture.",
+      "Hardened source/state/config traversal against symlink escapes, strictly revalidated persisted observations and lifecycle identity before status/query/discover use, corrected package-relative and discovered-import-root invalidation, preserved captured source snapshots after machine-health expiry, and kept LSP/second-language surfaces receipt-only until external evidence exists.",
+      "Added focused coverage for package-relative invalidation, symlink rejection, tampered observation/lifecycle/last-good rejection, last-good fallback, executable restart/last-good/canary/rollback operations, ABI exposure, anchor posture, authenticated LSP binding, stdio transport enforcement, bounded response headers, authenticated persisted-summary provenance, parser resource degradation, stale machine health, query truncation, aggregate source-memory bounding, lifecycle receipt transactions, Windows lock fail-closed behavior, undecodable POSIX filenames, generic LSP URI containment including arbitrary nested command arguments, fixed launch cwd and minimal child environment, admitted script interpreters, complete runtime dependency manifest rejection, source-epoch manifest rejection after disk mutation, bound document content, descriptor-relative parent-symlink rejection, serialized state reads, concurrent LSP starts, and the authored programmatic file-size cap.",
+      "Changed source scanning to retain no aggregate file-content buffer, use descriptor-relative no-follow parent walks on POSIX, reread and digest-check one bounded file at a time for parsing, degrade undecodable POSIX filenames into explicit diagnostics, and roll back state/candidate/transition/operation receipts together when lifecycle receipt publication fails.",
+      "Bound persisted authenticated summaries to the runtime's capture-time evidence, require admitted LSP sessions to use observed stdio transport, bind script interpreters and the admitted working directory, bind the complete runtime-root dependency manifest and recheck it before every launch, launch Python children with -S and a fixed manifest-root PYTHONPATH, exclude caller-controlled Python and native-loader inputs, recursively validate generic URI-bearing messages including file URIs hidden in arbitrary nested values, bind opened bytes to a signed per-file source-epoch manifest, reject unbound or changed document buffers, serialize session lifecycle transitions, and cap response header line, cumulative, and count limits before reading message bodies.",
+      "Kept the programmatic max_file_bytes setting and its authenticated machine resource envelope at or below the authored 1,000,000-byte limit, including when callers construct a matching custom binding.",
+      "Synchronized the repository-level active-schema manifest regression with the four newly admitted LIVE code-intelligence schema surfaces.",
+      "Refreshed the derived repo-local KAG family with the pinned owner generator and an explicit measured-exceedance receipt without raising standing budgets; the family remains navigation data only.",
+      "Added canonical runtime-lifecycle routes, provenance, roadmap, landing-log, changelog, and test-inventory entries."
+    ],
+    "machine_consumer_abi": {
+      "owner": "abyss-stack",
+      "binding_schema": "abyss-machine-code-intelligence-provider-binding-v1",
+      "evidence_schema": "abyss-stack-machine-code-intelligence-evidence-v1",
+      "gate_schema": "abyss-stack-machine-code-intelligence-gate-v1",
+      "gate_record_schema": "abyss-machine-admission-gate-v1",
+      "signed_payload_schema": "abyss-machine-admission-gate-signed-payload-v1",
+      "public_key_schema": "abyss-machine-code-intelligence-gate-public-key-v1",
+      "algorithm": "ed25519",
+      "verification_method": "ed25519-owner-signature-v1",
+      "trust_anchor_ref": "/etc/abyss-machine/trust/code-intelligence-gate-ed25519.json",
+      "trust_anchor_posture": "existing_root_owned_anchor_only",
+      "provider_neutral": true,
+      "state_axes": ["candidate", "current", "last_good"]
+    }
+  },
+  "reviewed_claim_boundaries": [
+    {
+      "reference": "master/generation-58-headless-return-responsibility-disposition-v1.json",
+      "accepted_for_this_continuation": "G58 fail-closed source candidate, fixed trust-boundary contract, and provider-neutral lifecycle/LSP/state direction.",
+      "not_accepted": "Real trust anchor, signed registry/provider, installation, admission, deployment, restart, canary, rollback, LSP runtime, proof, landing, and owner acceptance."
+    },
+    {
+      "reference": "master/generation-59-headless-return-responsibility-disposition-v1.json",
+      "accepted_for_this_continuation": "The exact MACHINE consumer ABI and source integration path; the Universal Ctags candidate remains unsigned and unadmitted.",
+      "not_accepted": "Artifact promotion, trust, installation, activation, admission, deployment, transport, semantic proof, or runtime execution."
+    },
+    {
+      "reference": "master/generation-60-headless-return-responsibility-disposition-v1.json",
+      "accepted_for_this_continuation": "The bounded source/eval-facing separation as an integration constraint.",
+      "not_accepted": "Any proof/eval verdict or runtime/provider acceptance."
+    },
+    {
+      "reference": "G42 INDEXED output",
+      "accepted_for_this_continuation": "None; no exact later master disposition was supplied.",
+      "not_accepted": "All G42 output as input or authority."
+    },
+    {
+      "reference": "master/generation-62-headless-return-responsibility-disposition-v1.json",
+      "accepted_for_this_continuation": "The exact owner-bound G62 return, meaningful uncommitted LIVE source delta, and continuation obligation for durable source landing.",
+      "not_accepted": "The claimed G62 commit or landing, deployed/runtime proof, Ctags/Tree-sitter/SCIP/LSP/second-language execution, repository-wide CI, transport semantics, proof/eval verdict, or owner acceptance."
+    },
+    {
+      "reference": "master/generation-63-live-code-intelligence-direction-responsibility-reclassification-v1.json",
+      "accepted_for_this_continuation": "Independent whole-direction source, validation, repair, and GitHub landing responsibility for this exact LIVE continuation.",
+      "not_accepted": "Trust-root creation, provider installation/admission/activation/execution, service or host mutation, sibling-owner mutation, runtime/proof/eval authority, or owner acceptance."
+    }
+  ],
+  "decision": "submit_for_review",
+  "status": "review_required",
+  "external_effects_claimed": false,
+  "owner_acceptance_claimed": false,
+  "summary": "The review-closure pass carries the complete LIVE direction and targeted boundary repairs into canonical abyss-stack source: a bounded Python-AST observation provider, source-epoch and dependency invalidation, candidate/current/last-good lifecycle, executable restart/last-good/canary/rollback operations with bounded receipts, exact G59 MACHINE consumer ABI, strict state/config currentness checks, bound LSP launch identity, working directory, interpreter, complete runtime dependency manifest, fixed child environment, recursively contained URI and source-epoch-manifest-bound document-content boundaries including arbitrary nested file URIs, authored programmatic resource limits, serialized state/session reads, authenticated persisted-summary provenance, bounded response headers, fresh machine-health posture, parser-resource degradation, and explicit query truncation. No G59 artifact was installed, admitted, activated, executed, or described as current. The return remains review_required with repository-wide environment residuals separated from changed-surface readiness.",
+  "findings": [
+    {
+      "category": "canonical-live-source-integration",
+      "severity": "implemented_source_only",
+      "evidence_refs": [
+        "source:mechanics/runtime-lifecycle/parts/live-code-intelligence/live_code_intelligence.py",
+        "source:mechanics/runtime-lifecycle/parts/live-code-intelligence/config/python-ast-live-provider.json",
+        "validation:focused-live-code-intelligence-unittest-67",
+        "validation:validate-stack-g63"
+      ],
+      "summary": "The whole reviewed LIVE source direction is now represented under the canonical abyss-stack runtime-lifecycle part with owner-local routes and source validation."
+    },
+    {
+      "category": "fail-closed-machine-boundary",
+      "severity": "implemented_source_only_without_machine_admission",
+      "evidence_refs": [
+        "source:mechanics/runtime-lifecycle/parts/live-code-intelligence/live_code_intelligence.py:MACHINE_CONSUMER_ABI",
+        "source:mechanics/runtime-lifecycle/parts/live-code-intelligence/live_code_intelligence.py:_validate_machine_evidence_gate_bundle",
+        "source:mechanics/runtime-lifecycle/parts/live-code-intelligence/config/schemas/machine-code-intelligence-gate.schema.json",
+        "source:mechanics/runtime-lifecycle/parts/live-code-intelligence/config/schemas/machine-code-intelligence-evidence.schema.json",
+        "test:mechanics/runtime-lifecycle/parts/live-code-intelligence/tests/test_live_code_intelligence.py:test_machine_evidence_is_external_owner_qualified_and_provider_neutral"
+      ],
+      "summary": "The source consumes only exact provider-neutral, content-addressed, detached-signature evidence bound to the fixed existing root-owned anchor path; no anchor or machine receipt was created or imported."
+    },
+    {
+      "category": "source-state-recovery-hardening",
+      "severity": "implemented_source_only",
+      "evidence_refs": [
+        "source:mechanics/runtime-lifecycle/parts/live-code-intelligence/live_code_intelligence.py:_contains_symlink",
+        "source:mechanics/runtime-lifecycle/parts/live-code-intelligence/live_code_intelligence.py:_persisted_state_is_well_formed",
+        "source:mechanics/runtime-lifecycle/parts/live-code-intelligence/live_code_intelligence.py:_state_identity_matches_config",
+        "validation:focused-live-code-intelligence-unittest-67"
+      ],
+      "summary": "Source and state roots reject symlinked paths; persisted observation, lifecycle, and last-good records are structurally and identity checked before use; package-relative invalidation is correct; degraded refresh points to a validated last-good fallback; and restart, canary, last-good, and rollback execute under the state lock without overclaiming deployed lifecycle behavior."
+    },
+    {
+      "category": "lsp-admitted-manifest-boundaries",
+      "severity": "implemented_source_only_without_machine_admission",
+      "evidence_refs": [
+        "source:mechanics/runtime-lifecycle/parts/live-code-intelligence/live_code_intelligence.py:_directory_file_manifest",
+        "source:mechanics/runtime-lifecycle/parts/live-code-intelligence/config/schemas/machine-code-intelligence-evidence.schema.json",
+        "test:mechanics/runtime-lifecycle/parts/live-code-intelligence/tests/test_live_code_intelligence.py:test_lsp_launch_rejects_changed_runtime_dependency_manifest",
+        "test:mechanics/runtime-lifecycle/parts/live-code-intelligence/tests/test_live_code_intelligence.py:test_lsp_open_document_rejects_unbound_buffer"
+      ],
+      "summary": "Observed LSP sessions require machine-signed runtime-root and source-epoch file manifests. The runtime manifest is recomputed at construction and launch, Python scripts run without site initialization and only with a fixed manifest-root path, and opened document bytes must match the signed per-file source digest before notification. Missing or changed manifests fail closed; no machine manifest or admission is created by this source owner."
+    },
+    {
+      "category": "owner-review-and-landing-boundary",
+      "severity": "review_required",
+      "evidence_refs": [
+        "artifact:reports/live-code-intelligence-direction-completion.json:transition",
+        "artifact:reports/live-code-intelligence-direction-completion.md:Return ABI",
+        "validation:changed-source-evidence-review-closure"
+      ],
+      "summary": "Source readiness, producer validation, registry promotion, consumer admission, deployment/runtime evidence, transport, semantic acceptance, proof/eval, landing, and owner acceptance remain separate claims."
+    }
+  ],
+  "immutable_inputs_read": [],
+  "private_capture": "omitted; source-relative evidence is retained",
+  "owner_validations": [
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest mechanics.runtime-lifecycle.parts.live-code-intelligence.tests.test_live_code_intelligence -q",
+      "status": "passed",
+      "result": "67 tests passed",
+      "evidence_ref": "validation:focused-live-code-intelligence-unittest-67"
+    },
+    {
+      "command": "ruff check mechanics/runtime-lifecycle/parts/live-code-intelligence/live_code_intelligence.py mechanics/runtime-lifecycle/parts/live-code-intelligence/tests/test_live_code_intelligence.py",
+      "status": "passed",
+      "result": "All checks passed",
+      "evidence_ref": "validation:ruff-live-code-intelligence-g63"
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 -m py_compile mechanics/runtime-lifecycle/parts/live-code-intelligence/live_code_intelligence.py mechanics/runtime-lifecycle/parts/live-code-intelligence/tests/test_live_code_intelligence.py",
+      "status": "passed",
+      "result": "compiled",
+      "evidence_ref": "validation:py-compile-live-code-intelligence-g63"
+    },
+    {
+      "command": "python3 -m json.tool on the provider config and four code-intelligence schemas",
+      "status": "passed",
+      "result": "all five JSON documents parsed",
+      "evidence_ref": "validation:live-code-intelligence-json-documents-g63"
+    },
+    {
+      "command": "Draft202012Validator for provider config against live-code-intelligence-provider.schema.json",
+      "status": "passed",
+      "result": "provider-config-schema-ok",
+      "evidence_ref": "validation:provider-config-schema-g63"
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -q tests/test_schema_contracts.py",
+      "status": "passed",
+      "result": "9 tests passed",
+      "evidence_ref": "validation:active-schema-contracts-9-g63"
+    },
+    {
+      "command": "python3 -m pytest -q tests/test_test_topology.py tests/test_mechanics_topology_validator_module.py",
+      "status": "passed",
+      "result": "11 tests passed",
+      "evidence_ref": "validation:topology-tests-g63"
+    },
+    {
+      "command": "python3 scripts/validate_stack.py",
+      "status": "passed",
+      "result": "validation passed",
+      "evidence_ref": "validation:validate-stack-g63"
+    },
+    {
+      "command": "python3 scripts/validate_nested_agents.py",
+      "status": "passed",
+      "result": "53 required nested documents passed",
+      "evidence_ref": "validation:validate-nested-agents-g63"
+    },
+    {
+      "command": "aoa-kag@72cea62c76ee8b32304c7c358734276c47833b9a generator --tiered-family with explicit budget receipt",
+      "status": "passed",
+      "result": "canonical derived owner-family gate passed with a digest-bound measured-exceedance receipt",
+      "evidence_ref": "validation:repo-local-kag-family-refresh-g63"
+    },
+    {
+      "command": "python3 scripts/ci_gate.py --mode source-fast",
+      "status": "blocked_environment",
+      "result": "All stages through validate_stack passed; validate_local_stats_port failed because the aoa-stats validator was unavailable at both checked owner-worktree paths.",
+      "evidence_ref": "validation:source-fast-aoa-stats-unavailable-g63"
+    },
+    {
+      "command": "python3 scripts/ci_gate.py --mode tests",
+      "status": "blocked_environment",
+      "result": "2814 tests collected; seven collection errors: six from installed MCP API drift (MCPError versus McpError and missing MCPServer) and one because aoa_sdk.contracts.programmatic_execution is unavailable; exit 2.",
+      "evidence_ref": "validation:full-tests-environment-blockers-g63"
+    }
+  ],
+  "residuals": [
+    "No real abyss-machine trust anchor, signed registry record, provider artifact, installation, activation, trust grant, admission, deployment, restart, canary, rollback, host-health observation, service mutation, secret access, or global configuration mutation occurred.",
+    "The G59 Universal Ctags candidate remains an unsigned and unadmitted MACHINE-side artifact; this continuation imported only its reviewed consumer ABI, not the artifact or a registry assertion.",
+    "The Python worker and queue are stack-local source observation mechanics. Tree-sitter, SCIP, Ctags, TypeScript/LSP execution, second-language observations, and transport remain receipt/read-model surfaces until their owners supply exact admitted runtime evidence.",
+    "The refreshed repo-local KAG family is derived navigation data and is not an authored source, trust, runtime, semantic, proof, or owner-acceptance verdict.",
+    "Source-fast remains blocked by the unavailable local aoa-stats validator. The full tests lane remains blocked by seven collection errors after 2814 tests were collected: six installed-MCP API errors and one unavailable aoa_sdk.contracts.programmatic_execution module from the rebased base seam.",
+    "No G42 INDEXED output was accepted as input because no exact later master disposition was supplied.",
+    "No semantic acceptance, proof/eval verdict, owner acceptance, or landing acceptance is claimed by this owner return; those remain separate gates even if source landing proceeds through GitHub."
+  ],
+  "transition": {
+    "from_status": "active",
+    "to_status": "review_required",
+    "owner": "abyss-stack",
+    "approval_posture": "master_review_required",
+    "rollback_reentry_route": "master:01a02fec-b609-7120-b11c-fa80d34ee86a",
+    "evidence_refs": [
+      "source:mechanics/runtime-lifecycle/parts/live-code-intelligence",
+      "validation:focused-live-code-intelligence-unittest-67",
+      "validation:active-schema-contracts-9-g63",
+      "validation:repo-local-kag-family-refresh-g63",
+      "validation:validate-stack-g63",
+      "validation:source-fast-aoa-stats-unavailable-g63",
+      "validation:full-tests-environment-blockers-g63",
+      "validation:changed-source-evidence-review-closure"
+    ]
+  },
+  "reentry_request": {
+    "condition_id": "validated-return",
+    "proposed_action": "wake_parent",
+    "reason": "Meaningful G63 whole-direction source repair, validation, and landing preparation are complete for master review. Source-only landing evidence remains separable from machine trust/admission, deployed runtime, transport, semantic proof, eval, and owner acceptance."
+  },
+  "validation_claims": [
+    {
+      "argv": ["python3", "-m", "json.tool", "reports/live-code-intelligence-direction-completion.json"],
+      "command_id": "validate-live-code-intelligence-direction-completion-json",
+      "cwd": ".",
+      "evidence_ref": "runtime:validation:validate-live-code-intelligence-direction-completion-json",
+      "status": "passed"
+    },
+    {
+      "argv": ["/usr/bin/test", "-s", "reports/live-code-intelligence-direction-completion.md"],
+      "command_id": "validate-live-code-intelligence-direction-completion-md",
+      "cwd": ".",
+      "evidence_ref": "runtime:validation:validate-live-code-intelligence-direction-completion-md",
+      "status": "passed"
+    },
+    {
+      "argv": ["git", "diff", "--check", "HEAD"],
+      "command_id": "check-live-code-intelligence-direction-diff",
+      "cwd": ".",
+      "evidence_ref": "runtime:validation:check-live-code-intelligence-direction-diff",
+      "status": "passed"
+    }
+  ]
+}

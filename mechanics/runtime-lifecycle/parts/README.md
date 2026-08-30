@@ -11,6 +11,7 @@ readiness, status readouts, and systemd user unit routes.
 - [logs-status](logs-status/README.md)
 - [status-readouts](status-readouts/README.md)
 - [user-unit](user-unit/README.md)
+- [live-code-intelligence](live-code-intelligence/README.md)
 
 Packet routes:
 

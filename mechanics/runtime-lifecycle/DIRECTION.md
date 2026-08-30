@@ -18,3 +18,6 @@ Near direction:
 - add focused tests when status readouts or lifecycle wrappers gain new logic
 - route host-fit questions to machine-fit and config material to
   config-projection
+- keep the source-local LIVE code-intelligence observer provider-neutral,
+  candidate/current/last-good, and explicit about machine admission and
+  observation-meaning ownership

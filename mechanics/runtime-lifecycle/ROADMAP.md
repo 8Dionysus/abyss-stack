@@ -19,6 +19,9 @@
   environment assembly
 - split logs/status readout contracts further only when new source-safe
   runtime artifacts appear
+- carry the LIVE code-intelligence candidate through focused source validation
+  before any separate machine artifact, provider admission, deployment, LSP
+  session, or semantic-proof route is considered
 
 ## Stop-lines
 

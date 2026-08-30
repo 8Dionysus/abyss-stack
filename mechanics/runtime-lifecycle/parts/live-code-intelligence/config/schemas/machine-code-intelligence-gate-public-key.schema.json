@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://abyss-stack/schemas/machine-code-intelligence-gate-public-key.schema.json",
+  "title": "abyss-machine code-intelligence gate public key",
+  "description": "The root-owned, out-of-band Ed25519 trust anchor consumed by the runtime gate verifier.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "owner", "key_id", "algorithm", "public_key"],
+  "properties": {
+    "schema_version": {"const": "abyss-machine-code-intelligence-gate-public-key-v1"},
+    "owner": {"const": "abyss-machine"},
+    "key_id": {"type": "string", "minLength": 1},
+    "algorithm": {"const": "ed25519"},
+    "public_key": {"type": "string", "minLength": 1}
+  }
+}
