@@ -54,7 +54,7 @@
           "properties": {
             "version": {"const": "2.1.1"},
             "commit": {"const": "0921d94a74db900dccd2d534842aa7b6160542d2"},
-            "artifact_digest": {"const": "sha256:1ef71b1a3cfb3daba29b61d9f280896b35bdc1038474285cc8295071418b01e5"},
+            "artifact_digest": {"enum": ["sha256:1ef71b1a3cfb3daba29b61d9f280896b35bdc1038474285cc8295071418b01e5", "sha256:a638c12e432fc0444d263a55db04668cd789437fde33951cc2be491021219601"]},
             "mcp_distribution_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
             "mcp_types_distribution_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
           },
@@ -65,6 +65,18 @@
             "mcp_distribution_digest",
             "mcp_types_distribution_digest"
           ]
+        },
+        "runtime_identity_attestation": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "state": {"const": "passed"},
+            "method": {"const": "server_emitted_startup_runtime_identity_header"},
+            "header": {"const": "X-Abyss-MCP-Runtime-Identity"},
+            "pid": {"type": "integer", "minimum": 1},
+            "checked_during_discovery": {"const": true}
+          },
+          "required": ["state", "method", "header", "pid", "checked_during_discovery"]
         },
         "sdk_identity_matches_fleet": {"const": true},
         "sdk_identity_stable": {"const": true},
@@ -86,6 +98,7 @@
         "process_identity_stable",
         "python_executable_realpath",
         "sdk_identity",
+        "runtime_identity_attestation",
         "sdk_identity_matches_fleet",
         "sdk_identity_stable",
         "checked_before_and_after_tool_call"

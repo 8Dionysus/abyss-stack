@@ -21,6 +21,13 @@ EXPECTED_GATE_IDS = tuple(f"P1-{index:02d}" for index in range(1, 15))
 EXPECTED_PYTHON_MCP_VERSION = "2.1.1"
 EXPECTED_PYTHON_MCP_COMMIT = "0921d94a74db900dccd2d534842aa7b6160542d2"
 EXPECTED_PYTHON_MCP_ARTIFACT_DIGEST = "sha256:1ef71b1a3cfb3daba29b61d9f280896b35bdc1038474285cc8295071418b01e5"
+EXPECTED_PRODUCTION_PYTHON_MCP_ARTIFACT_DIGEST = "sha256:a638c12e432fc0444d263a55db04668cd789437fde33951cc2be491021219601"
+EXPECTED_PYTHON_MCP_ARTIFACT_DIGESTS = frozenset(
+    {
+        EXPECTED_PYTHON_MCP_ARTIFACT_DIGEST,
+        EXPECTED_PRODUCTION_PYTHON_MCP_ARTIFACT_DIGEST,
+    }
+)
 EXPECTED_DEPLOYMENT_MCP_VERSION = "2.0.0"
 EXPECTED_DEPLOYMENT_MCP_COMMIT = "6f69a3758ebf2ee55ce050f58b470ce11af71133"
 EXPECTED_AOA_KAG_COMMIT = "578e4cea9a04b76a881bde240d5479efceea4926"
@@ -120,11 +127,12 @@ def _live_fleet_identity_attested(payload: dict[str, Any]) -> bool:
         return True
     read_fleet = payload.get("read_fleet")
     return bool(
-        payload.get("mcp_sdk_artifact_digest") == EXPECTED_PYTHON_MCP_ARTIFACT_DIGEST
+        payload.get("mcp_sdk_artifact_digest") in EXPECTED_PYTHON_MCP_ARTIFACT_DIGESTS
         and isinstance(read_fleet, dict)
         and read_fleet.get("sdk_identity_attested") is True
         and read_fleet.get("sdk_identity_count") == 11
         and read_fleet.get("sdk_identity_unique_count") == 1
+        and read_fleet.get("runtime_identity_attested") is True
     )
 
 
@@ -495,6 +503,14 @@ def validate(checked_at: datetime | None = None) -> list[str]:
         errors.append("live modern-only production fleet evidence drifted")
     if not _live_fleet_identity_attested(live_modern_fleet):
         errors.append("live modern fleet candidate lacks per-unit SDK artifact attestation")
+    if not builder._deployment_artifact_identity_current(
+        live_modern_fleet,
+        stable_rollback,
+        codex_tasks_production_pair,
+    ):
+        errors.append(
+            "deployment-bound candidate receipts do not share one reviewed SDK artifact form"
+        )
     deployment_identities = {
         (payload["mcp_sdk"], payload["mcp_sdk_source_revision"])
         for payload in (

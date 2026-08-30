@@ -27,7 +27,8 @@
         "legacy_session_issued": {"const": false},
         "sdk_identity_attested": {"const": true},
         "sdk_identity_count": {"const": 11},
-        "sdk_identity_unique_count": {"const": 1}
+        "sdk_identity_unique_count": {"const": 1},
+        "runtime_identity_attested": {"const": true}
       },
       "required": ["production_units", "admitted_units", "production_identities", "bootstrap_identities", "modern_discovery_passed", "wrong_bearer_denied", "legacy_initialize_denied", "legacy_session_issued"]
     },
@@ -80,7 +81,7 @@
         "required": ["mcp_sdk_artifact_digest"],
         "properties": {
           "read_fleet": {
-            "required": ["sdk_identity_attested", "sdk_identity_count", "sdk_identity_unique_count"]
+            "required": ["sdk_identity_attested", "sdk_identity_count", "sdk_identity_unique_count", "runtime_identity_attested"]
           }
         }
       }

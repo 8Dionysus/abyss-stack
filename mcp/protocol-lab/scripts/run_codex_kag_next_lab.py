@@ -58,6 +58,16 @@ MCP_SDK_SOURCE_REVISIONS = {
     "2.1.1": "0921d94a74db900dccd2d534842aa7b6160542d2",
 }
 EXPECTED_PYTHON_MCP_ARTIFACT_DIGEST = "sha256:1ef71b1a3cfb3daba29b61d9f280896b35bdc1038474285cc8295071418b01e5"
+EXPECTED_PRODUCTION_PYTHON_MCP_ARTIFACT_DIGEST = "sha256:a638c12e432fc0444d263a55db04668cd789437fde33951cc2be491021219601"
+EXPECTED_PYTHON_MCP_ARTIFACT_DIGESTS = frozenset(
+    {
+        EXPECTED_PYTHON_MCP_ARTIFACT_DIGEST,
+        EXPECTED_PRODUCTION_PYTHON_MCP_ARTIFACT_DIGEST,
+    }
+)
+RUNTIME_IDENTITY_ATTESTATION_METHOD = (
+    "server_emitted_startup_runtime_identity_header"
+)
 
 
 def _utc_now() -> str:
@@ -389,7 +399,7 @@ def _deployment_sdk_identity(path: Path) -> tuple[str, str]:
     if MCP_SDK_SOURCE_REVISIONS.get(sdk) != source_revision:
         raise RuntimeError("the live fleet receipt returned an unattested SDK identity")
     if sdk == "2.1.1":
-        if payload.get("mcp_sdk_artifact_digest") != EXPECTED_PYTHON_MCP_ARTIFACT_DIGEST:
+        if payload.get("mcp_sdk_artifact_digest") not in EXPECTED_PYTHON_MCP_ARTIFACT_DIGESTS:
             raise RuntimeError(
                 "the MCP 2.1.1 live fleet receipt lacks the reviewed artifact digest"
             )
@@ -409,10 +419,30 @@ def _deployment_sdk_identity(path: Path) -> tuple[str, str]:
                     and row.get("mcp_sdk") == sdk
                     and row.get("mcp_sdk_source_revision") == source_revision
                     and row.get("mcp_sdk_artifact_digest")
-                    == EXPECTED_PYTHON_MCP_ARTIFACT_DIGEST
+                    in EXPECTED_PYTHON_MCP_ARTIFACT_DIGESTS
                 ):
                     raise RuntimeError(
                         "the MCP 2.1.1 live fleet receipt has an incomplete unit attestation"
+                    )
+                if row.get("mcp_sdk_artifact_digest") != payload.get(
+                    "mcp_sdk_artifact_digest"
+                ):
+                    raise RuntimeError(
+                        "the MCP 2.1.1 live fleet receipt has nonuniform artifact identities"
+                    )
+                runtime_attestation = row.get("runtime_identity_attestation")
+                if not (
+                    isinstance(runtime_attestation, dict)
+                    and runtime_attestation.get("state") == "passed"
+                    and runtime_attestation.get("method")
+                    == RUNTIME_IDENTITY_ATTESTATION_METHOD
+                    and runtime_attestation.get("header")
+                    == "X-Abyss-MCP-Runtime-Identity"
+                    and runtime_attestation.get("pid") == row.get("main_pid")
+                    and runtime_attestation.get("checked_during_discovery") is True
+                ):
+                    raise RuntimeError(
+                        "the MCP 2.1.1 live fleet receipt lacks serving-process identity attestation"
                     )
             summary = payload.get("sdk_attestation")
             if not (
@@ -420,6 +450,7 @@ def _deployment_sdk_identity(path: Path) -> tuple[str, str]:
                 and summary.get("scope") == "every production read unit"
                 and summary.get("unit_count") == 11
                 and summary.get("attested_unit_count") == 11
+                and summary.get("server_identity_attested_unit_count") == 11
                 and summary.get("unique_identities") == 1
             ):
                 raise RuntimeError(
@@ -432,6 +463,7 @@ def _deployment_sdk_identity(path: Path) -> tuple[str, str]:
                 and read_fleet.get("sdk_identity_attested") is True
                 and read_fleet.get("sdk_identity_count") == 11
                 and read_fleet.get("sdk_identity_unique_count") == 1
+                and read_fleet.get("runtime_identity_attested") is True
             ):
                 raise RuntimeError(
                     "the MCP 2.1.1 normalized fleet receipt lacks per-unit SDK attestation"
@@ -481,7 +513,7 @@ def _deployment_fleet_unit(
     if (
         row["mcp_sdk"] != sdk
         or row["mcp_sdk_source_revision"] != MCP_SDK_SOURCE_REVISIONS[sdk]
-        or row["mcp_sdk_artifact_digest"] != EXPECTED_PYTHON_MCP_ARTIFACT_DIGEST
+        or row["mcp_sdk_artifact_digest"] not in EXPECTED_PYTHON_MCP_ARTIFACT_DIGESTS
     ):
         raise RuntimeError(f"candidate {organ_id} fleet row has an unattested SDK identity")
     if not isinstance(row.get("main_pid"), int) or row["main_pid"] <= 0:
@@ -493,6 +525,18 @@ def _deployment_fleet_unit(
         and attestation.get("checked_before_and_after_probe") is True
     ):
         raise RuntimeError(f"candidate {organ_id} fleet row lacks before/after attestation")
+    runtime_attestation = row.get("runtime_identity_attestation")
+    if not (
+        isinstance(runtime_attestation, dict)
+        and runtime_attestation.get("state") == "passed"
+        and runtime_attestation.get("method") == RUNTIME_IDENTITY_ATTESTATION_METHOD
+        and runtime_attestation.get("header") == "X-Abyss-MCP-Runtime-Identity"
+        and runtime_attestation.get("pid") == row.get("main_pid")
+        and runtime_attestation.get("checked_during_discovery") is True
+    ):
+        raise RuntimeError(
+            f"candidate {organ_id} fleet row lacks serving-process identity attestation"
+        )
     distribution_digests = row.get("mcp_sdk_distribution_digests")
     if not (
         isinstance(distribution_digests, dict)
@@ -1074,6 +1118,9 @@ def _stable_canary(args: argparse.Namespace) -> int:
                         "mcp_types_distribution_digest"
                     ],
                 },
+                "runtime_identity_attestation": fleet_row[
+                    "runtime_identity_attestation"
+                ],
                 "sdk_identity_matches_fleet": (
                     fleet_sdk_before["version"] == fleet_row["mcp_sdk"]
                     and fleet_sdk_before["commit"]

@@ -26,6 +26,13 @@ INSPECTOR_TASKS_BLOCKER_PATH = LAB_ROOT / "fixtures" / "inspector-2.1.0-tasks-st
 LIVE_MODERN_FLEET_PATH = LAB_ROOT / "fixtures" / "live-modern-fleet-20260809.json"
 CODEX_TASKS_PRODUCTION_PAIR_PATH = LAB_ROOT / "fixtures" / "codex-tasks-production-pair-20260809.json"
 EXPECTED_CANDIDATE_MCP_ARTIFACT_DIGEST = "sha256:1ef71b1a3cfb3daba29b61d9f280896b35bdc1038474285cc8295071418b01e5"
+EXPECTED_PRODUCTION_MCP_ARTIFACT_DIGEST = "sha256:a638c12e432fc0444d263a55db04668cd789437fde33951cc2be491021219601"
+EXPECTED_CANDIDATE_MCP_ARTIFACT_DIGESTS = frozenset(
+    {
+        EXPECTED_CANDIDATE_MCP_ARTIFACT_DIGEST,
+        EXPECTED_PRODUCTION_MCP_ARTIFACT_DIGEST,
+    }
+)
 MATRIX_SCHEMA_PATH = LAB_ROOT / "schemas" / "protocol-compatibility-matrix.schema.json"
 OBSERVATION_SCHEMA_PATH = LAB_ROOT / "schemas" / "protocol-pair-observation.schema.json"
 STATUS_SCHEMA_PATH = LAB_ROOT / "schemas" / "protocol-lab-status.schema.json"
@@ -77,11 +84,12 @@ def _live_fleet_identity_attested(payload: dict[str, Any]) -> bool:
     read_fleet = payload.get("read_fleet")
     return bool(
         payload.get("mcp_sdk_artifact_digest")
-        == EXPECTED_CANDIDATE_MCP_ARTIFACT_DIGEST
+        in EXPECTED_CANDIDATE_MCP_ARTIFACT_DIGESTS
         and isinstance(read_fleet, dict)
         and read_fleet.get("sdk_identity_attested") is True
         and read_fleet.get("sdk_identity_count") == 11
         and read_fleet.get("sdk_identity_unique_count") == 1
+        and read_fleet.get("runtime_identity_attested") is True
     )
 
 
@@ -109,8 +117,41 @@ def _stable_rollback_identity_bound(payload: dict[str, Any]) -> bool:
         and sdk_identity.get("version") == "2.1.1"
         and sdk_identity.get("commit") == "0921d94a74db900dccd2d534842aa7b6160542d2"
         and sdk_identity.get("artifact_digest")
-        == EXPECTED_CANDIDATE_MCP_ARTIFACT_DIGEST
+        in EXPECTED_CANDIDATE_MCP_ARTIFACT_DIGESTS
+        and isinstance(binding.get("runtime_identity_attestation"), dict)
+        and binding["runtime_identity_attestation"].get("state") == "passed"
+        and binding["runtime_identity_attestation"].get("method")
+        == "server_emitted_startup_runtime_identity_header"
+        and binding["runtime_identity_attestation"].get("header")
+        == "X-Abyss-MCP-Runtime-Identity"
+        and binding["runtime_identity_attestation"].get("checked_during_discovery")
+        is True
     )
+
+
+def _deployment_artifact_identity_current(
+    live_modern_fleet: dict[str, Any],
+    stable_rollback_observation: dict[str, Any],
+    codex_tasks_production_pair: dict[str, Any],
+) -> bool:
+    """Require one reviewed installation form across artifact-bearing receipts."""
+
+    artifacts: list[str] = []
+    for payload in (live_modern_fleet, codex_tasks_production_pair):
+        if payload.get("mcp_sdk") != "2.1.1":
+            continue
+        artifact = payload.get("mcp_sdk_artifact_digest")
+        if artifact not in EXPECTED_CANDIDATE_MCP_ARTIFACT_DIGESTS:
+            return False
+        artifacts.append(artifact)
+    if stable_rollback_observation.get("mcp_sdk") == "2.1.1":
+        binding = stable_rollback_observation.get("server_binding")
+        sdk_identity = binding.get("sdk_identity") if isinstance(binding, dict) else None
+        artifact = sdk_identity.get("artifact_digest") if isinstance(sdk_identity, dict) else None
+        if artifact not in EXPECTED_CANDIDATE_MCP_ARTIFACT_DIGESTS:
+            return False
+        artifacts.append(artifact)
+    return bool(artifacts) and len(set(artifacts)) == 1
 
 
 def validate_payload(payload: dict[str, Any], schema_path: Path) -> None:
@@ -249,10 +290,16 @@ def build_status(
     stable_rollback_identity_current = _stable_rollback_identity_bound(
         stable_rollback_observation
     )
+    deployment_artifact_identity_current = _deployment_artifact_identity_current(
+        live_modern_fleet,
+        stable_rollback_observation,
+        codex_tasks_production_pair,
+    )
     deployment_evidence_expires_at = _earliest_expiry(*deployment_evidence)
     deployment_evidence_current = (
         live_fleet_identity_current
         and stable_rollback_identity_current
+        and deployment_artifact_identity_current
         and all(
             (
                 payload.get("mcp_sdk") == candidate_sdk_identity["mcp_sdk"]

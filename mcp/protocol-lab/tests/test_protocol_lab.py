@@ -405,20 +405,76 @@ def test_live_fleet_accepts_only_reviewed_sdk_identities() -> None:
         "bootstrap_identity_count": 0,
     }
     def row(sdk: str, artifact: str) -> dict[str, Any]:
-        return {
+        result = {
             "organ_id": "abyss-stack",
             "mcp_sdk": sdk,
             "mcp_sdk_source_revision": runner.MCP_SDK_SOURCE_REVISIONS[sdk],
             "mcp_sdk_artifact_digest": artifact,
             "sdk_attestation": {"state": "passed"},
         }
+        if sdk == "2.1.1":
+            result.update(
+                {
+                    "main_pid": 1,
+                    "runtime_identity_attestation": {
+                        "state": "passed",
+                        "method": "server_emitted_startup_runtime_identity_header",
+                        "header": "X-Abyss-MCP-Runtime-Identity",
+                        "pid": 1,
+                        "checked_during_discovery": True,
+                    },
+                }
+            )
+        return result
 
     historical = row("2.0.0", "sha256:" + ("a" * 64))
-    candidate = row("2.1.1", "sha256:" + ("b" * 64))
+    candidate = row(
+        "2.1.1",
+        "sha256:a638c12e432fc0444d263a55db04668cd789437fde33951cc2be491021219601",
+    )
     assert runner._fleet_verdict("2.0.0", registry, [historical], True) == "passed"
     assert runner._fleet_verdict("2.1.1", registry, [candidate], True) == "passed"
     assert runner._fleet_verdict("2.2.0", registry, [candidate], True) == "failed"
     assert runner._fleet_verdict("2.1.1", registry, [candidate], False) == "failed"
+
+
+def test_live_fleet_binds_candidate_identity_to_the_answering_process() -> None:
+    runner = _load_live_fleet_runner()
+    sdk = {
+        "version": "2.1.1",
+        "commit": runner.MCP_SDK_SOURCE_REVISIONS["2.1.1"],
+        "artifact_digest": "sha256:a638c12e432fc0444d263a55db04668cd789437fde33951cc2be491021219601",
+        "mcp_distribution_digest": "sha256:" + ("a" * 64),
+        "mcp_types_distribution_digest": "sha256:" + ("b" * 64),
+    }
+    before = {"main_pid": 4321}
+    headers = {
+        "X-Abyss-MCP-Runtime-Identity": json.dumps({**sdk, "pid": 4321}),
+    }
+
+    attestation = runner._server_runtime_identity_attestation(
+        headers,
+        before,
+        sdk,
+        "aoa-kag",
+    )
+
+    assert attestation == {
+        "state": "passed",
+        "method": "server_emitted_startup_runtime_identity_header",
+        "header": "X-Abyss-MCP-Runtime-Identity",
+        "pid": 4321,
+        "checked_during_discovery": True,
+    }
+    with pytest.raises(RuntimeError, match="does not match"):
+        runner._server_runtime_identity_attestation(
+            {"x-abyss-mcp-runtime-identity": json.dumps({**sdk, "pid": 4322})},
+            before,
+            sdk,
+            "aoa-kag",
+        )
+    with pytest.raises(RuntimeError, match="omitted"):
+        runner._server_runtime_identity_attestation({}, before, sdk, "aoa-kag")
 
 
 def test_live_fleet_rejects_nonuniform_or_unattested_unit_identity() -> None:
@@ -462,6 +518,7 @@ def test_candidate_deployment_receipt_requires_per_unit_identity_summary(tmp_pat
         "sdk_identity_attested": True,
         "sdk_identity_count": 11,
         "sdk_identity_unique_count": 1,
+        "runtime_identity_attested": True,
     }
     candidate_path = tmp_path / "candidate.json"
     candidate_path.write_text(json.dumps(candidate), encoding="utf-8")
@@ -492,6 +549,7 @@ def test_candidate_stable_canary_requires_raw_aoa_kag_fleet_binding(tmp_path: Pa
         "sdk_identity_attested": True,
         "sdk_identity_count": 11,
         "sdk_identity_unique_count": 1,
+        "runtime_identity_attested": True,
     }
     receipt_path = tmp_path / "candidate.json"
     receipt_path.write_text(json.dumps(candidate), encoding="utf-8")
@@ -518,6 +576,13 @@ def test_candidate_stable_canary_requires_raw_aoa_kag_fleet_binding(tmp_path: Pa
             "sdk_attestation": {
                 "state": "passed",
                 "checked_before_and_after_probe": True,
+            },
+            "runtime_identity_attestation": {
+                "state": "passed",
+                "method": "server_emitted_startup_runtime_identity_header",
+                "header": "X-Abyss-MCP-Runtime-Identity",
+                "pid": 1234,
+                "checked_during_discovery": True,
             },
         }
     ]
@@ -709,16 +774,17 @@ def test_deployment_receipts_must_match_candidate_sdk_for_migration(
     )
     tasks_matrix = _load(LAB_ROOT / "tasks-compatibility-matrix.v1.json")
     deployment["mcp_sdk"] = "2.1.1"
-    deployment["mcp_sdk_artifact_digest"] = builder.EXPECTED_CANDIDATE_MCP_ARTIFACT_DIGEST
+    deployment["mcp_sdk_artifact_digest"] = builder.EXPECTED_PRODUCTION_MCP_ARTIFACT_DIGEST
     deployment["read_fleet"].update(
         {
             "sdk_identity_attested": True,
             "sdk_identity_count": 11,
             "sdk_identity_unique_count": 1,
+            "runtime_identity_attested": True,
         }
     )
     tasks_pair["mcp_sdk"] = "2.1.1"
-    tasks_pair["mcp_sdk_artifact_digest"] = "sha256:" + ("b" * 64)
+    tasks_pair["mcp_sdk_artifact_digest"] = builder.EXPECTED_PRODUCTION_MCP_ARTIFACT_DIGEST
     tasks_pair["runtime_observation_digest"] = "sha256:" + ("a" * 64)
 
     stale = builder.build_status(
@@ -765,13 +831,20 @@ def test_deployment_receipts_must_match_candidate_sdk_for_migration(
         "sdk_identity": {
             "version": "2.1.1",
             "commit": candidate_commit,
-            "artifact_digest": builder.EXPECTED_CANDIDATE_MCP_ARTIFACT_DIGEST,
+            "artifact_digest": builder.EXPECTED_PRODUCTION_MCP_ARTIFACT_DIGEST,
             "mcp_distribution_digest": "sha256:" + ("a" * 64),
             "mcp_types_distribution_digest": "sha256:" + ("b" * 64),
         },
         "sdk_identity_matches_fleet": True,
         "sdk_identity_stable": True,
         "checked_before_and_after_tool_call": True,
+        "runtime_identity_attestation": {
+            "state": "passed",
+            "method": "server_emitted_startup_runtime_identity_header",
+            "header": "X-Abyss-MCP-Runtime-Identity",
+            "pid": 1234,
+            "checked_during_discovery": True,
+        },
     }
     for payload in (deployment, tasks_pair, stable_rollback, tasks_matrix):
         payload["mcp_sdk"] = "2.1.1"

@@ -1,0 +1,346 @@
+"""Runtime identity emitted by every modern MCP serving process.
+
+The identity is captured in the serving process, once per process, before its
+HTTP application is exposed.  Fleet evidence can therefore bind the SDK
+identity to the process that answered the wire probe instead of relying only
+on a second interpreter reading the current filesystem.
+"""
+
+from __future__ import annotations
+
+import base64
+import csv
+import hashlib
+import importlib.util
+import io
+import json
+import os
+import subprocess
+import urllib.parse
+from functools import lru_cache
+from importlib.metadata import PackageNotFoundError, distribution
+from pathlib import Path
+from typing import Any
+
+
+SUPPORTED_MCP_SDK = "2.1.1"
+MCP_SDK_SOURCE_REVISIONS = {
+    "2.1.1": "0921d94a74db900dccd2d534842aa7b6160542d2",
+}
+MCP_SDK_DISTRIBUTION_RECORD_DIGESTS = {
+    "2.1.1": {
+        "mcp": "sha256:8023abb83ccd24e167d5ad39a5296ce87040c52972f714b3576fcb8ce1b28a14",
+        "mcp-types": "sha256:d315ab265f62420dc87baadbb9373013330833aeced8950d9951f8b9d71eee0c",
+    },
+}
+RUNTIME_IDENTITY_HEADER = "X-Abyss-MCP-Runtime-Identity"
+
+
+def _is_under(path: Path, root: Path) -> bool:
+    try:
+        path.relative_to(root)
+    except ValueError:
+        return False
+    return True
+
+
+def _installed_package_root(module_name: str) -> Path:
+    spec = importlib.util.find_spec(module_name)
+    if spec is None or spec.submodule_search_locations is None:
+        raise RuntimeError(f"the serving {module_name} package location is unavailable")
+    locations = [Path(item) for item in spec.submodule_search_locations]
+    if len(locations) != 1:
+        raise RuntimeError(f"the serving {module_name} package has ambiguous locations")
+    package_root = locations[0]
+    if package_root.is_symlink():
+        raise RuntimeError(f"the serving {module_name} package root is a symlink")
+    package_root = package_root.resolve()
+    if not package_root.is_dir():
+        raise RuntimeError(
+            f"the serving {module_name} package root is not a regular directory"
+        )
+    return package_root
+
+
+def _git_output(root: Path, *arguments: str) -> str:
+    try:
+        return subprocess.run(
+            ["git", *arguments],
+            cwd=root,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        ).stdout.strip()
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise RuntimeError(f"unable to attest the MCP SDK checkout at {root}") from exc
+
+
+def _source_checkout_is_clean(root: Path) -> bool:
+    return not _git_output(
+        root,
+        "status",
+        "--porcelain",
+        "--untracked-files=all",
+    )
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    try:
+        with path.open("rb") as stream:
+            for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                digest.update(chunk)
+    except OSError as exc:
+        raise RuntimeError(f"unable to read attested MCP SDK file: {path}") from exc
+    return digest.hexdigest()
+
+
+def _source_package_digest(package_root: Path) -> str:
+    digest = hashlib.sha256()
+    for path in sorted(package_root.rglob("*")):
+        if "__pycache__" in path.parts:
+            continue
+        if path.is_symlink():
+            raise RuntimeError(f"the serving MCP SDK package contains a symlink: {path}")
+        if not path.is_file():
+            continue
+        digest.update(path.relative_to(package_root).as_posix().encode("utf-8"))
+        digest.update(b"\0")
+        try:
+            with path.open("rb") as stream:
+                for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                    digest.update(chunk)
+        except OSError as exc:
+            raise RuntimeError(f"unable to read attested MCP SDK file: {path}") from exc
+        digest.update(b"\0")
+    return f"sha256:{digest.hexdigest()}"
+
+
+def _editable_mcp_source_digest(
+    distribution_metadata: Any,
+    package_root: Path,
+    source_revision: str,
+) -> str | None:
+    raw_direct_url = distribution_metadata.read_text("direct_url.json")
+    if raw_direct_url is None:
+        return None
+    try:
+        direct_url = json.loads(raw_direct_url)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError("the serving MCP SDK direct_url metadata is invalid") from exc
+    if not isinstance(direct_url, dict):
+        raise RuntimeError("the serving MCP SDK direct_url metadata is not an object")
+    directory_info = direct_url.get("dir_info")
+    if not isinstance(directory_info, dict) or not directory_info.get("editable"):
+        return None
+    raw_url = direct_url.get("url")
+    if not isinstance(raw_url, str):
+        raise RuntimeError("the editable MCP SDK direct_url metadata omitted its URL")
+    parsed_url = urllib.parse.urlparse(raw_url)
+    if parsed_url.scheme != "file" or parsed_url.netloc not in {"", "localhost"}:
+        raise RuntimeError("the editable MCP SDK must use a local file URL")
+    source_root = Path(urllib.parse.unquote(parsed_url.path)).resolve()
+    if not source_root.is_dir() or source_root.is_symlink():
+        raise RuntimeError("the editable MCP SDK source checkout is unavailable")
+    if not _is_under(package_root, source_root):
+        raise RuntimeError(
+            "the imported MCP SDK package is not inside its attested source checkout"
+        )
+    if not _source_checkout_is_clean(source_root):
+        raise RuntimeError("the editable MCP SDK source checkout is dirty")
+    actual_revision = _git_output(source_root, "rev-parse", "HEAD")
+    if actual_revision != source_revision:
+        raise RuntimeError(
+            "the editable MCP SDK source checkout does not match its reviewed revision: "
+            f"{actual_revision}"
+        )
+    return _source_package_digest(package_root)
+
+
+def _distribution_record_digest(
+    distribution_metadata: Any,
+    *,
+    distribution_name: str,
+    sdk_version: str,
+) -> str:
+    raw_record = distribution_metadata.read_text("RECORD")
+    if raw_record is None:
+        raise RuntimeError(f"the serving {distribution_name} distribution omitted RECORD")
+    distribution_info = Path(distribution_metadata._path).name
+    site_packages = Path(distribution_metadata._path).parent.resolve()
+    package_prefix = "mcp/" if distribution_name == "mcp" else "mcp_types/"
+    canonical_rows: list[tuple[str, str, str]] = []
+    try:
+        rows = csv.reader(io.StringIO(raw_record, newline=""))
+        for row in rows:
+            if len(row) != 3:
+                raise RuntimeError(
+                    f"the serving {distribution_name} RECORD contains an invalid row"
+                )
+            relative_name, encoded_digest, recorded_size = row
+            path_parts = relative_name.split("/")
+            if distribution_name == "mcp" and relative_name == "../../../bin/mcp":
+                continue
+            if (
+                not relative_name
+                or "\\" in relative_name
+                or relative_name.startswith("/")
+                or "//" in relative_name
+                or relative_name.startswith("../")
+                or "/../" in relative_name
+                or not (
+                    relative_name.startswith(package_prefix)
+                    or relative_name.startswith(f"{distribution_info}/")
+                )
+            ):
+                raise RuntimeError(
+                    f"the serving {distribution_name} RECORD contains an unsafe path: "
+                    f"{relative_name}"
+                )
+            if "__pycache__" in path_parts:
+                continue
+            if relative_name in {
+                f"{distribution_info}/INSTALLER",
+                f"{distribution_info}/REQUESTED",
+            }:
+                continue
+            if relative_name == f"{distribution_info}/RECORD":
+                if encoded_digest or recorded_size:
+                    raise RuntimeError(
+                        f"the serving {distribution_name} RECORD row must be self-unsigned"
+                    )
+                canonical_rows.append((relative_name, "", ""))
+                continue
+            if not encoded_digest.startswith("sha256=") or not recorded_size.isdigit():
+                raise RuntimeError(
+                    f"the serving {distribution_name} RECORD has an invalid file attestation"
+                )
+            target = Path(distribution_metadata.locate_file(Path(relative_name)))
+            if target.is_symlink() or not target.is_file():
+                raise RuntimeError(
+                    f"the serving {distribution_name} RECORD target is not a regular file: "
+                    f"{relative_name}"
+                )
+            resolved_target = target.resolve()
+            if not _is_under(resolved_target, site_packages):
+                raise RuntimeError(
+                    f"the serving {distribution_name} RECORD target escapes site-packages: "
+                    f"{relative_name}"
+                )
+            if resolved_target.stat().st_size != int(recorded_size):
+                raise RuntimeError(
+                    f"the serving {distribution_name} RECORD size does not match: "
+                    f"{relative_name}"
+                )
+            actual_digest = base64.urlsafe_b64encode(
+                bytes.fromhex(_sha256_file(resolved_target))
+            ).decode("ascii").rstrip("=")
+            if encoded_digest != f"sha256={actual_digest}":
+                raise RuntimeError(
+                    f"the serving {distribution_name} RECORD digest does not match: "
+                    f"{relative_name}"
+                )
+            canonical_rows.append((relative_name, encoded_digest, recorded_size))
+    except csv.Error as exc:
+        raise RuntimeError(f"the serving {distribution_name} RECORD is not valid CSV") from exc
+    if not canonical_rows:
+        raise RuntimeError(f"the serving {distribution_name} RECORD is empty")
+    canonical_payload = "\n".join(
+        ",".join(row) for row in sorted(canonical_rows)
+    ).encode("utf-8")
+    actual_record_digest = f"sha256:{hashlib.sha256(canonical_payload).hexdigest()}"
+    expected_record_digest = MCP_SDK_DISTRIBUTION_RECORD_DIGESTS[sdk_version][
+        distribution_name
+    ]
+    if actual_record_digest != expected_record_digest:
+        raise RuntimeError(
+            f"the serving {distribution_name} distribution bytes are not the reviewed "
+            f"{sdk_version} artifact: {actual_record_digest}"
+        )
+    return actual_record_digest
+
+
+def _distribution_package_digest(
+    distribution_metadata: Any,
+    *,
+    distribution_name: str,
+    module_name: str,
+    sdk_version: str,
+) -> str:
+    package_root = _installed_package_root(module_name)
+    site_packages = Path(distribution_metadata._path).parent.resolve()
+    if not _is_under(package_root, site_packages):
+        raise RuntimeError(
+            f"the imported {module_name} package is outside its attested "
+            f"{distribution_name} distribution: {package_root}"
+        )
+    return _distribution_record_digest(
+        distribution_metadata,
+        distribution_name=distribution_name,
+        sdk_version=sdk_version,
+    )
+
+
+@lru_cache(maxsize=4)
+def _runtime_mcp_sdk_identity(process_id: int) -> dict[str, Any]:
+    try:
+        mcp_distribution = distribution("mcp")
+    except PackageNotFoundError as exc:
+        raise RuntimeError("the serving interpreter has no MCP distribution") from exc
+    sdk_version = mcp_distribution.version
+    if sdk_version != SUPPORTED_MCP_SDK:
+        raise RuntimeError(
+            "the serving MCP SDK must be the exact reviewed version "
+            f"{SUPPORTED_MCP_SDK}; observed {sdk_version}"
+        )
+    source_revision = MCP_SDK_SOURCE_REVISIONS[sdk_version]
+
+    mcp_package_root = _installed_package_root("mcp")
+    editable_digest = _editable_mcp_source_digest(
+        mcp_distribution,
+        mcp_package_root,
+        source_revision,
+    )
+    mcp_digest = editable_digest or _distribution_package_digest(
+        mcp_distribution,
+        distribution_name="mcp",
+        module_name="mcp",
+        sdk_version=sdk_version,
+    )
+
+    try:
+        mcp_types_distribution = distribution("mcp-types")
+    except PackageNotFoundError as exc:
+        raise RuntimeError(
+            "the serving interpreter has no MCP wire-types distribution"
+        ) from exc
+    if mcp_types_distribution.version != sdk_version:
+        raise RuntimeError(
+            "the serving MCP and MCP wire-types versions differ: "
+            f"{sdk_version} != {mcp_types_distribution.version}"
+        )
+    mcp_types_digest = _distribution_package_digest(
+        mcp_types_distribution,
+        distribution_name="mcp-types",
+        module_name="mcp_types",
+        sdk_version=sdk_version,
+    )
+    combined = (
+        f"mcp:{sdk_version}:{mcp_digest}\n"
+        f"mcp-types:{sdk_version}:{mcp_types_digest}\n"
+    ).encode("utf-8")
+    return {
+        "version": sdk_version,
+        "commit": source_revision,
+        "artifact_digest": f"sha256:{hashlib.sha256(combined).hexdigest()}",
+        "mcp_distribution_digest": mcp_digest,
+        "mcp_types_distribution_digest": mcp_types_digest,
+        "pid": process_id,
+    }
+
+
+def runtime_mcp_sdk_identity() -> dict[str, Any]:
+    """Return a process-bound, reviewed identity for the serving MCP SDK."""
+
+    return dict(_runtime_mcp_sdk_identity(os.getpid()))

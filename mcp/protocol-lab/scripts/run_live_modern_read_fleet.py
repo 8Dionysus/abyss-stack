@@ -24,6 +24,16 @@ MCP_SDK_SOURCE_REVISIONS = {
     "2.0.0": "6f69a3758ebf2ee55ce050f58b470ce11af71133",
     "2.1.1": "0921d94a74db900dccd2d534842aa7b6160542d2",
 }
+EXPECTED_CANDIDATE_MCP_ARTIFACT_DIGESTS = frozenset(
+    {
+        "sha256:1ef71b1a3cfb3daba29b61d9f280896b35bdc1038474285cc8295071418b01e5",
+        "sha256:a638c12e432fc0444d263a55db04668cd789437fde33951cc2be491021219601",
+    }
+)
+RUNTIME_IDENTITY_HEADER = "x-abyss-mcp-runtime-identity"
+RUNTIME_IDENTITY_ATTESTATION_METHOD = (
+    "server_emitted_startup_runtime_identity_header"
+)
 SERVERS = (
     ("abyss-stack", 5431, "abyss-stack-mcp-read.service", "abyss-stack-mcp-read-bearer-token"),
     ("abyss-machine", 5423, "aoa-organ-mcp-read@abyss-machine.service", "abyss-machine-mcp-read-bearer-token"),
@@ -90,6 +100,52 @@ def _request(
         raw = exc.read()
         payload = json.loads(raw) if raw.startswith(b"{") else None
         return exc.code, payload, dict(exc.headers)
+
+
+def _response_header(headers: dict[str, str], name: str) -> str | None:
+    lowered = name.lower()
+    return next(
+        (value for key, value in headers.items() if key.lower() == lowered),
+        None,
+    )
+
+
+def _server_runtime_identity_attestation(
+    headers: dict[str, str],
+    before: dict[str, Any],
+    sdk: dict[str, str],
+    unit: str,
+) -> dict[str, Any] | None:
+    raw_identity = _response_header(headers, RUNTIME_IDENTITY_HEADER)
+    if raw_identity is None:
+        if sdk["version"] == "2.1.1":
+            raise RuntimeError(
+                f"candidate {unit} response omitted its serving-process SDK identity"
+            )
+        return None
+    try:
+        identity = json.loads(raw_identity)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(
+            f"serving-process SDK identity header is invalid JSON for {unit}"
+        ) from exc
+    expected = {**sdk, "pid": before["main_pid"]}
+    if identity != expected:
+        raise RuntimeError(
+            f"serving-process SDK identity header does not match {unit}"
+        )
+    if (
+        sdk["version"] == "2.1.1"
+        and sdk["artifact_digest"] not in EXPECTED_CANDIDATE_MCP_ARTIFACT_DIGESTS
+    ):
+        raise RuntimeError(f"candidate {unit} returned an unreviewed SDK artifact")
+    return {
+        "state": "passed",
+        "method": RUNTIME_IDENTITY_ATTESTATION_METHOD,
+        "header": "X-Abyss-MCP-Runtime-Identity",
+        "pid": before["main_pid"],
+        "checked_during_discovery": True,
+    }
 
 
 def _process_interpreter(pid: int, unit: str) -> dict[str, str]:
@@ -246,6 +302,12 @@ def _probe(name: str, port: int, unit: str, credential: str) -> dict[str, Any]:
     result = discover.get("result") if isinstance(discover, dict) else None
     if status != 200 or not isinstance(result, dict):
         raise RuntimeError(f"{name} discovery failed: {status} {discover}")
+    runtime_identity_attestation = _server_runtime_identity_attestation(
+        headers,
+        before,
+        sdk_before,
+        unit,
+    )
     status, inventory, _ = _request(url, token, "tools/list", _meta())
     tools = inventory.get("result", {}).get("tools") if isinstance(inventory, dict) else None
     wrong_status, _, _ = _request(url, secrets.token_urlsafe(48), "server/discover", _meta())
@@ -287,7 +349,7 @@ def _probe(name: str, port: int, unit: str, credential: str) -> dict[str, Any]:
             f"{name} serving process or SDK identity changed during the probe"
         )
     encoded_tools = json.dumps(tools, sort_keys=True, separators=(",", ":")).encode()
-    return {
+    row = {
         "organ_id": name,
         "endpoint_ref": url,
         **before,
@@ -300,7 +362,10 @@ def _probe(name: str, port: int, unit: str, credential: str) -> dict[str, Any]:
         },
         "sdk_attestation": {
             "state": "passed",
-            "method": "per_unit_process_interpreter_distribution_records",
+            "method": (
+                "per_unit_process_interpreter_distribution_records_and_"
+                "server_emitted_identity_header"
+            ),
             "checked_before_and_after_probe": True,
         },
         "protocol_version": PROTOCOL,
@@ -314,6 +379,9 @@ def _probe(name: str, port: int, unit: str, credential: str) -> dict[str, Any]:
         "legacy_session_issued": False,
         "verdict": "passed",
     }
+    if runtime_identity_attestation is not None:
+        row["runtime_identity_attestation"] = runtime_identity_attestation
+    return row
 
 
 def _fleet_verdict(
@@ -349,6 +417,30 @@ def _fleet_verdict(
         is not None
         for row in rows
     )
+    server_identity_attestation = all(
+        row.get("mcp_sdk") != "2.1.1"
+        or (
+            isinstance(row.get("runtime_identity_attestation"), dict)
+            and row["runtime_identity_attestation"].get("state") == "passed"
+            and row["runtime_identity_attestation"].get("method")
+            == RUNTIME_IDENTITY_ATTESTATION_METHOD
+            and row["runtime_identity_attestation"].get("header")
+            == "X-Abyss-MCP-Runtime-Identity"
+            and row["runtime_identity_attestation"].get("pid")
+            == row.get("main_pid")
+            and row["runtime_identity_attestation"].get(
+                "checked_during_discovery"
+            )
+            is True
+        )
+        for row in rows
+    )
+    reviewed_candidate_artifact = all(
+        row.get("mcp_sdk") != "2.1.1"
+        or row.get("mcp_sdk_artifact_digest")
+        in EXPECTED_CANDIDATE_MCP_ARTIFACT_DIGESTS
+        for row in rows
+    )
     expected_identity = (
         (sdk, MCP_SDK_SOURCE_REVISIONS[sdk], next(iter(identities))[2])
         if sdk in MCP_SDK_SOURCE_REVISIONS and len(identities) == 1
@@ -364,6 +456,8 @@ def _fleet_verdict(
         and len(identities) == 1
         and expected_identity in identities
         and per_unit_attestation
+        and server_identity_attestation
+        and reviewed_candidate_artifact
         and zero_legacy
         else "failed"
     )
@@ -389,10 +483,17 @@ def main() -> int:
         "mcp_sdk_artifact_digest": sdk_artifact_digest,
         "sdk_attestation": {
             "scope": "every production read unit",
-            "method": "per_unit_process_interpreter_distribution_records",
+            "method": (
+                "per_unit_process_interpreter_distribution_records_and_"
+                "server_emitted_identity_header"
+            ),
             "unit_count": len(rows),
             "attested_unit_count": sum(
                 row["sdk_attestation"]["state"] == "passed" for row in rows
+            ),
+            "server_identity_attested_unit_count": sum(
+                row.get("runtime_identity_attestation", {}).get("state") == "passed"
+                for row in rows
             ),
             "unique_identities": len(
                 {
