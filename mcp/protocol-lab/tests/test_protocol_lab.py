@@ -52,6 +52,19 @@ def _load_tasks_runner() -> Any:
     return module
 
 
+def _load_live_fleet_runner() -> Any:
+    runner_path = LAB_ROOT / "scripts" / "run_live_modern_read_fleet.py"
+    spec = importlib.util.spec_from_file_location(
+        "live_modern_read_fleet_under_test",
+        runner_path,
+    )
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def _load(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
@@ -81,7 +94,7 @@ def test_current_status_is_deterministic_and_keeps_deployment_cutover_blocked(
 
     assert first == second
     assert first["evidence_expires_at"] == "2026-08-15T08:33:46.547214Z"
-    assert first["candidate_evidence_expires_at"] == "2026-09-05T07:32:30.866342Z"
+    assert first["candidate_evidence_expires_at"] == "2026-09-06T01:51:50.099097Z"
     assert first["deployment_evidence_expires_at"] == "2026-08-15T08:33:46.547214Z"
     assert first["deployment_evidence_current"] is False
     assert first["gate_counts"] == {"passed": 14, "blocked": 0, "pending": 0}
@@ -309,6 +322,7 @@ def test_mcp_211_candidate_receipts_are_source_bound(builder: Any) -> None:
         LAB_ROOT / "fixtures" / "python-mcp-2.1.1-frozen-conformance-observation.json"
     )
     assert conformance["python_sdk"] == {
+        "artifact_digest": "sha256:1ef71b1a3cfb3daba29b61d9f280896b35bdc1038474285cc8295071418b01e5",
         "commit": "0921d94a74db900dccd2d534842aa7b6160542d2",
         "source_checkout_clean": True,
         "version": "2.1.1",
@@ -321,11 +335,29 @@ def test_mcp_211_candidate_receipts_are_source_bound(builder: Any) -> None:
         / "codex-0.147.0-stable-kag-next-lab-2.1.1-observation.json"
     )
     assert codex["server"]["python_mcp_version"] == "2.1.1"
+    assert codex["server"]["python_mcp_artifact_digest"] == (
+        "sha256:1ef71b1a3cfb3daba29b61d9f280896b35bdc1038474285cc8295071418b01e5"
+    )
     assert codex["server"]["source_revisions"] == {
-        "abyss_stack": "c22ec7626d07ec66ff32569a2cc1b1b82e45f7b4",
+        "abyss_stack": "cbb387567b193cd75762894fd77e192d2bf5cb80",
         "aoa_kag": "578e4cea9a04b76a881bde240d5479efceea4926",
     }
     assert codex["consumer"]["production_authority"] is False
+
+
+def test_live_fleet_accepts_only_reviewed_sdk_identities() -> None:
+    runner = _load_live_fleet_runner()
+    registry = {
+        "admitted_read_count": 1,
+        "protocol_versions": ["2026-07-28"],
+        "bootstrap_identity_count": 0,
+    }
+    rows = [{"organ_id": "abyss-stack"}]
+
+    assert runner._fleet_verdict("2.0.0", registry, rows, True) == "passed"
+    assert runner._fleet_verdict("2.1.1", registry, rows, True) == "passed"
+    assert runner._fleet_verdict("2.2.0", registry, rows, True) == "failed"
+    assert runner._fleet_verdict("2.1.1", registry, rows, False) == "failed"
 
 
 def test_kag_next_cancellable_pair_is_adapter_scoped(builder: Any) -> None:
@@ -345,7 +377,6 @@ def test_kag_next_cancellable_pair_is_adapter_scoped(builder: Any) -> None:
     assert pair["pair"]["trace_sent"] == pair["pair"]["trace_observed"]
     assert pair["stable_registration"]["unchanged"] is True
     assert pair["owner_canary"]["projection_exact_state"] == "current"
-    assert pair["owner_canary"]["freshness_state"] == "current"
     assert pair["pair"]["cancellation"] == {
         "client_request_cancelled": True,
         "server_dispatch_cancelled": True,

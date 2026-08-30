@@ -10,7 +10,22 @@
     "observed_at": {"type": "string", "format": "date-time"},
     "finished_at": {"type": "string", "format": "date-time"},
     "wire_version": {"const": "2026-07-28"},
-    "python_sdk": {"enum": [{"commit": "6f69a3758ebf2ee55ce050f58b470ce11af71133", "version": "2.0.0"}, {"commit": "0921d94a74db900dccd2d534842aa7b6160542d2", "version": "2.1.1"}]},
+    "python_sdk": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "commit": {"enum": ["6f69a3758ebf2ee55ce050f58b470ce11af71133", "0921d94a74db900dccd2d534842aa7b6160542d2"]},
+        "version": {"enum": ["2.0.0", "2.1.1"]},
+        "artifact_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      },
+      "required": ["commit", "version"],
+      "allOf": [
+        {
+          "if": {"properties": {"version": {"const": "2.1.1"}}, "required": ["version"]},
+          "then": {"required": ["artifact_digest"]}
+        }
+      ]
+    },
     "source_revisions": {
       "type": "object",
       "additionalProperties": false,
@@ -23,7 +38,19 @@
     "handle_contract": {"const": {"bearer_verified_each_request": true, "opaque": true, "plaintext_observed_on_wire": false, "principal_binding": ["client_id", "issuer", "subject"], "raw_tokens_recorded": false, "ttl_seconds": 5.0}},
     "handle_checks": {"const": {"cross_request_replay": "denied", "expiry": "denied", "key_retirement_revocation": "denied", "principal_isolation": "denied", "same_request_replay": "allowed_read_only_idempotent", "same_request_result_unchanged": true, "tamper": "denied", "valid_round_trip": "passed"}},
     "rejection_shape": {"const": {"code": -32602, "data": {"reason": "invalid_request_state"}, "message": "Invalid or expired requestState"}},
-    "owner_canary": {"const": {"freshness_state": "current", "owner": "abyss-stack", "projection_exact_state": "current", "schema_version": "aoa-kag-mcp-capabilities-v1"}},
+    "owner_canary": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "freshness_state": {"enum": ["current", "canonical_only"]},
+        "owner": {"const": "abyss-stack"},
+        "projection_exact_state": {"const": "current"},
+        "schema_version": {"const": "aoa-kag-mcp-capabilities-v1"},
+        "canonical_source_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "runtime_source_digest": {"type": "string", "oneOf": [{"const": ""}, {"pattern": "^[0-9a-f]{64}$"}]}
+      },
+      "required": ["freshness_state", "owner", "projection_exact_state", "schema_version"]
+    },
     "stable_registration_unchanged": {"const": true},
     "raw_receipt": {
       "type": "object",

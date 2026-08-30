@@ -17,7 +17,7 @@
     "client": {
       "info_checks": 500,
       "manifest_sha256": "f9f0a03bf72392dd8fa2ed8b0201b087d7db343cd209e129fd98e20e0360c05c",
-      "raw_result_ref": "local:///srv/abyss-machine/tmp/mcp-211-lab.SMGqtq/conformance-run/client",
+      "raw_result_ref": "local:///srv/abyss-machine/cache/abyss-stack-mcp-validation-20260829/frozen-conformance-identity-refresh-20260829/raw/client",
       "scored_failed_checks": 0,
       "scored_failure_ids": [],
       "scored_scenario_count": 32,
@@ -39,7 +39,7 @@
     "server": {
       "info_checks": 1,
       "manifest_sha256": "ab71be41f6b00a25b447d913ef0a3854618fb8fed5891589b4639999edee75b0",
-      "raw_result_ref": "local:///srv/abyss-machine/tmp/mcp-211-lab.SMGqtq/conformance-run/server",
+      "raw_result_ref": "local:///srv/abyss-machine/cache/abyss-stack-mcp-validation-20260829/frozen-conformance-identity-refresh-20260829/raw/server",
       "scored_failed_checks": 0,
       "scored_failure_ids": [],
       "scored_scenario_count": 37,
@@ -65,10 +65,11 @@
       }
     }
   },
-  "finished_at": "2026-08-29T07:30:05.324897Z",
-  "observation_id": "python-mcp-2.1.1-frozen-2026-07-28-conformance-20260829",
-  "observed_at": "2026-08-29T07:29:42.195017Z",
+  "finished_at": "2026-08-30T01:52:44.198448Z",
+  "observation_id": "python-mcp-2.1.1-frozen-2026-07-28-conformance-20260830",
+  "observed_at": "2026-08-30T01:52:25.478686Z",
   "python_sdk": {
+    "artifact_digest": "sha256:1ef71b1a3cfb3daba29b61d9f280896b35bdc1038474285cc8295071418b01e5",
     "commit": "0921d94a74db900dccd2d534842aa7b6160542d2",
     "source_checkout_clean": true,
     "version": "2.1.1"

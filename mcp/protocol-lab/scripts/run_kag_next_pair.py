@@ -642,6 +642,7 @@ def main() -> int:
             "spec_version": NEXT_WIRE_VERSION,
             "python_mcp_version": sdk_identity["version"],
             "python_mcp_commit": sdk_identity["commit"],
+            "python_mcp_artifact_digest": sdk_identity["artifact_digest"],
             "stack_source_revision": _git_head(args.stack_source_root),
             "aoa_kag_source_revision": _git_head(args.aoa_kag_root),
             "stack_runtime_current_digest": _digest(

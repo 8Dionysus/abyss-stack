@@ -10,7 +10,22 @@
     "observed_at": {"type": "string", "format": "date-time"},
     "finished_at": {"type": "string", "format": "date-time"},
     "wire_version": {"const": "2026-07-28"},
-    "python_sdk": {"enum": [{"commit": "6f69a3758ebf2ee55ce050f58b470ce11af71133", "version": "2.0.0"}, {"commit": "0921d94a74db900dccd2d534842aa7b6160542d2", "version": "2.1.1"}]},
+    "python_sdk": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "commit": {"enum": ["6f69a3758ebf2ee55ce050f58b470ce11af71133", "0921d94a74db900dccd2d534842aa7b6160542d2"]},
+        "version": {"enum": ["2.0.0", "2.1.1"]},
+        "artifact_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      },
+      "required": ["commit", "version"],
+      "allOf": [
+        {
+          "if": {"properties": {"version": {"const": "2.1.1"}}, "required": ["version"]},
+          "then": {"required": ["artifact_digest"]}
+        }
+      ]
+    },
     "source_revisions": {
       "type": "object",
       "additionalProperties": false,

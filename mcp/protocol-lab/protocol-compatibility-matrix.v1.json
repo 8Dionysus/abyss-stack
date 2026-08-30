@@ -141,7 +141,7 @@
     "shared_credential_forbidden": true,
     "stable_registration_retained": true
   },
-  "expires_at": "2026-09-05T07:32:30.866342Z",
+  "expires_at": "2026-09-06T01:51:50.099097Z",
   "migration_gates": [
     {
       "evidence_refs": [

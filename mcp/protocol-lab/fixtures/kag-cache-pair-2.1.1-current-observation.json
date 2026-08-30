@@ -20,7 +20,7 @@
     "The adapter was not registered, deployed, admitted, or granted owner authority.",
     "No candidate, memory, source mutation, or external effect was performed."
   ],
-  "finished_at": "2026-08-29T07:31:20.150158Z",
+  "finished_at": "2026-08-30T01:51:04.260161Z",
   "inventories": {
     "after_explicit_refresh": [
       "kag_discover"
@@ -47,20 +47,21 @@
       "kag_discover"
     ]
   },
-  "observation_id": "aoa-kag-cache-pair-2.1.1-20260829",
-  "observed_at": "2026-08-29T07:31:19.726835Z",
+  "observation_id": "aoa-kag-cache-pair-2.1.1-20260830",
+  "observed_at": "2026-08-30T01:51:03.756208Z",
   "python_sdk": {
+    "artifact_digest": "sha256:1ef71b1a3cfb3daba29b61d9f280896b35bdc1038474285cc8295071418b01e5",
     "commit": "0921d94a74db900dccd2d534842aa7b6160542d2",
     "version": "2.1.1"
   },
   "raw_receipt": {
     "mode": "0600",
-    "ref": "local:///srv/abyss-machine/tmp/mcp-211-lab.SMGqtq/kag-cache-pair-2.1.1.json",
-    "sha256": "ce37647393c9274e53bd9853e8765b3863bafaa5c2ba502f7e43293d6a412397"
+    "ref": "local:///srv/abyss-machine/cache/abyss-stack-mcp-validation-20260829/candidate-receipts-20260830/cache.json",
+    "sha256": "e271932b0705df8a724e597324b2f0b710bf10b9c677097aa7323e18ca327173"
   },
   "schema_version": "abyss_mcp_kag_cache_pair_observation_v1",
   "source_revisions": {
-    "abyss_stack": "c22ec7626d07ec66ff32569a2cc1b1b82e45f7b4",
+    "abyss_stack": "cbb387567b193cd75762894fd77e192d2bf5cb80",
     "aoa_kag": "578e4cea9a04b76a881bde240d5479efceea4926"
   },
   "stable_registration_unchanged": true,

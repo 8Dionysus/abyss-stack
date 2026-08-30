@@ -160,17 +160,30 @@ def _is_under(path: Path, root: Path) -> bool:
     return True
 
 
-def _installed_mcp_package_root() -> Path:
-    spec = importlib.util.find_spec("mcp")
+def _installed_package_root(module_name: str) -> Path:
+    spec = importlib.util.find_spec(module_name)
     if spec is None or spec.submodule_search_locations is None:
-        raise RuntimeError("the serving MCP SDK package location is unavailable")
-    locations = [Path(item).resolve() for item in spec.submodule_search_locations]
+        raise RuntimeError(
+            f"the serving {module_name} package location is unavailable"
+        )
+    locations = [Path(item) for item in spec.submodule_search_locations]
     if len(locations) != 1:
-        raise RuntimeError("the serving MCP SDK package has ambiguous locations")
+        raise RuntimeError(
+            f"the serving {module_name} package has ambiguous locations"
+        )
     package_root = locations[0]
-    if not package_root.is_dir() or package_root.is_symlink():
-        raise RuntimeError("the serving MCP SDK package root is not a regular directory")
+    if package_root.is_symlink():
+        raise RuntimeError(f"the serving {module_name} package root is a symlink")
+    package_root = package_root.resolve()
+    if not package_root.is_dir():
+        raise RuntimeError(
+            f"the serving {module_name} package root is not a regular directory"
+        )
     return package_root
+
+
+def _installed_mcp_package_root() -> Path:
+    return _installed_package_root("mcp")
 
 
 def _git_output(root: Path, *arguments: str) -> str:
@@ -392,6 +405,13 @@ def _installed_mcp_sdk_artifact_digest(
             f"{mcp_types_distribution.version}"
         )
     package_root = _installed_mcp_package_root()
+    mcp_types_package_root = _installed_package_root("mcp_types")
+    mcp_types_site_packages = Path(mcp_types_distribution._path).parent.resolve()
+    if not _is_under(mcp_types_package_root, mcp_types_site_packages):
+        raise RuntimeError(
+            "the imported MCP wire-types package is not loaded from its "
+            f"attested distribution: {mcp_types_package_root}"
+        )
     mcp_source_digest = _editable_mcp_source_digest(
         mcp_distribution,
         package_root,

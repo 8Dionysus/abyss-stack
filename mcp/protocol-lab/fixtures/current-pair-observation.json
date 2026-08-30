@@ -28,8 +28,8 @@
   "effectful_organs_migrated": false,
   "explicit_handles_observed": true,
   "matrix_version": "abyss_mcp_protocol_compatibility_matrix_v1",
-  "observation_id": "p2-mcp-2-1-1-isolated-candidate-20260829",
-  "observed_at": "2026-08-29T07:33:01.750250Z",
+  "observation_id": "p2-mcp-2-1-1-isolated-candidate-20260830",
+  "observed_at": "2026-08-30T01:52:44.198448Z",
   "official_conformance": {
     "reason": "Official conformance commit c321dd3 freezes requirements per specification revision; Python MCP 2.1.1 passed every scored client and server check for 2026-07-28, while later extension and pending failures remain visible and unscored.",
     "receipt_refs": [

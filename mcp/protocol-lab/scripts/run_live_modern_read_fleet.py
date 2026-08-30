@@ -201,6 +201,24 @@ def _probe(name: str, port: int, unit: str, credential: str) -> dict[str, Any]:
     }
 
 
+def _fleet_verdict(
+    sdk: str,
+    registry: dict[str, Any],
+    rows: list[dict[str, Any]],
+    zero_legacy: bool,
+) -> str:
+    """Accept only a reviewed MCP SDK identity on an otherwise passing fleet."""
+    return (
+        "passed"
+        if sdk in MCP_SDK_SOURCE_REVISIONS
+        and registry["admitted_read_count"] == len(rows)
+        and registry["protocol_versions"] == [PROTOCOL]
+        and registry["bootstrap_identity_count"] == 0
+        and zero_legacy
+        else "failed"
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", type=Path, required=True)
@@ -236,15 +254,7 @@ def main() -> int:
             for row in rows
         ),
     }
-    receipt["verdict"] = (
-        "passed"
-        if sdk == "2.0.0"
-        and registry["admitted_read_count"] == len(rows)
-        and registry["protocol_versions"] == [PROTOCOL]
-        and registry["bootstrap_identity_count"] == 0
-        and receipt["zero_legacy"]
-        else "failed"
-    )
+    receipt["verdict"] = _fleet_verdict(sdk, registry, rows, receipt["zero_legacy"])
     args.output.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     args.output.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n")
     os.chmod(args.output, 0o600)

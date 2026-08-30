@@ -10,15 +10,16 @@
     "effect_like_tool_code": -32601,
     "legacy_client_code": -32022
   },
-  "finished_at": "2026-08-29T07:28:13.779756Z",
-  "observation_id": "aoa-kag-next-cancellable-pair-2.1.1-20260829",
-  "observed_at": "2026-08-29T07:27:34.798749Z",
+  "finished_at": "2026-08-30T01:51:27.986868Z",
+  "observation_id": "aoa-kag-next-cancellable-pair-2.1.1-20260830",
+  "observed_at": "2026-08-30T01:51:04.012074Z",
   "owner_canary": {
+    "canonical_source_digest": "5aeb7b89dce54b414281f5390c8cc063f59bb75d02b28e1a014da2d96701e164",
     "degradation": [],
-    "freshness_state": "current",
+    "freshness_state": "canonical_only",
     "owner": "abyss-stack",
     "projection_exact_state": "current",
-    "runtime_source_digest": "9854a5989531f3afaa52af2d8b2836fe03c03ed1566e164f48cae35d5886a5e6",
+    "runtime_source_digest": "",
     "schema_version": "aoa-kag-mcp-capabilities-v1"
   },
   "pair": {
@@ -52,23 +53,24 @@
     "wire_version": "2026-07-28"
   },
   "python_sdk": {
+    "artifact_digest": "sha256:1ef71b1a3cfb3daba29b61d9f280896b35bdc1038474285cc8295071418b01e5",
     "commit": "0921d94a74db900dccd2d534842aa7b6160542d2",
     "version": "2.1.1"
   },
   "raw_receipt": {
     "mode": "0600",
-    "ref": "local:///srv/abyss-machine/tmp/mcp-211-lab.SMGqtq/kag-next-pair-2.1.1.json",
-    "sha256": "676f6ad95910b31adb8ec0a44e7cf3f6e8a17514028520e12eb295eabfa51b20"
+    "ref": "local:///srv/abyss-machine/cache/abyss-stack-mcp-validation-20260829/candidate-receipts-20260830/next.json",
+    "sha256": "b0bb7715f5e83c7de54295791c8f9a7763f7f34192f9c469b309ef272a78832a"
   },
   "schema_version": "abyss_mcp_kag_next_cancellable_pair_observation_v1",
   "source_revisions": {
-    "abyss_stack": "c22ec7626d07ec66ff32569a2cc1b1b82e45f7b4",
+    "abyss_stack": "cbb387567b193cd75762894fd77e192d2bf5cb80",
     "aoa_kag": "578e4cea9a04b76a881bde240d5479efceea4926",
-    "stack_runtime_current_digest": "sha256:9e5f45ff79c40776ff9c471c69ee978e84de41ddbae52b3cbedab8d33a3b0038"
+    "stack_runtime_current_digest": "sha256:dd16ea9d147d7793ee53060f995ea08348036075641ce2a5664fa69a24c320ba"
   },
   "stable_registration": {
-    "config_digest_after": "sha256:7dd18cc02de8a7ac9227c50957ab169f51d853b327583270b567b64c8c2bf98b",
-    "config_digest_before": "sha256:7dd18cc02de8a7ac9227c50957ab169f51d853b327583270b567b64c8c2bf98b",
+    "config_digest_after": "sha256:138988f2edb0ea52bbbf546c5d96e2675322009a09ae4db13d9e72929e521627",
+    "config_digest_before": "sha256:138988f2edb0ea52bbbf546c5d96e2675322009a09ae4db13d9e72929e521627",
     "unchanged": true
   },
   "verdict": "adapter_pair_passed_with_cancellation"

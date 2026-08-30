@@ -20,10 +20,12 @@ TASKS_MATRIX_SCHEMA_PATH = LAB_ROOT / "schemas" / "tasks-compatibility-matrix.sc
 EXPECTED_GATE_IDS = tuple(f"P1-{index:02d}" for index in range(1, 15))
 EXPECTED_PYTHON_MCP_VERSION = "2.1.1"
 EXPECTED_PYTHON_MCP_COMMIT = "0921d94a74db900dccd2d534842aa7b6160542d2"
+EXPECTED_PYTHON_MCP_ARTIFACT_DIGEST = "sha256:1ef71b1a3cfb3daba29b61d9f280896b35bdc1038474285cc8295071418b01e5"
 EXPECTED_DEPLOYMENT_MCP_VERSION = "2.0.0"
 EXPECTED_DEPLOYMENT_MCP_COMMIT = "6f69a3758ebf2ee55ce050f58b470ce11af71133"
 EXPECTED_AOA_KAG_COMMIT = "578e4cea9a04b76a881bde240d5479efceea4926"
-EXPECTED_STACK_SOURCE_COMMIT = "c22ec7626d07ec66ff32569a2cc1b1b82e45f7b4"
+EXPECTED_KAG_CANONICAL_SOURCE_DIGEST = "5aeb7b89dce54b414281f5390c8cc063f59bb75d02b28e1a014da2d96701e164"
+EXPECTED_STACK_SOURCE_COMMIT = "cbb387567b193cd75762894fd77e192d2bf5cb80"
 FIXTURES = {
     "wire": (
         "codex-0.146.0-wire-observation.json",
@@ -275,6 +277,7 @@ def validate(checked_at: datetime | None = None) -> list[str]:
         or conformance["conformance_harness"]["commit"] != matrix["official_conformance"]["commit"]
         or conformance["python_sdk"]["commit"] != EXPECTED_PYTHON_MCP_COMMIT
         or conformance["python_sdk"]["version"] != EXPECTED_PYTHON_MCP_VERSION
+        or conformance["python_sdk"]["artifact_digest"] != EXPECTED_PYTHON_MCP_ARTIFACT_DIGEST
         or conformance["requirements_revision"] != "2026-07-28"
         or conformance["directions"]["client"]["scored_scenario_count"] != 32
         or conformance["directions"]["client"]["scored_success_checks"] != 372
@@ -328,15 +331,17 @@ def validate(checked_at: datetime | None = None) -> list[str]:
         or codex_lab["wire"]["oversized_input_denied_code"] != -32602
         or codex_lab["server"]["python_mcp_version"] != EXPECTED_PYTHON_MCP_VERSION
         or codex_lab["server"]["python_mcp_commit"] != EXPECTED_PYTHON_MCP_COMMIT
+        or codex_lab["server"]["python_mcp_artifact_digest"]
+        != EXPECTED_PYTHON_MCP_ARTIFACT_DIGEST
         or codex_lab["server"]["source_revisions"]["abyss_stack"]
         != EXPECTED_STACK_SOURCE_COMMIT
         or codex_lab["server"]["source_revisions"]["aoa_kag"]
         != EXPECTED_AOA_KAG_COMMIT
         or codex_lab["server"]["source_artifacts"]
         != {
-            "adapter_harness_sha256": "81467ae1690efdb07360de63e05fcf1a1c5c8d69eed0132f94ac165e81000608",
-            "adapter_package_tree_sha256": "b5b66741f8c206964493c9cfc73a949d5f822a2493f4b129cf9974412968b4ba",
-            "driver_sha256": "d3341cd48e4e473e80794af86af83582268831cb30f1cd42f05b90934b539c12",
+            "adapter_harness_sha256": "3dc4b78352072340e3677ae50ceb94a25671e00e5e1ff8dfbf4407f85f8e8f56",
+            "adapter_package_tree_sha256": "ac7f2a70de13a69d14f5b43b0ffd01f9f797112e5929f6008b2cae0357210078",
+            "driver_sha256": "d7dae0ae03795c9041413ca0662809411ca8106b7ce991e673ab603878c33b66",
         }
         or not codex_lab["stable_registration"]["unchanged"]
         or codex_lab["wire"]["tasks_extension_advertised"]
@@ -446,17 +451,30 @@ def validate(checked_at: datetime | None = None) -> list[str]:
         or live_modern_fleet["rollback"]["active_legacy_units"] != 0
     ):
         errors.append("live modern-only production fleet evidence drifted")
-    if (
-        live_modern_fleet["mcp_sdk"] != "2.0.0"
-        or live_modern_fleet["mcp_sdk_source_revision"] != EXPECTED_DEPLOYMENT_MCP_COMMIT
-        or codex_tasks_production_pair["mcp_sdk"] != "2.0.0"
-        or codex_tasks_production_pair["mcp_sdk_source_revision"]
-        != EXPECTED_DEPLOYMENT_MCP_COMMIT
-        or tasks_matrix["mcp_sdk"] != EXPECTED_DEPLOYMENT_MCP_VERSION
-        or tasks_matrix["mcp_sdk_source_revision"] != EXPECTED_DEPLOYMENT_MCP_COMMIT
-    ):
+    candidate_identity = (
+        sdk_by_id["python-next"]["version"],
+        sdk_by_id["python-next"]["commit"],
+    )
+    historical_identity = (
+        EXPECTED_DEPLOYMENT_MCP_VERSION,
+        EXPECTED_DEPLOYMENT_MCP_COMMIT,
+    )
+    deployment_identities = {
+        (payload["mcp_sdk"], payload["mcp_sdk_source_revision"])
+        for payload in (
+            stable_rollback,
+            live_modern_fleet,
+            codex_tasks_production_pair,
+            tasks_matrix,
+        )
+    }
+    if not deployment_identities.issubset({candidate_identity, historical_identity}):
         errors.append(
-            "all deployment-bound production receipts must remain explicitly pinned to MCP 2.0.0 and its source revision"
+            "deployment-bound production receipts must use the candidate or retained historical MCP identity"
+        )
+    elif len(deployment_identities) != 1:
+        errors.append(
+            "deployment-bound production receipts must share one exact MCP identity during a refresh"
         )
     if (
         codex_tasks_production_pair["verdict"] != "eligible_for_bounded_production"
@@ -481,7 +499,11 @@ def validate(checked_at: datetime | None = None) -> list[str]:
         errors.append("requestState isolation, expiry, replay or revocation proof drifted")
     if (
         handle["python_sdk"]
-        != {"commit": EXPECTED_PYTHON_MCP_COMMIT, "version": EXPECTED_PYTHON_MCP_VERSION}
+        != {
+            "artifact_digest": EXPECTED_PYTHON_MCP_ARTIFACT_DIGEST,
+            "commit": EXPECTED_PYTHON_MCP_COMMIT,
+            "version": EXPECTED_PYTHON_MCP_VERSION,
+        }
         or handle["source_revisions"]["abyss_stack"] != EXPECTED_STACK_SOURCE_COMMIT
         or handle["source_revisions"]["aoa_kag"] != EXPECTED_AOA_KAG_COMMIT
     ):
@@ -490,14 +512,22 @@ def validate(checked_at: datetime | None = None) -> list[str]:
         errors.append("private cache TTL, invalidation or removal proof drifted")
     if (
         cache["python_sdk"]
-        != {"commit": EXPECTED_PYTHON_MCP_COMMIT, "version": EXPECTED_PYTHON_MCP_VERSION}
+        != {
+            "artifact_digest": EXPECTED_PYTHON_MCP_ARTIFACT_DIGEST,
+            "commit": EXPECTED_PYTHON_MCP_COMMIT,
+            "version": EXPECTED_PYTHON_MCP_VERSION,
+        }
         or cache["source_revisions"]["abyss_stack"] != EXPECTED_STACK_SOURCE_COMMIT
         or cache["source_revisions"]["aoa_kag"] != EXPECTED_AOA_KAG_COMMIT
     ):
         errors.append("MCP 2.1.1 cache receipt is not bound to its source revisions")
     adapter = fixtures["adapter"]
     if (
-        adapter["owner_canary"]["freshness_state"] != "current"
+        adapter["owner_canary"]["freshness_state"]
+        not in {"current", "canonical_only"}
+        or adapter["owner_canary"]["projection_exact_state"] != "current"
+        or adapter["owner_canary"]["canonical_source_digest"]
+        != EXPECTED_KAG_CANONICAL_SOURCE_DIGEST
         or adapter["pair"]["cancellation"]
         != {
             "client_request_cancelled": True,
@@ -508,7 +538,11 @@ def validate(checked_at: datetime | None = None) -> list[str]:
         errors.append("current owner freshness or cancellation propagation proof drifted")
     if (
         adapter["python_sdk"]
-        != {"commit": EXPECTED_PYTHON_MCP_COMMIT, "version": EXPECTED_PYTHON_MCP_VERSION}
+        != {
+            "artifact_digest": EXPECTED_PYTHON_MCP_ARTIFACT_DIGEST,
+            "commit": EXPECTED_PYTHON_MCP_COMMIT,
+            "version": EXPECTED_PYTHON_MCP_VERSION,
+        }
         or adapter["source_revisions"]["abyss_stack"] != EXPECTED_STACK_SOURCE_COMMIT
         or adapter["source_revisions"]["aoa_kag"] != EXPECTED_AOA_KAG_COMMIT
     ):

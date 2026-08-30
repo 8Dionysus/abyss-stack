@@ -642,6 +642,7 @@ def _run(args: argparse.Namespace) -> int:
             "process_pid": record["pid"],
             "python_mcp_version": sdk_identity["version"],
             "python_mcp_commit": sdk_identity["commit"],
+            "python_mcp_artifact_digest": sdk_identity["artifact_digest"],
             "source_revisions": {
                 "abyss_stack": _git_head(args.stack_source_root),
                 "aoa_kag": _git_head(args.aoa_kag_root),

@@ -7,7 +7,7 @@
     "The adapter was not registered, deployed, admitted, or granted owner authority.",
     "KAG remains evidence and navigation; owner sources retain authority."
   ],
-  "finished_at": "2026-08-29T07:29:00.471503Z",
+  "finished_at": "2026-08-30T01:51:27.525246Z",
   "handle_checks": {
     "cross_request_replay": "denied",
     "expiry": "denied",
@@ -30,22 +30,25 @@
     "raw_tokens_recorded": false,
     "ttl_seconds": 5.0
   },
-  "observation_id": "aoa-kag-handle-pair-2.1.1-20260829",
-  "observed_at": "2026-08-29T07:28:24.780724Z",
+  "observation_id": "aoa-kag-handle-pair-2.1.1-20260830",
+  "observed_at": "2026-08-30T01:51:03.867979Z",
   "owner_canary": {
-    "freshness_state": "current",
+    "canonical_source_digest": "5aeb7b89dce54b414281f5390c8cc063f59bb75d02b28e1a014da2d96701e164",
+    "freshness_state": "canonical_only",
     "owner": "abyss-stack",
     "projection_exact_state": "current",
+    "runtime_source_digest": "",
     "schema_version": "aoa-kag-mcp-capabilities-v1"
   },
   "python_sdk": {
+    "artifact_digest": "sha256:1ef71b1a3cfb3daba29b61d9f280896b35bdc1038474285cc8295071418b01e5",
     "commit": "0921d94a74db900dccd2d534842aa7b6160542d2",
     "version": "2.1.1"
   },
   "raw_receipt": {
     "mode": "0600",
-    "ref": "local:///srv/abyss-machine/tmp/mcp-211-lab.SMGqtq/kag-handle-pair-2.1.1.json",
-    "sha256": "da4d5958a92fba52ad63b61b3517cbfb85ca56456b5fe69a21763235388f853b"
+    "ref": "local:///srv/abyss-machine/cache/abyss-stack-mcp-validation-20260829/candidate-receipts-20260830/handle.json",
+    "sha256": "b236b664318d08b92fab13800e595d37f6f3cfc96fe628e48ed82c4ed8d6f4ca"
   },
   "rejection_shape": {
     "code": -32602,
@@ -56,7 +59,7 @@
   },
   "schema_version": "abyss_mcp_kag_handle_pair_observation_v1",
   "source_revisions": {
-    "abyss_stack": "c22ec7626d07ec66ff32569a2cc1b1b82e45f7b4",
+    "abyss_stack": "cbb387567b193cd75762894fd77e192d2bf5cb80",
     "aoa_kag": "578e4cea9a04b76a881bde240d5479efceea4926"
   },
   "stable_registration_unchanged": true,

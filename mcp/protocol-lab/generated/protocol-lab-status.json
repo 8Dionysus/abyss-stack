@@ -1,6 +1,6 @@
 {
   "authority_move_combined": false,
-  "candidate_evidence_expires_at": "2026-09-05T07:32:30.866342Z",
+  "candidate_evidence_expires_at": "2026-09-06T01:51:50.099097Z",
   "candidate_migration_allowed": false,
   "candidate_protocol_ready": true,
   "claim_limits": [
@@ -11,12 +11,12 @@
     "A registered alias does not prove schema observation or a grounded call.",
     "Final publication and stable SDKs never authorize production migration without exact pair receipts."
   ],
-  "codex_lab_observation_digest": "sha256:86c79637a9feb57008e399a92a86c11aeb40f6cb80c1526c2f1433ee7fbdf678",
+  "codex_lab_observation_digest": "sha256:45902bebcc89f1221f7bc91b4c8bd2926df2ee3623b4d5db44c309dfcf3bcfbb",
   "codex_tasks_production_pair_digest": "sha256:5bf3a280c869fadcda6c170907f5116995a8d8601d4e44e02e962abc6c734704",
   "core_read_migration_allowed": false,
   "deployment_evidence_current": false,
   "deployment_evidence_expires_at": "2026-08-15T08:33:46.547214Z",
-  "evaluated_at": "2026-08-29T07:33:01.750250Z",
+  "evaluated_at": "2026-08-30T01:52:44.198448Z",
   "evidence_expires_at": "2026-08-15T08:33:46.547214Z",
   "external_effect_migration_allowed": false,
   "gate_counts": {
@@ -28,11 +28,11 @@
   "internal_effect_migration_allowed": false,
   "internal_effect_protocol_ready": false,
   "live_modern_fleet_digest": "sha256:1353e1e5a0a5c349785ddcd5a0c401e098ce6ba14decbb86008e2ad2475107d7",
-  "matrix_digest": "sha256:e73920d80dd00871128cc477893d053a58f78ff0d22a6b7685d88db0e0f5948f",
+  "matrix_digest": "sha256:09730f1837b107d1afa83fca62f5617d7f8b8d3ce435401fa761b0d8e66185fd",
   "next_action": "Keep production on its evidenced MCP 2.0.0 deployment; refresh the deployment-bound 2.1.1 pair, rollback, and Tasks receipts before any production cutover or non-read admission.",
   "next_protocol": "2026-07-28",
   "next_release_status": "final",
-  "observation_digest": "sha256:684ba0a8e073b20581ab2fef3c15dcf5397f9dbeb2ecb9a2a9f7a4dbaf3dfc41",
+  "observation_digest": "sha256:55c8a6b5e2e3f687bdd5bea8284301febb26c53ba8d9c553851d50518d153378",
   "passed_gate_ids": [
     "P1-01",
     "P1-02",
@@ -70,7 +70,7 @@
   "schema_version": "abyss_mcp_protocol_lab_status_v2",
   "stable_registration_retained": true,
   "stable_rollback_observation_digest": "sha256:140a64d223ddec2494b67852a369e09747fe17539a740f66922ba50b2725917d",
-  "status_digest": "sha256:21a34523e8b15c9c0cac3637d3c195e23c30a5b61fa7ef4b866ba281fe4ab8e6",
+  "status_digest": "sha256:1ef0bb2c2f083d6ec5a7feb8498c737e8c94a75512c703264be524965d8791b5",
   "tasks_blockers": [
     "input_required_update_live_pair_unproved",
     "tasks_notifications_unproved",

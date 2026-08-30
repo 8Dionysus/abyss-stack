@@ -13,14 +13,14 @@
     "production_authority": false,
     "version": "0.147.0"
   },
-  "expires_at": "2026-09-05T07:32:30.866342Z",
-  "finished_at": "2026-08-29T07:33:01.750250Z",
-  "observation_id": "codex-0.147.0-stable-kag-next-lab-2.1.1-20260829",
-  "observed_at": "2026-08-29T07:32:30.866342Z",
+  "expires_at": "2026-09-06T01:51:50.099097Z",
+  "finished_at": "2026-08-30T01:52:14.081457Z",
+  "observation_id": "codex-0.147.0-stable-kag-next-lab-2.1.1-20260830",
+  "observed_at": "2026-08-30T01:51:50.099097Z",
   "private_evidence": {
-    "normalized_from": "local:///srv/abyss-machine/tmp/mcp-211-lab.SMGqtq/codex-0.147.0-stable-kag-next-lab-2.1.1.json",
-    "raw_receipt_sha256": "28f70d3bbe0d6ba4653c875ae1607952dd555faf5809e22429352494bf6889cc",
-    "server_record_sha256": "526ad2b045027d0decdd09ebd286334c128dad5f0f65d65d0fcbb1c12690b862"
+    "normalized_from": "local:///srv/abyss-machine/cache/abyss-stack-mcp-validation-20260829/codex-lab-20260830/raw.json",
+    "raw_receipt_sha256": "6593b46af41d8ef84cff3074e7c51e45b4c928575b363f66d75b79f519b56275",
+    "server_record_sha256": "519670bfdbcdb9b804599c2fa177d89e621f3d1525566e9d8dbcfddf6eb5fb84"
   },
   "rollback": {
     "app_process_stopped": true,
@@ -33,23 +33,24 @@
   "secrets_included": false,
   "server": {
     "credential_regular_non_symlink_0600": true,
-    "endpoint": "http://127.0.0.1:45555/mcp",
+    "endpoint": "http://127.0.0.1:39020/mcp",
+    "python_mcp_artifact_digest": "sha256:1ef71b1a3cfb3daba29b61d9f280896b35bdc1038474285cc8295071418b01e5",
     "python_mcp_commit": "0921d94a74db900dccd2d534842aa7b6160542d2",
     "python_mcp_version": "2.1.1",
     "registration": "aoa_kag_next_lab",
     "source_artifacts": {
-      "adapter_harness_sha256": "81467ae1690efdb07360de63e05fcf1a1c5c8d69eed0132f94ac165e81000608",
-      "adapter_package_tree_sha256": "b5b66741f8c206964493c9cfc73a949d5f822a2493f4b129cf9974412968b4ba",
-      "driver_sha256": "d3341cd48e4e473e80794af86af83582268831cb30f1cd42f05b90934b539c12"
+      "adapter_harness_sha256": "3dc4b78352072340e3677ae50ceb94a25671e00e5e1ff8dfbf4407f85f8e8f56",
+      "adapter_package_tree_sha256": "ac7f2a70de13a69d14f5b43b0ffd01f9f797112e5929f6008b2cae0357210078",
+      "driver_sha256": "d7dae0ae03795c9041413ca0662809411ca8106b7ce991e673ab603878c33b66"
     },
     "source_revisions": {
-      "abyss_stack": "c22ec7626d07ec66ff32569a2cc1b1b82e45f7b4",
+      "abyss_stack": "cbb387567b193cd75762894fd77e192d2bf5cb80",
       "aoa_kag": "578e4cea9a04b76a881bde240d5479efceea4926"
     }
   },
   "stable_registration": {
-    "config_sha256_after": "7dd18cc02de8a7ac9227c50957ab169f51d853b327583270b567b64c8c2bf98b",
-    "config_sha256_before": "7dd18cc02de8a7ac9227c50957ab169f51d853b327583270b567b64c8c2bf98b",
+    "config_sha256_after": "138988f2edb0ea52bbbf546c5d96e2675322009a09ae4db13d9e72929e521627",
+    "config_sha256_before": "138988f2edb0ea52bbbf546c5d96e2675322009a09ae4db13d9e72929e521627",
     "unchanged": true
   },
   "verdict": "isolated_stable_pair_passed",
@@ -67,7 +68,7 @@
     "oversized_input_http_status": 400,
     "owner": "abyss-stack",
     "request_bytes": 45,
-    "response_bytes": 7482,
+    "response_bytes": 6628,
     "result_schema": "aoa-kag-mcp-capabilities-v1",
     "self_describing_requests": 9,
     "server_discover_observed": true,
