@@ -185,3 +185,4 @@
 
 - [ABYSS-STACK-D-0126 Typed Visible Holder Closure Authorization](../ABYSS-STACK-D-0126-typed-visible-holder-closure-authorization.md) (`docs/decisions/ABYSS-STACK-D-0126-typed-visible-holder-closure-authorization.md`)
 - [ABYSS-STACK-D-0128 Exact Content-Addressed Runtime Subject Admission](../ABYSS-STACK-D-0128-exact-runtime-subject-admission.md) (`docs/decisions/ABYSS-STACK-D-0128-exact-runtime-subject-admission.md`)
+- [ABYSS-STACK-D-0140 Native Goal Pause Request And Post-Read Proof](../ABYSS-STACK-D-0140-native-goal-pause-request-and-post-read-proof.md) (`docs/decisions/ABYSS-STACK-D-0140-native-goal-pause-request-and-post-read-proof.md`)

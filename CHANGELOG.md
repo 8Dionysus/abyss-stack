@@ -77,6 +77,10 @@ Tracking starts with the community-docs baseline for this repository.
   encoding, reject Unicode whitespace/control coordinates, accept lowercase
   RFC 3339 UTC designators, and carry SHA-256 Git heads through runtime,
   private-projection, binder, and study schemas.
+- Repair the owner-bound external Codex Goal pause contour to use the current
+  native `thread/goal/set` surface exactly once, bind its request and optional
+  response to a fresh post-read, and reconcile a lost response from durable
+  dispatch evidence without requiring an unsupported CAS/version field.
 - Bind the canonical `aoa-kag` MCP adapter to an authored absolute
   `AOA_KAG_ARTIFACT_ROOT` seam for v4 cold-CAS reads, preserving fail-closed
   loader behavior and separate artifact-admission verdicts.

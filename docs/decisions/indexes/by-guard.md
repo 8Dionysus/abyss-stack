@@ -181,6 +181,7 @@
 ## Goal identity binding
 
 - [ABYSS-STACK-D-0133 Owner-Bound External Goal Pause](../ABYSS-STACK-D-0133-owner-bound-external-goal-pause.md) (`docs/decisions/ABYSS-STACK-D-0133-owner-bound-external-goal-pause.md`)
+- [ABYSS-STACK-D-0140 Native Goal Pause Request And Post-Read Proof](../ABYSS-STACK-D-0140-native-goal-pause-request-and-post-read-proof.md) (`docs/decisions/ABYSS-STACK-D-0140-native-goal-pause-request-and-post-read-proof.md`)
 
 ## RPG runtime projection
 
@@ -441,6 +442,7 @@
 ## evidence separation
 
 - [ABYSS-STACK-D-0133 Owner-Bound External Goal Pause](../ABYSS-STACK-D-0133-owner-bound-external-goal-pause.md) (`docs/decisions/ABYSS-STACK-D-0133-owner-bound-external-goal-pause.md`)
+- [ABYSS-STACK-D-0140 Native Goal Pause Request And Post-Read Proof](../ABYSS-STACK-D-0140-native-goal-pause-request-and-post-read-proof.md) (`docs/decisions/ABYSS-STACK-D-0140-native-goal-pause-request-and-post-read-proof.md`)
 
 ## exact admission
 
@@ -675,6 +677,7 @@
 
 - [ABYSS-STACK-D-0133 Owner-Bound External Goal Pause](../ABYSS-STACK-D-0133-owner-bound-external-goal-pause.md) (`docs/decisions/ABYSS-STACK-D-0133-owner-bound-external-goal-pause.md`)
 - [ABYSS-STACK-D-0134 Generic Responsibility-Movement Observation](../ABYSS-STACK-D-0134-generic-responsibility-movement-observation.md) (`docs/decisions/ABYSS-STACK-D-0134-generic-responsibility-movement-observation.md`)
+- [ABYSS-STACK-D-0140 Native Goal Pause Request And Post-Read Proof](../ABYSS-STACK-D-0140-native-goal-pause-request-and-post-read-proof.md) (`docs/decisions/ABYSS-STACK-D-0140-native-goal-pause-request-and-post-read-proof.md`)
 
 ## loopback exposure
 

@@ -40,6 +40,7 @@ python -m py_compile \
   mechanics/governed-execution/parts/external-codex-agent/external_codex_supervisor.py \
   mechanics/governed-execution/parts/external-codex-agent/install_external_codex_runtime.py \
   mechanics/governed-execution/parts/external-codex-agent/external_codex_return.py \
+  mechanics/governed-execution/parts/external-codex-agent/goal_lifecycle_adapter.py \
   mechanics/governed-execution/parts/external-codex-agent/external_codex_responsibility_movement.py \
   mechanics/governed-execution/parts/external-codex-agent/prepare_landing_study.py \
   mechanics/governed-execution/parts/external-codex-agent/visible_incarnation_home.py
@@ -94,18 +95,33 @@ its replacement provenance is missing. These checks still do not claim a live
 app-server delivery, holder closure, semantic acceptance, or installed-release
 parity.
 
-The focused external-return tests also cover the separate Goal pause contour:
-an exact active owner-bound Goal is refused before `thread/goal/set` when the
-app-server adapter lacks an `atomic_goal_transition` method with a
-server-supported compare-and-set/version proof; the fixture adapter supplies
-that explicit atomic method and typed proof and verifies that the
-returned identity, status, request, precondition, and response digest are
-bound before a receipt is published. Non-active Goals are refused without a
-lifecycle mutation, and a completed pause receipt replays without a second
-app-server call. The suite also forces dispatch-marker, transition-proof, and
-receipt publication failure at their respective boundaries and verifies that
-a pre-send reservation fails closed while a matching post-send proof is
-reconciled through a read-only Goal read without a second `thread/goal/set`.
+The focused external-return tests cover the generic Goal lifecycle contour:
+owner-resolved typed requests and decisions reject stale Goal/DAG/ownership
+state before transport, and the same adapter executes both delegation pause
+  and accepted-return activation through `thread/goal/get`, one native
+`thread/goal/set`, and an authoritative read. The fixture receipt keeps
+requested, accepted, executed, delivered, semantically accepted, and closed
+claims separate and asserts that no turn or terminal transport is used. The
+adapter also rejects mismatched decisions and replays an already desired
+state through a read-only path. A mutating attempt persists its exact Goal
+precondition and dispatch marker before transport, records the server proof
+before receipt publication, and reconciles a proof-recorded ambiguous retry
+through `thread/goal/get` without a second `thread/goal/set`. Receipt replay
+revalidates the exact decision reference, transition frame, proof, and
+response digests; executed receipt replay also requires the mutation attempt
+sidecar, binds the authoritative result response to its digest and safe
+summary, and rejects a receipt whose path identity is missing or changed.
+
+The legacy external-return tests also cover the separate Goal pause contour:
+an exact active owner-bound Goal uses the current public `thread/goal/set`
+surface once, then proves the returned identity, status, request, precondition,
+and fresh post-read before a receipt is published. Non-active Goals are refused
+without a lifecycle mutation, and a completed pause receipt replays without a
+second app-server call. The suite also forces dispatch-marker, transition-proof,
+and receipt publication failure at their respective boundaries and verifies
+that a pre-send reservation fails closed while a matching post-send dispatch
+marker is reconciled through a read-only Goal read without a second
+`thread/goal/set`.
 Companion cases prove that an active observation after dispatch fails closed, a
 paused observation through a replacement app-server endpoint fails closed, a
 paused observation without the marker or proof fails closed, and incomplete or
@@ -115,8 +131,8 @@ evidence. The reservation fixture validates the initial, prepared, pre-send,
 and post-send reservation states against the separate
 `abyss_stack_external_codex_pause_reservation_v1` schema, while completed
 evidence remains validated by the pause-receipt schema. The current public
-Codex app-server is therefore a known capability blocker for a live fresh
-`active_to_paused` canary; no source test double is a live canary claim.
+Codex app-server can now serve the live fresh `active_to_paused` canary through
+its public Goal set method; no source test double is a live canary claim.
 
 The responsibility-movement tests prove the required branch independently:
 the compiled obligation and exact handoff digest are carried through a

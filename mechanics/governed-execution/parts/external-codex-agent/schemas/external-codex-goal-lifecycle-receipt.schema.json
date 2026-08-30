@@ -1,0 +1,192 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://abyss.local/schemas/external-codex-goal-lifecycle-receipt.schema.json",
+  "title": "Abyss external Codex Goal lifecycle execution receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "execution_id", "stage", "correlation_id",
+    "idempotency_key", "goal_ref", "request_ref", "decision_ref",
+    "observed_state", "desired_state", "resulting_state", "status",
+    "evidence_refs", "produced_by", "executed_at", "boundaries",
+    "owner_ref", "owner_sha256", "owner", "transport", "lifecycle",
+    "owner_acceptance", "semantic_acceptance", "delivered", "closed",
+    "generated_at"
+  ],
+  "properties": {
+    "schema_version": {"const": "abyss_stack_external_codex_goal_lifecycle_receipt_v2"},
+    "execution_id": {"type": "string", "minLength": 1},
+    "stage": {"const": "executed"},
+    "correlation_id": {"type": "string", "minLength": 1},
+    "idempotency_key": {"type": "string", "minLength": 1},
+    "goal_ref": {"$ref": "#/$defs/contentRef"},
+    "request_ref": {"$ref": "#/$defs/contentRef"},
+    "decision_ref": {"$ref": "#/$defs/contentRef"},
+    "observed_state": {"type": "string", "minLength": 1},
+    "desired_state": {"type": "string", "minLength": 1},
+    "resulting_state": {"type": "string", "minLength": 1},
+    "status": {"enum": ["executed", "replayed", "rejected"]},
+    "evidence_refs": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/provenance"}},
+    "produced_by": {"$ref": "#/$defs/provenance"},
+    "executed_at": {"type": "string", "format": "date-time"},
+    "generated_at": {"type": "string", "format": "date-time"},
+    "owner_ref": {"type": "string", "minLength": 1},
+    "receipt_ref": {"type": "string", "minLength": 1},
+    "owner_sha256": {"$ref": "#/$defs/digest"},
+    "owner": {
+      "type": "object", "additionalProperties": false,
+      "required": ["owner_id", "owner_repo", "goal_id", "thread_id", "runtime", "transport_posture", "acceptance_posture"],
+      "properties": {
+        "owner_id": {"type": "string", "minLength": 1},
+        "owner_repo": {"type": "string", "minLength": 1},
+        "goal_id": {"type": "string", "minLength": 1},
+        "thread_id": {"type": "string", "minLength": 1},
+        "runtime": {"const": "codex"},
+        "transport_posture": {"type": "string", "minLength": 1},
+        "acceptance_posture": {"type": "string", "minLength": 1}
+      }
+    },
+    "transport": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "endpoint", "method"],
+      "properties": {
+        "kind": {"const": "codex_app_server_websocket_unix"},
+        "endpoint": {"type": "string", "minLength": 1},
+        "method": {"enum": ["thread/goal/get", "thread/goal/set"]},
+        "resolution": {"type": "string", "minLength": 1}
+      }
+    },
+    "lifecycle": {
+      "type": "object", "additionalProperties": false,
+      "required": ["initialize", "before", "result", "result_response", "before_response_sha256", "result_response_sha256", "mutation_response_sha256", "transition_request", "transition_proof"],
+      "properties": {
+        "initialize": {"type": "object"},
+        "before": {"type": "object"},
+        "result": {"type": "object"},
+        "result_response": {"type": "object"},
+        "before_response_sha256": {"$ref": "#/$defs/digest"},
+        "result_response_sha256": {"$ref": "#/$defs/digest"},
+        "mutation_response_sha256": {"type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$"},
+        "transition_request": {"type": ["object", "null"]},
+        "transition_proof": {
+          "anyOf": [
+            {"$ref": "#/$defs/transitionProof"},
+            {"$ref": "#/$defs/legacyTransitionProof"},
+            {"type": "null"}
+          ]
+        },
+        "recovery": {
+          "type": "object", "additionalProperties": false,
+          "required": ["mode", "mutation_response_available", "reconciled_by", "authoritative", "authoritative_response_sha256"],
+          "properties": {
+            "mode": {"const": "ambiguous_post_mutation"},
+            "mutation_response_available": {"type": "boolean"},
+            "reconciled_by": {"const": "thread/goal/get"},
+            "authoritative": {"type": "object"},
+            "authoritative_response_sha256": {"$ref": "#/$defs/digest"}
+          }
+        }
+      }
+    },
+    "boundaries": {
+      "type": "object", "additionalProperties": false,
+      "required": ["requested", "accepted", "executed", "delivered", "semantically_accepted", "closed"],
+      "properties": {
+        "requested": {"const": true},
+        "accepted": {"type": "boolean"},
+        "executed": {"type": "boolean"},
+        "delivered": {"type": "boolean"},
+        "semantically_accepted": {"type": "boolean"},
+        "closed": {"type": "boolean"}
+      }
+    },
+    "owner_acceptance": {"const": "separate"},
+    "semantic_acceptance": {"const": "separate"},
+    "delivered": {"const": false},
+    "closed": {"const": false},
+    "request_artifact": {
+      "type": "object", "additionalProperties": false,
+      "required": ["ref", "sha256"],
+      "properties": {"ref": {"type": "string", "minLength": 1}, "sha256": {"$ref": "#/$defs/digest"}}
+    },
+    "decision_artifact": {
+      "type": "object", "additionalProperties": false,
+      "required": ["ref", "sha256"],
+      "properties": {"ref": {"type": "string", "minLength": 1}, "sha256": {"$ref": "#/$defs/digest"}}
+    },
+    "attempt_artifact": {
+      "type": "object", "additionalProperties": false,
+      "required": ["ref", "sha256"],
+      "properties": {"ref": {"type": "string", "minLength": 1}, "sha256": {"$ref": "#/$defs/digest"}}
+    }
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "contentRef": {
+      "type": "object", "additionalProperties": false,
+      "required": ["object_id", "owner_repo", "schema_version", "digest"],
+      "properties": {
+        "object_id": {"type": "string", "minLength": 1},
+        "owner_repo": {"type": "string", "minLength": 1},
+        "schema_version": {"type": "string", "minLength": 1},
+        "digest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "provenance": {
+      "type": "object", "additionalProperties": false,
+      "required": ["owner_repo", "artifact_ref", "source_ref", "artifact_digest", "schema_ref", "schema_version"],
+      "properties": {
+        "owner_repo": {"type": "string", "minLength": 1},
+        "artifact_ref": {"type": "string", "minLength": 1},
+        "source_ref": {"type": "string", "minLength": 1},
+        "artifact_digest": {"$ref": "#/$defs/digest"},
+        "schema_ref": {"type": "string", "minLength": 1},
+        "schema_version": {"type": "string", "minLength": 1}
+      }
+    },
+    "transitionProof": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version", "kind", "method", "thread_id", "from_status",
+        "to_status", "precondition_sha256", "request_id", "request_sha256",
+        "goal_response_sha256", "post_read_response_sha256", "response_available"
+      ],
+      "properties": {
+        "schema_version": {"const": "abyss_stack_external_codex_goal_transition_v2"},
+        "kind": {"enum": ["request_response_post_read", "dispatch_reconciled_post_read"]},
+        "method": {"const": "thread/goal/set"},
+        "thread_id": {"type": "string", "minLength": 1},
+        "from_status": {"type": "string", "minLength": 1},
+        "to_status": {"type": "string", "minLength": 1},
+        "precondition_sha256": {"$ref": "#/$defs/digest"},
+        "request_id": {"type": "integer", "minimum": 1},
+        "request_sha256": {"$ref": "#/$defs/digest"},
+        "goal_response_sha256": {"type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$"},
+        "post_read_response_sha256": {"$ref": "#/$defs/digest"},
+        "response_available": {"type": "boolean"}
+      }
+    },
+    "legacyTransitionProof": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version", "kind", "method", "thread_id", "from_status",
+        "to_status", "precondition_sha256", "request_id", "request_sha256",
+        "goal_response_sha256"
+      ],
+      "properties": {
+        "schema_version": {"const": "abyss_stack_external_codex_goal_transition_v1"},
+        "kind": {"const": "server_compare_and_set"},
+        "method": {"const": "thread/goal/set"},
+        "thread_id": {"type": "string", "minLength": 1},
+        "from_status": {"type": "string", "minLength": 1},
+        "to_status": {"type": "string", "minLength": 1},
+        "precondition_sha256": {"$ref": "#/$defs/digest"},
+        "request_id": {"type": "integer", "minimum": 1},
+        "request_sha256": {"$ref": "#/$defs/digest"},
+        "goal_response_sha256": {"$ref": "#/$defs/digest"}
+      }
+    }
+  }
+}

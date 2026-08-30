@@ -280,6 +280,7 @@
 ## 2026-08-26
 
 - [ABYSS-STACK-D-0138 Provider-Neutral Programmatic Execution Runtime](../ABYSS-STACK-D-0138-provider-neutral-programmatic-execution-runtime.md) (`docs/decisions/ABYSS-STACK-D-0138-provider-neutral-programmatic-execution-runtime.md`)
+- [ABYSS-STACK-D-0140 Native Goal Pause Request And Post-Read Proof](../ABYSS-STACK-D-0140-native-goal-pause-request-and-post-read-proof.md) (`docs/decisions/ABYSS-STACK-D-0140-native-goal-pause-request-and-post-read-proof.md`)
 
 ## 2026-08-29
 

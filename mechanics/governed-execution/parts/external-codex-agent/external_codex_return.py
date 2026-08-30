@@ -39,7 +39,19 @@ PAUSE_OWNER_SCHEMA_VERSION = "abyss_stack_external_codex_pause_owner_v1"
 PAUSE_RESERVATION_SCHEMA_VERSION = "abyss_stack_external_codex_pause_reservation_v1"
 PAUSE_RECEIPT_SCHEMA_VERSION = "abyss_stack_external_codex_pause_receipt_v1"
 PAUSE_TRANSITION_PROOF_SCHEMA_VERSION = (
+    "abyss_stack_external_codex_goal_transition_v2"
+)
+LEGACY_PAUSE_TRANSITION_PROOF_SCHEMA_VERSION = (
     "abyss_stack_external_codex_atomic_goal_transition_v1"
+)
+GOAL_LIFECYCLE_OWNER_SCHEMA_VERSION = (
+    "abyss_stack_external_codex_goal_lifecycle_owner_v2"
+)
+GOAL_LIFECYCLE_RECEIPT_SCHEMA_VERSION = (
+    "abyss_stack_external_codex_goal_lifecycle_receipt_v2"
+)
+GOAL_LIFECYCLE_ATTEMPT_SCHEMA_VERSION = (
+    "abyss_stack_external_codex_goal_lifecycle_attempt_v1"
 )
 PAUSE_RECEIPT_SCHEMA_PATH = (
     Path(__file__).resolve().parent / "schemas" / "external-codex-pause-receipt.schema.json"
@@ -257,6 +269,7 @@ def _validate_owner_binding(
     *,
     accepted_schema_versions: set[str],
     label: str,
+    extra_allowed_keys: set[str] | None = None,
 ) -> dict[str, Any]:
     """Validate one owner-selected Goal/thread transport binding."""
 
@@ -273,6 +286,8 @@ def _validate_owner_binding(
         "app_server_socket",
         "transport",
     }
+    if extra_allowed_keys:
+        allowed_keys.update(extra_allowed_keys)
     unknown_keys = set(owner) - allowed_keys
     if unknown_keys:
         raise ExternalCodexReturnError(
@@ -329,6 +344,31 @@ def validate_pause_owner(owner: dict[str, Any]) -> dict[str, Any]:
         accepted_schema_versions={PAUSE_OWNER_SCHEMA_VERSION},
         label="pause owner",
     )
+
+
+def validate_goal_lifecycle_owner(owner: dict[str, Any]) -> dict[str, Any]:
+    """Validate the transport binding for the generic Goal lifecycle leaf."""
+
+    validated = _validate_owner_binding(
+        owner,
+        accepted_schema_versions={GOAL_LIFECYCLE_OWNER_SCHEMA_VERSION},
+        label="Goal lifecycle owner",
+        extra_allowed_keys={"goal_ref", "return_owner_ref"},
+    )
+    for ref_key, id_key, label in (
+        ("goal_ref", "goal_id", "Goal"),
+        ("return_owner_ref", "owner_id", "return-owner"),
+    ):
+        reference = validated.get(ref_key)
+        if not isinstance(reference, dict) or reference.get("object_id") != validated[id_key]:
+            raise ExternalCodexReturnError(
+                f"Goal lifecycle owner {label} reference object_id must match {id_key}"
+            )
+        if reference.get("owner_repo") != validated["owner_repo"]:
+            raise ExternalCodexReturnError(
+                f"Goal lifecycle owner {label} reference owner_repo must match owner_repo"
+            )
+    return validated
 
 
 def _endpoint_from_owner(owner: dict[str, Any]) -> str | None:
@@ -548,19 +588,6 @@ def _safe_response_summary(value: object) -> dict[str, object]:
 
 class UnixWebSocketRpc:
     """Small stdlib-only JSON-RPC WebSocket client for the local app-server."""
-
-    # The public ThreadGoalSetParams contract in the current Codex app-server
-    # has no compare-and-set/version precondition.  A plain successful
-    # thread/goal/set response therefore cannot prove that this caller caused
-    # active -> paused when another controller may have won the race.  Keep
-    # this explicit so a future protocol adapter must opt in with a real
-    # server-side proof instead of inheriting a false default. Such an adapter
-    # must expose ``atomic_goal_transition(owner, precondition, status)`` and
-    # return the exact Goal response plus server-issued transition proof. The
-    # method owns the conditional request (including any version token) and
-    # must invoke the request callbacks while issuing its WebSocket request so
-    # the caller can bind the exact request to the durable reservation.
-    supports_atomic_goal_transition = False
 
     def __init__(
         self,
@@ -1083,21 +1110,9 @@ def _pause_precondition(goal_get_response: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _require_atomic_goal_transition(rpc: Any) -> None:
-    """Refuse a pause adapter that cannot prove its mutation was conditional."""
-
-    if getattr(rpc, "supports_atomic_goal_transition", False) is not True:
-        raise ExternalCodexReturnError(
-            "Codex app-server thread/goal/set has no server-supported "
-            "compare-and-set/version proof; refusing to certify active_to_paused"
-        )
-    if not callable(getattr(rpc, "atomic_goal_transition", None)):
-        raise ExternalCodexReturnError(
-            "Codex app-server pause adapter lacks an atomic Goal transition method"
-        )
-
-
-def _validated_pause_precondition(reservation: dict[str, Any]) -> dict[str, Any]:
+def _validated_pause_precondition(
+    reservation: dict[str, Any], *, owner: dict[str, Any] | None = None
+) -> dict[str, Any]:
     precondition = reservation.get("precondition")
     if not isinstance(precondition, dict):
         raise ExternalCodexReturnError(
@@ -1119,6 +1134,13 @@ def _validated_pause_precondition(reservation: dict[str, Any]) -> dict[str, Any]
         raise ExternalCodexReturnError(
             "reserved Goal pause has an invalid active precondition"
         )
+    if owner is not None:
+        goal = _goal_object(precondition["goal_get_response"], "thread/goal/get")
+        _validate_goal_binding(goal, owner)
+        if _string_at(goal, ("status",)) != "active":
+            raise ExternalCodexReturnError(
+                "reserved Goal pause precondition does not confirm an active Goal"
+            )
     return precondition
 
 
@@ -1263,9 +1285,85 @@ def _validated_pause_transition_proof(
     mutation: dict[str, Any],
     goal_response: dict[str, Any] | None = None,
     expected_response_digest: object | None = None,
+    post_read_response: dict[str, Any] | None = None,
+    expected_post_read_digest: object | None = None,
 ) -> dict[str, Any]:
-    """Validate server evidence that the pause was an atomic transition."""
+    """Validate request/response/post-read evidence for one Goal transition."""
 
+    if not isinstance(proof, dict):
+        raise ExternalCodexReturnError(
+            "Codex app-server pause response lacks transition evidence"
+        )
+    response_available = goal_response is not None or _is_sha256_digest(
+        expected_response_digest
+    )
+    response_digest = (
+        _sha256_bytes(_canonical_bytes(goal_response))
+        if goal_response is not None
+        else expected_response_digest
+    )
+    if (
+        expected_response_digest is not None
+        and goal_response is not None
+        and response_digest != expected_response_digest
+    ):
+        raise ExternalCodexReturnError(
+            "Codex app-server pause transition response digest is not bound"
+        )
+    if proof.get("schema_version") == LEGACY_PAUSE_TRANSITION_PROOF_SCHEMA_VERSION:
+        expected_keys = {
+            "schema_version",
+            "kind",
+            "method",
+            "thread_id",
+            "from_status",
+            "to_status",
+            "precondition_sha256",
+            "request_id",
+            "request_sha256",
+            "goal_response_sha256",
+        }
+        if not _is_sha256_digest(response_digest):
+            raise ExternalCodexReturnError(
+                "legacy Goal pause transition proof lacks its mutation response"
+            )
+        if (
+            set(proof) != expected_keys
+            or proof.get("kind") != "server_compare_and_set"
+            or proof.get("method") != "thread/goal/set"
+            or proof.get("thread_id") != owner["thread_id"]
+            or proof.get("from_status") != "active"
+            or proof.get("to_status") != "paused"
+            or proof.get("precondition_sha256")
+            != precondition.get("goal_response_sha256")
+            or proof.get("request_id") != mutation.get("request_id")
+            or proof.get("request_sha256") != mutation.get("request_sha256")
+            or not _is_sha256_digest(proof.get("precondition_sha256"))
+            or not _is_sha256_digest(proof.get("request_sha256"))
+            or proof.get("goal_response_sha256") != response_digest
+        ):
+            raise ExternalCodexReturnError(
+                "legacy Goal pause transition proof is not bound to its request and response"
+            )
+        return proof
+    if (
+        post_read_response is not None
+    ):
+        observed_post_read_digest = _sha256_bytes(
+            _canonical_bytes(post_read_response)
+        )
+        if (
+            expected_post_read_digest is not None
+            and expected_post_read_digest != observed_post_read_digest
+        ):
+            raise ExternalCodexReturnError(
+                "Codex app-server pause transition post-read digest is not bound"
+            )
+        expected_post_read_digest = observed_post_read_digest
+    elif not _is_sha256_digest(expected_post_read_digest):
+        raise ExternalCodexReturnError(
+            "Codex app-server pause transition evidence lacks a verifiable post-read"
+        )
     expected_keys = {
         "schema_version",
         "kind",
@@ -1277,20 +1375,18 @@ def _validated_pause_transition_proof(
         "request_id",
         "request_sha256",
         "goal_response_sha256",
+        "post_read_response_sha256",
+        "response_available",
     }
-    if not isinstance(proof, dict) or set(proof) != expected_keys:
-        raise ExternalCodexReturnError(
-            "Codex app-server pause response lacks an exact atomic transition proof"
-        )
-    if goal_response is not None:
-        expected_response_digest = _sha256_bytes(_canonical_bytes(goal_response))
-    elif not _is_sha256_digest(expected_response_digest):
-        raise ExternalCodexReturnError(
-            "Codex app-server pause transition proof lacks a verifiable Goal response"
-        )
     if (
-        proof.get("schema_version") != PAUSE_TRANSITION_PROOF_SCHEMA_VERSION
-        or proof.get("kind") != "server_compare_and_set"
+        set(proof) != expected_keys
+        or proof.get("schema_version") != PAUSE_TRANSITION_PROOF_SCHEMA_VERSION
+        or proof.get("kind")
+        != (
+            "request_response_post_read"
+            if response_available
+            else "dispatch_reconciled_post_read"
+        )
         or proof.get("method") != "thread/goal/set"
         or proof.get("thread_id") != owner["thread_id"]
         or proof.get("from_status") != "active"
@@ -1301,43 +1397,57 @@ def _validated_pause_transition_proof(
         or proof.get("request_sha256") != mutation.get("request_sha256")
         or not _is_sha256_digest(proof.get("precondition_sha256"))
         or not _is_sha256_digest(proof.get("request_sha256"))
-        or not _is_sha256_digest(proof.get("goal_response_sha256"))
-        or proof.get("goal_response_sha256") != expected_response_digest
+        or proof.get("goal_response_sha256") != response_digest
+        or proof.get("post_read_response_sha256") != expected_post_read_digest
+        or proof.get("response_available") is not response_available
     ):
         raise ExternalCodexReturnError(
-            "Codex app-server pause atomic transition proof is not bound to "
-            "the active precondition and exact mutation"
+            "Codex app-server pause transition evidence is not bound to the "
+            "active precondition, exact mutation, and post-read"
         )
     return proof
 
 
-def _validated_atomic_pause_result(
-    result: object,
+def _pause_transition_proof(
     *,
     owner: dict[str, Any],
     precondition: dict[str, Any],
     mutation: dict[str, Any],
-) -> tuple[dict[str, Any], dict[str, Any]]:
-    if not isinstance(result, dict) or set(result) != {
-        "goal_response",
-        "transition_proof",
-    }:
-        raise ExternalCodexReturnError(
-            "Codex app-server atomic Goal transition result is incomplete"
-        )
-    goal_response = result.get("goal_response")
-    if not isinstance(goal_response, dict):
-        raise ExternalCodexReturnError(
-            "Codex app-server atomic Goal transition lacks a Goal response"
-        )
-    proof = _validated_pause_transition_proof(
-        result.get("transition_proof"),
+    goal_response: dict[str, Any] | None,
+    post_read_response: dict[str, Any],
+) -> dict[str, Any]:
+    proof = {
+        "schema_version": PAUSE_TRANSITION_PROOF_SCHEMA_VERSION,
+        "kind": (
+            "request_response_post_read"
+            if goal_response is not None
+            else "dispatch_reconciled_post_read"
+        ),
+        "method": "thread/goal/set",
+        "thread_id": owner["thread_id"],
+        "from_status": "active",
+        "to_status": "paused",
+        "precondition_sha256": precondition["goal_response_sha256"],
+        "request_id": mutation["request_id"],
+        "request_sha256": mutation["request_sha256"],
+        "goal_response_sha256": (
+            _sha256_bytes(_canonical_bytes(goal_response))
+            if goal_response is not None
+            else None
+        ),
+        "post_read_response_sha256": _sha256_bytes(
+            _canonical_bytes(post_read_response)
+        ),
+        "response_available": goal_response is not None,
+    }
+    return _validated_pause_transition_proof(
+        proof,
         owner=owner,
         precondition=precondition,
         mutation=mutation,
         goal_response=goal_response,
+        post_read_response=post_read_response,
     )
-    return goal_response, proof
 
 
 def _pause_receipt(
@@ -1349,7 +1459,8 @@ def _pause_receipt(
     endpoint: Path,
     initialize: dict[str, Any],
     goal_get_response: dict[str, Any],
-    goal_response: dict[str, Any],
+    goal_response: dict[str, Any] | None,
+    post_read_response: dict[str, Any],
     before_status: str,
     goal_status: str,
     identity_source: str,
@@ -1366,15 +1477,34 @@ def _pause_receipt(
         # reconciliation read; the durable precondition remains the evidence
         # that this lifecycle attempt started from active.
         "goal_get": precondition["goal_get"],
-        "goal": _safe_response_summary(goal_response),
-        "goal_summary_sha256": _sha256_bytes(
-            _canonical_bytes(_safe_response_summary(goal_response))
+        "goal": _safe_response_summary(
+            goal_response if goal_response is not None else post_read_response
         ),
-        "goal_response_sha256": _sha256_bytes(
-            _canonical_bytes(goal_response)
+        "goal_summary_sha256": _sha256_bytes(
+            _canonical_bytes(
+                _safe_response_summary(
+                    goal_response if goal_response is not None else post_read_response
+                )
+            )
+        ),
+        "goal_response_sha256": (
+            _sha256_bytes(_canonical_bytes(goal_response))
+            if goal_response is not None
+            else None
+        ),
+        # Preserve the returned mutation response too.  A digest without the
+        # response bytes cannot be recomputed during receipt replay.
+        "goal_response": goal_response,
+        "post_read": _safe_response_summary(post_read_response),
+        # Keep the exact post-read alongside its digest.  The safe summary is
+        # useful for projection, but cannot by itself prove which bytes the
+        # transition proof covered.
+        "post_read_response": post_read_response,
+        "post_read_response_sha256": _sha256_bytes(
+            _canonical_bytes(post_read_response)
         ),
         "precondition": precondition,
-        "response_available": recovery is None,
+        "response_available": goal_response is not None,
         "transition_proof": transition_proof,
     }
     if mutation_dispatched is not None:
@@ -1431,9 +1561,12 @@ def pause_goal(
     reconciliation of the already-paused Goal without issuing a second set.
     Every mutation attempt must carry its durable reservation so the completed
     pause receipt cannot omit the dispatch evidence required by its schema.
-    The actual mutation is delegated to an adapter-specific atomic transition
-    method; a plain ``thread/goal/set`` response is never certified as an
-    active-to-paused transition.
+    The current Codex protocol exposes the ordinary ``thread/goal/set``
+    mutation without a compare-and-set token.  The runtime therefore binds the
+    exact issued request and returned response, then performs a bounded fresh
+    ``thread/goal/get`` confirmation.  A lost response is recovered only from
+    the durable dispatch marker and that fresh read; it never issues a second
+    lifecycle set.
     """
 
     if owner_bytes is None:
@@ -1464,24 +1597,105 @@ def pause_goal(
                     "Codex app-server Goal is not pausable from active state; it is already paused without a resumable pause reservation"
                 )
             _validated_pause_transport(reservation, endpoint=endpoint)
-            precondition = _validated_pause_precondition(reservation)
+            precondition = _validated_pause_precondition(reservation, owner=owner)
             mutation_dispatched = _validated_pause_mutation(
                 reservation.get("mutation_dispatched"),
                 owner=owner,
                 attempt_id=reservation.get("attempt_id"),
             )
             durable_goal_response = reservation.get("goal_response")
-            if not isinstance(durable_goal_response, dict):
+            if durable_goal_response is not None and not isinstance(
+                durable_goal_response, dict
+            ):
                 raise ExternalCodexReturnError(
-                    "reserved Goal pause lacks a durable mutation Goal response"
+                    "reserved Goal pause mutation response is not an object"
                 )
-            transition_proof = _validated_pause_transition_proof(
-                reservation.get("transition_proof"),
-                owner=owner,
-                precondition=precondition,
-                mutation=mutation_dispatched,
-                goal_response=durable_goal_response,
+            if isinstance(durable_goal_response, dict):
+                durable_goal = _goal_object(
+                    durable_goal_response, "thread/goal/set"
+                )
+                _validate_goal_binding(durable_goal, owner)
+                if _string_at(durable_goal, ("status",)) != "paused":
+                    raise ExternalCodexReturnError(
+                        "reserved Goal pause mutation response did not confirm a paused Goal"
+                    )
+            stored_proof = reservation.get("transition_proof")
+            stored_post_read = reservation.get("post_read_response")
+            if (
+                isinstance(stored_proof, dict)
+                and stored_proof.get("schema_version")
+                == PAUSE_TRANSITION_PROOF_SCHEMA_VERSION
+                and not isinstance(stored_post_read, dict)
+            ):
+                raise ExternalCodexReturnError(
+                    "stored Goal pause transition proof lacks its post-read response"
+                )
+            if isinstance(stored_post_read, dict):
+                stored_post_read_goal = _goal_object(
+                    stored_post_read, "thread/goal/get"
+                )
+                _validate_goal_binding(stored_post_read_goal, owner)
+                if _string_at(stored_post_read_goal, ("status",)) != "paused":
+                    raise ExternalCodexReturnError(
+                        "stored Goal pause post-read did not confirm a paused Goal"
+                    )
+            if stored_proof is not None:
+                proof_post_read = (
+                    stored_post_read
+                    if isinstance(stored_post_read, dict)
+                    else None
+                )
+                _validated_pause_transition_proof(
+                    stored_proof,
+                    owner=owner,
+                    precondition=precondition,
+                    mutation=mutation_dispatched,
+                    goal_response=durable_goal_response,
+                    expected_response_digest=(
+                        stored_proof.get("goal_response_sha256")
+                        if isinstance(stored_proof, dict)
+                        else None
+                    ),
+                    post_read_response=proof_post_read,
+                    expected_post_read_digest=(
+                        stored_proof.get("post_read_response_sha256")
+                        if isinstance(stored_proof, dict)
+                        else None
+                    ),
+                )
+            # A paused Goal plus the durable dispatch marker is enough to
+            # reconcile an interrupted attempt.  When proof and post-read
+            # bytes already exist, the fresh read above is only a current
+            # identity/state check; preserve those historical proof bytes
+            # instead of rewriting them from mutable Goal metadata.
+            if isinstance(stored_proof, dict):
+                transition_proof = stored_proof
+                proof_post_read = (
+                    stored_post_read
+                    if isinstance(stored_post_read, dict)
+                    else goal_get_response
+                )
+            else:
+                proof_post_read = goal_get_response
+                transition_proof = _pause_transition_proof(
+                    owner=owner,
+                    precondition=precondition,
+                    mutation=mutation_dispatched,
+                    goal_response=durable_goal_response,
+                    post_read_response=proof_post_read,
+                )
+            proof_reservation = {
+                **reservation,
+                "post_read_response": proof_post_read,
+                "transition_proof": transition_proof,
+            }
+            _replace_json(
+                reservation_path,
+                proof_reservation,
+                "canonical Goal pause transition proof",
             )
+            reservation.clear()
+            reservation.update(proof_reservation)
             return _pause_receipt(
                 owner=owner,
                 owner_path=owner_path,
@@ -1491,6 +1705,7 @@ def pause_goal(
                 initialize=initialize,
                 goal_get_response=goal_get_response,
                 goal_response=durable_goal_response,
+                post_read_response=proof_post_read,
                 before_status="active",
                 goal_status="paused",
                 identity_source=goal_identity_source,
@@ -1499,7 +1714,9 @@ def pause_goal(
                 mutation_dispatched=mutation_dispatched,
                 recovery={
                     "mode": "ambiguous_post_mutation",
-                    "mutation_response_available": False,
+                    "mutation_response_available": isinstance(
+                        durable_goal_response, dict
+                    ),
                     "reconciled_by": "thread/goal/get",
                     "mutation_dispatched": mutation_dispatched,
                 },
@@ -1535,7 +1752,6 @@ def pause_goal(
                 raise ExternalCodexReturnError(
                     "Goal pause mutation was reserved before transport dispatch; refusing to issue a second lifecycle set"
                 )
-        _require_atomic_goal_transition(rpc)
         precondition = _pause_precondition(goal_get_response)
         if reservation_path is not None:
             if reservation is None:
@@ -1652,11 +1868,9 @@ def pause_goal(
         setattr(rpc, "request_prepare_callback", record_request_prepared)
         setattr(rpc, "request_issued_callback", record_request_issued)
         try:
-            _require_atomic_goal_transition(rpc)
-            atomic_result = rpc.atomic_goal_transition(
-                owner=owner,
-                precondition=precondition,
-                status="paused",
+            goal_response = rpc.call(
+                "thread/goal/set",
+                {"threadId": owner["thread_id"], "status": "paused"},
             )
         finally:
             setattr(rpc, "request_prepare_callback", previous_prepare_callback)
@@ -1665,12 +1879,6 @@ def pause_goal(
             reservation.get("mutation_dispatched"),
             owner=owner,
             attempt_id=reservation.get("attempt_id"),
-        )
-        goal_response, transition_proof = _validated_atomic_pause_result(
-            atomic_result,
-            owner=owner,
-            precondition=precondition,
-            mutation=mutation_dispatched,
         )
         goal = _goal_object(goal_response, "thread/goal/set")
         goal_identity_source = _validate_goal_binding(goal, owner)
@@ -1683,6 +1891,37 @@ def pause_goal(
         proof_reservation = {
             **reservation,
             "goal_response": goal_response,
+        }
+        _replace_json(
+            reservation_path,
+            proof_reservation,
+            "canonical Goal pause mutation response",
+        )
+        reservation.clear()
+        reservation.update(proof_reservation)
+        post_read_response = rpc.call(
+            "thread/goal/get",
+            {"threadId": owner["thread_id"]},
+        )
+        post_read_goal = _goal_object(post_read_response, "thread/goal/get")
+        _validate_goal_binding(post_read_goal, owner)
+        post_read_status = _string_at(post_read_goal, ("status",))
+        if post_read_status != "paused":
+            raise ExternalCodexReturnError(
+                "Codex app-server post-read did not confirm a paused Goal: "
+                f"{post_read_status!r}"
+            )
+        transition_proof = _pause_transition_proof(
+            owner=owner,
+            precondition=precondition,
+            mutation=mutation_dispatched,
+            goal_response=goal_response,
+            post_read_response=post_read_response,
+        )
+        proof_reservation = {
+            **reservation,
+            "goal_response": goal_response,
+            "post_read_response": post_read_response,
             "transition_proof": transition_proof,
         }
         _replace_json(
@@ -1701,6 +1940,7 @@ def pause_goal(
         initialize=initialize,
         goal_get_response=goal_get_response,
         goal_response=goal_response,
+        post_read_response=post_read_response,
         before_status=goal_before_status,
         goal_status=goal_status,
         identity_source=goal_identity_source,
@@ -2598,6 +2838,11 @@ def _validate_pause_receipt(
     transition_proof = (
         lifecycle.get("transition_proof") if isinstance(lifecycle, dict) else None
     )
+    legacy_transition_proof = (
+        isinstance(transition_proof, dict)
+        and transition_proof.get("schema_version")
+        == LEGACY_PAUSE_TRANSITION_PROOF_SCHEMA_VERSION
+    )
     recovery = receipt.get("recovery")
     if (
         receipt.get("lifecycle_method") != "thread/goal/set"
@@ -2608,7 +2853,48 @@ def _validate_pause_receipt(
         or not isinstance(lifecycle.get("goal_get"), dict)
         or not isinstance(lifecycle.get("goal"), dict)
         or not _is_sha256_digest(lifecycle.get("goal_summary_sha256"))
-        or not _is_sha256_digest(lifecycle.get("goal_response_sha256"))
+        or (
+            lifecycle.get("response_available") is True
+            and not _is_sha256_digest(lifecycle.get("goal_response_sha256"))
+        )
+        or (
+            lifecycle.get("response_available") is False
+            and lifecycle.get("goal_response_sha256") is not None
+        )
+        or (
+            not legacy_transition_proof
+            and not isinstance(lifecycle.get("post_read"), dict)
+        )
+        or (
+            not legacy_transition_proof
+            and not _is_sha256_digest(lifecycle.get("post_read_response_sha256"))
+        )
+        or (
+            not legacy_transition_proof
+            and not isinstance(lifecycle.get("post_read_response"), dict)
+        )
+        or (
+            not legacy_transition_proof
+            and isinstance(lifecycle.get("post_read_response"), dict)
+            and lifecycle.get("post_read_response_sha256")
+            != _sha256_bytes(
+                _canonical_bytes(lifecycle.get("post_read_response"))
+            )
+        )
+        or (
+            not legacy_transition_proof
+            and "goal_response" not in lifecycle
+        )
+        or (
+            not legacy_transition_proof
+            and lifecycle.get("response_available") is True
+            and not isinstance(lifecycle.get("goal_response"), dict)
+        )
+        or (
+            not legacy_transition_proof
+            and lifecycle.get("response_available") is False
+            and lifecycle.get("goal_response") is not None
+        )
         or (
             lifecycle.get("response_available") is False
             and recovery is None
@@ -2630,7 +2916,7 @@ def _validate_pause_receipt(
         raise ExternalCodexReturnError(
             "canonical Goal pause receipt lacks lifecycle evidence"
         )
-    _validated_pause_precondition({"precondition": precondition})
+    _validated_pause_precondition({"precondition": precondition}, owner=owner)
     if lifecycle.get("goal_get") != precondition.get("goal_get"):
         raise ExternalCodexReturnError(
             "canonical Goal pause receipt active Goal summary does not match its precondition"
@@ -2653,13 +2939,47 @@ def _validate_pause_receipt(
         raise ExternalCodexReturnError(
             "canonical Goal pause receipt paused Goal summary digest is invalid"
         )
+    if not legacy_transition_proof:
+        post_read_summary = lifecycle.get("post_read")
+        post_read_status = (
+            post_read_summary.get("status")
+            if isinstance(post_read_summary, dict)
+            else None
+        )
+        if post_read_status is None and isinstance(post_read_summary, dict):
+            nested_post_read = post_read_summary.get("goal")
+            if isinstance(nested_post_read, dict):
+                post_read_status = nested_post_read.get("status")
+        if post_read_status != "paused":
+            raise ExternalCodexReturnError(
+                "canonical Goal pause receipt post-read does not confirm a paused Goal"
+            )
+        post_read_response = lifecycle.get("post_read_response")
+        if post_read_summary != _safe_response_summary(post_read_response):
+            raise ExternalCodexReturnError(
+                "canonical Goal pause receipt post-read summary is not bound to its raw response"
+            )
+        post_read_goal = _goal_object(post_read_response, "thread/goal/get")
+        _validate_goal_binding(post_read_goal, owner)
+        if _string_at(post_read_goal, ("status",)) != "paused":
+            raise ExternalCodexReturnError(
+                "canonical Goal pause receipt raw post-read does not confirm a paused Goal"
+            )
+    stored_goal_response = lifecycle.get("goal_response")
+    if isinstance(stored_goal_response, dict):
+        stored_goal = _goal_object(stored_goal_response, "thread/goal/set")
+        _validate_goal_binding(stored_goal, owner)
+        if _string_at(stored_goal, ("status",)) != "paused":
+            raise ExternalCodexReturnError(
+                "canonical Goal pause receipt raw mutation response does not confirm a paused Goal"
+            )
     if recovery is not None:
         if (
             not isinstance(recovery, dict)
             or recovery.get("mode") != "ambiguous_post_mutation"
-            or recovery.get("mutation_response_available") is not False
+            or recovery.get("mutation_response_available")
+            is not lifecycle.get("response_available")
             or recovery.get("reconciled_by") != "thread/goal/get"
-            or lifecycle.get("response_available") is not False
             or not isinstance(recovery.get("mutation_dispatched"), dict)
             or recovery.get("mutation_dispatched") != mutation_dispatched
         ):
@@ -2686,13 +3006,34 @@ def _validate_pause_receipt(
         owner=owner,
         precondition=precondition,
         mutation=mutation_dispatched,
+        goal_response=(
+            stored_goal_response if isinstance(stored_goal_response, dict) else None
+        ),
         expected_response_digest=lifecycle.get("goal_response_sha256"),
+        expected_post_read_digest=(
+            lifecycle.get("post_read_response_sha256")
+            if not legacy_transition_proof
+            else None
+        ),
+        post_read_response=(
+            lifecycle.get("post_read_response")
+            if not legacy_transition_proof
+            else None
+        ),
     )
     if validated_proof.get("goal_response_sha256") != lifecycle.get(
         "goal_response_sha256"
     ):
         raise ExternalCodexReturnError(
             "canonical Goal pause transition proof does not match its response"
+        )
+    if (
+        not legacy_transition_proof
+        and validated_proof.get("post_read_response_sha256")
+        != lifecycle.get("post_read_response_sha256")
+    ):
+        raise ExternalCodexReturnError(
+            "canonical Goal pause transition proof does not match its post-read"
         )
     _validate_pause_receipt_schema(receipt)
     return receipt
@@ -3174,6 +3515,34 @@ def command_pause(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_goal_transition(args: argparse.Namespace) -> int:
+    """Project one typed owner decision onto the current runtime adapter."""
+
+    module_name = "goal_lifecycle_adapter"
+    module = sys.modules.get(module_name)
+    if module is None:
+        path = Path(__file__).with_name("goal_lifecycle_adapter.py")
+        spec = importlib.util.spec_from_file_location(module_name, path)
+        if spec is None or spec.loader is None:
+            raise ExternalCodexReturnError(
+                "cannot load the Goal lifecycle runtime adapter"
+            )
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[module_name] = module
+        spec.loader.exec_module(module)
+
+    bind_runtime = getattr(module, "bind_runtime_namespace", None)
+    if callable(bind_runtime):
+        # The installed return entrypoint uses runpy, so the executing
+        # runtime is a namespace rather than a sys.modules module.  Pass that
+        # live namespace to the adapter and preserve one exception identity.
+        bind_runtime(globals())
+
+    response = module.run_goal_transition(args)
+    print(json.dumps(response, ensure_ascii=False, sort_keys=True))
+    return 0
+
+
 def _command_return_detached(
     args: argparse.Namespace, lock: _ReturnAttemptLock
 ) -> int:
@@ -3400,6 +3769,19 @@ def parser() -> argparse.ArgumentParser:
     pause_parser.add_argument("--pause-owner", required=True)
     pause_parser.add_argument("--pause-receipt", required=True)
     pause_parser.set_defaults(handler=command_pause)
+    transition_parser = subcommands.add_parser(
+        "goal-transition",
+        aliases=["transition"],
+        help=(
+            "execute one accepted typed Goal lifecycle request through the "
+            "current runtime adapter"
+        ),
+    )
+    transition_parser.add_argument("--request", required=True)
+    transition_parser.add_argument("--decision", required=True)
+    transition_parser.add_argument("--owner", required=True)
+    transition_parser.add_argument("--receipt", required=True)
+    transition_parser.set_defaults(handler=command_goal_transition)
     route_parser = subcommands.add_parser(
         "return-route",
         help="deliver and close from one exact digest-bound return route",
