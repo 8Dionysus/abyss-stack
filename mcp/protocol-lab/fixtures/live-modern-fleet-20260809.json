@@ -5,6 +5,7 @@
   "source_revision": "a468623b63dc0096144b324c7b0674ba8880103a",
   "protocol_version": "2026-07-28",
   "mcp_sdk": "2.0.0",
+  "mcp_sdk_source_revision": "6f69a3758ebf2ee55ce050f58b470ce11af71133",
   "read_fleet": {
     "production_units": 11,
     "admitted_units": 11,

@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 31177516,
+  "allowed_tracked_bytes": 39626271,
+  "approved_by": "repository-owner",
+  "base_ref": "acee6d7684959ceaace27464c81f1ba23a4f03ea",
+  "changed_generated_bytes": 31177516,
+  "changed_generated_files": 366,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "61d46a8652dbad71f1ef8219c835c1df73c00e14a04654a1cb920db882779e1f",
+  "reason": "MCP 2.1.1 serving-process identity, listener ownership, direct endpoint binding, and refreshed candidate evidence",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 39626271,
+  "tracked_bytes_max": 24117248
+}

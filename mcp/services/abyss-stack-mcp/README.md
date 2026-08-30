@@ -660,6 +660,12 @@ digest still matches; missing or changed installed or interpreter bytes force a
 guarded rebuild. A changed identity is never installed
 over a running plane: provisioning fails closed while any read, candidate, or
 internal-effect unit is active or its user-systemd state cannot be observed.
+The Tasks result metadata also carries `mcp_sdk_artifact_digest`. The server
+emits the reviewed source revision only after measuring both installed MCP
+distributions: regular installations must match their allowlisted `RECORD`
+content and editable lab installations must resolve to a clean checkout at the
+reviewed revision. A Tasks consumer therefore cannot treat a version-to-commit
+mapping alone as proof of the bytes serving the request.
 Stop all three units explicitly before reprovisioning, then start or canary them as a
 separate action. The units have `ConditionPathExists` guards for the runtime
 and both lock files, an executable `ExecCondition`, and a read-only verifier

@@ -445,6 +445,7 @@
       "family": "mcp-protocol-lab-scripts",
       "paths": [
         "mcp/protocol-lab/scripts/build_protocol_lab_status.py",
+        "mcp/protocol-lab/scripts/_mcp_sdk_identity.py",
         "mcp/protocol-lab/scripts/inspector_tasks_adapter_client.ts",
         "mcp/protocol-lab/scripts/normalize_protocol_watch_run.py",
         "mcp/protocol-lab/scripts/protocol_watcher.py",

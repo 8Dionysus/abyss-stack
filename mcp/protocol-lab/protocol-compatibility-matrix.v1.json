@@ -118,7 +118,7 @@
       "capability_posture": "supported",
       "consumer_id": "codex-cli-stable-modern-lab",
       "evidence": [
-        "mcp/protocol-lab/fixtures/codex-0.147.0-stable-kag-next-lab-observation.json",
+        "mcp/protocol-lab/fixtures/codex-0.147.0-stable-kag-next-lab-2.1.1-observation.json",
         "isolated binary sha256:cb0a15567e9a60a5820d54b0f6ae86d504dc3805c1eab21a47f70e3eb7b73a40",
         "mcp_2026_07_28 was explicitly enabled only for the removable lab contour"
       ],
@@ -141,7 +141,7 @@
     "shared_credential_forbidden": true,
     "stable_registration_retained": true
   },
-  "expires_at": "2026-08-16T13:53:36.813735Z",
+  "expires_at": "2026-09-06T01:51:50.099097Z",
   "migration_gates": [
     {
       "evidence_refs": [
@@ -154,36 +154,36 @@
     },
     {
       "evidence_refs": [
-        "https://github.com/modelcontextprotocol/python-sdk/releases/tag/v2.0.0",
+        "https://github.com/modelcontextprotocol/python-sdk/releases/tag/v2.1.1",
         "https://github.com/modelcontextprotocol/typescript-sdk/releases"
       ],
       "gate_id": "P1-02",
-      "reason": "Python MCP 2.0.0 and TypeScript client/server 2.0.0 are stable, exact-commit pinned next-protocol SDK lines.",
+      "reason": "Python MCP 2.1.1 and TypeScript client/server 2.0.0 are stable, exact-commit pinned next-protocol SDK lines; only the Python line is the stack candidate in this change.",
       "requirement": "Observe a stable next-protocol SDK release.",
       "status": "passed"
     },
     {
-      "evidence_refs": [
-        "mcp/protocol-lab/fixtures/codex-0.147.0-stable-kag-next-lab-observation.json"
-      ],
       "gate_id": "P1-03",
-      "reason": "An exact isolated stable Codex 0.147.0 pair used server/discover and MCP 2026-07-28 with the under-development feature explicitly enabled; this proves removable lab support, not production admission.",
+      "evidence_refs": [
+        "mcp/protocol-lab/fixtures/codex-0.147.0-stable-kag-next-lab-2.1.1-observation.json"
+      ],
+      "reason": "An exact isolated stable Codex 0.147.0 pair used server/discover and MCP 2026-07-28 with Python MCP 2.1.1 and the under-development feature explicitly enabled; this proves removable lab support, not production admission.",
       "requirement": "Prove Codex next-protocol capabilities.",
       "status": "passed"
     },
     {
       "evidence_refs": [
-        "mcp/protocol-lab/fixtures/python-mcp-2.0.0-frozen-conformance-observation.json"
+        "mcp/protocol-lab/fixtures/python-mcp-2.1.1-frozen-conformance-observation.json"
       ],
       "gate_id": "P1-04",
-      "reason": "Official conformance commit c321dd3 freezes requirements per specification revision; Python MCP 2.0.0 passed every scored client and server check for 2026-07-28, while later extension and pending failures remain visible and unscored.",
+      "reason": "Official conformance commit c321dd3 freezes requirements per specification revision; Python MCP 2.1.1 passed every scored client and server check for 2026-07-28, while later extension and pending failures remain visible and unscored.",
       "requirement": "Run official conformance against the exact pair.",
       "status": "passed"
     },
     {
       "evidence_refs": [
-        "mcp/protocol-lab/fixtures/kag-next-cancellable-pair-observation.json",
-        "mcp/protocol-lab/fixtures/codex-0.147.0-stable-kag-next-lab-observation.json"
+        "mcp/protocol-lab/fixtures/kag-next-cancellable-pair-2.1.1-observation.json",
+        "mcp/protocol-lab/fixtures/codex-0.147.0-stable-kag-next-lab-2.1.1-observation.json"
       ],
       "gate_id": "P1-05",
       "reason": "The isolated KAG pair passed discovery, stateless, auth, limits and read behavior; SSE disconnect cancellation reached the server dispatch and the cancelled operation did not complete afterward.",
@@ -201,8 +201,8 @@
     },
     {
       "evidence_refs": [
-        "mcp/protocol-lab/fixtures/kag-next-cancellable-pair-observation.json",
-        "mcp/protocol-lab/fixtures/codex-0.147.0-stable-kag-next-lab-observation.json"
+        "mcp/protocol-lab/fixtures/kag-next-cancellable-pair-2.1.1-observation.json",
+        "mcp/protocol-lab/fixtures/codex-0.147.0-stable-kag-next-lab-2.1.1-observation.json"
       ],
       "gate_id": "P1-07",
       "reason": "The isolated KAG pair used two independent clients with self-describing requests, no protocol session header, and no server-request backchannel.",
@@ -211,7 +211,7 @@
     },
     {
       "evidence_refs": [
-        "mcp/protocol-lab/fixtures/kag-handle-pair-current-observation.json"
+        "mcp/protocol-lab/fixtures/kag-handle-pair-2.1.1-current-observation.json"
       ],
       "gate_id": "P1-08",
       "reason": "The isolated read-only KAG pair proved opaque requestState round trips, bearer principal isolation, expiry, cross-request replay denial, tamper denial, and key-retirement revocation; same-request replay remained safe and idempotent.",
@@ -220,19 +220,19 @@
     },
     {
       "evidence_refs": [
-        "mcp/protocol-lab/fixtures/kag-next-cancellable-pair-observation.json",
-        "mcp/protocol-lab/fixtures/kag-handle-pair-current-observation.json"
+        "mcp/protocol-lab/fixtures/kag-next-cancellable-pair-2.1.1-observation.json",
+        "mcp/protocol-lab/fixtures/kag-handle-pair-2.1.1-current-observation.json"
       ],
       "gate_id": "P1-09",
-      "reason": "The isolated Python MCP 2.0.0 KAG adapter and stable Codex 0.147.0 lab pair served server/discover at 2026-07-28.",
+      "reason": "The isolated Python MCP 2.1.1 KAG adapter and stable Codex 0.147.0 lab pair served server/discover at 2026-07-28.",
       "requirement": "Verify server/discover.",
       "status": "passed"
     },
     {
       "evidence_refs": [
-        "mcp/protocol-lab/fixtures/kag-next-cancellable-pair-observation.json",
-        "mcp/protocol-lab/fixtures/kag-cache-pair-current-observation.json",
-        "mcp/protocol-lab/fixtures/codex-0.147.0-stable-kag-next-lab-observation.json"
+        "mcp/protocol-lab/fixtures/kag-next-cancellable-pair-2.1.1-observation.json",
+        "mcp/protocol-lab/fixtures/kag-cache-pair-2.1.1-current-observation.json",
+        "mcp/protocol-lab/fixtures/codex-0.147.0-stable-kag-next-lab-2.1.1-observation.json"
       ],
       "gate_id": "P1-10",
       "reason": "The isolated KAG pair preserved trace context and proved private TTL hits, exact-expiry refetch, subscription invalidation, removal revocation, bounded stale-catalog behavior, and explicit refresh.",
@@ -260,21 +260,21 @@
     },
     {
       "evidence_refs": [
-        "mcp/protocol-lab/fixtures/codex-0.147.0-stable-kag-next-lab-observation.json"
+        "mcp/protocol-lab/fixtures/codex-0.147.0-stable-kag-next-lab-2.1.1-observation.json"
       ],
       "gate_id": "P1-13",
-      "reason": "The separately named and credentialed aoa_kag_next_lab registration performed one exact kag_discover call through stable Codex 0.147.0 on MCP 2026-07-28.",
+      "reason": "The separately named and credentialed aoa_kag_next_lab registration performed one exact kag_discover call through stable Codex 0.147.0 on MCP 2026-07-28 with Python MCP 2.1.1; the result is isolated candidate evidence.",
       "requirement": "Run one compact read-only canary.",
       "status": "passed"
     },
     {
       "evidence_refs": [
         "mcp/protocol-lab/protocol-compatibility-matrix.v1.json",
-        "mcp/protocol-lab/fixtures/codex-0.147.0-stable-kag-next-lab-observation.json",
+        "mcp/protocol-lab/fixtures/codex-0.147.0-stable-kag-next-lab-2.1.1-observation.json",
         "mcp/protocol-lab/fixtures/codex-0.147.0-stable-kag-post-rollback-observation.json"
       ],
       "gate_id": "P1-14",
-      "reason": "The isolated process, endpoint, credential, registration and CODEX_HOME were removed; the operator config remained byte-identical and the production aoa_kag registration passed a real post-rollback canary.",
+      "reason": "The isolated 2.1.1 process, endpoint, credential, registration and CODEX_HOME were removed; the operator config remained byte-identical. The separate post-rollback receipt is historical 2.0.0 deployment evidence and does not prove a 2.1.1 production cutover.",
       "requirement": "Retain dual support and rollback.",
       "status": "passed"
     }
@@ -289,7 +289,7 @@
     "tag": "2026-07-28",
     "wire_version": "2026-07-28"
   },
-  "observed_at": "2026-08-09T13:53:36.813735Z",
+  "observed_at": "2026-08-29T07:32:30.866342Z",
   "official_conformance": {
     "commit": "c321dd32035556e6769d3724a8ee97d87c3faaac",
     "latest_public_release": {
@@ -299,9 +299,9 @@
       "version": "v0.1.16"
     },
     "next_suite_executed": true,
-    "receipt_refs": [
-      "mcp/protocol-lab/fixtures/python-mcp-2.0.0-frozen-conformance-observation.json"
-    ],
+      "receipt_refs": [
+        "mcp/protocol-lab/fixtures/python-mcp-2.1.1-frozen-conformance-observation.json"
+      ],
     "repository": "https://github.com/modelcontextprotocol/conformance",
     "version": "0.2.0-alpha.11"
   },
@@ -347,7 +347,7 @@
       "version": "1.29.0"
     },
     {
-      "commit": "6f69a3758ebf2ee55ce050f58b470ce11af71133",
+      "commit": "0921d94a74db900dccd2d534842aa7b6160542d2",
       "ecosystem": "python",
       "production_allowed": true,
       "protocol_versions": [
@@ -359,9 +359,9 @@
       ],
       "release_status": "stable",
       "sdk_id": "python-next",
-      "stack_pin": "2.0.0",
+      "stack_pin": "2.1.1",
       "stack_pin_status": "exact",
-      "version": "2.0.0"
+      "version": "2.1.1"
     },
     {
       "commit": "cc4b41617ce3601b1290d67216ea0b194a3cd9ac",
@@ -382,7 +382,7 @@
     "https://github.com/modelcontextprotocol/modelcontextprotocol/releases/tag/2025-11-25",
     "https://github.com/modelcontextprotocol/modelcontextprotocol/releases/tag/2026-07-28",
     "https://github.com/modelcontextprotocol/python-sdk/releases/tag/v1.29.0",
-    "https://github.com/modelcontextprotocol/python-sdk/releases/tag/v2.0.0",
+    "https://github.com/modelcontextprotocol/python-sdk/releases/tag/v2.1.1",
     "https://github.com/modelcontextprotocol/typescript-sdk/releases",
     "https://github.com/modelcontextprotocol/typescript-sdk/blob/main/docs/migration/support-2026-07-28.md",
     "https://github.com/modelcontextprotocol/conformance",

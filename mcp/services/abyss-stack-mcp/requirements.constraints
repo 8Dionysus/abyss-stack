@@ -18,8 +18,8 @@ idna==3.18
 jsonschema==4.23.0
 jsonschema-specifications==2024.10.1
 markdown-it-py==4.2.0
-mcp==2.0.0
-mcp-types==2.0.0
+mcp==2.1.1
+mcp-types==2.1.1
 mdurl==0.1.2
 orjson==3.11.9
 pycparser==2.22

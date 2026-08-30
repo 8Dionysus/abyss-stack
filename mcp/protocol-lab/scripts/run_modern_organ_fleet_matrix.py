@@ -20,6 +20,7 @@ from typing import Any
 PROTOCOL = "2026-07-28"
 PYTHON = Path("/srv/abyss-machine/cache/mcp-modern-fleet-20260809/venv/bin/python")
 EVIDENCE_ROOT = Path("/srv/abyss-machine/cache/mcp-modern-fleet-20260809/evidence")
+MCP_SDK_SOURCE_REVISION = "6f69a3758ebf2ee55ce050f58b470ce11af71133"
 SERVERS = (
     ("abyss-machine", "abyss_machine_mcp", "ABYSS_MACHINE_MCP_READ_BEARER_TOKEN", True),
     ("abyss-stack", "abyss_stack_mcp", "ABYSS_STACK_MCP_READ_BEARER_TOKEN", False),
@@ -221,6 +222,7 @@ def main() -> int:
         "schema_version": "abyss_modern_organ_fleet_matrix_v1",
         "observed_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         "mcp_sdk": "2.0.0",
+        "mcp_sdk_source_revision": MCP_SDK_SOURCE_REVISION,
         "required_protocol": PROTOCOL,
         "active_count": sum(1 for row in rows if row["active_codex_organ"]),
         "package_count": len(rows),

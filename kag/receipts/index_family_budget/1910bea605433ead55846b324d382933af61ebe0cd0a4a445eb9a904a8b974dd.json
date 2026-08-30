@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 25485922,
+  "allowed_tracked_bytes": 39014868,
+  "approved_by": "repository-owner",
+  "base_ref": "acee6d7684959ceaace27464c81f1ba23a4f03ea",
+  "changed_generated_bytes": 25485922,
+  "changed_generated_files": 297,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "1910bea605433ead55846b324d382933af61ebe0cd0a4a445eb9a904a8b974dd",
+  "reason": "The protocol-lab expiry gate now evaluates deployment-bound evidence at validation time and rejects every expired deployment receipt; regenerate the reviewed owner family for this candidate tree.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 39014868,
+  "tracked_bytes_max": 24117248
+}

@@ -10,7 +10,9 @@
     "expires_at": {"type": "string", "format": "date-time"},
     "source_revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
     "protocol_version": {"const": "2026-07-28"},
-    "mcp_sdk": {"const": "2.0.0"},
+    "mcp_sdk": {"enum": ["2.0.0", "2.1.1"]},
+    "mcp_sdk_source_revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "mcp_sdk_artifact_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
     "read_fleet": {
       "type": "object",
       "additionalProperties": false,
@@ -22,7 +24,12 @@
         "modern_discovery_passed": {"const": true},
         "wrong_bearer_denied": {"const": true},
         "legacy_initialize_denied": {"const": true},
-        "legacy_session_issued": {"const": false}
+        "legacy_session_issued": {"const": false},
+        "sdk_identity_attested": {"const": true},
+        "sdk_identity_count": {"const": 11},
+        "sdk_identity_unique_count": {"const": 1},
+        "runtime_identity_attested": {"const": true},
+        "listener_attested": {"const": true}
       },
       "required": ["production_units", "admitted_units", "production_identities", "bootstrap_identities", "modern_discovery_passed", "wrong_bearer_denied", "legacy_initialize_denied", "legacy_session_issued"]
     },
@@ -64,5 +71,21 @@
     "verdict": {"const": "production_modern_only_passed"},
     "claim_limits": {"type": "array", "minItems": 2, "items": {"type": "string", "minLength": 12}}
   },
-  "required": ["schema_version", "observed_at", "expires_at", "source_revision", "protocol_version", "mcp_sdk", "read_fleet", "nonread_protocol", "automation", "rollback", "verdict", "claim_limits"]
+  "required": ["schema_version", "observed_at", "expires_at", "source_revision", "protocol_version", "mcp_sdk", "mcp_sdk_source_revision", "read_fleet", "nonread_protocol", "automation", "rollback", "verdict", "claim_limits"],
+  "allOf": [
+    {
+      "if": {
+        "required": ["mcp_sdk"],
+        "properties": {"mcp_sdk": {"const": "2.1.1"}}
+      },
+      "then": {
+        "required": ["mcp_sdk_artifact_digest"],
+        "properties": {
+          "read_fleet": {
+            "required": ["sdk_identity_attested", "sdk_identity_count", "sdk_identity_unique_count", "runtime_identity_attested", "listener_attested"]
+          }
+        }
+      }
+    }
+  ]
 }

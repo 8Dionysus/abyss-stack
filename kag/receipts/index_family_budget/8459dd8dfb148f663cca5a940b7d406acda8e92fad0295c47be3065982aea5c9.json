@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 26092828,
+  "allowed_tracked_bytes": 39072217,
+  "approved_by": "repository-owner",
+  "base_ref": "acee6d7684959ceaace27464c81f1ba23a4f03ea",
+  "changed_generated_bytes": 26092828,
+  "changed_generated_files": 305,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "8459dd8dfb148f663cca5a940b7d406acda8e92fad0295c47be3065982aea5c9",
+  "reason": "Refresh the canonical owner portable family after the MCP 2.1.1 per-unit serving-interpreter and distribution-record attestation repair; preserve historical deployment evidence and fail-closed cutover semantics.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 39072217,
+  "tracked_bytes_max": 24117248
+}

@@ -11,6 +11,8 @@
     "finished_at": {"type": "string", "format": "date-time"},
     "expires_at": {"type": "string", "format": "date-time"},
     "verdict": {"const": "stable_production_route_passed_after_lab_rollback"},
+    "mcp_sdk": {"enum": ["2.0.0", "2.1.1"]},
+    "mcp_sdk_source_revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
     "consumer": {"const": {"actual_operator_config": true, "binary_sha256": "cb0a15567e9a60a5820d54b0f6ae86d504dc3805c1eab21a47f70e3eb7b73a40", "registration": "aoa_kag", "version": "0.147.0"}},
     "canary": {"const": {"is_error": false, "owner": "abyss-stack", "result_schema": "aoa-kag-mcp-capabilities-v1", "tool": "kag_discover"}},
     "stable_registration": {
@@ -22,6 +24,128 @@
         "unchanged": {"const": true}
       },
       "required": ["config_sha256_before", "config_sha256_after", "unchanged"]
+    },
+    "server_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "binding_method": {"const": "configured_codex_endpoint_to_per_unit_fleet_identity"},
+        "organ_id": {"const": "aoa-kag"},
+        "unit": {"type": "string", "pattern": "^[A-Za-z0-9_.@:-]+$"},
+        "fleet_endpoint_ref": {"type": "string", "pattern": "^https?://[^\\s]+$"},
+        "configured_endpoint_ref": {"type": "string", "pattern": "^https?://[^\\s]+$"},
+        "status_endpoint_ref": {
+          "anyOf": [
+            {"type": "string", "pattern": "^https?://[^\\s]+$"},
+            {"type": "null"}
+          ]
+        },
+        "status_entry_observed": {"const": true},
+        "endpoint_matches": {"const": true},
+        "fleet_process_identity": {"type": "string", "minLength": 3},
+        "process_identity_before": {"type": "string", "minLength": 3},
+        "process_identity_after": {"type": "string", "minLength": 3},
+        "process_identity_matches_fleet": {"const": true},
+        "process_identity_stable": {"const": true},
+        "python_executable_realpath": {"type": "string", "pattern": "^/[^\\s]+$"},
+        "sdk_identity": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "version": {"const": "2.1.1"},
+            "commit": {"const": "0921d94a74db900dccd2d534842aa7b6160542d2"},
+            "artifact_digest": {"enum": ["sha256:1ef71b1a3cfb3daba29b61d9f280896b35bdc1038474285cc8295071418b01e5", "sha256:a638c12e432fc0444d263a55db04668cd789437fde33951cc2be491021219601"]},
+            "mcp_distribution_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+            "mcp_types_distribution_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+          },
+          "required": [
+            "version",
+            "commit",
+            "artifact_digest",
+            "mcp_distribution_digest",
+            "mcp_types_distribution_digest"
+          ]
+        },
+        "runtime_identity_attestation": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "state": {"const": "passed"},
+            "method": {"const": "server_emitted_startup_runtime_identity_header"},
+            "header": {"const": "X-Abyss-MCP-Runtime-Identity"},
+            "pid": {"type": "integer", "minimum": 1},
+            "checked_during_discovery": {"const": true}
+          },
+          "required": ["state", "method", "header", "pid", "checked_during_discovery"]
+        },
+        "listener_attestation": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "state": {"const": "passed"},
+            "method": {"const": "proc_net_tcp_listener_inode_owned_by_main_pid"},
+            "port": {"type": "integer", "minimum": 1, "maximum": 65535},
+            "pid": {"type": "integer", "minimum": 1},
+            "socket_inodes": {
+              "type": "array",
+              "items": {"type": "string", "pattern": "^[0-9]+$"},
+              "minItems": 1,
+              "uniqueItems": true
+            },
+            "checked_before_and_after_probe": {"const": true}
+          },
+          "required": ["state", "method", "port", "pid", "socket_inodes", "checked_before_and_after_probe"]
+        },
+        "contacted_server_probe": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "state": {"const": "passed"},
+            "method": {"const": "direct_modern_server_discover_with_runtime_identity_header"},
+            "endpoint_ref": {"type": "string", "pattern": "^https?://[^\\s]+$"},
+            "http_status": {"const": 200},
+            "runtime_identity_attestation": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "state": {"const": "passed"},
+                "method": {"const": "server_emitted_startup_runtime_identity_header"},
+                "header": {"const": "X-Abyss-MCP-Runtime-Identity"},
+                "pid": {"type": "integer", "minimum": 1},
+                "checked_during_discovery": {"const": true}
+              },
+              "required": ["state", "method", "header", "pid", "checked_during_discovery"]
+            }
+          },
+          "required": ["state", "method", "endpoint_ref", "http_status", "runtime_identity_attestation"]
+        },
+        "sdk_identity_matches_fleet": {"const": true},
+        "sdk_identity_stable": {"const": true},
+        "checked_before_and_after_tool_call": {"const": true}
+      },
+      "required": [
+        "binding_method",
+        "organ_id",
+        "unit",
+        "fleet_endpoint_ref",
+        "configured_endpoint_ref",
+        "status_endpoint_ref",
+        "status_entry_observed",
+        "endpoint_matches",
+        "fleet_process_identity",
+        "process_identity_before",
+        "process_identity_after",
+        "process_identity_matches_fleet",
+        "process_identity_stable",
+        "python_executable_realpath",
+        "sdk_identity",
+        "runtime_identity_attestation",
+        "listener_attestation",
+        "contacted_server_probe",
+        "sdk_identity_matches_fleet",
+        "sdk_identity_stable",
+        "checked_before_and_after_tool_call"
+      ]
     },
     "process_stopped": {"const": true},
     "private_receipt": {
@@ -36,5 +160,14 @@
     "secrets_included": {"const": false},
     "claim_limits": {"type": "array", "items": {"type": "string", "minLength": 3}, "minItems": 3}
   },
-  "required": ["schema_version", "observation_id", "observed_at", "finished_at", "expires_at", "verdict", "consumer", "canary", "stable_registration", "process_stopped", "private_receipt", "secrets_included", "claim_limits"]
+  "required": ["schema_version", "observation_id", "observed_at", "finished_at", "expires_at", "verdict", "mcp_sdk", "mcp_sdk_source_revision", "consumer", "canary", "stable_registration", "process_stopped", "private_receipt", "secrets_included", "claim_limits"],
+  "allOf": [
+    {
+      "if": {
+        "required": ["mcp_sdk"],
+        "properties": {"mcp_sdk": {"const": "2.1.1"}}
+      },
+      "then": {"required": ["server_binding"]}
+    }
+  ]
 }

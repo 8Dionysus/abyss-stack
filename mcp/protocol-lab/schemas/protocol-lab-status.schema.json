@@ -6,6 +6,10 @@
     "schema_version": {"const": "abyss_mcp_protocol_lab_status_v2"},
     "evaluated_at": {"type": "string", "format": "date-time"},
     "evidence_expires_at": {"type": "string", "format": "date-time"},
+    "candidate_evidence_expires_at": {"type": "string", "format": "date-time"},
+    "candidate_evidence_current": {"type": "boolean"},
+    "deployment_evidence_expires_at": {"type": "string", "format": "date-time"},
+    "deployment_evidence_current": {"type": "boolean"},
     "matrix_digest": {"$ref": "#/$defs/digest"},
     "observation_digest": {"$ref": "#/$defs/digest"},
     "codex_lab_observation_digest": {"$ref": "#/$defs/digest"},
@@ -39,7 +43,7 @@
       "uniqueItems": true
     },
     "candidate_protocol_ready": {"const": true},
-    "internal_effect_protocol_ready": {"const": true},
+    "internal_effect_protocol_ready": {"type": "boolean"},
     "candidate_migration_allowed": {"const": false},
     "internal_effect_migration_allowed": {"const": false},
     "external_effect_migration_allowed": {"const": false},
@@ -75,7 +79,10 @@
     "claim_limits": {"type": "array", "items": {"type": "string", "minLength": 3}, "minItems": 5}
   },
   "required": [
-    "schema_version", "evaluated_at", "evidence_expires_at", "matrix_digest",
+    "schema_version", "evaluated_at", "evidence_expires_at",
+    "candidate_evidence_expires_at", "candidate_evidence_current",
+    "deployment_evidence_expires_at",
+    "deployment_evidence_current", "matrix_digest",
     "observation_digest", "codex_lab_observation_digest",
     "stable_rollback_observation_digest", "tasks_matrix_digest",
     "tasks_pilot_digest", "rmcp_tasks_pair_digest",

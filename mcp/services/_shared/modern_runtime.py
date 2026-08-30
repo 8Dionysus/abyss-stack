@@ -13,21 +13,51 @@ from typing import Any, Literal
 
 from mcp.server import MCPServer
 
+from ._runtime_identity import RUNTIME_IDENTITY_HEADER, runtime_mcp_sdk_identity
+
 
 PROTOCOL_VERSION = "2026-07-28"
-SUPPORTED_MCP_SDK = "2.0.0"
+SUPPORTED_MCP_SDK = "2.1.1"
 
 
 class _ModernOnlyHTTPApp:
     """Reject handshake-era traffic before the dual-era SDK can admit it."""
 
-    def __init__(self, app: Any, *, mcp_path: str) -> None:
+    def __init__(
+        self,
+        app: Any,
+        *,
+        mcp_path: str,
+        runtime_identity: dict[str, Any],
+    ) -> None:
         self.app = app
         self.mcp_path = mcp_path.rstrip("/") or "/"
+        self._runtime_identity_header = json.dumps(
+            runtime_identity,
+            ensure_ascii=True,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode("ascii")
 
     async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
         path = str(scope.get("path", "")).rstrip("/") or "/"
         if scope.get("type") == "http" and path == self.mcp_path:
+            async def send_with_identity(message: Any) -> None:
+                if message.get("type") == "http.response.start":
+                    headers = [
+                        (key, value)
+                        for key, value in message.get("headers", ())
+                        if key.lower() != RUNTIME_IDENTITY_HEADER.lower().encode("ascii")
+                    ]
+                    headers.append(
+                        (
+                            RUNTIME_IDENTITY_HEADER.lower().encode("ascii"),
+                            self._runtime_identity_header,
+                        )
+                    )
+                    message = {**message, "headers": headers}
+                await send(message)
+
             headers = {
                 key.decode("latin-1").lower(): value.decode("latin-1").strip(" \t")
                 for key, value in scope.get("headers", ())
@@ -52,7 +82,7 @@ class _ModernOnlyHTTPApp:
                     },
                     separators=(",", ":"),
                 ).encode("utf-8")
-                await send(
+                await send_with_identity(
                     {
                         "type": "http.response.start",
                         "status": 400,
@@ -63,8 +93,10 @@ class _ModernOnlyHTTPApp:
                         ],
                     }
                 )
-                await send({"type": "http.response.body", "body": payload})
+                await send_with_identity({"type": "http.response.body", "body": payload})
                 return
+            await self.app(scope, receive, send_with_identity)
+            return
         await self.app(scope, receive, send)
 
 
@@ -148,4 +180,8 @@ class AbyssMCPServer(MCPServer):
         app = super().streamable_http_app(**kwargs)
         if not self._abyss_modern_only_http:
             return app
-        return _ModernOnlyHTTPApp(app, mcp_path=streamable_http_path)
+        return _ModernOnlyHTTPApp(
+            app,
+            mcp_path=streamable_http_path,
+            runtime_identity=runtime_mcp_sdk_identity(),
+        )

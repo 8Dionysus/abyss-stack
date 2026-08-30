@@ -182,10 +182,26 @@ def _read_only_tool_annotation_summary(tools: list[object], context: str) -> dic
         name = str(getattr(tool, "name", "<unnamed>"))
         annotations = getattr(tool, "annotations", None)
         observed = {
-            "readOnlyHint": getattr(annotations, "readOnlyHint", None),
-            "destructiveHint": getattr(annotations, "destructiveHint", None),
-            "idempotentHint": getattr(annotations, "idempotentHint", None),
-            "openWorldHint": getattr(annotations, "openWorldHint", None),
+            "readOnlyHint": getattr(
+                annotations,
+                "read_only_hint",
+                getattr(annotations, "readOnlyHint", None),
+            ),
+            "destructiveHint": getattr(
+                annotations,
+                "destructive_hint",
+                getattr(annotations, "destructiveHint", None),
+            ),
+            "idempotentHint": getattr(
+                annotations,
+                "idempotent_hint",
+                getattr(annotations, "idempotentHint", None),
+            ),
+            "openWorldHint": getattr(
+                annotations,
+                "open_world_hint",
+                getattr(annotations, "openWorldHint", None),
+            ),
         }
         expected = {
             "readOnlyHint": True,

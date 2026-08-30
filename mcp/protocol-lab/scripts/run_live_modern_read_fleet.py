@@ -7,9 +7,11 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import secrets
 import subprocess
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import UTC, datetime
 from pathlib import Path
@@ -19,7 +21,20 @@ from typing import Any
 PROTOCOL = "2026-07-28"
 STACK = Path("/srv/AbyssOS/abyss-stack")
 REGISTRY = Path("/srv/AbyssOS/.aoa/organ-access/organ-registry.v2.source.json")
-RUNTIME_PYTHON = STACK / "Services/abyss-stack-mcp/venv/bin/python"
+MCP_SDK_SOURCE_REVISIONS = {
+    "2.0.0": "6f69a3758ebf2ee55ce050f58b470ce11af71133",
+    "2.1.1": "0921d94a74db900dccd2d534842aa7b6160542d2",
+}
+EXPECTED_CANDIDATE_MCP_ARTIFACT_DIGESTS = frozenset(
+    {
+        "sha256:1ef71b1a3cfb3daba29b61d9f280896b35bdc1038474285cc8295071418b01e5",
+        "sha256:a638c12e432fc0444d263a55db04668cd789437fde33951cc2be491021219601",
+    }
+)
+RUNTIME_IDENTITY_HEADER = "x-abyss-mcp-runtime-identity"
+RUNTIME_IDENTITY_ATTESTATION_METHOD = (
+    "server_emitted_startup_runtime_identity_header"
+)
 SERVERS = (
     ("abyss-stack", 5431, "abyss-stack-mcp-read.service", "abyss-stack-mcp-read-bearer-token"),
     ("abyss-machine", 5423, "aoa-organ-mcp-read@abyss-machine.service", "abyss-machine-mcp-read-bearer-token"),
@@ -58,6 +73,26 @@ def _meta() -> dict[str, Any]:
     }
 
 
+def _endpoint_port(endpoint_ref: object) -> int | None:
+    """Parse only a loopback HTTP endpoint into its TCP port."""
+    if not isinstance(endpoint_ref, str):
+        return None
+    try:
+        parsed = urllib.parse.urlparse(endpoint_ref)
+        port = parsed.port
+    except ValueError:
+        return None
+    if parsed.scheme not in {"http", "https"} or parsed.hostname not in {
+        "127.0.0.1",
+        "localhost",
+        "::1",
+    }:
+        return None
+    if port is None or not 1 <= port <= 65535:
+        return None
+    return port
+
+
 def _request(
     url: str,
     bearer: str,
@@ -88,6 +123,139 @@ def _request(
         return exc.code, payload, dict(exc.headers)
 
 
+def _response_header(headers: dict[str, str], name: str) -> str | None:
+    lowered = name.lower()
+    return next(
+        (value for key, value in headers.items() if key.lower() == lowered),
+        None,
+    )
+
+
+def _server_runtime_identity_attestation(
+    headers: dict[str, str],
+    before: dict[str, Any],
+    sdk: dict[str, str],
+    unit: str,
+) -> dict[str, Any] | None:
+    raw_identity = _response_header(headers, RUNTIME_IDENTITY_HEADER)
+    if raw_identity is None:
+        if sdk["version"] == "2.1.1":
+            raise RuntimeError(
+                f"candidate {unit} response omitted its serving-process SDK identity"
+            )
+        return None
+    try:
+        identity = json.loads(raw_identity)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(
+            f"serving-process SDK identity header is invalid JSON for {unit}"
+        ) from exc
+    expected = {**sdk, "pid": before["main_pid"]}
+    if identity != expected:
+        raise RuntimeError(
+            f"serving-process SDK identity header does not match {unit}"
+        )
+    if (
+        sdk["version"] == "2.1.1"
+        and sdk["artifact_digest"] not in EXPECTED_CANDIDATE_MCP_ARTIFACT_DIGESTS
+    ):
+        raise RuntimeError(f"candidate {unit} returned an unreviewed SDK artifact")
+    return {
+        "state": "passed",
+        "method": RUNTIME_IDENTITY_ATTESTATION_METHOD,
+        "header": "X-Abyss-MCP-Runtime-Identity",
+        "pid": before["main_pid"],
+        "checked_during_discovery": True,
+    }
+
+
+def _process_interpreter(pid: int, unit: str) -> dict[str, str]:
+    """Resolve the interpreter actually serving the systemd main process."""
+
+    try:
+        argv = [
+            item.decode("utf-8")
+            for item in Path(f"/proc/{pid}/cmdline").read_bytes().split(b"\0")
+            if item
+        ]
+    except (OSError, UnicodeDecodeError) as exc:
+        raise RuntimeError(f"cannot inspect the serving process for {unit}") from exc
+    if len(argv) < 3 or argv[1:3] != ["-I", "-B"]:
+        raise RuntimeError(
+            f"serving process for {unit} is not an isolated Python process"
+        )
+    interpreter = Path(argv[0])
+    if not interpreter.is_absolute() or not interpreter.is_file() or not os.access(
+        interpreter,
+        os.X_OK,
+    ):
+        raise RuntimeError(f"serving process for {unit} has no usable interpreter")
+    try:
+        resolved_interpreter = interpreter.resolve(strict=True)
+        process_executable = Path(f"/proc/{pid}/exe").resolve(strict=True)
+    except OSError as exc:
+        raise RuntimeError(f"cannot resolve the serving interpreter for {unit}") from exc
+    if resolved_interpreter != process_executable:
+        raise RuntimeError(
+            f"serving process for {unit} changed its interpreter identity"
+        )
+    return {
+        "python_executable": interpreter.as_posix(),
+        "python_executable_realpath": resolved_interpreter.as_posix(),
+    }
+
+
+def _runtime_sdk_identity(interpreter: str, unit: str) -> dict[str, str]:
+    """Measure SDK bytes through the interpreter belonging to one unit."""
+
+    helper = Path(__file__).resolve().with_name("_mcp_sdk_identity.py")
+    expression = (
+        "import json, runpy; "
+        f"namespace = runpy.run_path({helper.as_posix()!r}); "
+        "print(json.dumps(namespace['installed_mcp_runtime_identity'](), sort_keys=True))"
+    )
+    completed = subprocess.run(
+        [interpreter, "-I", "-B", "-c", expression],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if completed.returncode != 0:
+        detail = (completed.stderr or completed.stdout).strip()[-1200:]
+        raise RuntimeError(f"SDK attestation failed for {unit}: {detail}")
+    try:
+        identity = json.loads(completed.stdout)
+    except (json.JSONDecodeError, TypeError) as exc:
+        raise RuntimeError(f"SDK attestation returned invalid JSON for {unit}") from exc
+    if not isinstance(identity, dict):
+        raise RuntimeError(f"SDK attestation returned a non-object for {unit}")
+    version = identity.get("version")
+    source_revision = identity.get("commit")
+    artifact_digest = identity.get("artifact_digest")
+    if (
+        not isinstance(version, str)
+        or MCP_SDK_SOURCE_REVISIONS.get(version) != source_revision
+        or not isinstance(artifact_digest, str)
+        or re.fullmatch(r"sha256:[0-9a-f]{64}", artifact_digest) is None
+        or not isinstance(identity.get("mcp_distribution_digest"), str)
+        or re.fullmatch(
+            r"sha256:[0-9a-f]{64}", identity["mcp_distribution_digest"]
+        ) is None
+        or not isinstance(identity.get("mcp_types_distribution_digest"), str)
+        or re.fullmatch(
+            r"sha256:[0-9a-f]{64}", identity["mcp_types_distribution_digest"]
+        ) is None
+    ):
+        raise RuntimeError(f"SDK attestation was incomplete for {unit}")
+    return {
+        "version": version,
+        "commit": source_revision,
+        "artifact_digest": artifact_digest,
+        "mcp_distribution_digest": identity["mcp_distribution_digest"],
+        "mcp_types_distribution_digest": identity["mcp_types_distribution_digest"],
+    }
+
+
 def _unit_identity(unit: str) -> dict[str, Any]:
     completed = subprocess.run(
         [
@@ -116,10 +284,70 @@ def _unit_identity(unit: str) -> dict[str, Any]:
         raise RuntimeError(f"production unit has no main process: {unit}")
     return {
         "unit": unit,
+        "main_pid": pid,
         "process_identity": (
             f"systemd-user:{unit}:pid:{pid}:start:"
             f"{values['ExecMainStartTimestampMonotonic']}"
         ),
+        **_process_interpreter(pid, unit),
+    }
+
+
+def _listener_socket_inodes(port: int) -> set[str]:
+    """Return every listening socket inode currently bound to ``port``."""
+    inodes: set[str] = set()
+    for proc_net in (Path("/proc/net/tcp"), Path("/proc/net/tcp6")):
+        try:
+            lines = proc_net.read_text(encoding="ascii").splitlines()[1:]
+        except (OSError, UnicodeError) as exc:
+            raise RuntimeError(f"cannot inspect listening sockets in {proc_net}") from exc
+        for line in lines:
+            fields = line.split()
+            if len(fields) < 10 or fields[3] != "0A":
+                continue
+            try:
+                local_port = int(fields[1].rsplit(":", 1)[1], 16)
+            except (IndexError, ValueError) as exc:
+                raise RuntimeError(f"invalid listening socket entry in {proc_net}") from exc
+            if local_port == port and fields[9] != "0":
+                inodes.add(fields[9])
+    return inodes
+
+
+def _process_socket_inodes(pid: int, unit: str) -> set[str]:
+    inodes: set[str] = set()
+    try:
+        descriptors = Path(f"/proc/{pid}/fd").iterdir()
+        for descriptor in descriptors:
+            try:
+                target = os.readlink(descriptor)
+            except OSError:
+                continue
+            match = re.fullmatch(r"socket:\[(\d+)\]", target)
+            if match is not None:
+                inodes.add(match.group(1))
+    except OSError as exc:
+        raise RuntimeError(f"cannot inspect sockets owned by {unit}") from exc
+    return inodes
+
+
+def _listener_attestation(port: int, pid: int, unit: str) -> dict[str, Any]:
+    """Prove that the loopback port is listened to by the named MainPID."""
+    listening = _listener_socket_inodes(port)
+    owned = listening & _process_socket_inodes(pid, unit)
+    if not listening:
+        raise RuntimeError(f"no listening socket was found for {unit}:{port}")
+    if listening != owned:
+        foreign = sorted(listening - owned)
+        raise RuntimeError(
+            f"{unit}:{port} is served by a socket outside MainPID {pid}: {foreign}"
+        )
+    return {
+        "state": "passed",
+        "method": "proc_net_tcp_listener_inode_owned_by_main_pid",
+        "port": port,
+        "pid": pid,
+        "socket_inodes": sorted(owned),
     }
 
 
@@ -147,10 +375,19 @@ def _registry_facts() -> dict[str, Any]:
 def _probe(name: str, port: int, unit: str, credential: str) -> dict[str, Any]:
     token = _load_token(credential)
     url = f"http://127.0.0.1:{port}/mcp"
+    before = _unit_identity(unit)
+    listener_before = _listener_attestation(port, before["main_pid"], unit)
+    sdk_before = _runtime_sdk_identity(before["python_executable"], unit)
     status, discover, headers = _request(url, token, "server/discover", _meta())
     result = discover.get("result") if isinstance(discover, dict) else None
     if status != 200 or not isinstance(result, dict):
         raise RuntimeError(f"{name} discovery failed: {status} {discover}")
+    runtime_identity_attestation = _server_runtime_identity_attestation(
+        headers,
+        before,
+        sdk_before,
+        unit,
+    )
     status, inventory, _ = _request(url, token, "tools/list", _meta())
     tools = inventory.get("result", {}).get("tools") if isinstance(inventory, dict) else None
     wrong_status, _, _ = _request(url, secrets.token_urlsafe(48), "server/discover", _meta())
@@ -179,11 +416,40 @@ def _probe(name: str, port: int, unit: str, credential: str) -> dict[str, Any]:
     )
     if not passed:
         raise RuntimeError(f"{name} modern-only gates failed")
+    after = _unit_identity(unit)
+    listener_after = _listener_attestation(port, after["main_pid"], unit)
+    sdk_after = _runtime_sdk_identity(after["python_executable"], unit)
+    if (
+        after["process_identity"] != before["process_identity"]
+        or after["python_executable"] != before["python_executable"]
+        or after["python_executable_realpath"]
+        != before["python_executable_realpath"]
+        or sdk_after != sdk_before
+        or listener_after != listener_before
+    ):
+        raise RuntimeError(
+            f"{name} serving process or SDK identity changed during the probe"
+        )
     encoded_tools = json.dumps(tools, sort_keys=True, separators=(",", ":")).encode()
-    return {
+    row = {
         "organ_id": name,
         "endpoint_ref": url,
-        **_unit_identity(unit),
+        **before,
+        "mcp_sdk": sdk_before["version"],
+        "mcp_sdk_source_revision": sdk_before["commit"],
+        "mcp_sdk_artifact_digest": sdk_before["artifact_digest"],
+        "mcp_sdk_distribution_digests": {
+            "mcp": sdk_before["mcp_distribution_digest"],
+            "mcp-types": sdk_before["mcp_types_distribution_digest"],
+        },
+        "sdk_attestation": {
+            "state": "passed",
+            "method": (
+                "per_unit_process_interpreter_distribution_records_and_"
+                "server_emitted_identity_header"
+            ),
+            "checked_before_and_after_probe": True,
+        },
         "protocol_version": PROTOCOL,
         "server_info": result.get("_meta", {}).get("io.modelcontextprotocol/serverInfo"),
         "tool_count": len(tools),
@@ -195,6 +461,108 @@ def _probe(name: str, port: int, unit: str, credential: str) -> dict[str, Any]:
         "legacy_session_issued": False,
         "verdict": "passed",
     }
+    if runtime_identity_attestation is not None:
+        row["runtime_identity_attestation"] = runtime_identity_attestation
+    row["listener_attestation"] = {
+        **listener_before,
+        "checked_before_and_after_probe": True,
+    }
+    return row
+
+
+def _fleet_verdict(
+    sdk: str,
+    registry: dict[str, Any],
+    rows: list[dict[str, Any]],
+    zero_legacy: bool,
+) -> str:
+    """Accept one reviewed, measured SDK identity across every serving unit."""
+
+    identities: set[tuple[object, object, object]] = set()
+    rows_are_objects = True
+    for row in rows:
+        if not isinstance(row, dict):
+            rows_are_objects = False
+            continue
+        identities.add(
+            (
+                row.get("mcp_sdk"),
+                row.get("mcp_sdk_source_revision"),
+                row.get("mcp_sdk_artifact_digest"),
+            )
+        )
+    per_unit_attestation = all(
+        isinstance(row, dict)
+        and isinstance(row.get("sdk_attestation"), dict)
+        and row["sdk_attestation"].get("state") == "passed"
+        and isinstance(row.get("mcp_sdk"), str)
+        and MCP_SDK_SOURCE_REVISIONS.get(row["mcp_sdk"])
+        == row.get("mcp_sdk_source_revision")
+        and isinstance(row.get("mcp_sdk_artifact_digest"), str)
+        and re.fullmatch(r"sha256:[0-9a-f]{64}", row["mcp_sdk_artifact_digest"])
+        is not None
+        for row in rows
+    )
+    server_identity_attestation = all(
+        row.get("mcp_sdk") != "2.1.1"
+        or (
+            isinstance(row.get("runtime_identity_attestation"), dict)
+            and row["runtime_identity_attestation"].get("state") == "passed"
+            and row["runtime_identity_attestation"].get("method")
+            == RUNTIME_IDENTITY_ATTESTATION_METHOD
+            and row["runtime_identity_attestation"].get("header")
+            == "X-Abyss-MCP-Runtime-Identity"
+            and row["runtime_identity_attestation"].get("pid")
+            == row.get("main_pid")
+            and row["runtime_identity_attestation"].get(
+                "checked_during_discovery"
+            )
+            is True
+        )
+        for row in rows
+    )
+    listener_attestation = all(
+        row.get("mcp_sdk") != "2.1.1"
+        or (
+            isinstance(row.get("listener_attestation"), dict)
+            and row["listener_attestation"].get("state") == "passed"
+            and row["listener_attestation"].get("method")
+            == "proc_net_tcp_listener_inode_owned_by_main_pid"
+            and row["listener_attestation"].get("port")
+            == _endpoint_port(row.get("endpoint_ref"))
+            and row["listener_attestation"].get("pid") == row.get("main_pid")
+            and row["listener_attestation"].get("checked_before_and_after_probe")
+            is True
+        )
+        for row in rows
+    )
+    reviewed_candidate_artifact = all(
+        row.get("mcp_sdk") != "2.1.1"
+        or row.get("mcp_sdk_artifact_digest")
+        in EXPECTED_CANDIDATE_MCP_ARTIFACT_DIGESTS
+        for row in rows
+    )
+    expected_identity = (
+        (sdk, MCP_SDK_SOURCE_REVISIONS[sdk], next(iter(identities))[2])
+        if sdk in MCP_SDK_SOURCE_REVISIONS and len(identities) == 1
+        else None
+    )
+    return (
+        "passed"
+        if rows_are_objects
+        and sdk in MCP_SDK_SOURCE_REVISIONS
+        and registry["admitted_read_count"] == len(rows)
+        and registry["protocol_versions"] == [PROTOCOL]
+        and registry["bootstrap_identity_count"] == 0
+        and len(identities) == 1
+        and expected_identity in identities
+        and per_unit_attestation
+        and server_identity_attestation
+        and listener_attestation
+        and reviewed_candidate_artifact
+        and zero_legacy
+        else "failed"
+    )
 
 
 def main() -> int:
@@ -203,17 +571,50 @@ def main() -> int:
     args = parser.parse_args()
     rows = [_probe(*entry) for entry in SERVERS]
     registry = _registry_facts()
-    sdk = subprocess.run(
-        [str(RUNTIME_PYTHON), "-I", "-B", "-c", "import importlib.metadata as m; print(m.version('mcp'))"],
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout.strip()
+    if not rows:
+        raise RuntimeError("the production read fleet is empty")
+    sdk = rows[0]["mcp_sdk"]
+    sdk_source_revision = rows[0]["mcp_sdk_source_revision"]
+    sdk_artifact_digest = rows[0]["mcp_sdk_artifact_digest"]
     receipt = {
         "schema_version": "abyss_live_modern_read_fleet_v1",
         "observed_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         "protocol_version": PROTOCOL,
         "mcp_sdk": sdk,
+        "mcp_sdk_source_revision": sdk_source_revision,
+        "mcp_sdk_artifact_digest": sdk_artifact_digest,
+        "sdk_attestation": {
+            "scope": "every production read unit",
+            "method": (
+                "per_unit_process_interpreter_distribution_records_and_"
+                "server_emitted_identity_header"
+            ),
+            "unit_count": len(rows),
+            "attested_unit_count": sum(
+                row["sdk_attestation"]["state"] == "passed" for row in rows
+            ),
+            "server_identity_attested_unit_count": sum(
+                row.get("runtime_identity_attestation", {}).get("state") == "passed"
+                for row in rows
+            ),
+            "listener_attested_unit_count": sum(
+                row.get("listener_attestation", {}).get(
+                    "checked_before_and_after_probe"
+                )
+                is True
+                for row in rows
+            ),
+            "unique_identities": len(
+                {
+                    (
+                        row["mcp_sdk"],
+                        row["mcp_sdk_source_revision"],
+                        row["mcp_sdk_artifact_digest"],
+                    )
+                    for row in rows
+                }
+            ),
+        },
         "production_unit_count": len(rows),
         "registry": registry,
         "servers": rows,
@@ -224,15 +625,7 @@ def main() -> int:
             for row in rows
         ),
     }
-    receipt["verdict"] = (
-        "passed"
-        if sdk == "2.0.0"
-        and registry["admitted_read_count"] == len(rows)
-        and registry["protocol_versions"] == [PROTOCOL]
-        and registry["bootstrap_identity_count"] == 0
-        and receipt["zero_legacy"]
-        else "failed"
-    )
+    receipt["verdict"] = _fleet_verdict(sdk, registry, rows, receipt["zero_legacy"])
     args.output.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     args.output.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n")
     os.chmod(args.output, 0o600)

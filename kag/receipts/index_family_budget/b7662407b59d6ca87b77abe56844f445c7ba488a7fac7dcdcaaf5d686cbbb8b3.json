@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 18362567,
+  "allowed_tracked_bytes": 38959854,
+  "approved_by": "repository-owner",
+  "base_ref": "acee6d7684959ceaace27464c81f1ba23a4f03ea",
+  "changed_generated_bytes": 18362567,
+  "changed_generated_files": 212,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "b7662407b59d6ca87b77abe56844f445c7ba488a7fac7dcdcaaf5d686cbbb8b3",
+  "reason": "MCP 2.1.1 follow-up review repair: source commit 7b2cb3d closes deployment expiry and live Tasks identity gates; regenerate owner family from merged dependency base acee6d768.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 38959854,
+  "tracked_bytes_max": 24117248
+}

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Exercise Codex Tasks against the real abyss-stack MCP 2.0 server."""
+"""Exercise Codex Tasks against the configured abyss-stack MCP server."""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ import json
 import os
 import secrets
 import socket
+import subprocess
 import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
@@ -28,6 +29,126 @@ LIVE_BEARER_FILE = Path(
 )
 PYTHON = Path("/srv/abyss-machine/cache/mcp-modern-fleet-20260809/venv/bin/python")
 OBSERVATION = Path("/srv/AbyssOS/abyss-stack/Logs/mcp/observations/current.json")
+MCP_SDK_SOURCE_REVISIONS = {
+    "2.0.0": "6f69a3758ebf2ee55ce050f58b470ce11af71133",
+    "2.1.1": "0921d94a74db900dccd2d534842aa7b6160542d2",
+}
+
+
+def _task_metadata(terminal: dict[str, Any]) -> dict[str, Any]:
+    try:
+        metadata = terminal["result"]["structuredContent"]["metadata"]
+    except (KeyError, TypeError) as exc:
+        raise RuntimeError("the serving MCP task result omitted its metadata") from exc
+    if not isinstance(metadata, dict):
+        raise RuntimeError("the serving MCP task result metadata is not an object")
+    return metadata
+
+
+def _validate_process_startup_identity(
+    metadata: dict[str, Any],
+    sdk: str,
+    *,
+    expected_process_id: int | None,
+) -> int | None:
+    """Require candidate Tasks metadata to name the process that served it."""
+    if sdk != "2.1.1":
+        return None
+    process_id = metadata.get("mcp_sdk_process_id")
+    attestation = metadata.get("mcp_sdk_runtime_attestation")
+    if (
+        not isinstance(process_id, int)
+        or process_id <= 0
+        or not isinstance(attestation, dict)
+        or attestation.get("state") != "passed"
+        or attestation.get("method") != "process_startup_sdk_identity_snapshot"
+        or attestation.get("pid") != process_id
+    ):
+        raise RuntimeError(
+            "the serving MCP task result omitted its process-start SDK identity"
+        )
+    if expected_process_id is not None and process_id != expected_process_id:
+        raise RuntimeError(
+            "the serving MCP task result was emitted by a different process"
+        )
+    return process_id
+
+
+def server_runtime_identity(
+    terminal: dict[str, Any],
+    *,
+    expected_process_id: int | None = None,
+) -> tuple[str, str, str, str]:
+    """Return SDK, artifact, and observation identities emitted by the server."""
+    metadata = _task_metadata(terminal)
+    try:
+        sdk = metadata["mcp_sdk"]
+        sdk_source_revision = metadata["mcp_sdk_source_revision"]
+        sdk_artifact_digest = metadata["mcp_sdk_artifact_digest"]
+        observation_digest = metadata["observation_digest"]
+    except (KeyError, TypeError) as exc:
+        raise RuntimeError(
+            "the serving MCP task result omitted its SDK, source, artifact, or observation identity"
+        ) from exc
+    if not isinstance(sdk, str) or not sdk:
+        raise RuntimeError("the serving MCP task result returned an empty SDK identity")
+    if MCP_SDK_SOURCE_REVISIONS.get(sdk) != sdk_source_revision:
+        raise RuntimeError(
+            "the serving MCP task result returned an unattested SDK source identity"
+        )
+    if (
+        not isinstance(sdk_artifact_digest, str)
+        or not sdk_artifact_digest.startswith("sha256:")
+        or len(sdk_artifact_digest) != 71
+        or any(char not in "0123456789abcdef" for char in sdk_artifact_digest[7:])
+    ):
+        raise RuntimeError(
+            "the serving MCP task result returned an invalid SDK artifact digest"
+        )
+    if (
+        not isinstance(observation_digest, str)
+        or not observation_digest.startswith("sha256:")
+        or len(observation_digest) != 71
+    ):
+        raise RuntimeError(
+            "the serving MCP task result returned an invalid observation digest"
+        )
+    _validate_process_startup_identity(
+        metadata,
+        sdk,
+        expected_process_id=expected_process_id,
+    )
+    return sdk, sdk_source_revision, sdk_artifact_digest, observation_digest
+
+
+def _live_server_process_id() -> int:
+    completed = subprocess.run(
+        [
+            "systemctl",
+            "--user",
+            "show",
+            "abyss-stack-mcp-read.service",
+            "-p",
+            "ActiveState",
+            "-p",
+            "SubState",
+            "-p",
+            "MainPID",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    values = dict(line.split("=", 1) for line in completed.stdout.splitlines())
+    if values.get("ActiveState") != "active" or values.get("SubState") != "running":
+        raise RuntimeError("live abyss-stack Tasks server is not running")
+    try:
+        process_id = int(values["MainPID"])
+    except (KeyError, ValueError) as exc:
+        raise RuntimeError("live abyss-stack Tasks server has no usable MainPID") from exc
+    if process_id <= 0:
+        raise RuntimeError("live abyss-stack Tasks server has no usable MainPID")
+    return process_id
 
 
 class AppClient:
@@ -337,13 +458,31 @@ async def main() -> None:
         terminal = pair["completed"]
         task_id = pair["completed_task_id"]
         rejected = pair["missing_extension"]
+        metadata = _task_metadata(terminal)
+        expected_process_id = None
+        if server is not None:
+            expected_process_id = server.pid
+        elif metadata.get("mcp_sdk") == "2.1.1":
+            expected_process_id = _live_server_process_id()
+        (
+            mcp_sdk,
+            mcp_sdk_source_revision,
+            mcp_sdk_artifact_digest,
+            runtime_observation_digest,
+        ) = server_runtime_identity(
+            terminal,
+            expected_process_id=expected_process_id,
+        )
 
         receipt = {
             "schema_version": "codex_real_abyss_stack_tasks_pair_v1",
             "observed_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
             "protocol_version": PROTOCOL,
             "server": "abyss-stack-mcp/0.5.2",
-            "mcp_sdk": "2.0.0",
+            "mcp_sdk": mcp_sdk,
+            "mcp_sdk_source_revision": mcp_sdk_source_revision,
+            "mcp_sdk_artifact_digest": mcp_sdk_artifact_digest,
+            "runtime_observation_digest": runtime_observation_digest,
             "codex_runtime": args.runtime.parents[1].name,
             "codex_runtime_sha256": hashlib.sha256(
                 args.runtime.parent.joinpath("codex").read_bytes()
@@ -371,6 +510,13 @@ async def main() -> None:
                 "error": rejected.get("error"),
             },
         }
+        runtime_process_id = _validate_process_startup_identity(
+            metadata,
+            mcp_sdk,
+            expected_process_id=expected_process_id,
+        )
+        if runtime_process_id is not None:
+            receipt["runtime_process_id"] = runtime_process_id
         receipt["verdict"] = (
             "passed"
             if receipt["task"]["owner"] == "abyss-stack"

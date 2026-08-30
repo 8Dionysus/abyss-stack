@@ -25,6 +25,7 @@ from mcp_types import Implementation, ToolAnnotations
 
 from aoa_kag_mcp.core import AoAKagMCPState
 from aoa_kag_mcp.runtime import build_application
+from _mcp_sdk_identity import installed_mcp_identity
 
 
 NEXT_WIRE_VERSION = "2026-07-28"
@@ -323,7 +324,7 @@ async def _exercise_pair(
     app = server.streamable_http_app(
         streamable_http_path="/mcp",
         # The 2026-07-28 transport expresses cancellation by closing the
-        # request's SSE response stream. Python MCP 2.0.0 can return JSON, but
+        # request's SSE response stream. Python MCP 2.1.1 can return JSON, but
         # that shortcut has no disconnect watcher and therefore lets the
         # dispatch continue after a client gives up. Keep the modern contour
         # on SSE so disconnect reaches the handler/worker cancel scope.
@@ -608,9 +609,11 @@ def main() -> int:
     parser.add_argument("--stack-runtime-root", required=True, type=Path)
     parser.add_argument("--stack-source-root", required=True, type=Path)
     parser.add_argument("--stable-codex-config", required=True, type=Path)
+    parser.add_argument("--python-sdk-root", required=True, type=Path)
     args = parser.parse_args()
 
     started_at = _utc_now()
+    sdk_identity = installed_mcp_identity(args.python_sdk_root)
     stable_before = _digest(args.stable_codex_config)
     state = AoAKagMCPState.discover(
         workspace_root=args.workspace_root,
@@ -637,10 +640,9 @@ def main() -> int:
         "finished_at": _utc_now(),
         "exact_inputs": {
             "spec_version": NEXT_WIRE_VERSION,
-            "python_mcp_version": "2.0.0",
-            "python_mcp_commit": (
-                "6f69a3758ebf2ee55ce050f58b470ce11af71133"
-            ),
+            "python_mcp_version": sdk_identity["version"],
+            "python_mcp_commit": sdk_identity["commit"],
+            "python_mcp_artifact_digest": sdk_identity["artifact_digest"],
             "stack_source_revision": _git_head(args.stack_source_root),
             "aoa_kag_source_revision": _git_head(args.aoa_kag_root),
             "stack_runtime_current_digest": _digest(
@@ -660,7 +662,7 @@ def main() -> int:
         "pair": observation,
         "verdict": "passed",
         "claim_limits": [
-            "This receipt proves one isolated Python MCP 2.0.0 KAG read pair, not Codex next-wire support.",
+            "This receipt proves one isolated Python MCP 2.1.1 KAG read pair, not Codex next-wire support.",
             "The adapter was not registered, deployed, credentialed, or admitted.",
             "KAG output remains navigation/evidence; owner sources retain authority.",
             "The owner canary proves a current exact projection for abyss-stack only.",
