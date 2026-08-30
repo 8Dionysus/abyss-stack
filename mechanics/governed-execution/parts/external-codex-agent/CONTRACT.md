@@ -134,7 +134,10 @@ Operations are:
   `thread/goal/set` request marker, returned Goal response when available, and
   a bounded fresh `thread/goal/get` post-read. A response loss after dispatch
   is reconciled only from the durable dispatch marker plus that post-read and
-  never by issuing a second lifecycle set. The generic receipt uses
+  never by issuing a second lifecycle set. CLI and programmatic SDK entrypoints
+  hold the same attempt-artifact lock across attempt loading, mutation, and
+  proof persistence, so concurrent consumers cannot both dispatch the same
+  accepted transition. The generic receipt uses
   `abyss_stack_external_codex_goal_transition_v2`; it does not claim a
   server-side CAS/version feature or mutation causality. No terminal input,
   turn delivery, task-specific Goal, thread, model, version, or terminal

@@ -110,7 +110,10 @@ through `thread/goal/get` without a second `thread/goal/set`. Receipt replay
 revalidates the exact decision reference, transition frame, proof, and
 response digests; executed receipt replay also requires the mutation attempt
 sidecar, binds the authoritative result response to its digest and safe
-summary, and rejects a receipt whose path identity is missing or changed.
+summary, and rejects a receipt whose path identity is missing or changed. A
+concurrent SDK regression drives two callers through one durable attempt path
+and proves that the shared CLI/programmatic lock permits exactly one native
+Goal mutation while the second caller reconciles the recorded proof.
 
 The legacy external-return tests also cover the separate Goal pause contour:
 an exact active owner-bound Goal uses the current public `thread/goal/set`

@@ -4,6 +4,8 @@ import hashlib
 import importlib.util
 import json
 import sys
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
@@ -899,6 +901,58 @@ def test_generic_adapter_executes_against_the_current_public_goal_set_surface(
     )
     assert [method for method, _params in rpc.calls].count("thread/goal/set") == 1
     assert [method for method, _params in rpc.calls].count("thread/goal/get") == 2
+
+
+def test_programmatic_adapter_serializes_one_durable_attempt(
+    tmp_path: Path,
+) -> None:
+    endpoint = tmp_path / "concurrent-programmatic.sock"
+    owner = _owner(endpoint)
+    owner_path = tmp_path / "owner-concurrent-programmatic.json"
+    owner_path.write_bytes(RUNTIME._canonical_bytes(owner) + b"\n")
+    request = _request(
+        observed="active",
+        desired="paused",
+        kind="delegation_yield",
+        request_id="request:concurrent-programmatic",
+    )
+    decision = _decision(request)
+    rpc = FakeGoalRpc(endpoint, status="active")
+    adapter = ADAPTER.CodexGoalLifecycleAdapter(
+        owner=owner,
+        owner_path=owner_path,
+        endpoint=endpoint,
+        rpc_factory=lambda _endpoint: rpc,
+        attempt_path=tmp_path / "concurrent-programmatic.attempt.json",
+    )
+    callers_ready = threading.Barrier(2)
+    mutation_entered = threading.Event()
+    release_mutation = threading.Event()
+    original_call = rpc.call
+
+    def blocking_call(
+        method: str, params: dict[str, object] | None = None
+    ) -> dict[str, object]:
+        if method == "thread/goal/set":
+            mutation_entered.set()
+            assert release_mutation.wait(timeout=5)
+        return original_call(method, params)
+
+    rpc.call = blocking_call  # type: ignore[method-assign]
+
+    def invoke() -> dict[str, Any]:
+        callers_ready.wait(timeout=5)
+        return adapter.execute_goal_transition(request, decision)
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        futures = [executor.submit(invoke) for _ in range(2)]
+        assert mutation_entered.wait(timeout=5)
+        assert all(not future.done() for future in futures)
+        release_mutation.set()
+        receipts = [future.result(timeout=5) for future in futures]
+
+    assert {receipt["status"] for receipt in receipts} == {"executed"}
+    assert [method for method, _params in rpc.calls].count("thread/goal/set") == 1
 
 
 def test_generic_adapter_reconciles_a_lost_set_response_without_a_second_set(

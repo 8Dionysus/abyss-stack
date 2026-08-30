@@ -790,7 +790,7 @@ def _execution_projection(
     return receipt
 
 
-def execute_goal_transition(
+def _execute_goal_transition_unlocked(
     request: Any,
     decision: Any,
     owner: dict[str, Any],
@@ -801,7 +801,7 @@ def execute_goal_transition(
     attempt_path: Path | None = None,
     attempt: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Execute one accepted semantic request through the Codex Goal API."""
+    """Execute one accepted semantic request while the attempt lock is held."""
 
     runtime = _runtime()
     (
@@ -1303,6 +1303,52 @@ def execute_goal_transition(
     )
 
 
+def execute_goal_transition(
+    request: Any,
+    decision: Any,
+    owner: dict[str, Any],
+    owner_path: Path,
+    endpoint: Path,
+    *,
+    rpc_factory: Callable[[Path], Any] | None = None,
+    attempt_path: Path | None = None,
+    attempt: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Execute one accepted semantic request through the Codex Goal API.
+
+    A transition that can mutate a Goal must name a durable attempt artifact.
+    Use that artifact as the shared serialization coordinate so SDK consumers
+    and the CLI wrapper cannot race the same exactly-once transition.
+    """
+
+    if attempt_path is None:
+        return _execute_goal_transition_unlocked(
+            request,
+            decision,
+            owner,
+            owner_path,
+            endpoint,
+            rpc_factory=rpc_factory,
+            attempt_path=None,
+            attempt=attempt,
+        )
+    runtime = _runtime()
+    attempt_path = runtime._validate_output_path(
+        Path(attempt_path), "Goal lifecycle attempt reservation"
+    )
+    with _attempt_lock(attempt_path):
+        return _execute_goal_transition_unlocked(
+            request,
+            decision,
+            owner,
+            owner_path,
+            endpoint,
+            rpc_factory=rpc_factory,
+            attempt_path=attempt_path,
+            attempt=attempt,
+        )
+
+
 class CodexGoalLifecycleAdapter:
     """Current-Codex adapter implementing the SDK lifecycle seam."""
 
@@ -1787,7 +1833,7 @@ def run_goal_transition(args: Any) -> dict[str, Any]:
         raise runtime.ExternalCodexReturnError(
             "Goal lifecycle receipt must be distinct from all input artifacts"
         )
-    with _attempt_lock(receipt_path):
+    with _attempt_lock(attempt_path):
         if receipt_path.exists():
             existing, raw = runtime._load_json_file(
                 receipt_path, "existing Goal lifecycle receipt"
@@ -1847,14 +1893,14 @@ def run_goal_transition(args: Any) -> dict[str, Any]:
         )
         runtime.VISIBLE._assert_file_snapshot(owner_path, owner_bytes, "Goal lifecycle owner")
         endpoint, resolution = runtime.discover_app_server_socket(owner)
-        receipt = CodexGoalLifecycleAdapter(
-            owner=owner,
-            owner_path=owner_path,
-            endpoint=endpoint,
+        receipt = _execute_goal_transition_unlocked(
+            request,
+            decision,
+            owner,
+            owner_path,
+            endpoint,
             attempt_path=attempt_path,
             attempt=attempt,
-        ).execute_goal_transition(
-            request, decision
         )
         receipt["receipt_ref"] = str(receipt_path.resolve())
         receipt["transport"]["resolution"] = resolution

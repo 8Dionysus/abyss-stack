@@ -80,7 +80,9 @@ Tracking starts with the community-docs baseline for this repository.
 - Repair the owner-bound external Codex Goal pause contour to use the current
   native `thread/goal/set` surface exactly once, bind its request and optional
   response to a fresh post-read, and reconcile a lost response from durable
-  dispatch evidence without requiring an unsupported CAS/version field.
+  dispatch evidence without requiring an unsupported CAS/version field. CLI
+  and SDK callers now serialize on the same durable attempt coordinate so a
+  concurrent retry cannot issue a second lifecycle mutation.
 - Bind the canonical `aoa-kag` MCP adapter to an authored absolute
   `AOA_KAG_ARTIFACT_ROOT` seam for v4 cold-CAS reads, preserving fail-closed
   loader behavior and separate artifact-admission verdicts.
