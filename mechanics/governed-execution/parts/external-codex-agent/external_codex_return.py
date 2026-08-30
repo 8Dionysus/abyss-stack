@@ -19,6 +19,7 @@ import json
 import os
 import secrets
 import socket
+import stat
 import struct
 import sys
 import time
@@ -2665,11 +2666,54 @@ def _pause_binding(
     }
 
 
-@contextlib.contextmanager
-def _pause_attempt_lock(anchor_path: Path) -> Any:
-    """Serialize one pause receipt and its single lifecycle mutation."""
+def _pause_attempt_lock_root() -> Path:
+    """Return one owner-private host coordinate for legacy Goal locks."""
 
-    lock_path = anchor_path.with_name(anchor_path.name + ".pause-attempt.lock")
+    uid = os.getuid()
+    runtime_parent = Path(f"/run/user/{uid}")
+    if runtime_parent.is_symlink() or not runtime_parent.is_dir():
+        runtime_parent = Path("/tmp")
+    if runtime_parent.is_symlink() or not runtime_parent.is_dir():
+        raise ExternalCodexReturnError(
+            "Goal pause lock parent is not a real directory"
+        )
+    root = runtime_parent / f"aoa-external-codex-goal-pause-{uid}"
+    try:
+        root.mkdir(mode=0o700, exist_ok=True)
+        observed = root.stat(follow_symlinks=False)
+    except OSError as exc:
+        raise ExternalCodexReturnError(
+            f"Goal pause lock root cannot be prepared: {root}"
+        ) from exc
+    if (
+        root.is_symlink()
+        or not stat.S_ISDIR(observed.st_mode)
+        or observed.st_uid != uid
+        or stat.S_IMODE(observed.st_mode) & 0o077
+    ):
+        raise ExternalCodexReturnError(
+            f"Goal pause lock root is not owner-private: {root}"
+        )
+    return root
+
+
+def _pause_attempt_lock_path(owner: dict[str, Any]) -> Path:
+    binding = {
+        "schema_version": "abyss_stack_external_codex_pause_lock_v1",
+        "owner_id": owner["owner_id"],
+        "owner_repo": owner["owner_repo"],
+        "goal_id": owner["goal_id"],
+        "thread_id": owner["thread_id"],
+    }
+    digest = _sha256_bytes(_canonical_bytes(binding))
+    return _pause_attempt_lock_root() / f"{digest}.lock"
+
+
+@contextlib.contextmanager
+def _pause_attempt_lock(owner: dict[str, Any]) -> Any:
+    """Serialize legacy pauses by qualified Goal identity."""
+
+    lock_path = _pause_attempt_lock_path(owner)
     _validate_output_path(lock_path, "Goal pause attempt lock")
     flags = os.O_RDWR | os.O_CREAT
     if hasattr(os, "O_CLOEXEC"):
@@ -3143,7 +3187,7 @@ def run_pause(args: argparse.Namespace) -> dict[str, Any]:
         raise ExternalCodexReturnError(
             "canonical Goal pause receipt must be distinct from pause owner"
         )
-    with _pause_attempt_lock(pause_path):
+    with _pause_attempt_lock(owner):
         return _run_pause_bound(
             owner_path=owner_path,
             owner_bytes=owner_bytes,

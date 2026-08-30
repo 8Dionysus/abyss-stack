@@ -41,6 +41,16 @@ ADAPTER = _load("goal_lifecycle_adapter", PART / "goal_lifecycle_adapter.py")
 NOW = datetime(2026, 8, 25, 12, 0, tzinfo=timezone.utc)
 
 
+@pytest.fixture(autouse=True)
+def _isolated_semantic_attempt_root(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "semantic-attempt-state"
+    root.mkdir(mode=0o700)
+    monkeypatch.setattr(ADAPTER, "_semantic_attempt_lock_root", lambda: root)
+
+
 def _digest(value: object) -> str:
     encoded = json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
     return "sha256:" + hashlib.sha256(encoded).hexdigest()
@@ -871,6 +881,42 @@ def test_generic_adapter_rechecks_all_inputs_before_publishing_receipt(
     assert not receipt_path.exists()
 
 
+@pytest.mark.parametrize("artifact_name", ("request", "decision"))
+def test_cli_rechecks_authority_artifacts_immediately_before_mutation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    artifact_name: str,
+) -> None:
+    args, request_path, decision_path, receipt_path, rpc = _cli_fixture(
+        tmp_path,
+        monkeypatch,
+        request_id=f"request:{artifact_name}-drift-before-mutation",
+    )
+    target = request_path if artifact_name == "request" else decision_path
+    original_call = rpc.call
+    drifted = False
+
+    def mutate_after_pre_read(
+        method: str, params: dict[str, object] | None = None
+    ) -> dict[str, object]:
+        nonlocal drifted
+        result = original_call(method, params)
+        if method == "thread/goal/get" and not drifted:
+            target.write_bytes(b"{}\n")
+            drifted = True
+        return result
+
+    rpc.call = mutate_after_pre_read  # type: ignore[method-assign]
+    with pytest.raises(
+        RUNTIME.VISIBLE.IncarnationHomeError,
+        match="changed during validation",
+    ):
+        ADAPTER.run_goal_transition(args)
+
+    assert [method for method, _params in rpc.calls].count("thread/goal/set") == 0
+    assert not receipt_path.exists()
+
+
 def test_generic_adapter_executes_against_the_current_public_goal_set_surface(
     tmp_path: Path,
 ) -> None:
@@ -962,7 +1008,10 @@ def test_programmatic_adapter_serializes_one_semantic_attempt_across_paths(
         release_mutation.set()
         receipts = [future.result(timeout=5) for future in futures]
 
-    assert {receipt["status"] for receipt in receipts} == {"executed", "replayed"}
+    assert {receipt["status"] for receipt in receipts} == {"executed"}
+    assert sum(
+        receipt["lifecycle"].get("recovery") is not None for receipt in receipts
+    ) == 1
     assert [method for method, _params in rpc.calls].count("thread/goal/set") == 1
     attempt_paths = [
         tmp_path / "concurrent-programmatic-first.attempt.json",
@@ -1016,13 +1065,53 @@ def test_cli_adapter_serializes_one_semantic_attempt_across_receipts(
         release_mutation.set()
         receipts = [future.result(timeout=5) for future in futures]
 
-    assert {receipt["status"] for receipt in receipts} == {"executed", "replayed"}
+    assert {receipt["status"] for receipt in receipts} == {"executed"}
+    assert sum(
+        receipt["lifecycle"].get("recovery") is not None for receipt in receipts
+    ) == 1
     assert [method for method, _params in rpc.calls].count("thread/goal/set") == 1
     attempt_paths = [
         ADAPTER._attempt_path(first_receipt),
         ADAPTER._attempt_path(second_receipt),
     ]
     assert sum(path.exists() for path in attempt_paths) == 1
+
+
+def test_cli_retry_after_reverse_uses_original_semantic_attempt(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    args, _request_path, _decision_path, first_receipt, rpc = _cli_fixture(
+        tmp_path,
+        monkeypatch,
+        request_id="request:durable-semantic-attempt",
+    )
+    first = ADAPTER.run_goal_transition(args)
+    first_attempt = Path(first["attempt_artifact"]["ref"])
+    assert first_attempt == ADAPTER._attempt_path(first_receipt).resolve()
+    assert first_attempt.exists()
+
+    # A separately accepted reverse transition may legitimately restore the
+    # original state.  Replaying this old idempotency key through another
+    # receipt must still resolve the original completed attempt and refuse a
+    # second native mutation.
+    rpc.status = "active"
+    second_receipt = tmp_path / "durable-semantic-attempt-retry.json"
+    second_args = SimpleNamespace(
+        request=args.request,
+        decision=args.decision,
+        owner=args.owner,
+        receipt=str(second_receipt),
+    )
+    with pytest.raises(
+        RUNTIME.ExternalCodexReturnError,
+        match="already has a durable attempt",
+    ):
+        ADAPTER.run_goal_transition(second_args)
+
+    assert [method for method, _params in rpc.calls].count("thread/goal/set") == 1
+    assert not ADAPTER._attempt_path(second_receipt).exists()
+    assert not second_receipt.exists()
 
 
 def test_programmatic_semantic_lock_survives_endpoint_rebinding(
@@ -1093,7 +1182,10 @@ def test_programmatic_semantic_lock_survives_endpoint_rebinding(
         receipts = [future.result(timeout=5) for future in futures]
 
     assert discovery_calls == [old_endpoint, new_endpoint]
-    assert {receipt["status"] for receipt in receipts} == {"executed", "replayed"}
+    assert {receipt["status"] for receipt in receipts} == {"executed"}
+    assert sum(
+        receipt["lifecycle"].get("recovery") is not None for receipt in receipts
+    ) == 1
     assert [method for method, _params in rpc.calls].count("thread/goal/set") == 1
 
 

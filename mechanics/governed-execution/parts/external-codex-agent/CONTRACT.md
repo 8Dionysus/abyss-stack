@@ -137,12 +137,18 @@ Operations are:
   never by issuing a second lifecycle set. CLI and programmatic SDK entrypoints
   derive the same owner-private runtime lock from the qualified owner identity
   and idempotency key across endpoint discovery, attempt loading, mutation,
-  and proof persistence. Caller-selected receipt/attempt paths and app-server
-  endpoint rebinding therefore cannot split one accepted transition into
-  multiple native mutations. Attempt and receipt owner digests come only from the
-  initially validated owner bytes; both entrypoints reassert that snapshot
-  immediately before native mutation and after proof persistence, failing
-  closed instead of mixing stale authority with rewritten owner evidence. The
+  and proof persistence. A non-replacing semantic anchor in that same
+  owner-private root binds the first durable attempt path to the qualified
+  owner and idempotency key; later callers resolve that path instead of
+  selecting fresh state from their receipt path. Caller-selected
+  receipt/attempt paths, a later reverse transition, and app-server endpoint
+  rebinding therefore cannot split or repeat one accepted transition's native
+  mutation. Attempt and receipt owner digests come only from the initially
+  validated owner bytes. Both entrypoints reassert that snapshot immediately
+  before native mutation and after proof persistence, while the CLI also
+  reasserts the initially loaded request and decision bytes immediately before
+  dispatch. Drift fails closed instead of mixing stale authority with
+  rewritten evidence. The
   generic receipt uses
   `abyss_stack_external_codex_goal_transition_v2`; it does not claim a
   server-side CAS/version feature or mutation causality. No terminal input,
@@ -153,7 +159,10 @@ Operations are:
   backwards-compatible legacy pause projection and remains a mutating
   compatibility entrypoint when no completed receipt exists: it reserves the
   active precondition and issues the one native Goal-set request. New Masters
-  use the generic typed route above. Once a completed pause receipt exists,
+  use the generic typed route above. Legacy callers serialize through an
+  owner-private lock derived from the qualified Goal identity, so different
+  pause-receipt paths cannot concurrently dispatch duplicate mutations. Once a
+  completed pause receipt exists,
   replay of that receipt is read-only, while historical
   `abyss_stack_external_codex_atomic_goal_transition_v1` evidence remains
   accepted only for migration/replay.

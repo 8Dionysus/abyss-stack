@@ -84,9 +84,13 @@ Tracking starts with the community-docs baseline for this repository.
   and SDK callers now serialize on a coordinate derived from the qualified
   owner identity and idempotency key in an owner-private runtime directory, so
   different caller-selected receipt/attempt paths and app-server endpoint
-  rebinding cannot issue duplicate lifecycle mutations. The SDK path also
-  binds attempt/receipt evidence to the initially loaded owner bytes while
-  rejecting owner drift before dispatch and after proof persistence.
+  rebinding cannot issue duplicate lifecycle mutations. A protected semantic
+  anchor retains the first durable attempt across later receipt paths and
+  state reversals; CLI request/decision artifacts are reasserted immediately
+  before dispatch, and the SDK binds attempt/receipt evidence to the initially
+  loaded owner bytes while rejecting owner drift before dispatch and after
+  proof persistence. Legacy pause callers now lock by qualified Goal identity
+  instead of receipt path.
 - Bind the canonical `aoa-kag` MCP adapter to an authored absolute
   `AOA_KAG_ARTIFACT_ROOT` seam for v4 cold-CAS reads, preserving fail-closed
   loader behavior and separate artifact-admission verdicts.

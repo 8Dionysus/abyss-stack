@@ -26,6 +26,9 @@ LEGACY_GOAL_TRANSITION_PROOF_SCHEMA_VERSION = (
     "abyss_stack_external_codex_goal_transition_v1"
 )
 GOAL_TRANSITION_METHOD = "thread/goal/set"
+SEMANTIC_ATTEMPT_ANCHOR_SCHEMA_VERSION = (
+    "abyss_stack_external_codex_goal_lifecycle_attempt_anchor_v1"
+)
 
 
 class _RuntimeNamespace:
@@ -369,9 +372,16 @@ def _validate_attempt(
             "Goal lifecycle attempt reservation is outside request/owner scope"
         )
     transport = value.get("transport")
+    stored_endpoint = transport.get("endpoint") if isinstance(transport, dict) else None
+    if not isinstance(stored_endpoint, str):
+        raise runtime.ExternalCodexReturnError(
+            "Goal lifecycle attempt reservation endpoint mismatch"
+        )
+    runtime._socket_path(stored_endpoint)
     if (
-        not isinstance(transport, dict)
-        or transport.get("endpoint") != str(endpoint)
+        owner.get("transport_posture")
+        != "resolve-current-local-codex-app-server"
+        and stored_endpoint != str(endpoint)
     ):
         raise runtime.ExternalCodexReturnError(
             "Goal lifecycle attempt reservation endpoint mismatch"
@@ -810,6 +820,7 @@ def _execute_goal_transition_unlocked(
     attempt_path: Path | None = None,
     attempt: dict[str, Any] | None = None,
     endpoint_is_owner_resolved: bool = False,
+    artifact_snapshots: tuple[tuple[Path, bytes, str], ...] = (),
 ) -> dict[str, Any]:
     """Execute one accepted semantic request while the attempt lock is held."""
 
@@ -1109,6 +1120,8 @@ def _execute_goal_transition_unlocked(
                 raise runtime.ExternalCodexReturnError(
                     "Goal lifecycle mutation requires a durable attempt reservation"
                 )
+            for path, expected, label in artifact_snapshots:
+                runtime.VISIBLE._assert_file_snapshot(path, expected, label)
             if attempt is not None:
                 raise runtime.ExternalCodexReturnError(
                     "Goal lifecycle mutation already has a durable attempt; refusing to issue a second lifecycle set"
@@ -1225,6 +1238,8 @@ def _execute_goal_transition_unlocked(
             setattr(rpc, "request_prepare_callback", record_request_prepared)
             setattr(rpc, "request_issued_callback", record_request_issued)
             try:
+                for path, expected, label in artifact_snapshots:
+                    runtime.VISIBLE._assert_file_snapshot(path, expected, label)
                 runtime.VISIBLE._assert_file_snapshot(
                     owner_path, owner_bytes, "Goal lifecycle owner"
                 )
@@ -1377,6 +1392,11 @@ def execute_goal_transition(
         validated_owner,
     )
     with _attempt_lock(lock_path):
+        attempt_path = _resolve_semantic_attempt_path(
+            typed_request,
+            validated_owner,
+            attempt_path,
+        )
         resolved_endpoint = _resolve_owner_endpoint(
             validated_owner,
             Path(endpoint),
@@ -1815,6 +1835,13 @@ def _semantic_attempt_lock_path(
 ) -> Path:
     """Derive one lock coordinate from semantic authority, not output names."""
 
+    digest = _semantic_attempt_digest(request, owner)
+    return _semantic_attempt_lock_root() / f"{digest}.lock"
+
+
+def _semantic_attempt_digest(request: Any, owner: dict[str, Any]) -> str:
+    """Bind lock and durable attempt selection to one semantic request."""
+
     runtime = _runtime()
     binding = {
         "schema_version": "abyss_stack_goal_lifecycle_lock_v1",
@@ -1828,8 +1855,68 @@ def _semantic_attempt_lock_path(
             "return_owner_ref": owner["return_owner_ref"],
         },
     }
-    digest = runtime._sha256_bytes(runtime._canonical_bytes(binding))
-    return _semantic_attempt_lock_root() / f"{digest}.lock"
+    return runtime._sha256_bytes(runtime._canonical_bytes(binding))
+
+
+def _semantic_attempt_anchor_path(request: Any, owner: dict[str, Any]) -> Path:
+    digest = _semantic_attempt_digest(request, owner)
+    return _semantic_attempt_lock_root() / f"{digest}.attempt-anchor.json"
+
+
+def _resolve_semantic_attempt_path(
+    request: Any,
+    owner: dict[str, Any],
+    requested_path: Path,
+) -> Path:
+    """Resolve every caller path through one durable semantic anchor."""
+
+    runtime = _runtime()
+    requested_path = runtime._validate_output_path(
+        Path(requested_path), "Goal lifecycle requested attempt reservation"
+    )
+    anchor_path = runtime._validate_output_path(
+        _semantic_attempt_anchor_path(request, owner),
+        "Goal lifecycle semantic attempt anchor",
+    )
+    digest = _semantic_attempt_digest(request, owner)
+    if anchor_path.exists():
+        anchor, raw = runtime._load_json_file(
+            anchor_path, "Goal lifecycle semantic attempt anchor"
+        )
+        if raw != runtime._canonical_bytes(anchor) + b"\n":
+            raise runtime.ExternalCodexReturnError(
+                "Goal lifecycle semantic attempt anchor is not canonically encoded"
+            )
+        if (
+            set(anchor)
+            != {
+                "schema_version",
+                "semantic_attempt_sha256",
+                "attempt_ref",
+            }
+            or anchor.get("schema_version")
+            != SEMANTIC_ATTEMPT_ANCHOR_SCHEMA_VERSION
+            or anchor.get("semantic_attempt_sha256") != digest
+            or not isinstance(anchor.get("attempt_ref"), str)
+        ):
+            raise runtime.ExternalCodexReturnError(
+                "Goal lifecycle semantic attempt anchor binding mismatch"
+            )
+        return runtime._validate_output_path(
+            Path(anchor["attempt_ref"]),
+            "Goal lifecycle anchored attempt reservation",
+        )
+    anchor = {
+        "schema_version": SEMANTIC_ATTEMPT_ANCHOR_SCHEMA_VERSION,
+        "semantic_attempt_sha256": digest,
+        "attempt_ref": str(requested_path.resolve()),
+    }
+    runtime._write_new_json(
+        anchor_path,
+        anchor,
+        "Goal lifecycle semantic attempt anchor",
+    )
+    return requested_path
 
 
 def _semantic_attempt_lock_root() -> Path:
@@ -1939,6 +2026,19 @@ def run_goal_transition(args: Any) -> dict[str, Any]:
         )
     lock_path = _semantic_attempt_lock_path(request, owner)
     with _attempt_lock(lock_path):
+        attempt_path = _resolve_semantic_attempt_path(
+            request,
+            owner,
+            attempt_path,
+        )
+        if {receipt_path.resolve(), attempt_path.resolve()} & input_paths:
+            raise runtime.ExternalCodexReturnError(
+                "Goal lifecycle receipt and anchored attempt must be distinct from all input artifacts"
+            )
+        if receipt_path.resolve() == attempt_path.resolve():
+            raise runtime.ExternalCodexReturnError(
+                "Goal lifecycle receipt must be distinct from its anchored attempt"
+            )
         endpoint, resolution = runtime.discover_app_server_socket(owner)
         if receipt_path.exists():
             existing, raw = runtime._load_json_file(
@@ -2007,6 +2107,10 @@ def run_goal_transition(args: Any) -> dict[str, Any]:
             attempt_path=attempt_path,
             attempt=attempt,
             endpoint_is_owner_resolved=True,
+            artifact_snapshots=(
+                (request_path, request_bytes, "Goal lifecycle request"),
+                (decision_path, decision_bytes, "Goal lifecycle decision"),
+            ),
         )
         receipt["receipt_ref"] = str(receipt_path.resolve())
         receipt["transport"]["resolution"] = resolution

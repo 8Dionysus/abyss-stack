@@ -114,10 +114,16 @@ summary, and rejects a receipt whose path identity is missing or changed. A
 concurrent SDK regression drives two callers through different durable
 attempt paths, and a CLI regression drives the same accepted request through
 different receipt paths. Both prove that the owner/idempotency-derived lock
-permits exactly one native Goal mutation while the other caller takes the
-read-only already-desired path. A dynamic-endpoint regression additionally
+permits exactly one native Goal mutation while the other caller resolves the
+same proof-recorded attempt. A later-state-reversal regression proves that the
+same idempotency key resolves that original attempt from its protected
+semantic anchor and refuses a second mutation even through a different
+receipt. A dynamic-endpoint regression additionally
 returns different owner-proved app-server paths to the two callers and proves
-that endpoint discovery remains inside the same stable semantic lock. Separate
+that endpoint discovery remains inside the same stable semantic lock while the
+attempt retains its historical endpoint evidence. Separate CLI regressions
+rewrite the request and decision after the pre-read and prove both are
+reasserted before dispatch with zero mutations. Separate
 programmatic regressions rewrite the owner after the precondition read and
 after the authoritative post-read: the former proves no mutation is sent, and
 the latter proves the persisted attempt remains bound to the original owner
@@ -128,7 +134,9 @@ an exact active owner-bound Goal uses the current public `thread/goal/set`
 surface once, then proves the returned identity, status, request, precondition,
 and fresh post-read before a receipt is published. Non-active Goals are refused
 without a lifecycle mutation, and a completed pause receipt replays without a
-second app-server call. The suite also forces dispatch-marker, transition-proof,
+second app-server call. Concurrent legacy callers using different receipt
+paths serialize on the qualified Goal identity and issue exactly one native
+mutation. The suite also forces dispatch-marker, transition-proof,
 and receipt publication failure at their respective boundaries and verifies
 that a pre-send reservation fails closed while a matching post-send dispatch
 marker is reconciled through a read-only Goal read without a second

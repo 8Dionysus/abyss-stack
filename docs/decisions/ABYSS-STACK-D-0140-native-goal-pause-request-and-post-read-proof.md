@@ -45,6 +45,18 @@ marker and fresh post-read; never issue a second lifecycle set. Historical
 atomic proof records remain readable only for migration/replay and do not
 authorize a new mutation.
 
+The qualified owner identity and accepted idempotency key also own a protected
+runtime anchor for the first durable attempt path. Alternate caller-selected
+receipt paths resolve that anchor instead of creating fresh lifecycle state;
+if another accepted transition later restores the original Goal state, a
+retry of the old idempotency key still finds the completed attempt and refuses
+a second mutation. Dynamic endpoint rebinding may change the fresh transport
+coordinate but does not rewrite the attempt's historical endpoint evidence.
+The CLI reasserts the original request, decision, and owner bytes immediately
+before dispatch. The legacy pause compatibility route lacks the typed
+idempotency artifact, so it serializes by qualified Goal identity across
+receipt paths and fails closed rather than issuing a concurrent duplicate.
+
 Pause evidence remains separate from transport ambiguity, wake delivery,
 semantic acceptance, owner acceptance, holder closure, and Goal completion.
 The completed pause receipt retains the raw mutation response and raw post-read
@@ -71,6 +83,9 @@ route.
   contour and produce a truthful observable proof.
 - Positive: a lost response can be reconciled without replaying the mutation
   when the durable dispatch marker proves that the exact request was issued.
+- Positive: alternate receipt paths, endpoint rebinding, later state reversal,
+  and concurrent legacy pause callers cannot cause a duplicate native set for
+  the same admitted contour.
 - Tradeoff: without a protocol CAS/version field, a receipt proves the bound
   request and post-read observation, not server-side compare-and-set causality.
 - Follow-up: live pause, root wake, holder closure, owner acceptance, and

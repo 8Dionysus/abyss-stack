@@ -160,11 +160,16 @@ and replay only through their matching legacy wake reservation. A retry after a 
   receipt records response availability and does not claim unsupported
   server-side CAS or mutation causality. Executed receipts retain and
   revalidate the authoritative result response, require the mutation attempt
-  sidecar, and bind the file-backed receipt to its canonical path;
+  sidecar, and bind the file-backed receipt to its canonical path. A protected
+  owner/idempotency anchor retains the first attempt path across alternate
+  receipt paths and later reverse transitions; the CLI reasserts request,
+  decision, and owner bytes immediately before mutation;
 - keeps `aoa-external-codex-return pause` as a backwards-compatible legacy
   pause projection. It remains a mutating compatibility entrypoint when no
   completed receipt exists, reserving the exact precondition and issuing one
   native `thread/goal/set`; replay of a completed receipt is read-only. The
+  qualified Goal identity, rather than the caller-selected receipt path, owns
+  the legacy pause lock. The
   current public `ThreadGoalSetParams` surface exposes the native
   `thread/goal/set` mutation without a CAS/version field, so this route binds
   the exact request, optional returned Goal response with raw bytes, and

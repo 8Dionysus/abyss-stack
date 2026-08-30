@@ -4,8 +4,11 @@ import fcntl
 import importlib.util
 import json
 import os
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 from jsonschema import ValidationError, validate
@@ -18,6 +21,16 @@ SPEC = importlib.util.spec_from_file_location(
 assert SPEC is not None and SPEC.loader is not None
 MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
+
+
+@pytest.fixture(autouse=True)
+def _isolated_pause_lock_root(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pause-locks"
+    root.mkdir(mode=0o700)
+    monkeypatch.setattr(MODULE, "_pause_attempt_lock_root", lambda: root)
 
 
 def owner(*, goal: str, thread: str, endpoint: str | None = None) -> dict[str, object]:
@@ -877,6 +890,99 @@ def test_run_pause_reserves_and_replays_without_second_transport_mutation(
     fake.goal_get_extra = {"server_metadata": {"revision": 2}}
     second = MODULE.run_pause(args)
     assert second == first
+
+
+def test_legacy_pause_serializes_same_goal_across_receipt_paths(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    owner_path = tmp_path / "pause-owner-concurrent.json"
+    endpoint = tmp_path / "pause-concurrent.sock"
+    owner_value = pause_owner(
+        goal="goal-pause-concurrent",
+        thread="thread-pause-concurrent",
+        endpoint=f"unix:{endpoint}",
+    )
+    owner_path.write_text(
+        json.dumps(owner_value, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    fake = FakeRpc(
+        endpoint,
+        active_turn=None,
+        goal_status="active",
+        goal_set_status="paused",
+        thread_id="thread-pause-concurrent",
+    )
+    monkeypatch.setattr(
+        MODULE,
+        "discover_app_server_socket",
+        lambda _owner: (endpoint, "explicit-endpoint"),
+    )
+    pause_impl = MODULE.pause_goal
+
+    def pause_once(
+        owner_value: dict[str, object],
+        owner_file: Path,
+        target: Path,
+        *,
+        owner_bytes: bytes,
+        reservation_path: Path | None = None,
+        reservation: dict[str, object] | None = None,
+    ) -> dict[str, object]:
+        return pause_impl(
+            owner_value,
+            owner_file,
+            target,
+            owner_bytes=owner_bytes,
+            reservation_path=reservation_path,
+            reservation=reservation,
+            rpc_factory=lambda _path: fake,
+        )
+
+    monkeypatch.setattr(MODULE, "pause_goal", pause_once)
+    mutation_entered = threading.Event()
+    release_mutation = threading.Event()
+    callers_ready = threading.Barrier(2)
+    original_call = fake.call
+
+    def blocking_call(
+        method: str, params: dict[str, object] | None = None
+    ) -> dict[str, object]:
+        if method == "thread/goal/set":
+            mutation_entered.set()
+            assert release_mutation.wait(timeout=5)
+        return original_call(method, params)
+
+    fake.call = blocking_call  # type: ignore[method-assign]
+    invocations = [
+        SimpleNamespace(
+            pause_owner=str(owner_path),
+            pause_receipt=str(tmp_path / f"pause-concurrent-{index}.json"),
+        )
+        for index in range(2)
+    ]
+
+    def invoke(args: SimpleNamespace) -> dict[str, Any]:
+        callers_ready.wait(timeout=5)
+        return MODULE.run_pause(args)
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        futures = [executor.submit(invoke, args) for args in invocations]
+        assert mutation_entered.wait(timeout=5)
+        assert all(not future.done() for future in futures)
+        release_mutation.set()
+        outcomes: list[dict[str, Any] | Exception] = []
+        for future in futures:
+            try:
+                outcomes.append(future.result(timeout=5))
+            except Exception as exc:  # noqa: BLE001 - asserted below
+                outcomes.append(exc)
+
+    assert sum(isinstance(value, dict) for value in outcomes) == 1
+    assert sum(
+        isinstance(value, MODULE.ExternalCodexReturnError) for value in outcomes
+    ) == 1
+    assert [method for method, _params in fake.calls].count("thread/goal/set") == 1
 
 
 def test_run_pause_reconciles_reserved_mutation_after_receipt_publication_failure(
