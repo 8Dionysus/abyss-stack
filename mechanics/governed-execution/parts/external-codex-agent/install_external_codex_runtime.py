@@ -44,6 +44,7 @@ DEFAULT_BIN_DIR = Path.home() / ".local/bin"
 RUNTIME_FILES = (
     "bind_external_actor_launch.py",
     "external_codex_agent.py",
+    "external_codex_continuity_capsule.py",
     "external_codex_nested_evidence.py",
     "external_codex_landing_effect.py",
     "external_codex_mount_launcher.py",

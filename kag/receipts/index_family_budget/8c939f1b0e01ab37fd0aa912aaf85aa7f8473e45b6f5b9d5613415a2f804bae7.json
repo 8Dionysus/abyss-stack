@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 23834091,
+  "allowed_tracked_bytes": 40174642,
+  "approved_by": "repository-owner",
+  "base_ref": "64bdae20b3a5c885ca75755188b04803b587ab50",
+  "changed_generated_bytes": 23834091,
+  "changed_generated_files": 219,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "8c939f1b0e01ab37fd0aa912aaf85aa7f8473e45b6f5b9d5613415a2f804bae7",
+  "reason": "Refresh the exact abyss-stack owner family for provider-neutral continuity capsule admission, bounded private-tail reinjection, and typed resume-drift closeout. Authorize only this measured digest-bound generated-family delta; do not raise standing budgets or claim activation, runtime outcome, eval verdict, closeout, or acceptance.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 40174642,
+  "tracked_bytes_max": 24117248
+}

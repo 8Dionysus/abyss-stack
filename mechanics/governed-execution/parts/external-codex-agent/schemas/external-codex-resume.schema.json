@@ -13,6 +13,11 @@
     "reason": {"enum": ["checkpoint_continue", "process_death_recovery", "capacity_recovery", "bounded_repair", "review_followup"]},
     "instruction": {"type": "string", "minLength": 1},
     "previous_result_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "continuity_capsule": {
+      "type": "object",
+      "minProperties": 5,
+      "description": "Validated by the sibling external-codex-continuity-capsule-reinjection.schema.json contract before admission."
+    },
     "evidence_inputs": {
       "type": "array",
       "minItems": 1,

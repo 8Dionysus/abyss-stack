@@ -37,6 +37,11 @@ Tracking starts with the community-docs baseline for this repository.
   `multi_agent`, request cardinality and metadata are bounded, normalized
   duplicate paths are rejected, and mismatched ABI or ambiguous built-in
   transport values fail closed.
+- Admit an exact `aoa-session-memory` continuity-capsule pair on external Codex
+  resume, preserve the verbatim protected tail only in the private runtime
+  view, project one bounded non-duplicated model-visible continuation payload,
+  and record a tail-free content-addressed reinjection event. This source seam
+  remains default-off and does not claim a live compaction or eval verdict.
 - Harden governed landing-effect admission with an independent artifact-byte
   digest, descriptor-bound bounded no-follow reads, duplicate-member rejection,
   complete Git ref validation, effect-specific target constraints, and a

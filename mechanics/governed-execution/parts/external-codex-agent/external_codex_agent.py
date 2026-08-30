@@ -71,6 +71,12 @@ from external_codex_nested_evidence import (  # noqa: E402
     build_nested_evidence_namespace,
     nested_evidence_namespace_digest,
 )
+from external_codex_continuity_capsule import (  # noqa: E402
+    ContinuityCapsuleReinjectionError,
+    model_reinjection_payload,
+    reinjection_event_payload,
+    validate_continuity_capsule_binding,
+)
 from external_codex_landing_effect import (  # noqa: E402
     LANDING_EFFECTS as _LANDING_EFFECTS,
     LandingEffectGrantError as _LandingEffectGrantError,
@@ -104,6 +110,9 @@ RESULT_EVIDENCE_CLOSURE_SCHEMA_PATH = (
     SCHEMA_ROOT / "external-codex-result-evidence-closure.schema.json"
 )
 RESUME_SCHEMA_PATH = SCHEMA_ROOT / "external-codex-resume.schema.json"
+CONTINUITY_CAPSULE_REINJECTION_SCHEMA_PATH = (
+    SCHEMA_ROOT / "external-codex-continuity-capsule-reinjection.schema.json"
+)
 STATE_SCHEMA_PATH = SCHEMA_ROOT / "external-codex-state.schema.json"
 OWNER_ADMISSION_GENERATION_SCHEMA_PATH = (
     SCHEMA_ROOT / "external-codex-owner-admission-generation.schema.json"
@@ -11825,6 +11834,12 @@ class ExternalCodexRuntime:
             else None
         )
         if isinstance(resume_prompt_payload, dict) and isinstance(
+            resume_prompt_payload.get("continuity_capsule"), dict
+        ):
+            resume_prompt_payload["continuity_capsule"] = model_reinjection_payload(
+                resume_prompt_payload["continuity_capsule"]
+            )
+        if isinstance(resume_prompt_payload, dict) and isinstance(
             resume_prompt_payload.get("evidence_inputs"), list
         ):
             resume_prompt_payload["evidence_inputs"] = [
@@ -12213,6 +12228,43 @@ Runtime session identity: {state["session_id"]}
             launch, _, binding, task, realization, role_raw = (
                 self._materialized_payloads(state)
             )
+            continuity_capsule = None
+            if mode == "resume":
+                continuity_capsule_input = (
+                    resume_payload.get("continuity_capsule")
+                    if isinstance(resume_payload, Mapping)
+                    else None
+                )
+                bound_capsule_ref = getattr(
+                    binding, "continuity_capsule_ref", None
+                )
+                expected_capsule_ref = (
+                    bound_capsule_ref.model_dump(mode="json")
+                    if bound_capsule_ref is not None
+                    else None
+                )
+                try:
+                    continuity_capsule = validate_continuity_capsule_binding(
+                        continuity_capsule_input,
+                        expected_ref=expected_capsule_ref,
+                    )
+                except ContinuityCapsuleReinjectionError as exc:
+                    raise ExternalCodexRuntimeError(
+                        "resume_continuity_capsule_invalid",
+                        str(exc),
+                    ) from exc
+                if continuity_capsule is not None:
+                    self._append_event(
+                        state,
+                        event_type=(
+                            "external_agent.continuity_capsule_reinjected"
+                        ),
+                        payload=reinjection_event_payload(continuity_capsule),
+                        attempt_id=attempt_id,
+                        thread_id=str(state["thread_id"]),
+                        significance="checkpoint",
+                    )
+                    self._save_state(state)
             workspace_manifest_input_id = str(launch["workspace_manifest_input_id"])
             controller_inputs = state.get(
                 "controller_materialized_task_inputs",
@@ -14672,6 +14724,13 @@ Runtime session identity: {state["session_id"]}
     def resume(self, session_id: str, resume_path: str | Path) -> dict[str, Any]:
         resume = load_json(Path(resume_path), label="resume request")
         validate_json(resume, RESUME_SCHEMA_PATH, label="resume request")
+        continuity_capsule_input = resume.get("continuity_capsule")
+        if continuity_capsule_input is not None:
+            validate_json(
+                continuity_capsule_input,
+                CONTINUITY_CAPSULE_REINJECTION_SCHEMA_PATH,
+                label="continuity capsule reinjection",
+            )
         with self._lock(session_id):
             state = self._load_state(session_id)
             if state["schema_version"] not in PROJECTION_STATE_SCHEMA_VERSIONS:

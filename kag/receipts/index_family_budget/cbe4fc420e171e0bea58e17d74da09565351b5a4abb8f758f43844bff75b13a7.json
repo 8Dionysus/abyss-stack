@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 26403048,
+  "allowed_tracked_bytes": 40180432,
+  "approved_by": "repository-owner",
+  "base_ref": "64bdae20b3a5c885ca75755188b04803b587ab50",
+  "changed_generated_bytes": 26403048,
+  "changed_generated_files": 248,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "cbe4fc420e171e0bea58e17d74da09565351b5a4abb8f758f43844bff75b13a7",
+  "reason": "Refresh D3 continuity capsule owner family after current-head review repair",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 40180432,
+  "tracked_bytes_max": 24117248
+}
