@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/8Dionysus/abyss-stack/main/mechanics/governed-execution/parts/ephemeral-worker/schemas/ephemeral-read-worker-result.schema.json",
+  "title": "abyss-stack ephemeral read worker result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "request_id",
+    "delegation_class",
+    "parent_holder_ref",
+    "records",
+    "economy_observation",
+    "actual_effects",
+    "responsibility_posture",
+    "role_formation",
+    "durable_responsibility_transfer",
+    "result_digest"
+  ],
+  "properties": {
+    "schema_version": {"const": "abyss_ephemeral_read_result_v1"},
+    "request_id": {"type": "string", "minLength": 1, "maxLength": 4096},
+    "delegation_class": {"const": "ephemeral_read_worker_v1"},
+    "parent_holder_ref": {"$ref": "#/$defs/contentRef"},
+    "records": {"type": "array", "minItems": 1, "maxItems": 1024, "items": {"$ref": "#/$defs/record"}},
+    "economy_observation": {"$ref": "#/$defs/observation"},
+    "actual_effects": {"type": "array", "const": ["read_only"]},
+    "responsibility_posture": {"const": "parent_retained"},
+    "role_formation": {"const": false},
+    "durable_responsibility_transfer": {"const": false},
+    "result_digest": {"$ref": "#/$defs/digest"}
+  },
+  "$defs": {
+    "digest": {"type": "string", "maxLength": 71, "pattern": "^sha256:[0-9a-f]{64}$"},
+    "contentRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["object_id", "owner_repo", "schema_version", "digest"],
+      "properties": {
+        "object_id": {"type": "string", "minLength": 1, "maxLength": 4096},
+        "owner_repo": {"type": "string", "minLength": 1, "maxLength": 4096},
+        "schema_version": {"type": "string", "minLength": 1, "maxLength": 4096},
+        "digest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifact_ref", "digest", "bytes", "content_base64"],
+      "properties": {
+        "artifact_ref": {"type": "string", "minLength": 1, "maxLength": 4096},
+        "digest": {"$ref": "#/$defs/digest"},
+        "bytes": {"type": "integer", "minimum": 0, "maximum": 16777216},
+        "content_base64": {
+          "type": "string",
+          "maxLength": 16777216,
+          "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?(?![\\s\\S])"
+        }
+      }
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "input_bytes", "output_bytes", "active_wall_seconds", "turn_count", "executed_commands"],
+      "properties": {
+        "schema_version": {"const": "abyss_delegation_economy_observation_v1"},
+        "input_bytes": {"type": "integer", "minimum": 0, "maximum": 16777216},
+        "output_bytes": {"type": "integer", "minimum": 0, "maximum": 16777216},
+        "active_wall_seconds": {"type": "number", "minimum": 0, "maximum": 31536000},
+        "turn_count": {"const": 1},
+        "executed_commands": {"const": 0}
+      }
+    }
+  }
+}

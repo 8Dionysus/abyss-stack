@@ -297,6 +297,15 @@ EXPECTED_ACTIVE_SCHEMA_PATHS = {
         "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-workspace-manifest.schema.json"
     ),
     Path(
+        "mechanics/governed-execution/parts/ephemeral-worker/schemas/delegation-adapter-profile.schema.json"
+    ),
+    Path(
+        "mechanics/governed-execution/parts/ephemeral-worker/schemas/ephemeral-read-worker-request.schema.json"
+    ),
+    Path(
+        "mechanics/governed-execution/parts/ephemeral-worker/schemas/ephemeral-read-worker-result.schema.json"
+    ),
+    Path(
         "mechanics/governed-execution/parts/return-policy/schemas/runtime-return-event.schema.json"
     ),
     Path(

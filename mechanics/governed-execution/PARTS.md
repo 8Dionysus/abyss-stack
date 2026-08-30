@@ -11,6 +11,7 @@
 | Candidate exports | `parts/candidate-exports/` | `scripts/aoa-export-memo-candidate`, `scripts/aoa-export-runtime-evidence-selection`, `scripts/aoa-export-artifact-hook-candidate`, part-local export backends, candidate schemas, examples, and focused tests |
 | Local worker path | `parts/local-worker-path/` | `mechanics/governed-execution/parts/local-worker-path/docs/CONTEXT_BUDGET_POLICY.md`, `mechanics/inference-pilots/parts/langgraph-pilot/docs/LANGGRAPH_PILOT.md`, `mechanics/inference-pilots/PROVENANCE.md` |
 | Programmatic tool execution | `parts/programmatic-tool-execution/` | provider-neutral SDK request/observation runtime seam, Codex host adapter, local-model substrate adapter, and validated observation handoff |
+| Ephemeral worker | `parts/ephemeral-worker/` | default-off `ephemeral_read_worker_v1` request/result contracts, bounded read implementation, and Codex/local-provider common-ABI adapter profiles |
 
 Keep these parts together: if governed execution request, policy, canary, or
 review behavior changes, update schemas, scripts, validators, and tests in the
