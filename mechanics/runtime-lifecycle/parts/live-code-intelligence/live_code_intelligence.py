@@ -170,6 +170,9 @@ MACHINE_HEALTH_MAX_AGE_SECONDS = 15 * 60
 LSP_MAX_HEADER_LINE_BYTES = 16 * 1024
 LSP_MAX_HEADER_BYTES = 64 * 1024
 LSP_MAX_HEADER_LINES = 32
+# Bubblewrap is a machine-owned prerequisite of the immutable LSP launch
+# boundary.  Do not resolve it through caller-controlled PATH.
+MACHINE_BUBBLEWRAP_PATH = Path("/usr/bin/bwrap")
 _PERSISTED_MACHINE_DYNAMIC_KEYS = frozenset(
     {
         "installation",
@@ -3164,18 +3167,33 @@ class ManagedLspSession:
 
     @staticmethod
     def _launch_namespace_binary() -> str:
-        """Return the owner-provided namespace launcher or fail closed."""
+        """Return the verified machine-owned namespace launcher."""
 
         if os.name != "posix":
             raise LiveCodeIntelligenceError(
                 "LSP runtime snapshot requires a read-only launch namespace"
             )
-        launcher = shutil.which("bwrap")
-        if not launcher:
-            raise LiveCodeIntelligenceError(
-                "LSP runtime snapshot requires bubblewrap for immutable dependencies"
+        try:
+            descriptor, metadata = _open_regular_descriptor(
+                MACHINE_BUBBLEWRAP_PATH,
+                "machine-owned bubblewrap",
             )
-        return launcher
+        except LiveCodeIntelligenceError as exc:
+            raise LiveCodeIntelligenceError(
+                "LSP runtime snapshot requires the fixed machine-owned bubblewrap binary"
+            ) from exc
+        try:
+            if metadata.st_uid != 0 or metadata.st_mode & 0o022:
+                raise LiveCodeIntelligenceError(
+                    "machine-owned bubblewrap must be root-owned and not writable"
+                )
+            if not metadata.st_mode & 0o111:
+                raise LiveCodeIntelligenceError(
+                    "machine-owned bubblewrap must be executable"
+                )
+        finally:
+            os.close(descriptor)
+        return str(MACHINE_BUBBLEWRAP_PATH)
 
     @staticmethod
     def _snapshot_namespace_directories(
@@ -3516,6 +3534,9 @@ class ManagedLspSession:
                 # Retire that generation before preparing its replacement so
                 # retries cannot leak runtime storage or descriptors.
                 self._terminate_process()
+            # Health is generation-specific.  Clear the previous generation's
+            # success before exposing a newly running child to observers.
+            self._last_good_at = None
             self._generation += 1
             binding = self._prepare_launch_binding()
             try:
@@ -5473,7 +5494,54 @@ class LiveCodeIntelligenceRuntime:
             "full_rebuild": invalidation.get("full_rebuild"),
         }:
             return False
+        if not self._persisted_observations_match_source(
+            source_epoch=source_epoch,
+            files=files,
+        ):
+            return False
         return True
+
+    def _persisted_observations_match_source(
+        self,
+        *,
+        source_epoch: str,
+        files: Mapping[str, Mapping[str, Any]],
+    ) -> bool:
+        """Re-derive persisted rows from the epoch-bound source before use.
+
+        State files are runtime outputs rather than signed artifacts.  Their
+        shape and content digests therefore cannot authenticate observations:
+        a local writer could replace a symbol or relation while preserving
+        every structural field and the recorded epoch.  Re-reading and
+        parsing the current source binds every served observation to the
+        actual bytes represented by that epoch.
+        """
+
+        try:
+            scanned = self._scan()
+            if self._source_epoch(scanned) != source_epoch:
+                # A valid historical current/last-good snapshot is allowed to
+                # remain available while the working tree has moved on; the
+                # refresh transaction will bind the next candidate to the new
+                # epoch.  There is no same-epoch source against which to
+                # rederive this historical observation here.
+                return True
+            parsed = self._run_provider_work_queue(set(scanned), scanned)
+            expected = {
+                path: {
+                    key: copy.deepcopy(value)
+                    for key, value in record.items()
+                    if key not in {"content", "scan_diagnostics"}
+                }
+                for path, record in parsed.items()
+            }
+            actual = {
+                path: copy.deepcopy(dict(record))
+                for path, record in files.items()
+            }
+            return actual == expected
+        except Exception:
+            return False
 
     def _state_identity_matches_config(self, state: Mapping[str, Any]) -> bool:
         if not self._persisted_state_is_well_formed(state):
@@ -6051,24 +6119,20 @@ class LiveCodeIntelligenceRuntime:
                         "promotion": "none",
                     },
                 )
-            except Exception as exc:
+            except Exception:
                 self._restore_json_snapshot(operation_path, previous_operation)
-                if (
-                    isinstance(exc, LiveCodeIntelligenceError)
-                    and str(exc).startswith("source changed during refresh: ")
-                ):
-                    try:
-                        self._write_operation_receipt(
-                            operation="canary",
-                            state="failed",
-                            source_epoch=self._refresh_attempt_source_epoch,
-                            previous_source_epoch=current_epoch,
-                            target_source_epoch=None,
-                        )
-                    except Exception as receipt_exc:
-                        raise LiveCodeIntelligenceError(
-                            "source changed during canary and failed lifecycle receipt could not be recorded"
-                        ) from receipt_exc
+                try:
+                    self._write_operation_receipt(
+                        operation="canary",
+                        state="failed",
+                        source_epoch=self._refresh_attempt_source_epoch or current_epoch,
+                        previous_source_epoch=current_epoch,
+                        target_source_epoch=None,
+                    )
+                except Exception as receipt_exc:
+                    raise LiveCodeIntelligenceError(
+                        "canary failed and failed lifecycle receipt could not be recorded"
+                    ) from receipt_exc
                 raise
             finally:
                 self._refresh_attempt_source_epoch = None

@@ -720,6 +720,31 @@ class LiveCodeIntelligenceRuntimeTests(unittest.TestCase):
         session._process = None
         session._cleanup_launch_snapshot()
 
+    def test_lsp_namespace_launcher_ignores_caller_path(self) -> None:
+        attacker = self.root / "bwrap"
+        attacker.write_text("#!/bin/sh\n", encoding="utf-8")
+        attacker.chmod(0o755)
+        with mock.patch(
+            "live_code_intelligence.shutil.which",
+            return_value=str(attacker),
+        ):
+            self.assertEqual(
+                str(live_code_intelligence.MACHINE_BUBBLEWRAP_PATH),
+                ManagedLspSession._launch_namespace_binary(),
+            )
+
+        attacker.chmod(0o777)
+        with mock.patch.object(
+            live_code_intelligence,
+            "MACHINE_BUBBLEWRAP_PATH",
+            attacker,
+        ):
+            with self.assertRaisesRegex(
+                LiveCodeIntelligenceError,
+                "root-owned and not writable",
+            ):
+                ManagedLspSession._launch_namespace_binary()
+
     def test_lsp_reader_replies_to_string_server_requests(self) -> None:
         session = object.__new__(ManagedLspSession)
         process = mock.Mock()
@@ -963,16 +988,23 @@ class LiveCodeIntelligenceRuntimeTests(unittest.TestCase):
         old_process.stdout = BytesIO()
         session._process = old_process
         session._launch_snapshot_root = old_snapshot
+        session._last_good_at = "old-generation"
         replacement = mock.Mock()
         replacement.poll.return_value = None
         replacement.stdin = BytesIO()
         replacement.stdout = BytesIO()
+
+        def initialize(*args: object, **kwargs: object) -> dict[str, object]:
+            del args, kwargs
+            self.assertEqual("starting", session.snapshot()["state"])
+            return {"result": {}}
+
         with (
             mock.patch(
                 "live_code_intelligence.subprocess.Popen",
                 return_value=replacement,
             ),
-            mock.patch.object(session, "request", return_value={"result": {}}),
+            mock.patch.object(session, "request", side_effect=initialize),
             mock.patch.object(session, "notify"),
         ):
             session.start(root_uri=self.source.as_uri())
@@ -980,6 +1012,7 @@ class LiveCodeIntelligenceRuntimeTests(unittest.TestCase):
         self.assertFalse(old_snapshot.exists())
         self.assertTrue(old_process.stdin.closed)
         self.assertTrue(old_process.stdout.closed)
+        self.assertEqual("observed", session.snapshot()["state"])
         session._process = None
         session._cleanup_launch_snapshot()
 
@@ -2247,6 +2280,32 @@ class LiveCodeIntelligenceRuntimeTests(unittest.TestCase):
         self.runtime.current_path.write_text(json.dumps(missing), encoding="utf-8")
         self.assertEqual(self.runtime.status()["state"], "unavailable")
 
+    def test_persisted_observations_are_rederived_from_source_bytes(self) -> None:
+        self.write_source(
+            "module.py",
+            "def stable(value):\n    return value\n",
+        )
+        state = self.runtime.refresh()
+        tampered = json.loads(json.dumps(state))
+        reference = next(
+            occurrence
+            for occurrence in tampered["files"]["module.py"]["observation"][
+                "occurrences"
+            ]
+            if occurrence["kind"] == "reference"
+        )
+        reference["name"] = "forged"
+        tampered["files"]["module.py"]["observation"]["occurrences"].sort(
+            key=lambda item: (item["location"], item["kind"], item["name"])
+        )
+        self.runtime.current_path.write_text(json.dumps(tampered), encoding="utf-8")
+
+        self.assertEqual(self.runtime.status()["state"], "unavailable")
+        self.assertEqual(
+            [],
+            self.runtime.definitions("forged")["results"],
+        )
+
     def test_persisted_authenticated_summary_must_match_capture(self) -> None:
         self.write_source("module.py", "def stable(): return 1\n")
         evidence = self.machine_evidence(fresh_health=True)
@@ -2435,6 +2494,29 @@ class LiveCodeIntelligenceRuntimeTests(unittest.TestCase):
         self.assertNotEqual(first_epoch, failed_receipt["source_epoch"])
         self.assertEqual(first_epoch, failed_receipt["previous_source_epoch"])
         self.assertIsNone(failed_receipt["target_source_epoch"])
+
+    def test_canary_scan_failure_records_failed_operation_receipt(self) -> None:
+        self.write_source("module.py", "VALUE = 1\n")
+        first = self.runtime.refresh()
+        first_epoch = first["source"]["source_epoch"]
+        current_before = self.runtime.current_path.read_bytes()
+
+        with mock.patch.object(
+            self.runtime,
+            "_scan",
+            side_effect=PermissionError("source tree disappeared"),
+        ):
+            with self.assertRaisesRegex(PermissionError, "source tree disappeared"):
+                self.runtime.canary()
+
+        failed_receipt = self.read_json(
+            self.runtime.operation_receipts_path / "canary.json"
+        )
+        self.assertEqual("failed", failed_receipt["state"])
+        self.assertEqual(first_epoch, failed_receipt["source_epoch"])
+        self.assertEqual(first_epoch, failed_receipt["previous_source_epoch"])
+        self.assertIsNone(failed_receipt["target_source_epoch"])
+        self.assertEqual(current_before, self.runtime.current_path.read_bytes())
 
     def test_rollback_receipt_failure_restores_degraded_candidate(self) -> None:
         self.write_source("module.py", "VALUE = 1\n")
