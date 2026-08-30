@@ -176,6 +176,20 @@ def test_result_intake_bounds_serialized_packet_before_parse() -> None:
         validate_ephemeral_read_result(b" " * 65, max_transport_bytes=64)
 
 
+def test_result_intake_bounds_text_before_full_utf8_allocation() -> None:
+    class EncodeForbidden(str):
+        def encode(self, *_args: object, **_kwargs: object) -> bytes:
+            raise AssertionError("oversized text must be rejected before encoding")
+
+    with pytest.raises(EphemeralWorkerError, match="before parse"):
+        validate_ephemeral_read_result(
+            EncodeForbidden("x" * 65), max_transport_bytes=64
+        )
+
+    with pytest.raises(EphemeralWorkerError, match="before parse"):
+        validate_ephemeral_read_result("😀" * 20, max_transport_bytes=64)
+
+
 def test_result_intake_bounds_mapped_base64_before_decode(tmp_path: Path) -> None:
     content = b"mapped transport ceiling"
     path = tmp_path / "input.txt"

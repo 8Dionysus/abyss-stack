@@ -638,12 +638,18 @@ def validate_ephemeral_read_result(
         except (UnicodeDecodeError, ValueError, RecursionError) as exc:
             raise EphemeralWorkerError("result is not canonical JSON input") from exc
     elif isinstance(payload, str):
-        try:
-            encoded = payload.encode("utf-8")
-        except UnicodeEncodeError as exc:
-            raise EphemeralWorkerError("result is not UTF-8 encodable") from exc
-        if len(encoded) > transport_ceiling:
+        if len(payload) > transport_ceiling:
             raise EphemeralWorkerError("result exceeds max_transport_bytes before parse")
+        encoded_bytes = 0
+        for offset in range(0, len(payload), 4096):
+            try:
+                encoded_bytes += len(payload[offset : offset + 4096].encode("utf-8"))
+            except UnicodeEncodeError as exc:
+                raise EphemeralWorkerError("result is not UTF-8 encodable") from exc
+            if encoded_bytes > transport_ceiling:
+                raise EphemeralWorkerError(
+                    "result exceeds max_transport_bytes before parse"
+                )
         try:
             candidate = json.loads(payload)
         except (ValueError, RecursionError) as exc:
