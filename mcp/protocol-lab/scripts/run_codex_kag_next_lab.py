@@ -55,6 +55,7 @@ MCP_SDK_SOURCE_REVISIONS = {
     "2.0.0": "6f69a3758ebf2ee55ce050f58b470ce11af71133",
     "2.1.1": "0921d94a74db900dccd2d534842aa7b6160542d2",
 }
+EXPECTED_PYTHON_MCP_ARTIFACT_DIGEST = "sha256:1ef71b1a3cfb3daba29b61d9f280896b35bdc1038474285cc8295071418b01e5"
 
 
 def _utc_now() -> str:
@@ -375,6 +376,54 @@ def _deployment_sdk_identity(path: Path) -> tuple[str, str]:
         raise RuntimeError("the live fleet receipt is not a passing deployment observation")
     if MCP_SDK_SOURCE_REVISIONS.get(sdk) != source_revision:
         raise RuntimeError("the live fleet receipt returned an unattested SDK identity")
+    if sdk == "2.1.1":
+        if payload.get("mcp_sdk_artifact_digest") != EXPECTED_PYTHON_MCP_ARTIFACT_DIGEST:
+            raise RuntimeError(
+                "the MCP 2.1.1 live fleet receipt lacks the reviewed artifact digest"
+            )
+        servers = payload.get("servers")
+        if "servers" in payload:
+            if not isinstance(servers, list) or len(servers) != 11:
+                raise RuntimeError(
+                    "the MCP 2.1.1 live fleet receipt lacks all eleven unit attestations"
+                )
+            for row in servers:
+                attestation = row.get("sdk_attestation") if isinstance(row, dict) else None
+                if not (
+                    isinstance(row, dict)
+                    and isinstance(attestation, dict)
+                    and attestation.get("state") == "passed"
+                    and attestation.get("checked_before_and_after_probe") is True
+                    and row.get("mcp_sdk") == sdk
+                    and row.get("mcp_sdk_source_revision") == source_revision
+                    and row.get("mcp_sdk_artifact_digest")
+                    == EXPECTED_PYTHON_MCP_ARTIFACT_DIGEST
+                ):
+                    raise RuntimeError(
+                        "the MCP 2.1.1 live fleet receipt has an incomplete unit attestation"
+                    )
+            summary = payload.get("sdk_attestation")
+            if not (
+                isinstance(summary, dict)
+                and summary.get("scope") == "every production read unit"
+                and summary.get("unit_count") == 11
+                and summary.get("attested_unit_count") == 11
+                and summary.get("unique_identities") == 1
+            ):
+                raise RuntimeError(
+                    "the MCP 2.1.1 live fleet receipt has an incomplete fleet attestation"
+                )
+        else:
+            read_fleet = payload.get("read_fleet")
+            if not (
+                isinstance(read_fleet, dict)
+                and read_fleet.get("sdk_identity_attested") is True
+                and read_fleet.get("sdk_identity_count") == 11
+                and read_fleet.get("sdk_identity_unique_count") == 1
+            ):
+                raise RuntimeError(
+                    "the MCP 2.1.1 normalized fleet receipt lacks per-unit SDK attestation"
+                )
     return sdk, source_revision
 
 

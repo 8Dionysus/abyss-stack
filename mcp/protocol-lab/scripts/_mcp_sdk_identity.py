@@ -311,3 +311,86 @@ def installed_mcp_identity(sdk_root: Path) -> dict[str, str]:
         "commit": source_revision,
         "artifact_digest": f"sha256:{hashlib.sha256(combined).hexdigest()}",
     }
+
+
+def _distribution_package_digest(
+    distribution_metadata: object,
+    *,
+    distribution_name: str,
+    module_name: str,
+    sdk_version: str,
+) -> str:
+    """Hash one regular installed package and bind it to its distribution."""
+
+    package_root = _installed_package_root(module_name)
+    site_packages = Path(getattr(distribution_metadata, "_path")).parent.resolve()
+    if not _is_under(package_root, site_packages):
+        raise RuntimeError(
+            f"the imported {module_name} package is outside its attested "
+            f"{distribution_name} distribution: {package_root}"
+        )
+    return _distribution_record_digest(
+        distribution_metadata,
+        distribution_name=distribution_name,
+        sdk_version=sdk_version,
+    )
+
+
+def installed_mcp_runtime_identity() -> dict[str, str]:
+    """Attest the MCP SDK installed in the interpreter serving one unit.
+
+    This intentionally does not require a source checkout: production units
+    use regular wheel installations.  Editable installs are accepted only for
+    the explicitly reviewed source checkout, while both ``mcp`` and
+    ``mcp-types`` must still resolve to the observed SDK version and verified
+    distribution bytes before a runtime receipt can be emitted.
+    """
+
+    try:
+        mcp_distribution = distribution("mcp")
+    except PackageNotFoundError as exc:
+        raise RuntimeError("the serving interpreter has no MCP distribution") from exc
+    installed_version = mcp_distribution.version
+    source_revision = attested_mcp_sdk_source_revision(installed_version)
+
+    mcp_package_root = _installed_package_root("mcp")
+    editable_digest = _editable_mcp_source_digest(
+        mcp_distribution,
+        mcp_package_root,
+        source_revision,
+    )
+    mcp_digest = editable_digest or _distribution_package_digest(
+        mcp_distribution,
+        distribution_name="mcp",
+        module_name="mcp",
+        sdk_version=installed_version,
+    )
+
+    try:
+        mcp_types_distribution = distribution("mcp-types")
+    except PackageNotFoundError as exc:
+        raise RuntimeError(
+            "the serving interpreter has no MCP wire-types distribution"
+        ) from exc
+    if mcp_types_distribution.version != installed_version:
+        raise RuntimeError(
+            "the serving MCP and MCP wire-types versions differ: "
+            f"{installed_version} != {mcp_types_distribution.version}"
+        )
+    mcp_types_digest = _distribution_package_digest(
+        mcp_types_distribution,
+        distribution_name="mcp-types",
+        module_name="mcp_types",
+        sdk_version=installed_version,
+    )
+    combined = (
+        f"mcp:{installed_version}:{mcp_digest}\n"
+        f"mcp-types:{installed_version}:{mcp_types_digest}\n"
+    ).encode("utf-8")
+    return {
+        "version": installed_version,
+        "commit": source_revision,
+        "artifact_digest": f"sha256:{hashlib.sha256(combined).hexdigest()}",
+        "mcp_distribution_digest": mcp_digest,
+        "mcp_types_distribution_digest": mcp_types_digest,
+    }

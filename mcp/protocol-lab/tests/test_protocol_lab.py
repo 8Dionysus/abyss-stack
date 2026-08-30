@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import importlib.util
 import json
+import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -56,6 +57,26 @@ def _load_live_fleet_runner() -> Any:
     runner_path = LAB_ROOT / "scripts" / "run_live_modern_read_fleet.py"
     spec = importlib.util.spec_from_file_location(
         "live_modern_read_fleet_under_test",
+        runner_path,
+    )
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _load_kag_next_runner() -> Any:
+    runner_path = LAB_ROOT / "scripts" / "run_codex_kag_next_lab.py"
+    import_paths = [
+        str(LAB_ROOT / "scripts"),
+        str(LAB_ROOT.parent / "services" / "aoa-kag-mcp" / "src"),
+    ]
+    for path in reversed(import_paths):
+        if path not in sys.path:
+            sys.path.insert(0, path)
+    spec = importlib.util.spec_from_file_location(
+        "codex_kag_next_lab_under_test",
         runner_path,
     )
     assert spec is not None
@@ -352,12 +373,76 @@ def test_live_fleet_accepts_only_reviewed_sdk_identities() -> None:
         "protocol_versions": ["2026-07-28"],
         "bootstrap_identity_count": 0,
     }
-    rows = [{"organ_id": "abyss-stack"}]
+    def row(sdk: str, artifact: str) -> dict[str, Any]:
+        return {
+            "organ_id": "abyss-stack",
+            "mcp_sdk": sdk,
+            "mcp_sdk_source_revision": runner.MCP_SDK_SOURCE_REVISIONS[sdk],
+            "mcp_sdk_artifact_digest": artifact,
+            "sdk_attestation": {"state": "passed"},
+        }
 
-    assert runner._fleet_verdict("2.0.0", registry, rows, True) == "passed"
-    assert runner._fleet_verdict("2.1.1", registry, rows, True) == "passed"
-    assert runner._fleet_verdict("2.2.0", registry, rows, True) == "failed"
-    assert runner._fleet_verdict("2.1.1", registry, rows, False) == "failed"
+    historical = row("2.0.0", "sha256:" + ("a" * 64))
+    candidate = row("2.1.1", "sha256:" + ("b" * 64))
+    assert runner._fleet_verdict("2.0.0", registry, [historical], True) == "passed"
+    assert runner._fleet_verdict("2.1.1", registry, [candidate], True) == "passed"
+    assert runner._fleet_verdict("2.2.0", registry, [candidate], True) == "failed"
+    assert runner._fleet_verdict("2.1.1", registry, [candidate], False) == "failed"
+
+
+def test_live_fleet_rejects_nonuniform_or_unattested_unit_identity() -> None:
+    runner = _load_live_fleet_runner()
+    registry = {
+        "admitted_read_count": 2,
+        "protocol_versions": ["2026-07-28"],
+        "bootstrap_identity_count": 0,
+    }
+    first = {
+        "mcp_sdk": "2.1.1",
+        "mcp_sdk_source_revision": runner.MCP_SDK_SOURCE_REVISIONS["2.1.1"],
+        "mcp_sdk_artifact_digest": "sha256:" + ("b" * 64),
+        "sdk_attestation": {"state": "passed"},
+    }
+    second = copy.deepcopy(first)
+    second["mcp_sdk_artifact_digest"] = "sha256:" + ("c" * 64)
+    assert runner._fleet_verdict("2.1.1", registry, [first, second], True) == "failed"
+
+    missing = copy.deepcopy(first)
+    missing["sdk_attestation"] = None
+    assert runner._fleet_verdict("2.1.1", registry, [missing], True) == "failed"
+
+
+def test_candidate_deployment_receipt_requires_per_unit_identity_summary(tmp_path: Path) -> None:
+    runner = _load_kag_next_runner()
+    historical = _load(LAB_ROOT / "fixtures" / "live-modern-fleet-20260809.json")
+    historical_path = tmp_path / "historical.json"
+    historical_path.write_text(json.dumps(historical), encoding="utf-8")
+    assert runner._deployment_sdk_identity(historical_path) == (
+        "2.0.0",
+        "6f69a3758ebf2ee55ce050f58b470ce11af71133",
+    )
+
+    candidate = copy.deepcopy(historical)
+    candidate["mcp_sdk"] = "2.1.1"
+    candidate["mcp_sdk_source_revision"] = "0921d94a74db900dccd2d534842aa7b6160542d2"
+    candidate["mcp_sdk_artifact_digest"] = runner.EXPECTED_PYTHON_MCP_ARTIFACT_DIGEST
+    candidate["read_fleet"] = {
+        **candidate["read_fleet"],
+        "sdk_identity_attested": True,
+        "sdk_identity_count": 11,
+        "sdk_identity_unique_count": 1,
+    }
+    candidate_path = tmp_path / "candidate.json"
+    candidate_path.write_text(json.dumps(candidate), encoding="utf-8")
+    assert runner._deployment_sdk_identity(candidate_path) == (
+        "2.1.1",
+        "0921d94a74db900dccd2d534842aa7b6160542d2",
+    )
+
+    del candidate["read_fleet"]["sdk_identity_attested"]
+    candidate_path.write_text(json.dumps(candidate), encoding="utf-8")
+    with pytest.raises(RuntimeError, match="per-unit SDK attestation"):
+        runner._deployment_sdk_identity(candidate_path)
 
 
 def test_kag_next_cancellable_pair_is_adapter_scoped(builder: Any) -> None:
@@ -544,6 +629,14 @@ def test_deployment_receipts_must_match_candidate_sdk_for_migration(
     )
     tasks_matrix = _load(LAB_ROOT / "tasks-compatibility-matrix.v1.json")
     deployment["mcp_sdk"] = "2.1.1"
+    deployment["mcp_sdk_artifact_digest"] = builder.EXPECTED_CANDIDATE_MCP_ARTIFACT_DIGEST
+    deployment["read_fleet"].update(
+        {
+            "sdk_identity_attested": True,
+            "sdk_identity_count": 11,
+            "sdk_identity_unique_count": 1,
+        }
+    )
     tasks_pair["mcp_sdk"] = "2.1.1"
     tasks_pair["mcp_sdk_artifact_digest"] = "sha256:" + ("b" * 64)
     tasks_pair["runtime_observation_digest"] = "sha256:" + ("a" * 64)

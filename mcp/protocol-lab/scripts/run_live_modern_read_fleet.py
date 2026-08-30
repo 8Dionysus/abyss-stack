@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import secrets
 import subprocess
 import urllib.error
@@ -19,7 +20,6 @@ from typing import Any
 PROTOCOL = "2026-07-28"
 STACK = Path("/srv/AbyssOS/abyss-stack")
 REGISTRY = Path("/srv/AbyssOS/.aoa/organ-access/organ-registry.v2.source.json")
-RUNTIME_PYTHON = STACK / "Services/abyss-stack-mcp/venv/bin/python"
 MCP_SDK_SOURCE_REVISIONS = {
     "2.0.0": "6f69a3758ebf2ee55ce050f58b470ce11af71133",
     "2.1.1": "0921d94a74db900dccd2d534842aa7b6160542d2",
@@ -92,6 +92,93 @@ def _request(
         return exc.code, payload, dict(exc.headers)
 
 
+def _process_interpreter(pid: int, unit: str) -> dict[str, str]:
+    """Resolve the interpreter actually serving the systemd main process."""
+
+    try:
+        argv = [
+            item.decode("utf-8")
+            for item in Path(f"/proc/{pid}/cmdline").read_bytes().split(b"\0")
+            if item
+        ]
+    except (OSError, UnicodeDecodeError) as exc:
+        raise RuntimeError(f"cannot inspect the serving process for {unit}") from exc
+    if len(argv) < 3 or argv[1:3] != ["-I", "-B"]:
+        raise RuntimeError(
+            f"serving process for {unit} is not an isolated Python process"
+        )
+    interpreter = Path(argv[0])
+    if not interpreter.is_absolute() or not interpreter.is_file() or not os.access(
+        interpreter,
+        os.X_OK,
+    ):
+        raise RuntimeError(f"serving process for {unit} has no usable interpreter")
+    try:
+        resolved_interpreter = interpreter.resolve(strict=True)
+        process_executable = Path(f"/proc/{pid}/exe").resolve(strict=True)
+    except OSError as exc:
+        raise RuntimeError(f"cannot resolve the serving interpreter for {unit}") from exc
+    if resolved_interpreter != process_executable:
+        raise RuntimeError(
+            f"serving process for {unit} changed its interpreter identity"
+        )
+    return {
+        "python_executable": interpreter.as_posix(),
+        "python_executable_realpath": resolved_interpreter.as_posix(),
+    }
+
+
+def _runtime_sdk_identity(interpreter: str, unit: str) -> dict[str, str]:
+    """Measure SDK bytes through the interpreter belonging to one unit."""
+
+    helper = Path(__file__).resolve().with_name("_mcp_sdk_identity.py")
+    expression = (
+        "import json, runpy; "
+        f"namespace = runpy.run_path({helper.as_posix()!r}); "
+        "print(json.dumps(namespace['installed_mcp_runtime_identity'](), sort_keys=True))"
+    )
+    completed = subprocess.run(
+        [interpreter, "-I", "-B", "-c", expression],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if completed.returncode != 0:
+        detail = (completed.stderr or completed.stdout).strip()[-1200:]
+        raise RuntimeError(f"SDK attestation failed for {unit}: {detail}")
+    try:
+        identity = json.loads(completed.stdout)
+    except (json.JSONDecodeError, TypeError) as exc:
+        raise RuntimeError(f"SDK attestation returned invalid JSON for {unit}") from exc
+    if not isinstance(identity, dict):
+        raise RuntimeError(f"SDK attestation returned a non-object for {unit}")
+    version = identity.get("version")
+    source_revision = identity.get("commit")
+    artifact_digest = identity.get("artifact_digest")
+    if (
+        not isinstance(version, str)
+        or MCP_SDK_SOURCE_REVISIONS.get(version) != source_revision
+        or not isinstance(artifact_digest, str)
+        or re.fullmatch(r"sha256:[0-9a-f]{64}", artifact_digest) is None
+        or not isinstance(identity.get("mcp_distribution_digest"), str)
+        or re.fullmatch(
+            r"sha256:[0-9a-f]{64}", identity["mcp_distribution_digest"]
+        ) is None
+        or not isinstance(identity.get("mcp_types_distribution_digest"), str)
+        or re.fullmatch(
+            r"sha256:[0-9a-f]{64}", identity["mcp_types_distribution_digest"]
+        ) is None
+    ):
+        raise RuntimeError(f"SDK attestation was incomplete for {unit}")
+    return {
+        "version": version,
+        "commit": source_revision,
+        "artifact_digest": artifact_digest,
+        "mcp_distribution_digest": identity["mcp_distribution_digest"],
+        "mcp_types_distribution_digest": identity["mcp_types_distribution_digest"],
+    }
+
+
 def _unit_identity(unit: str) -> dict[str, Any]:
     completed = subprocess.run(
         [
@@ -120,10 +207,12 @@ def _unit_identity(unit: str) -> dict[str, Any]:
         raise RuntimeError(f"production unit has no main process: {unit}")
     return {
         "unit": unit,
+        "main_pid": pid,
         "process_identity": (
             f"systemd-user:{unit}:pid:{pid}:start:"
             f"{values['ExecMainStartTimestampMonotonic']}"
         ),
+        **_process_interpreter(pid, unit),
     }
 
 
@@ -151,6 +240,8 @@ def _registry_facts() -> dict[str, Any]:
 def _probe(name: str, port: int, unit: str, credential: str) -> dict[str, Any]:
     token = _load_token(credential)
     url = f"http://127.0.0.1:{port}/mcp"
+    before = _unit_identity(unit)
+    sdk_before = _runtime_sdk_identity(before["python_executable"], unit)
     status, discover, headers = _request(url, token, "server/discover", _meta())
     result = discover.get("result") if isinstance(discover, dict) else None
     if status != 200 or not isinstance(result, dict):
@@ -183,11 +274,35 @@ def _probe(name: str, port: int, unit: str, credential: str) -> dict[str, Any]:
     )
     if not passed:
         raise RuntimeError(f"{name} modern-only gates failed")
+    after = _unit_identity(unit)
+    sdk_after = _runtime_sdk_identity(after["python_executable"], unit)
+    if (
+        after["process_identity"] != before["process_identity"]
+        or after["python_executable"] != before["python_executable"]
+        or after["python_executable_realpath"]
+        != before["python_executable_realpath"]
+        or sdk_after != sdk_before
+    ):
+        raise RuntimeError(
+            f"{name} serving process or SDK identity changed during the probe"
+        )
     encoded_tools = json.dumps(tools, sort_keys=True, separators=(",", ":")).encode()
     return {
         "organ_id": name,
         "endpoint_ref": url,
-        **_unit_identity(unit),
+        **before,
+        "mcp_sdk": sdk_before["version"],
+        "mcp_sdk_source_revision": sdk_before["commit"],
+        "mcp_sdk_artifact_digest": sdk_before["artifact_digest"],
+        "mcp_sdk_distribution_digests": {
+            "mcp": sdk_before["mcp_distribution_digest"],
+            "mcp-types": sdk_before["mcp_types_distribution_digest"],
+        },
+        "sdk_attestation": {
+            "state": "passed",
+            "method": "per_unit_process_interpreter_distribution_records",
+            "checked_before_and_after_probe": True,
+        },
         "protocol_version": PROTOCOL,
         "server_info": result.get("_meta", {}).get("io.modelcontextprotocol/serverInfo"),
         "tool_count": len(tools),
@@ -207,13 +322,48 @@ def _fleet_verdict(
     rows: list[dict[str, Any]],
     zero_legacy: bool,
 ) -> str:
-    """Accept only a reviewed MCP SDK identity on an otherwise passing fleet."""
+    """Accept one reviewed, measured SDK identity across every serving unit."""
+
+    identities: set[tuple[object, object, object]] = set()
+    rows_are_objects = True
+    for row in rows:
+        if not isinstance(row, dict):
+            rows_are_objects = False
+            continue
+        identities.add(
+            (
+                row.get("mcp_sdk"),
+                row.get("mcp_sdk_source_revision"),
+                row.get("mcp_sdk_artifact_digest"),
+            )
+        )
+    per_unit_attestation = all(
+        isinstance(row, dict)
+        and isinstance(row.get("sdk_attestation"), dict)
+        and row["sdk_attestation"].get("state") == "passed"
+        and isinstance(row.get("mcp_sdk"), str)
+        and MCP_SDK_SOURCE_REVISIONS.get(row["mcp_sdk"])
+        == row.get("mcp_sdk_source_revision")
+        and isinstance(row.get("mcp_sdk_artifact_digest"), str)
+        and re.fullmatch(r"sha256:[0-9a-f]{64}", row["mcp_sdk_artifact_digest"])
+        is not None
+        for row in rows
+    )
+    expected_identity = (
+        (sdk, MCP_SDK_SOURCE_REVISIONS[sdk], next(iter(identities))[2])
+        if sdk in MCP_SDK_SOURCE_REVISIONS and len(identities) == 1
+        else None
+    )
     return (
         "passed"
-        if sdk in MCP_SDK_SOURCE_REVISIONS
+        if rows_are_objects
+        and sdk in MCP_SDK_SOURCE_REVISIONS
         and registry["admitted_read_count"] == len(rows)
         and registry["protocol_versions"] == [PROTOCOL]
         and registry["bootstrap_identity_count"] == 0
+        and len(identities) == 1
+        and expected_identity in identities
+        and per_unit_attestation
         and zero_legacy
         else "failed"
     )
@@ -225,25 +375,36 @@ def main() -> int:
     args = parser.parse_args()
     rows = [_probe(*entry) for entry in SERVERS]
     registry = _registry_facts()
-    sdk = subprocess.run(
-        [str(RUNTIME_PYTHON), "-I", "-B", "-c", "import importlib.metadata as m; print(m.version('mcp'))"],
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout.strip()
-    try:
-        sdk_source_revision = MCP_SDK_SOURCE_REVISIONS[sdk]
-    except KeyError as exc:
-        raise RuntimeError(
-            "the installed production MCP SDK has no reviewed source attestation: "
-            f"{sdk}"
-        ) from exc
+    if not rows:
+        raise RuntimeError("the production read fleet is empty")
+    sdk = rows[0]["mcp_sdk"]
+    sdk_source_revision = rows[0]["mcp_sdk_source_revision"]
+    sdk_artifact_digest = rows[0]["mcp_sdk_artifact_digest"]
     receipt = {
         "schema_version": "abyss_live_modern_read_fleet_v1",
         "observed_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         "protocol_version": PROTOCOL,
         "mcp_sdk": sdk,
         "mcp_sdk_source_revision": sdk_source_revision,
+        "mcp_sdk_artifact_digest": sdk_artifact_digest,
+        "sdk_attestation": {
+            "scope": "every production read unit",
+            "method": "per_unit_process_interpreter_distribution_records",
+            "unit_count": len(rows),
+            "attested_unit_count": sum(
+                row["sdk_attestation"]["state"] == "passed" for row in rows
+            ),
+            "unique_identities": len(
+                {
+                    (
+                        row["mcp_sdk"],
+                        row["mcp_sdk_source_revision"],
+                        row["mcp_sdk_artifact_digest"],
+                    )
+                    for row in rows
+                }
+            ),
+        },
         "production_unit_count": len(rows),
         "registry": registry,
         "servers": rows,

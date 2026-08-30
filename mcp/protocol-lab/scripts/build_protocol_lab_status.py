@@ -25,6 +25,7 @@ RMCP_TASKS_PAIR_PATH = LAB_ROOT / "fixtures" / "rmcp-3.1.2-tasks-adapter-pair-20
 INSPECTOR_TASKS_BLOCKER_PATH = LAB_ROOT / "fixtures" / "inspector-2.1.0-tasks-strict-pair-blocked-20260808.json"
 LIVE_MODERN_FLEET_PATH = LAB_ROOT / "fixtures" / "live-modern-fleet-20260809.json"
 CODEX_TASKS_PRODUCTION_PAIR_PATH = LAB_ROOT / "fixtures" / "codex-tasks-production-pair-20260809.json"
+EXPECTED_CANDIDATE_MCP_ARTIFACT_DIGEST = "sha256:1ef71b1a3cfb3daba29b61d9f280896b35bdc1038474285cc8295071418b01e5"
 MATRIX_SCHEMA_PATH = LAB_ROOT / "schemas" / "protocol-compatibility-matrix.schema.json"
 OBSERVATION_SCHEMA_PATH = LAB_ROOT / "schemas" / "protocol-pair-observation.schema.json"
 STATUS_SCHEMA_PATH = LAB_ROOT / "schemas" / "protocol-lab-status.schema.json"
@@ -66,6 +67,22 @@ def _earliest_expiry(*payloads: dict[str, Any]) -> str:
 
 def _evidence_is_current(payload: dict[str, Any], evaluated_at: str) -> bool:
     return _timestamp(payload["expires_at"]) > _timestamp(evaluated_at)
+
+
+def _live_fleet_identity_attested(payload: dict[str, Any]) -> bool:
+    """Require per-unit identity summary for the candidate fleet only."""
+
+    if payload.get("mcp_sdk") != "2.1.1":
+        return True
+    read_fleet = payload.get("read_fleet")
+    return bool(
+        payload.get("mcp_sdk_artifact_digest")
+        == EXPECTED_CANDIDATE_MCP_ARTIFACT_DIGEST
+        and isinstance(read_fleet, dict)
+        and read_fleet.get("sdk_identity_attested") is True
+        and read_fleet.get("sdk_identity_count") == 11
+        and read_fleet.get("sdk_identity_unique_count") == 1
+    )
 
 
 def validate_payload(payload: dict[str, Any], schema_path: Path) -> None:
@@ -195,9 +212,10 @@ def build_status(
         live_modern_fleet,
         codex_tasks_production_pair,
     )
+    live_fleet_identity_current = _live_fleet_identity_attested(live_modern_fleet)
     candidate_evidence_expires_at = _earliest_expiry(*candidate_evidence)
     deployment_evidence_expires_at = _earliest_expiry(*deployment_evidence)
-    deployment_evidence_current = all(
+    deployment_evidence_current = live_fleet_identity_current and all(
         (
             payload.get("mcp_sdk") == candidate_sdk_identity["mcp_sdk"]
             and payload.get("mcp_sdk_source_revision")
@@ -223,6 +241,7 @@ def build_status(
             live_modern_fleet["read_fleet"]["admitted_units"] == 11,
             live_modern_fleet["read_fleet"]["bootstrap_identities"] == 0,
             live_modern_fleet["rollback"]["active_legacy_units"] == 0,
+            live_fleet_identity_current,
             deployment_evidence_current,
         )
     )

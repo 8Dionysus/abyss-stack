@@ -113,6 +113,21 @@ def _consumer(matrix: dict[str, Any], consumer_id: str) -> dict[str, Any]:
     return rows[0]
 
 
+def _live_fleet_identity_attested(payload: dict[str, Any]) -> bool:
+    """Require candidate fleet evidence to summarize every serving unit."""
+
+    if payload.get("mcp_sdk") != EXPECTED_PYTHON_MCP_VERSION:
+        return True
+    read_fleet = payload.get("read_fleet")
+    return bool(
+        payload.get("mcp_sdk_artifact_digest") == EXPECTED_PYTHON_MCP_ARTIFACT_DIGEST
+        and isinstance(read_fleet, dict)
+        and read_fleet.get("sdk_identity_attested") is True
+        and read_fleet.get("sdk_identity_count") == 11
+        and read_fleet.get("sdk_identity_unique_count") == 1
+    )
+
+
 def validate(checked_at: datetime | None = None) -> list[str]:
     errors: list[str] = []
     checked_at = checked_at or datetime.now(UTC)
@@ -451,6 +466,8 @@ def validate(checked_at: datetime | None = None) -> list[str]:
         or live_modern_fleet["rollback"]["active_legacy_units"] != 0
     ):
         errors.append("live modern-only production fleet evidence drifted")
+    if not _live_fleet_identity_attested(live_modern_fleet):
+        errors.append("live modern fleet candidate lacks per-unit SDK artifact attestation")
     candidate_identity = (
         sdk_by_id["python-next"]["version"],
         sdk_by_id["python-next"]["commit"],
