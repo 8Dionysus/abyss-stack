@@ -473,6 +473,30 @@ def test_exposure_runtime_bounds_receipts_and_prunes_expired_plans() -> None:
     assert "materialization_receipt_not_found" in denied.reason_codes
 
 
+def test_secret_receipt_identifier_is_replaced_before_emission() -> None:
+    runtime = ExposureRuntime(
+        progressive_exposure_enabled=True,
+        baseline_admitted=True,
+        baseline_admission_ref="receipt://d0/baseline-ready",
+        clock=lambda: NOW,
+    )
+    materialization = runtime.materialize(_payload())
+    secret_caller = "Bearer sk-" + "a" * 48
+
+    receipt = runtime.invoke(
+        materialization.receipt_id,
+        request_id="secret-id-case",
+        caller_id=secret_caller,
+        tool_id="knowledge-inspect.inspect-knowledge",
+        arguments={},
+        authorization_ref=None,
+    )
+
+    assert receipt.caller_id == "invalid-caller-id"
+    assert "secret_material_rejected" in receipt.reason_codes
+    assert secret_caller not in json.dumps(runtime.recent_receipts())
+
+
 def test_stack_normalization_rejects_visible_tool_schema_drift() -> None:
     payload = _payload()
     payload["rendered_snapshot"]["visible_tool_ids"] = ["unexpected"]

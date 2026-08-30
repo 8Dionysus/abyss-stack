@@ -93,6 +93,16 @@ def _digest(value: object) -> str:
     return "sha256:" + hashlib.sha256(canonical_json_bytes(value)).hexdigest()
 
 
+def _receipt_identifier_status(value: Any) -> Literal["valid", "malformed", "secret"]:
+    if not isinstance(value, str) or not 1 <= len(value) <= 512:
+        return "malformed"
+    try:
+        _reject_secret_material(value)
+    except StackMCPError:
+        return "secret"
+    return "valid"
+
+
 class StrictExposureModel(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -624,9 +634,12 @@ class ExposureRuntime:
 
         now = self._now()
         self._prune_materializations(now)
-        valid_request_id = isinstance(request_id, str) and 1 <= len(request_id) <= 512
-        valid_caller_id = isinstance(caller_id, str) and 1 <= len(caller_id) <= 512
-        valid_tool_id = isinstance(tool_id, str) and 1 <= len(tool_id) <= 512
+        request_id_status = _receipt_identifier_status(request_id)
+        caller_id_status = _receipt_identifier_status(caller_id)
+        tool_id_status = _receipt_identifier_status(tool_id)
+        valid_request_id = request_id_status == "valid"
+        valid_caller_id = caller_id_status == "valid"
+        valid_tool_id = tool_id_status == "valid"
         valid_materialization_id = (
             isinstance(materialization_receipt_id, str)
             and re.fullmatch(r"sha256:[0-9a-f]{64}", materialization_receipt_id)
@@ -648,6 +661,8 @@ class ExposureRuntime:
             reasons.append("malformed_tool_id")
         if not valid_materialization_id:
             reasons.append("malformed_materialization_receipt_id")
+        if "secret" in {request_id_status, caller_id_status, tool_id_status}:
+            reasons.append("secret_material_rejected")
         plan = self._materializations.get(receipt_materialization_id)
         tool = None
         if plan is None:
