@@ -805,11 +805,13 @@ class LiveCodeIntelligenceRuntimeTests(unittest.TestCase):
         nested_runtime_file = runtime_root / "nested" / "dependency.json"
         nested_runtime_file.parent.mkdir()
         nested_runtime_file.write_text("nested\n", encoding="utf-8")
+        self.write_source("workspace.py", "SOURCE = 'admitted-source'\n")
         server = runtime_root / "fake-lsp"
         original_script = (
             f"#!{sys.executable}\n"
             "import json, sys\n"
             "from pathlib import Path\n"
+            "from urllib.parse import unquote, urlsplit\n"
             "from dependency import VALUE\n"
             "CONFIG = Path(sys.argv[1].split('=', 1)[1]).read_text().strip()\n"
             "def read():\n"
@@ -827,13 +829,15 @@ class LiveCodeIntelligenceRuntimeTests(unittest.TestCase):
             "    message = read()\n"
             "    if message is None: break\n"
             "    if message.get('method') == 'initialize':\n"
+            "        root = Path(unquote(urlsplit(message['params']['rootUri']).path))\n"
+            "        source = (root / 'workspace.py').read_text().strip()\n"
             "        try:\n"
             "            Path(sys.argv[1].split('=', 1)[1]).write_text('attacker')\n"
             "        except OSError:\n"
             "            write_state = 'readonly'\n"
             "        else:\n"
             "            write_state = 'mutable'\n"
-            "        send({'jsonrpc':'2.0','id':message['id'],'result':{'capabilities':{'marker':f'{VALUE}:{CONFIG}:{write_state}'}}})\n"
+            "        send({'jsonrpc':'2.0','id':message['id'],'result':{'capabilities':{'marker':f'{VALUE}:{CONFIG}:{write_state}:{source}'}}})\n"
             "    elif message.get('method') == 'shutdown':\n"
             "        send({'jsonrpc':'2.0','id':message['id'],'result':None})\n"
             "    elif message.get('method') == 'exit':\n"
@@ -871,6 +875,7 @@ class LiveCodeIntelligenceRuntimeTests(unittest.TestCase):
             server.write_text(attacker_script, encoding="utf-8")
             dependency.write_text("VALUE = 'attacker'\n", encoding="utf-8")
             config.write_text("attacker\n", encoding="utf-8")
+            self.write_source("workspace.py", "SOURCE = 'attacker-source'\n")
             return real_popen(command, **kwargs)
 
         try:
@@ -880,7 +885,7 @@ class LiveCodeIntelligenceRuntimeTests(unittest.TestCase):
             ):
                 response = session.start(root_uri=self.source.as_uri())
             self.assertEqual(
-                "admitted:admitted:readonly",
+                "admitted:admitted:readonly:SOURCE = 'admitted-source'",
                 response["result"]["capabilities"]["marker"],
             )
             self.assertEqual(
@@ -896,6 +901,7 @@ class LiveCodeIntelligenceRuntimeTests(unittest.TestCase):
                 launch["command"][-1],
             )
             self.assertIn(str(self.root / "lsp-scratch"), launch["command"][-1])
+            self.assertIn(str(self.source), launch["command"])
         finally:
             session.close()
 
@@ -2093,7 +2099,10 @@ class LiveCodeIntelligenceRuntimeTests(unittest.TestCase):
         self.assertEqual(completed.returncode, 0, completed.stderr)
         payload = json.loads(completed.stdout)
         self.assertEqual(payload["operation"], "last_good")
-        self.assertEqual(payload["result"]["state"], "available")
+        # A new process has no in-memory trust for a historical epoch after
+        # the source moved.  The writable transition receipt cannot make that
+        # old snapshot authenticated, so the operation reports unavailable.
+        self.assertEqual(payload["result"]["state"], "unavailable")
 
     def test_rollback_without_last_good_records_failed_operation_receipt(self) -> None:
         self.write_source("module.py", "VALUE = 1\n")
@@ -2342,7 +2351,7 @@ class LiveCodeIntelligenceRuntimeTests(unittest.TestCase):
             self.runtime.definitions("forged")["results"],
         )
 
-    def test_historical_persisted_observation_requires_epoch_receipt(self) -> None:
+    def test_historical_persisted_observation_rejects_writable_receipt(self) -> None:
         self.write_source("module.py", "def stable(value):\n    return value\n")
         state = self.runtime.refresh()
         self.write_source("module.py", "def stable(value):\n    return value + 1\n")
@@ -2361,6 +2370,12 @@ class LiveCodeIntelligenceRuntimeTests(unittest.TestCase):
             key=lambda item: (item["location"], item["kind"], item["name"])
         )
         self.runtime.current_path.write_text(json.dumps(tampered), encoding="utf-8")
+        receipt_path = self.runtime.receipts_path / (
+            f"{state['source']['source_epoch'].removeprefix('sha256:')}.json"
+        )
+        receipt = self.read_json(receipt_path)
+        receipt["observation_digest"] = _digest_payload(tampered["files"])
+        receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
 
         self.assertEqual(self.runtime.status()["state"], "unavailable")
 

@@ -3200,19 +3200,23 @@ class ManagedLspSession:
     def _snapshot_namespace_directories(
         snapshot_root: Path,
         runtime_fds: tuple[tuple[int, str], ...],
+        source_root: Path,
+        source_fds: tuple[tuple[int, str], ...],
     ) -> tuple[Path, ...]:
-        """Return directories needed before binding sealed runtime files."""
+        """Return directories needed before binding sealed launch files."""
 
         directories: set[Path] = set()
-        current = snapshot_root
-        while current != Path("/"):
-            directories.add(current)
-            current = current.parent
-        for _, relative in runtime_fds:
-            current = (snapshot_root / Path(relative)).parent
-            while current != snapshot_root.parent:
+        for target in (snapshot_root, source_root):
+            current = target
+            while current != Path("/"):
                 directories.add(current)
                 current = current.parent
+        for root, bindings in ((snapshot_root, runtime_fds), (source_root, source_fds)):
+            for _, relative in bindings:
+                current = (root / Path(relative)).parent
+                while current != Path("/"):
+                    directories.add(current)
+                    current = current.parent
         return tuple(sorted(directories, key=lambda path: len(path.parts)))
 
     def _immutable_runtime_fds(
@@ -3248,14 +3252,56 @@ class ManagedLspSession:
                     pass
             raise
 
+    def _immutable_source_fds(
+        self,
+    ) -> tuple[tuple[int, str], ...]:
+        """Seal every admitted source file before the child namespace exists."""
+
+        expected_manifest = tuple(sorted(self._source_manifest.items()))
+        bindings: list[tuple[int, str]] = []
+        try:
+            if _directory_file_manifest(
+                self.source_root,
+                "LSP source root",
+            ) != expected_manifest:
+                raise LiveCodeIntelligenceError(
+                    "LSP source epoch manifest changed while sealing the exact launch snapshot"
+                )
+            for relative, digest in expected_manifest:
+                descriptor = self._immutable_launch_fd(
+                    self.source_root / Path(relative),
+                    expected_digest=digest,
+                    label=f"LSP source file {relative}",
+                )
+                bindings.append((descriptor, relative))
+            # Sealed descriptors are the source snapshot.  Rechecking the
+            # complete manifest rejects an unadmitted addition or deletion
+            # while the descriptors are being prepared.
+            if _directory_file_manifest(
+                self.source_root,
+                "LSP source root",
+            ) != expected_manifest:
+                raise LiveCodeIntelligenceError(
+                    "LSP source epoch manifest changed while sealing the exact launch snapshot"
+                )
+            return tuple(bindings)
+        except Exception:
+            for descriptor, _ in bindings:
+                try:
+                    os.close(descriptor)
+                except OSError:
+                    pass
+            raise
+
     def _sandbox_command(
         self,
         command: tuple[str, ...],
         *,
         snapshot_root: Path,
         runtime_fds: tuple[tuple[int, str], ...],
+        source_fds: tuple[tuple[int, str], ...],
     ) -> tuple[str, ...]:
-        """Run the launch under a private namespace with sealed file binds."""
+        """Run the launch with sealed runtime and source files in its namespace."""
 
         launcher = self._launch_namespace_binary()
         sandbox: list[str] = [
@@ -3273,8 +3319,37 @@ class ManagedLspSession:
             if Path(system_root).exists():
                 sandbox.extend(("--ro-bind", system_root, system_root))
         sandbox.extend(("--proc", "/proc", "--dev", "/dev", "--tmpfs", "/tmp"))
-        for directory in self._snapshot_namespace_directories(snapshot_root, runtime_fds):
+        for directory in self._snapshot_namespace_directories(
+            snapshot_root,
+            runtime_fds,
+            self.source_root,
+            source_fds,
+        ):
+            if (
+                directory == snapshot_root
+                or snapshot_root in directory.parents
+                or directory == self.source_root
+                or self.source_root in directory.parents
+            ):
+                # The source and runtime roots are mount points assembled
+                # from sealed files.  Their directories must not remain
+                # writable, otherwise the child could add an unadmitted
+                # import or replace a mount before a lazy lookup.
+                sandbox.extend(("--perms", "0555"))
             sandbox.extend(("--dir", str(directory)))
+        for descriptor, relative in source_fds:
+            # Materialize the admitted source epoch at the exact root URI
+            # supplied to initialize.  Sealed descriptors keep the source
+            # bytes stable after binding even when the working tree changes.
+            sandbox.extend(
+                (
+                    "--perms",
+                    "0555",
+                    "--ro-bind-data",
+                    str(descriptor),
+                    str(self.source_root / Path(relative)),
+                )
+            )
         for descriptor, relative in runtime_fds:
             # Runtime files are never writable in the child, including files
             # whose source mode carried an execute bit.  0555 keeps executable
@@ -3338,6 +3413,8 @@ class ManagedLspSession:
                 )
             runtime_fds = self._immutable_runtime_fds()
             descriptors.extend(descriptor for descriptor, _ in runtime_fds)
+            source_fds = self._immutable_source_fds()
+            descriptors.extend(descriptor for descriptor, _ in source_fds)
             executable_descriptor = self._immutable_launch_fd(
                 Path(self.command[0]),
                 expected_digest=self.executable_digest,
@@ -3389,6 +3466,7 @@ class ManagedLspSession:
                 tuple(command),
                 snapshot_root=snapshot_root,
                 runtime_fds=runtime_fds,
+                source_fds=source_fds,
             )
             return _LspLaunchBinding(
                 command=tuple(command),
@@ -3770,6 +3848,11 @@ class LiveCodeIntelligenceRuntime:
         self.lock_path = config.state_root / STATE_LOCK_NAME
         self._refresh_receipt_snapshot: tuple[Path, dict[str, Any]] | None = None
         self._refresh_attempt_source_epoch: str | None = None
+        # A transition receipt in the writable state root is not an
+        # authenticator.  Keep only digests of states committed by this
+        # runtime instance so a same-UID writer cannot replace a historical
+        # snapshot and make its replacement self-authenticating.
+        self._trusted_observation_digests: dict[str, str] = {}
         self._captured_machine_evidence_summary = (
             copy.deepcopy(self._machine_evidence_summary(config.machine_evidence))
             if isinstance(config.machine_evidence, _AuthenticatedMachineEvidence)
@@ -5533,15 +5616,14 @@ class LiveCodeIntelligenceRuntime:
         try:
             scanned = self._scan()
             if self._source_epoch(scanned) != source_epoch:
-                # A historical current/last-good snapshot has no live source
-                # bytes to rederive against.  Require the transition receipt
-                # to authenticate the complete persisted state before it can
-                # remain a fallback while the working tree moves on.
-                receipt = _read_json(
-                    self.receipts_path
-                    / f"{source_epoch.removeprefix('sha256:')}.json"
+                # A historical snapshot has no live source bytes to rederive
+                # against.  A receipt beside the state is writable by the
+                # same UID and therefore cannot authenticate it.  Only a
+                # state committed by this still-live runtime instance may be
+                # used until an owner-backed immutable epoch store exists.
+                return self._trusted_observation_digests.get(source_epoch) == (
+                    _digest_payload(files)
                 )
-                return receipt.get("observation_digest") == _digest_payload(files)
             parsed = self._run_provider_work_queue(set(scanned), scanned)
             expected = {
                 path: {
@@ -5939,6 +6021,10 @@ class LiveCodeIntelligenceRuntime:
                 previous_source_epoch=previous_epoch,
                 target_source_epoch=source_epoch,
             )
+            if source_epoch is not None:
+                self._trusted_observation_digests[source_epoch] = _digest_payload(
+                    state["files"]
+                )
         except Exception:
             self._restore_json_snapshot(self.current_path, previous_current)
             self._restore_json_snapshot(self.last_good_path, previous_last_good)
