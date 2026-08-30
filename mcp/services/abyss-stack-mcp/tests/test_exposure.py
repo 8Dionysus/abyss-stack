@@ -497,6 +497,27 @@ def test_secret_receipt_identifier_is_replaced_before_emission() -> None:
     assert secret_caller not in json.dumps(runtime.recent_receipts())
 
 
+def test_secret_materialization_identifier_is_replaced_before_emission() -> None:
+    runtime = ExposureRuntime(
+        progressive_exposure_enabled=True,
+        baseline_admitted=True,
+        baseline_admission_ref="receipt://d0/baseline-ready",
+        clock=lambda: NOW,
+    )
+    payload = _payload()
+    secret_request = "Bearer sk-" + "b" * 48
+    payload["request_id"] = secret_request
+
+    receipt = runtime.materialize(_redigest_plan(payload))
+
+    assert receipt.decision == "denied"
+    assert receipt.request_id == "invalid-request-id"
+    assert receipt.visible_tool_ids == ()
+    assert receipt.rollback_bindings == ()
+    assert "secret_material_rejected" in receipt.reason_codes
+    assert secret_request not in json.dumps(runtime.recent_receipts())
+
+
 def test_stack_normalization_rejects_visible_tool_schema_drift() -> None:
     payload = _payload()
     payload["rendered_snapshot"]["visible_tool_ids"] = ["unexpected"]

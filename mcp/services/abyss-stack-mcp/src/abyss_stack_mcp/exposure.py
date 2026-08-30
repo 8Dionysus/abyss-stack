@@ -582,10 +582,13 @@ class ExposureRuntime:
         except StackMCPError:
             reasons.append("secret_material_rejected")
         decision: ExposureDecision = "allowed" if not reasons else "denied"
+        secret_rejected = "secret_material_rejected" in reasons
         receipt_expires_at = max(normalized.expires_at, now + timedelta(seconds=1))
         receipt_body = {
             "schema_version": "abyss_stack_exposure_materialization_receipt_v1",
-            "request_id": normalized.request_id,
+            "request_id": (
+                normalized.request_id if not secret_rejected else "invalid-request-id"
+            ),
             "plan_id": normalized.plan_id,
             "decision": decision,
             "reason_codes": sorted(set(reasons)),
@@ -593,7 +596,11 @@ class ExposureRuntime:
             "expires_at": receipt_expires_at.isoformat().replace("+00:00", "Z"),
             "snapshot_id": normalized.rendered_snapshot.snapshot_id,
             "source_digest": normalized.rendered_snapshot.source_digest,
-            "visible_tool_ids": list(normalized.rendered_snapshot.visible_tool_ids),
+            "visible_tool_ids": (
+                list(normalized.rendered_snapshot.visible_tool_ids)
+                if not secret_rejected
+                else []
+            ),
             "visible_bytes": normalized.rendered_snapshot.rendered_bytes,
             "visible_tokens": normalized.rendered_snapshot.rendered_tokens,
             "rollback_bindings": (
@@ -601,7 +608,7 @@ class ExposureRuntime:
                     binding.model_dump(mode="json")
                     for binding in normalized.rollback_bindings
                 ]
-                if "secret_material_rejected" not in reasons
+                if not secret_rejected
                 else []
             ),
             "baseline_admission_ref": self._baseline_admission_ref,
