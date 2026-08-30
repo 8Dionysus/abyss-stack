@@ -22,7 +22,7 @@
       "additionalProperties": false,
       "required": ["object_id", "owner_repo", "schema_version", "digest"],
       "properties": {
-        "object_id": {"type": "string", "pattern": "^continuity-capsule:.+"},
+        "object_id": {"type": "string", "pattern": "^continuity-capsule:.+", "maxLength": 65536},
         "owner_repo": {"const": "aoa-session-memory"},
         "schema_version": {"const": "continuity_capsule_v1"},
         "digest": {"$ref": "#/$defs/digest"}
@@ -44,8 +44,8 @@
         "omissions_uncertainty"
       ],
       "properties": {
-        "capsule_id": {"type": "string", "minLength": 1},
-        "goal": {"type": "object"},
+        "capsule_id": {"type": "string", "minLength": 1, "maxLength": 65536},
+        "goal": {"$ref": "#/$defs/goal"},
         "constraints": {"$ref": "#/$defs/stringList"},
         "completed": {"$ref": "#/$defs/stringList"},
         "current_work": {"$ref": "#/$defs/stringList"},
@@ -54,6 +54,7 @@
         "open_obligations": {"$ref": "#/$defs/stringList"},
         "evidence_refs": {
           "type": "array",
+          "maxItems": 512,
           "items": {"type": "object", "minProperties": 1}
         },
         "omissions_uncertainty": {"type": "object"}
@@ -61,13 +62,25 @@
     },
     "stringList": {
       "type": "array",
-      "items": {"type": "string", "minLength": 1}
+      "maxItems": 256,
+      "items": {"type": "string", "minLength": 1, "maxLength": 65536}
+    },
+    "goal": {
+      "type": "object",
+      "required": ["goal_id", "title", "source_ref", "digest", "content"],
+      "properties": {
+        "goal_id": {"type": "string", "minLength": 1, "maxLength": 65536},
+        "title": {"type": "string", "minLength": 1, "maxLength": 65536},
+        "source_ref": {"type": "string", "minLength": 1, "maxLength": 65536},
+        "digest": {"$ref": "#/$defs/digest"},
+        "content": {"type": "string", "minLength": 1, "maxLength": 65536}
+      }
     },
     "sourceWatermark": {
       "type": "object",
       "required": ["source_ref", "source_digest", "generation", "observed_at"],
       "properties": {
-        "source_ref": {"type": "string", "minLength": 1},
+        "source_ref": {"type": "string", "minLength": 1, "maxLength": 65536},
         "source_digest": {"$ref": "#/$defs/digest"},
         "generation": {"type": "integer", "minimum": 0},
         "observed_at": {"type": "string", "format": "date-time"}
@@ -77,8 +90,8 @@
       "type": "object",
       "required": ["event_ref", "session_id", "sequence", "occurred_at", "kind"],
       "properties": {
-        "event_ref": {"type": "string", "minLength": 1},
-        "session_id": {"type": "string", "minLength": 1},
+        "event_ref": {"type": "string", "minLength": 1, "maxLength": 65536},
+        "session_id": {"type": "string", "minLength": 1, "maxLength": 65536},
         "sequence": {"type": "integer", "minimum": 0},
         "occurred_at": {"type": "string", "format": "date-time"},
         "kind": {"const": "compaction"}
@@ -92,7 +105,7 @@
         "mode": {"const": "verbatim_private_tail"},
         "portable_tail_policy": {"const": "omitted"},
         "private_tail_digest": {"$ref": "#/$defs/digest"},
-        "private_tail_bytes": {"type": "integer", "minimum": 0}
+        "private_tail_bytes": {"type": "integer", "minimum": 0, "maximum": 524288}
       }
     },
     "portableView": {
@@ -146,7 +159,7 @@
         "compaction_event": {"$ref": "#/$defs/compactionEvent"},
         "protected_tail_posture": {"$ref": "#/$defs/protectedTailPosture"},
         "view_digest": {"$ref": "#/$defs/digest"},
-        "protected_tail": {"type": "string"}
+        "protected_tail": {"type": "string", "maxLength": 524288}
       }
     }
   }

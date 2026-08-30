@@ -55,6 +55,8 @@ def _envelope() -> dict[str, object]:
         "goal": {
             "goal_id": "goal-001",
             "title": "bounded continuity",
+            "source_ref": "goal://goal-001",
+            "digest": "sha256:" + "2" * 64,
             "content": "preserve exact state",
         },
         "constraints": ["default off"],
@@ -124,7 +126,9 @@ def test_exact_pair_validates_and_receipt_excludes_private_tail() -> None:
     envelope = _envelope()
     schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
     errors = list(
-        Draft202012Validator(schema, format_checker=FormatChecker()).iter_errors(envelope)
+        Draft202012Validator(schema, format_checker=FormatChecker()).iter_errors(
+            envelope
+        )
     )
     assert errors == []
 
@@ -136,6 +140,14 @@ def test_exact_pair_validates_and_receipt_excludes_private_tail() -> None:
     assert receipt["private_view_digest"] == envelope["private_view"]["view_digest"]
     assert "protected_tail" not in receipt
     assert "protected tail: exact decision" not in json.dumps(receipt)
+
+    model_payload = CAPSULE.model_reinjection_payload(validated)
+    assert model_payload["protected_tail"] == (
+        "protected tail: exact decision and unresolved obligation"
+    )
+    assert model_payload["content"] == envelope["private_view"]["content"]
+    assert "portable_view" not in model_payload
+    assert "private_view" not in model_payload
 
 
 def test_capsule_content_drift_is_rejected() -> None:
@@ -156,5 +168,26 @@ def test_portable_view_cannot_carry_protected_tail() -> None:
     assert isinstance(portable, dict)
     portable["protected_tail"] = "must remain private"
 
-    with pytest.raises(CAPSULE.ContinuityCapsuleReinjectionError, match="portable_view"):
+    with pytest.raises(
+        CAPSULE.ContinuityCapsuleReinjectionError, match="portable_view"
+    ):
+        CAPSULE.validate_continuity_capsule_reinjection(envelope)
+
+
+def test_owner_byte_and_list_ceilings_are_enforced() -> None:
+    envelope = _envelope()
+    portable = envelope["portable_view"]
+    private = envelope["private_view"]
+    assert isinstance(portable, dict) and isinstance(private, dict)
+    for view in (portable, private):
+        content = view["content"]
+        assert isinstance(content, dict)
+        content["constraints"] = ["bounded"] * 257
+        unsigned = {key: value for key, value in view.items() if key != "view_digest"}
+        view["view_digest"] = _digest(unsigned)
+
+    with pytest.raises(
+        CAPSULE.ContinuityCapsuleReinjectionError,
+        match="bounded list of strings",
+    ):
         CAPSULE.validate_continuity_capsule_reinjection(envelope)

@@ -12,16 +12,22 @@ import copy
 import hashlib
 import json
 from collections.abc import Mapping
+from datetime import datetime
 from typing import Any
 
 
-CONTINUITY_CAPSULE_REINJECTION_SCHEMA_VERSION = (
-    "continuity_capsule_reinjection_v1"
-)
+CONTINUITY_CAPSULE_REINJECTION_SCHEMA_VERSION = "continuity_capsule_reinjection_v1"
 CAPSULE_SCHEMA_VERSION = "continuity_capsule_v1"
 MATERIALIZATION_SCHEMA_VERSION = "continuity_capsule_materialization_v1"
 CAPSULE_OWNER_REPO = "aoa-session-memory"
 CAPSULE_REF_PREFIX = "continuity-capsule:"
+MAX_STRING_LENGTH = 65_536
+MAX_LIST_ITEMS = 256
+MAX_EVIDENCE_REFS = 512
+MAX_PROTECTED_TAIL_BYTES = 512 * 1024
+MAX_CAPSULE_BYTES = 1024 * 1024
+MAX_MATERIALIZATION_BYTES = MAX_CAPSULE_BYTES + MAX_PROTECTED_TAIL_BYTES + 64 * 1024
+MAX_REINJECTION_BYTES = 2 * MAX_MATERIALIZATION_BYTES + 64 * 1024
 CAPSULE_CONTENT_FIELDS = (
     "capsule_id",
     "goal",
@@ -40,13 +46,24 @@ class ContinuityCapsuleReinjectionError(ValueError):
     """Raised when the runtime envelope is not an exact capsule pair."""
 
 
+def _canonical_bytes(payload: Mapping[str, Any]) -> bytes:
+    try:
+        rendered = json.dumps(
+            payload,
+            allow_nan=False,
+            ensure_ascii=True,
+            separators=(",", ":"),
+            sort_keys=True,
+        )
+    except (TypeError, ValueError) as exc:
+        raise ContinuityCapsuleReinjectionError(
+            "continuity payload must be canonical JSON"
+        ) from exc
+    return rendered.encode("utf-8")
+
+
 def _canonical_digest(payload: Mapping[str, Any]) -> str:
-    encoded = json.dumps(
-        payload,
-        ensure_ascii=True,
-        separators=(",", ":"),
-        sort_keys=True,
-    ).encode("utf-8")
+    encoded = _canonical_bytes(payload)
     return f"sha256:{hashlib.sha256(encoded).hexdigest()}"
 
 
@@ -57,11 +74,36 @@ def _require_mapping(value: Any, *, label: str) -> Mapping[str, Any]:
 
 
 def _require_non_empty_string(value: Any, *, label: str) -> str:
-    if not isinstance(value, str) or not value:
+    if not isinstance(value, str) or not value.strip():
+        raise ContinuityCapsuleReinjectionError(f"{label} must be a non-empty string")
+    if len(value) > MAX_STRING_LENGTH:
         raise ContinuityCapsuleReinjectionError(
-            f"{label} must be a non-empty string"
+            f"{label} exceeds the supported string length"
         )
     return value
+
+
+def _require_string_list(value: Any, *, label: str) -> tuple[str, ...]:
+    if not isinstance(value, list) or len(value) > MAX_LIST_ITEMS:
+        raise ContinuityCapsuleReinjectionError(
+            f"{label} must be a bounded list of strings"
+        )
+    for index, item in enumerate(value):
+        _require_non_empty_string(item, label=f"{label}[{index}]")
+    return tuple(value)
+
+
+def _require_timestamp(value: Any, *, label: str) -> str:
+    text = _require_non_empty_string(value, label=label)
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise ContinuityCapsuleReinjectionError(
+            f"{label} must be an RFC3339 timestamp"
+        ) from exc
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise ContinuityCapsuleReinjectionError(f"{label} must include a timezone")
+    return text
 
 
 def _require_digest(value: Any, *, label: str) -> str:
@@ -136,10 +178,15 @@ def _validate_posture(value: Any, *, label: str) -> dict[str, Any]:
         raise ContinuityCapsuleReinjectionError(
             f"{label}.portable_tail_policy must omit the tail"
         )
-    _require_digest(posture["private_tail_digest"], label=f"{label}.private_tail_digest")
-    if not isinstance(posture["private_tail_bytes"], int) or posture[
-        "private_tail_bytes"
-    ] < 0:
+    _require_digest(
+        posture["private_tail_digest"], label=f"{label}.private_tail_digest"
+    )
+    if (
+        not isinstance(posture["private_tail_bytes"], int)
+        or posture["private_tail_bytes"] < 0
+        or isinstance(posture["private_tail_bytes"], bool)
+        or posture["private_tail_bytes"] > MAX_PROTECTED_TAIL_BYTES
+    ):
         raise ContinuityCapsuleReinjectionError(
             f"{label}.private_tail_bytes must be non-negative"
         )
@@ -189,19 +236,80 @@ def _validate_view(
         raise ContinuityCapsuleReinjectionError(
             f"{expected_view}_view changes the exact capsule digest"
         )
-    content = dict(_require_mapping(view["content"], label=f"{expected_view}_view.content"))
+    content = dict(
+        _require_mapping(view["content"], label=f"{expected_view}_view.content")
+    )
     if set(content) != set(CAPSULE_CONTENT_FIELDS):
         raise ContinuityCapsuleReinjectionError(
             f"{expected_view}_view.content does not preserve capsule fields"
         )
+    _require_non_empty_string(content["capsule_id"], label="content.capsule_id")
+    goal = _require_mapping(content["goal"], label="content.goal")
+    for field in ("goal_id", "title", "source_ref", "content"):
+        _require_non_empty_string(goal.get(field), label=f"content.goal.{field}")
+    _require_digest(goal.get("digest"), label="content.goal.digest")
+    for field in (
+        "constraints",
+        "completed",
+        "current_work",
+        "blockers",
+        "exact_decisions",
+        "open_obligations",
+    ):
+        _require_string_list(content[field], label=f"content.{field}")
+    evidence_refs = content["evidence_refs"]
+    if not isinstance(evidence_refs, list) or len(evidence_refs) > MAX_EVIDENCE_REFS:
+        raise ContinuityCapsuleReinjectionError(
+            "content.evidence_refs must be a bounded list"
+        )
+    for index, item in enumerate(evidence_refs):
+        if not isinstance(item, Mapping) or not item:
+            raise ContinuityCapsuleReinjectionError(
+                f"content.evidence_refs[{index}] must be a non-empty object"
+            )
     _require_mapping(
-        view["source_watermark"],
-        label=f"{expected_view}_view.source_watermark",
+        content["omissions_uncertainty"], label="content.omissions_uncertainty"
     )
-    _require_mapping(
-        view["compaction_event"],
-        label=f"{expected_view}_view.compaction_event",
+    source_watermark = _require_mapping(
+        view["source_watermark"], label=f"{expected_view}_view.source_watermark"
     )
+    _require_non_empty_string(
+        source_watermark.get("source_ref"), label="source_watermark.source_ref"
+    )
+    _require_digest(
+        source_watermark.get("source_digest"), label="source_watermark.source_digest"
+    )
+    generation = source_watermark.get("generation")
+    if (
+        isinstance(generation, bool)
+        or not isinstance(generation, int)
+        or generation < 0
+    ):
+        raise ContinuityCapsuleReinjectionError(
+            "source_watermark.generation must be a non-negative integer"
+        )
+    _require_timestamp(
+        source_watermark.get("observed_at"), label="source_watermark.observed_at"
+    )
+    compaction_event = _require_mapping(
+        view["compaction_event"], label=f"{expected_view}_view.compaction_event"
+    )
+    for field in ("event_ref", "session_id"):
+        _require_non_empty_string(
+            compaction_event.get(field), label=f"compaction_event.{field}"
+        )
+    sequence = compaction_event.get("sequence")
+    if isinstance(sequence, bool) or not isinstance(sequence, int) or sequence < 0:
+        raise ContinuityCapsuleReinjectionError(
+            "compaction_event.sequence must be a non-negative integer"
+        )
+    _require_timestamp(
+        compaction_event.get("occurred_at"), label="compaction_event.occurred_at"
+    )
+    if compaction_event.get("kind") != "compaction":
+        raise ContinuityCapsuleReinjectionError(
+            "compaction_event.kind must be compaction"
+        )
     posture = _validate_posture(
         view["protected_tail_posture"],
         label=f"{expected_view}_view.protected_tail_posture",
@@ -217,21 +325,38 @@ def _validate_view(
             raise ContinuityCapsuleReinjectionError(
                 "private_view.protected_tail must be a UTF-8 string"
             )
-        tail_digest = "sha256:" + hashlib.sha256(tail.encode("utf-8")).hexdigest()
+        try:
+            tail_raw = tail.encode("utf-8")
+        except UnicodeEncodeError as exc:
+            raise ContinuityCapsuleReinjectionError(
+                "private_view.protected_tail must be valid UTF-8"
+            ) from exc
+        if len(tail_raw) > MAX_PROTECTED_TAIL_BYTES:
+            raise ContinuityCapsuleReinjectionError(
+                "private_view.protected_tail exceeds its byte ceiling"
+            )
+        tail_digest = "sha256:" + hashlib.sha256(tail_raw).hexdigest()
         if tail_digest != posture["private_tail_digest"]:
             raise ContinuityCapsuleReinjectionError(
                 "private_view.protected_tail does not match its protected-tail digest"
             )
-        if len(tail.encode("utf-8")) != posture["private_tail_bytes"]:
+        if len(tail_raw) != posture["private_tail_bytes"]:
             raise ContinuityCapsuleReinjectionError(
                 "private_view.protected_tail does not match its byte count"
             )
-    view_digest = _require_digest(view["view_digest"], label=f"{expected_view}_view.view_digest")
-    if _canonical_digest(
-        {key: view[key] for key in view if key != "view_digest"}
-    ) != view_digest:
+    view_digest = _require_digest(
+        view["view_digest"], label=f"{expected_view}_view.view_digest"
+    )
+    if (
+        _canonical_digest({key: view[key] for key in view if key != "view_digest"})
+        != view_digest
+    ):
         raise ContinuityCapsuleReinjectionError(
             f"{expected_view}_view digest does not match its content"
+        )
+    if len(_canonical_bytes(view)) > MAX_MATERIALIZATION_BYTES:
+        raise ContinuityCapsuleReinjectionError(
+            f"{expected_view}_view exceeds its byte ceiling"
         )
     return view
 
@@ -244,7 +369,13 @@ def validate_continuity_capsule_reinjection(
     envelope = dict(_require_mapping(value, label="continuity_capsule"))
     _require_exact_keys(
         envelope,
-        {"schema_version", "capsule_ref", "capsule_digest", "portable_view", "private_view"},
+        {
+            "schema_version",
+            "capsule_ref",
+            "capsule_digest",
+            "portable_view",
+            "private_view",
+        },
         label="continuity_capsule",
     )
     if envelope["schema_version"] != CONTINUITY_CAPSULE_REINJECTION_SCHEMA_VERSION:
@@ -283,12 +414,49 @@ def validate_continuity_capsule_reinjection(
         raise ContinuityCapsuleReinjectionError(
             "continuity capsule digest does not match its materialized content"
         )
-    for field in ("content", "source_watermark", "compaction_event", "protected_tail_posture"):
+    for field in (
+        "content",
+        "source_watermark",
+        "compaction_event",
+        "protected_tail_posture",
+    ):
         if portable[field] != private[field]:
             raise ContinuityCapsuleReinjectionError(
                 f"portable_view and private_view disagree on {field}"
             )
+    capsule_id = str(portable["content"]["capsule_id"])
+    if capsule_ref["object_id"] != f"{CAPSULE_REF_PREFIX}{capsule_id}":
+        raise ContinuityCapsuleReinjectionError(
+            "capsule reference object id does not match capsule_id"
+        )
+    if len(_canonical_bytes(canonical_payload)) > MAX_CAPSULE_BYTES:
+        raise ContinuityCapsuleReinjectionError(
+            "continuity capsule exceeds its byte ceiling"
+        )
+    if len(_canonical_bytes(envelope)) > MAX_REINJECTION_BYTES:
+        raise ContinuityCapsuleReinjectionError(
+            "continuity reinjection envelope exceeds its byte ceiling"
+        )
     return copy.deepcopy(envelope)
+
+
+def model_reinjection_payload(value: Mapping[str, Any]) -> dict[str, Any]:
+    """Project one exact private view without duplicating portable content."""
+
+    envelope = validate_continuity_capsule_reinjection(value)
+    private = envelope["private_view"]
+    return {
+        "schema_version": CONTINUITY_CAPSULE_REINJECTION_SCHEMA_VERSION,
+        "capsule_ref": copy.deepcopy(envelope["capsule_ref"]),
+        "capsule_digest": envelope["capsule_digest"],
+        "portable_view_digest": envelope["portable_view"]["view_digest"],
+        "private_view_digest": private["view_digest"],
+        "content": copy.deepcopy(private["content"]),
+        "source_watermark": copy.deepcopy(private["source_watermark"]),
+        "compaction_event": copy.deepcopy(private["compaction_event"]),
+        "protected_tail_posture": copy.deepcopy(private["protected_tail_posture"]),
+        "protected_tail": private["protected_tail"],
+    }
 
 
 def reinjection_event_payload(value: Mapping[str, Any]) -> dict[str, Any]:
@@ -316,6 +484,7 @@ def reinjection_event_payload(value: Mapping[str, Any]) -> dict[str, Any]:
 __all__ = [
     "CONTINUITY_CAPSULE_REINJECTION_SCHEMA_VERSION",
     "ContinuityCapsuleReinjectionError",
+    "model_reinjection_payload",
     "reinjection_event_payload",
     "validate_continuity_capsule_reinjection",
 ]

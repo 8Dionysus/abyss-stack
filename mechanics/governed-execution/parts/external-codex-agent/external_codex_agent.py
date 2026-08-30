@@ -73,6 +73,7 @@ from external_codex_nested_evidence import (  # noqa: E402
 )
 from external_codex_continuity_capsule import (  # noqa: E402
     ContinuityCapsuleReinjectionError,
+    model_reinjection_payload,
     reinjection_event_payload,
     validate_continuity_capsule_reinjection,
 )
@@ -11832,6 +11833,12 @@ class ExternalCodexRuntime:
             if resume_payload is not None
             else None
         )
+        if isinstance(resume_prompt_payload, dict) and isinstance(
+            resume_prompt_payload.get("continuity_capsule"), dict
+        ):
+            resume_prompt_payload["continuity_capsule"] = model_reinjection_payload(
+                resume_prompt_payload["continuity_capsule"]
+            )
         if isinstance(resume_prompt_payload, dict) and isinstance(
             resume_prompt_payload.get("evidence_inputs"), list
         ):
