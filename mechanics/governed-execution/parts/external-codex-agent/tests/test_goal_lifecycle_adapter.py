@@ -904,7 +904,7 @@ def test_generic_adapter_executes_against_the_current_public_goal_set_surface(
     assert [method for method, _params in rpc.calls].count("thread/goal/get") == 2
 
 
-def test_programmatic_adapter_serializes_one_durable_attempt(
+def test_programmatic_adapter_serializes_one_semantic_attempt_across_paths(
     tmp_path: Path,
 ) -> None:
     endpoint = tmp_path / "concurrent-programmatic.sock"
@@ -919,12 +919,19 @@ def test_programmatic_adapter_serializes_one_durable_attempt(
     )
     decision = _decision(request)
     rpc = FakeGoalRpc(endpoint, status="active")
-    adapter = ADAPTER.CodexGoalLifecycleAdapter(
+    first_adapter = ADAPTER.CodexGoalLifecycleAdapter(
         owner=owner,
         owner_path=owner_path,
         endpoint=endpoint,
         rpc_factory=lambda _endpoint: rpc,
-        attempt_path=tmp_path / "concurrent-programmatic.attempt.json",
+        attempt_path=tmp_path / "concurrent-programmatic-first.attempt.json",
+    )
+    second_adapter = ADAPTER.CodexGoalLifecycleAdapter(
+        owner=owner,
+        owner_path=owner_path,
+        endpoint=endpoint,
+        rpc_factory=lambda _endpoint: rpc,
+        attempt_path=tmp_path / "concurrent-programmatic-second.attempt.json",
     )
     callers_ready = threading.Barrier(2)
     mutation_entered = threading.Event()
@@ -941,19 +948,81 @@ def test_programmatic_adapter_serializes_one_durable_attempt(
 
     rpc.call = blocking_call  # type: ignore[method-assign]
 
-    def invoke() -> dict[str, Any]:
+    def invoke(adapter: Any) -> dict[str, Any]:
         callers_ready.wait(timeout=5)
         return adapter.execute_goal_transition(request, decision)
 
     with ThreadPoolExecutor(max_workers=2) as executor:
-        futures = [executor.submit(invoke) for _ in range(2)]
+        futures = [
+            executor.submit(invoke, first_adapter),
+            executor.submit(invoke, second_adapter),
+        ]
         assert mutation_entered.wait(timeout=5)
         assert all(not future.done() for future in futures)
         release_mutation.set()
         receipts = [future.result(timeout=5) for future in futures]
 
-    assert {receipt["status"] for receipt in receipts} == {"executed"}
+    assert {receipt["status"] for receipt in receipts} == {"executed", "replayed"}
     assert [method for method, _params in rpc.calls].count("thread/goal/set") == 1
+    attempt_paths = [
+        tmp_path / "concurrent-programmatic-first.attempt.json",
+        tmp_path / "concurrent-programmatic-second.attempt.json",
+    ]
+    assert sum(path.exists() for path in attempt_paths) == 1
+
+
+def test_cli_adapter_serializes_one_semantic_attempt_across_receipts(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    args, _request_path, _decision_path, first_receipt, rpc = _cli_fixture(
+        tmp_path,
+        monkeypatch,
+        request_id="request:concurrent-cli-receipts",
+    )
+    second_receipt = tmp_path / "second-receipt.json"
+    second_args = SimpleNamespace(
+        request=args.request,
+        decision=args.decision,
+        owner=args.owner,
+        receipt=str(second_receipt),
+    )
+    callers_ready = threading.Barrier(2)
+    mutation_entered = threading.Event()
+    release_mutation = threading.Event()
+    original_call = rpc.call
+
+    def blocking_call(
+        method: str, params: dict[str, object] | None = None
+    ) -> dict[str, object]:
+        if method == "thread/goal/set":
+            mutation_entered.set()
+            assert release_mutation.wait(timeout=5)
+        return original_call(method, params)
+
+    rpc.call = blocking_call  # type: ignore[method-assign]
+
+    def invoke(invocation: SimpleNamespace) -> dict[str, Any]:
+        callers_ready.wait(timeout=5)
+        return ADAPTER.run_goal_transition(invocation)
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        futures = [
+            executor.submit(invoke, args),
+            executor.submit(invoke, second_args),
+        ]
+        assert mutation_entered.wait(timeout=5)
+        assert all(not future.done() for future in futures)
+        release_mutation.set()
+        receipts = [future.result(timeout=5) for future in futures]
+
+    assert {receipt["status"] for receipt in receipts} == {"executed", "replayed"}
+    assert [method for method, _params in rpc.calls].count("thread/goal/set") == 1
+    attempt_paths = [
+        ADAPTER._attempt_path(first_receipt),
+        ADAPTER._attempt_path(second_receipt),
+    ]
+    assert sum(path.exists() for path in attempt_paths) == 1
 
 
 def test_programmatic_adapter_rejects_owner_drift_before_mutation(

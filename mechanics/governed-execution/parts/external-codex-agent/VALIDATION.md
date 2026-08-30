@@ -111,9 +111,11 @@ revalidates the exact decision reference, transition frame, proof, and
 response digests; executed receipt replay also requires the mutation attempt
 sidecar, binds the authoritative result response to its digest and safe
 summary, and rejects a receipt whose path identity is missing or changed. A
-concurrent SDK regression drives two callers through one durable attempt path
-and proves that the shared CLI/programmatic lock permits exactly one native
-Goal mutation while the second caller reconciles the recorded proof. Separate
+concurrent SDK regression drives two callers through different durable
+attempt paths, and a CLI regression drives the same accepted request through
+different receipt paths. Both prove that the owner/idempotency-derived lock
+permits exactly one native Goal mutation while the other caller takes the
+read-only already-desired path. Separate
 programmatic regressions rewrite the owner after the precondition read and
 after the authoritative post-read: the former proves no mutation is sent, and
 the latter proves the persisted attempt remains bound to the original owner

@@ -717,7 +717,11 @@ def _execution_projection(
         "goal_ref": request.goal_ref.model_dump(mode="json"),
         "request_ref": request_ref.model_dump(mode="json"),
         "decision_ref": decision_ref.model_dump(mode="json"),
-        "observed_state": before_state,
+        # The typed receipt remains bound to the accepted request's
+        # observation. A duplicate invocation may read the already-desired
+        # state after another caller completed the same semantic attempt; the
+        # fresh state remains visible in lifecycle.before/result evidence.
+        "observed_state": request.observed_state,
         "desired_state": request.desired_state,
         "resulting_state": resulting_state,
         "status": status,
@@ -1340,8 +1344,8 @@ def execute_goal_transition(
     """Execute one accepted semantic request through the Codex Goal API.
 
     A transition that can mutate a Goal must name a durable attempt artifact.
-    Use that artifact as the shared serialization coordinate so SDK consumers
-    and the CLI wrapper cannot race the same exactly-once transition.
+    Serialization is derived from the owner identity and idempotency key so
+    caller-selected evidence paths cannot split one semantic attempt.
     """
 
     if attempt_path is None:
@@ -1359,7 +1363,21 @@ def execute_goal_transition(
     attempt_path = runtime._validate_output_path(
         Path(attempt_path), "Goal lifecycle attempt reservation"
     )
-    with _attempt_lock(attempt_path):
+    request_type = _contract_types()[3]
+    typed_request = _model(request, request_type, "Goal lifecycle request")
+    validated_owner = runtime.validate_goal_lifecycle_owner(owner)
+    _validate_request_owner_scope(typed_request, validated_owner)
+    resolved_endpoint = _resolve_owner_endpoint(
+        validated_owner,
+        Path(endpoint),
+        rpc_factory=rpc_factory,
+    )
+    lock_path = _semantic_attempt_lock_path(
+        typed_request,
+        validated_owner,
+        resolved_endpoint,
+    )
+    with _attempt_lock(lock_path):
         return _execute_goal_transition_unlocked(
             request,
             decision,
@@ -1786,11 +1804,36 @@ def _validate_existing_receipt(
     return value
 
 
+def _semantic_attempt_lock_path(
+    request: Any,
+    owner: dict[str, Any],
+    endpoint: Path,
+) -> Path:
+    """Derive one lock coordinate from semantic authority, not output names."""
+
+    runtime = _runtime()
+    binding = {
+        "schema_version": "abyss_stack_goal_lifecycle_lock_v1",
+        "idempotency_key": request.idempotency_key,
+        "owner": {
+            "owner_id": owner["owner_id"],
+            "owner_repo": owner["owner_repo"],
+            "goal_id": owner["goal_id"],
+            "thread_id": owner["thread_id"],
+            "goal_ref": owner["goal_ref"],
+            "return_owner_ref": owner["return_owner_ref"],
+        },
+    }
+    digest = runtime._sha256_bytes(runtime._canonical_bytes(binding))
+    return endpoint.parent / f".goal-lifecycle-{digest}.lock"
+
+
 @contextlib.contextmanager
 def _attempt_lock(path: Path):
     runtime = _runtime()
-    lock_path = path.with_name(path.name + ".goal-lifecycle.lock")
-    runtime._validate_output_path(lock_path, "Goal lifecycle attempt lock")
+    lock_path = runtime._validate_output_path(
+        path, "Goal lifecycle semantic attempt lock"
+    )
     flags = os.O_RDWR | os.O_CREAT
     if hasattr(os, "O_CLOEXEC"):
         flags |= os.O_CLOEXEC
@@ -1800,14 +1843,14 @@ def _attempt_lock(path: Path):
         descriptor = os.open(lock_path, flags, 0o600)
     except OSError as exc:
         raise runtime.ExternalCodexReturnError(
-            f"cannot open Goal lifecycle attempt lock: {lock_path}"
+            f"cannot open Goal lifecycle semantic attempt lock: {lock_path}"
         ) from exc
     try:
         fcntl.flock(descriptor, fcntl.LOCK_EX)
         yield
     except OSError as exc:
         raise runtime.ExternalCodexReturnError(
-            f"Goal lifecycle attempt lock failed: {lock_path}"
+            f"Goal lifecycle semantic attempt lock failed: {lock_path}"
         ) from exc
     finally:
         fcntl.flock(descriptor, fcntl.LOCK_UN)
@@ -1858,7 +1901,9 @@ def run_goal_transition(args: Any) -> dict[str, Any]:
         raise runtime.ExternalCodexReturnError(
             "Goal lifecycle receipt must be distinct from all input artifacts"
         )
-    with _attempt_lock(attempt_path):
+    endpoint, resolution = runtime.discover_app_server_socket(owner)
+    lock_path = _semantic_attempt_lock_path(request, owner, endpoint)
+    with _attempt_lock(lock_path):
         if receipt_path.exists():
             existing, raw = runtime._load_json_file(
                 receipt_path, "existing Goal lifecycle receipt"
@@ -1917,7 +1962,6 @@ def run_goal_transition(args: Any) -> dict[str, Any]:
             decision_path, decision_bytes, "Goal lifecycle decision"
         )
         runtime.VISIBLE._assert_file_snapshot(owner_path, owner_bytes, "Goal lifecycle owner")
-        endpoint, resolution = runtime.discover_app_server_socket(owner)
         receipt = _execute_goal_transition_unlocked(
             request,
             decision,
