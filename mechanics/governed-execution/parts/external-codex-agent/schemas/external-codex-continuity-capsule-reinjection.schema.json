@@ -78,6 +78,7 @@
     },
     "sourceWatermark": {
       "type": "object",
+      "additionalProperties": false,
       "required": ["source_ref", "source_digest", "generation", "observed_at"],
       "properties": {
         "source_ref": {"type": "string", "minLength": 1, "maxLength": 65536},
@@ -88,6 +89,7 @@
     },
     "compactionEvent": {
       "type": "object",
+      "additionalProperties": false,
       "required": ["event_ref", "session_id", "sequence", "occurred_at", "kind"],
       "properties": {
         "event_ref": {"type": "string", "minLength": 1, "maxLength": 65536},

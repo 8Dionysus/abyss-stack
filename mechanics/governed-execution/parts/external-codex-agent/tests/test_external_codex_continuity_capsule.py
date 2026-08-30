@@ -122,6 +122,33 @@ def _envelope() -> dict[str, object]:
     }
 
 
+def _redigest_envelope(envelope: dict[str, object]) -> None:
+    portable = envelope["portable_view"]
+    private = envelope["private_view"]
+    assert isinstance(portable, dict) and isinstance(private, dict)
+    capsule_digest = _digest(
+        {
+            "schema_version": "continuity_capsule_v1",
+            **portable["content"],
+            "source_watermark": portable["source_watermark"],
+            "compaction_event": portable["compaction_event"],
+            "protected_tail_posture": portable["protected_tail_posture"],
+        }
+    )
+    envelope["capsule_digest"] = capsule_digest
+    capsule_ref = envelope["capsule_ref"]
+    assert isinstance(capsule_ref, dict)
+    capsule_ref["digest"] = capsule_digest
+    for view in (portable, private):
+        view["capsule_digest"] = capsule_digest
+        view_ref = view["capsule_ref"]
+        assert isinstance(view_ref, dict)
+        view_ref["digest"] = capsule_digest
+        view["view_digest"] = _digest(
+            {key: value for key, value in view.items() if key != "view_digest"}
+        )
+
+
 def test_exact_pair_validates_and_receipt_excludes_private_tail() -> None:
     envelope = _envelope()
     schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
@@ -148,6 +175,30 @@ def test_exact_pair_validates_and_receipt_excludes_private_tail() -> None:
     assert model_payload["content"] == envelope["private_view"]["content"]
     assert "portable_view" not in model_payload
     assert "private_view" not in model_payload
+
+
+@pytest.mark.parametrize("field", ["source_watermark", "compaction_event"])
+def test_receipt_metadata_rejects_extra_fields(field: str) -> None:
+    envelope = _envelope()
+    for view_name in ("portable_view", "private_view"):
+        view = envelope[view_name]
+        assert isinstance(view, dict)
+        metadata = view[field]
+        assert isinstance(metadata, dict)
+        metadata["duplicated_private_tail"] = "must never reach events.jsonl"
+    _redigest_envelope(envelope)
+
+    schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
+    assert list(
+        Draft202012Validator(schema, format_checker=FormatChecker()).iter_errors(
+            envelope
+        )
+    )
+    with pytest.raises(
+        CAPSULE.ContinuityCapsuleReinjectionError,
+        match="unexpected or missing field",
+    ):
+        CAPSULE.validate_continuity_capsule_reinjection(envelope)
 
 
 def test_capsule_content_drift_is_rejected() -> None:

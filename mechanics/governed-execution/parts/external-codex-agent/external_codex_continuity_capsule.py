@@ -374,6 +374,11 @@ def _validate_view(
     source_watermark = _require_mapping(
         view["source_watermark"], label=f"{expected_view}_view.source_watermark"
     )
+    _require_exact_keys(
+        source_watermark,
+        {"source_ref", "source_digest", "generation", "observed_at"},
+        label=f"{expected_view}_view.source_watermark",
+    )
     _require_non_empty_string(
         source_watermark.get("source_ref"), label="source_watermark.source_ref"
     )
@@ -394,6 +399,11 @@ def _validate_view(
     )
     compaction_event = _require_mapping(
         view["compaction_event"], label=f"{expected_view}_view.compaction_event"
+    )
+    _require_exact_keys(
+        compaction_event,
+        {"event_ref", "session_id", "sequence", "occurred_at", "kind"},
+        label=f"{expected_view}_view.compaction_event",
     )
     for field in ("event_ref", "session_id"):
         _require_non_empty_string(
