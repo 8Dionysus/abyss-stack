@@ -532,6 +532,49 @@ def _read_verified(path: str, expected_digest: str, max_bytes: int, label: str) 
     return content
 
 
+def _projected_result_base_bytes(
+    request_id: str,
+    parent_holder: Mapping[str, str],
+    inputs: Sequence[Mapping[str, object]],
+) -> int:
+    """Return a conservative canonical result size before content encoding."""
+
+    skeleton: dict[str, object] = {
+        "schema_version": RESULT_SCHEMA_VERSION,
+        "request_id": request_id,
+        "delegation_class": EPHEMERAL_CLASS,
+        "parent_holder_ref": parent_holder,
+        "records": [],
+        "economy_observation": {
+            "schema_version": "abyss_delegation_economy_observation_v1",
+            "input_bytes": 0,
+            "output_bytes": 0,
+            "active_wall_seconds": 0.0,
+            "turn_count": 1,
+            "executed_commands": 0,
+        },
+        "actual_effects": ["read_only"],
+        "responsibility_posture": "parent_retained",
+        "role_formation": False,
+        "durable_responsibility_transfer": False,
+        "result_digest": "sha256:" + "0" * 64,
+    }
+    projected = len(_canonical_bytes(skeleton))
+    for item in inputs:
+        projected += len(
+            _canonical_bytes(
+                {
+                    "artifact_ref": item["artifact_ref"],
+                    "digest": item["digest"],
+                    "bytes": 0,
+                    "content_base64": "",
+                }
+            )
+        )
+    projected += max(0, len(inputs) - 1)
+    return projected
+
+
 def run_ephemeral_read_worker(request: Mapping[str, object]) -> dict[str, object]:
     """Execute one explicit, bounded, read-only request without writing state."""
 
@@ -547,7 +590,11 @@ def run_ephemeral_read_worker(request: Mapping[str, object]) -> dict[str, object
     records: list[dict[str, object]] = []
     input_bytes = 0
     output_bytes = 0
-    projected_base64_bytes = 0
+    projected_result_bytes = _projected_result_base_bytes(
+        request_id, parent_holder, inputs
+    )
+    projected_input_digits = 1
+    projected_output_digits = 1
     for index, item in enumerate(inputs):
         content = _read_verified(
             str(item["path"]),
@@ -561,10 +608,17 @@ def run_ephemeral_read_worker(request: Mapping[str, object]) -> dict[str, object
         output_bytes += len(content)
         if output_bytes > max_output_bytes:
             raise EphemeralWorkerError("read content exceeds max_output_bytes")
-        projected_base64_bytes += ((len(content) + 2) // 3) * 4
-        if projected_base64_bytes > max_transport_bytes:
+        input_digits = len(str(input_bytes))
+        output_digits = len(str(output_bytes))
+        projected_result_bytes += input_digits - projected_input_digits
+        projected_result_bytes += output_digits - projected_output_digits
+        projected_input_digits = input_digits
+        projected_output_digits = output_digits
+        projected_result_bytes += len(str(len(content))) - 1
+        projected_result_bytes += ((len(content) + 2) // 3) * 4
+        if projected_result_bytes > max_transport_bytes:
             raise EphemeralWorkerError(
-                "projected encoded content exceeds max_transport_bytes"
+                "projected result exceeds max_transport_bytes before encoding"
             )
         records.append(
             {

@@ -557,8 +557,33 @@ def test_worker_rejects_projected_base64_before_encoding(
     worker_base64 = run_ephemeral_read_worker.__globals__["base64"]
     monkeypatch.setattr(worker_base64, "b64encode", unexpected_encode)
 
-    with pytest.raises(EphemeralWorkerError, match="projected encoded content"):
+    with pytest.raises(EphemeralWorkerError, match="projected result"):
         run_ephemeral_read_worker(_request(path, content, max_transport_bytes=128))
+
+
+def test_worker_accounts_metadata_before_base64_encoding(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    content = b"x"
+    path = tmp_path / "metadata-heavy.txt"
+    path.write_bytes(content)
+    request = _request(path, content, max_transport_bytes=1024)
+    request["inputs"][0]["artifact_ref"] = "a" * 900  # type: ignore[index]
+    request["input_snapshot_digest"] = snapshot_digest_for_request(
+        request["inputs"],  # type: ignore[arg-type]
+        max_input_bytes=request["max_input_bytes"],
+        max_output_bytes=request["max_output_bytes"],
+        max_transport_bytes=request["max_transport_bytes"],
+    )
+
+    def unexpected_encode(_content: bytes) -> bytes:
+        raise AssertionError("metadata overflow must reject before base64 encoding")
+
+    worker_base64 = run_ephemeral_read_worker.__globals__["base64"]
+    monkeypatch.setattr(worker_base64, "b64encode", unexpected_encode)
+
+    with pytest.raises(EphemeralWorkerError, match="projected result"):
+        run_ephemeral_read_worker(request)
 
 
 def test_request_schema_matches_absolute_nul_free_runtime_paths(tmp_path: Path) -> None:
