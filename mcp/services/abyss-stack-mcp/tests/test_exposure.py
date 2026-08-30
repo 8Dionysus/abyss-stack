@@ -245,6 +245,20 @@ def test_admitted_runtime_requires_canonical_baseline_receipt() -> None:
         raise AssertionError("non-canonical baseline admission must fail closed")
 
 
+def test_non_admitted_runtime_rejects_any_baseline_receipt() -> None:
+    secret_ref = "Bearer sk-" + "c" * 48
+
+    with pytest.raises(ValueError, match="non-admitted runtime") as exc_info:
+        ExposureRuntime(
+            progressive_exposure_enabled=False,
+            baseline_admitted=False,
+            baseline_admission_ref=secret_ref,
+            clock=lambda: NOW,
+        )
+
+    assert secret_ref not in str(exc_info.value)
+
+
 def test_admitted_runtime_requires_explicit_invocation_authority_and_emits_receipts() -> (
     None
 ):
@@ -516,6 +530,39 @@ def test_secret_materialization_identifier_is_replaced_before_emission() -> None
     assert receipt.rollback_bindings == ()
     assert "secret_material_rejected" in receipt.reason_codes
     assert secret_request not in json.dumps(runtime.recent_receipts())
+
+
+def test_secret_plan_refusal_reason_is_replaced_before_emission() -> None:
+    runtime = ExposureRuntime(
+        progressive_exposure_enabled=True,
+        baseline_admitted=True,
+        baseline_admission_ref="receipt://d0/baseline-ready",
+        clock=lambda: NOW,
+    )
+    payload = _payload()
+    secret_reason = "Bearer sk-" + "d" * 48
+    payload["plan_state"] = "blocked"
+    payload["requested_primitive_ids"] = []
+    payload["visible_tools"] = []
+    payload["expansion_reasons"] = []
+    payload["refusal_reasons"] = [secret_reason]
+    snapshot = payload["rendered_snapshot"]
+    snapshot["tools"] = []
+    snapshot["visible_tool_ids"] = []
+    snapshot["rendered_schema_digest"] = sha256_digest([])
+    snapshot["rendered_bytes"] = len(canonical_json_bytes([]))
+    snapshot_body = {
+        key: value for key, value in snapshot.items() if key != "snapshot_id"
+    }
+    snapshot["snapshot_id"] = sha256_digest(snapshot_body)
+
+    receipt = runtime.materialize(_redigest_plan(payload))
+
+    assert receipt.decision == "denied"
+    assert "candidate_plan_required" in receipt.reason_codes
+    assert "secret_material_rejected" in receipt.reason_codes
+    assert secret_reason not in receipt.reason_codes
+    assert secret_reason not in json.dumps(runtime.recent_receipts())
 
 
 def test_stack_normalization_rejects_visible_tool_schema_drift() -> None:

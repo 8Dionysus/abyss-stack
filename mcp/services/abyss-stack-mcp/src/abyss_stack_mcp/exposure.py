@@ -500,8 +500,13 @@ class ExposureRuntime:
         clock: Callable[[], datetime] | None = None,
         receipt_sink: Callable[[dict[str, Any]], None] | None = None,
     ) -> None:
-        if baseline_admitted and baseline_admission_ref != BASELINE_ADMISSION_REF:
-            raise ValueError("baseline admission requires the canonical d0 receipt")
+        if baseline_admitted:
+            if baseline_admission_ref != BASELINE_ADMISSION_REF:
+                raise ValueError("baseline admission requires the canonical d0 receipt")
+        elif baseline_admission_ref is not None:
+            raise ValueError(
+                "a non-admitted runtime cannot carry a baseline admission receipt"
+            )
         self._enabled = progressive_exposure_enabled
         self._baseline_admitted = baseline_admitted
         self._baseline_admission_ref = baseline_admission_ref
@@ -550,12 +555,14 @@ class ExposureRuntime:
         now = self._now()
         self._prune_materializations(now)
         reasons: list[str] = []
+        plan_refusal_reasons: tuple[str, ...] = ()
         if not self._enabled or not normalized.feature_enabled:
             reasons.append("progressive_exposure_disabled")
         if not self._baseline_admitted or not normalized.baseline_ready:
             reasons.append("baseline_admission_required")
         if normalized.plan_state != "candidate":
-            reasons.extend(normalized.refusal_reasons or ("candidate_plan_required",))
+            reasons.append("candidate_plan_required")
+            plan_refusal_reasons = normalized.refusal_reasons
         if normalized.expires_at <= now:
             reasons.append("exposure_plan_expired")
         if normalized.requested_at > now + MAX_FUTURE_CLOCK_SKEW:
@@ -581,6 +588,8 @@ class ExposureRuntime:
             _reject_secret_material(normalized.model_dump(mode="json"))
         except StackMCPError:
             reasons.append("secret_material_rejected")
+        else:
+            reasons.extend(plan_refusal_reasons)
         decision: ExposureDecision = "allowed" if not reasons else "denied"
         secret_rejected = "secret_material_rejected" in reasons
         receipt_expires_at = max(normalized.expires_at, now + timedelta(seconds=1))
