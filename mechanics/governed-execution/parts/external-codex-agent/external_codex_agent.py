@@ -71,6 +71,11 @@ from external_codex_nested_evidence import (  # noqa: E402
     build_nested_evidence_namespace,
     nested_evidence_namespace_digest,
 )
+from external_codex_continuity_capsule import (  # noqa: E402
+    ContinuityCapsuleReinjectionError,
+    reinjection_event_payload,
+    validate_continuity_capsule_reinjection,
+)
 from external_codex_landing_effect import (  # noqa: E402
     LANDING_EFFECTS as _LANDING_EFFECTS,
     LandingEffectGrantError as _LandingEffectGrantError,
@@ -104,6 +109,9 @@ RESULT_EVIDENCE_CLOSURE_SCHEMA_PATH = (
     SCHEMA_ROOT / "external-codex-result-evidence-closure.schema.json"
 )
 RESUME_SCHEMA_PATH = SCHEMA_ROOT / "external-codex-resume.schema.json"
+CONTINUITY_CAPSULE_REINJECTION_SCHEMA_PATH = (
+    SCHEMA_ROOT / "external-codex-continuity-capsule-reinjection.schema.json"
+)
 STATE_SCHEMA_PATH = SCHEMA_ROOT / "external-codex-state.schema.json"
 OWNER_ADMISSION_GENERATION_SCHEMA_PATH = (
     SCHEMA_ROOT / "external-codex-owner-admission-generation.schema.json"
@@ -14672,6 +14680,20 @@ Runtime session identity: {state["session_id"]}
     def resume(self, session_id: str, resume_path: str | Path) -> dict[str, Any]:
         resume = load_json(Path(resume_path), label="resume request")
         validate_json(resume, RESUME_SCHEMA_PATH, label="resume request")
+        continuity_capsule = resume.get("continuity_capsule")
+        if continuity_capsule is not None:
+            validate_json(
+                continuity_capsule,
+                CONTINUITY_CAPSULE_REINJECTION_SCHEMA_PATH,
+                label="continuity capsule reinjection",
+            )
+            try:
+                validate_continuity_capsule_reinjection(continuity_capsule)
+            except ContinuityCapsuleReinjectionError as exc:
+                raise ExternalCodexRuntimeError(
+                    "resume_continuity_capsule_invalid",
+                    str(exc),
+                ) from exc
         with self._lock(session_id):
             state = self._load_state(session_id)
             if state["schema_version"] not in PROJECTION_STATE_SCHEMA_VERSIONS:
@@ -15005,6 +15027,15 @@ Runtime session identity: {state["session_id"]}
                 resume,
                 attempt_id=str(prior_attempt["attempt_id"]),
             )
+            if continuity_capsule is not None:
+                self._append_event(
+                    state,
+                    event_type="external_agent.continuity_capsule_reinjected",
+                    payload=reinjection_event_payload(continuity_capsule),
+                    attempt_id=str(prior_attempt["attempt_id"]),
+                    thread_id=str(state["thread_id"]),
+                    significance="checkpoint",
+                )
             state["finished_at"] = None
             state["result_path"] = None
             state["result_digest"] = None
