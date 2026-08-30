@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 36439320,
+  "allowed_tracked_bytes": 41064698,
+  "approved_by": "repository-owner",
+  "base_ref": "64bdae20b3a5c885ca75755188b04803b587ab50",
+  "changed_generated_bytes": 36439320,
+  "changed_generated_files": 528,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "af7fdd2ada314bfed370148f6b7caf011b8a2a5182b4b478fac4484a624b0848",
+  "reason": "Refresh the exact combined owner family after requiring the live Codex client admission projection to exactly match all declared MCP read contours. Authorize only the measured generated-family delta required to index this reviewed partial-admission recovery repair and regressions; do not weaken strict admission, mutate registry state, raise standing budgets, or admit candidate, effect, materialization, or invocation authority.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 41064698,
+  "tracked_bytes_max": 24117248
+}
