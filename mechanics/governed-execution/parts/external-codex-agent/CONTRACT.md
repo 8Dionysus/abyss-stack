@@ -144,6 +144,10 @@ Operations are:
   Caller-selected receipt/attempt paths, a later reverse transition,
   app-server endpoint rebinding, and volatile runtime-directory replacement
   therefore cannot split or repeat one accepted transition's native mutation.
+  An already-desired read-only execution records `read_only_recorded` at the
+  anchored attempt path; after a later reverse transition, the same
+  idempotency key therefore refuses mutation rather than treating the absent
+  sidecar as a new attempt.
   Attempt and receipt owner digests come only from the initially
   validated owner bytes. Both entrypoints reassert that snapshot immediately
   before native mutation and after proof persistence, while the CLI also

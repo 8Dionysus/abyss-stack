@@ -120,13 +120,18 @@ same idempotency key resolves that original attempt from its protected
 semantic anchor and refuses a second mutation even through a different
 receipt. A runtime-reset regression replaces the complete volatile lock root,
 then proves that the persistent owner-state anchor still resolves the original
-attempt and refuses a second mutation after state reversal. A dynamic-endpoint
+attempt and refuses a second mutation after state reversal. An already-desired
+regression records `read_only_recorded`, reverses the Goal, retries through a
+different receipt, and proves zero native sets. A dynamic-endpoint
 regression additionally
 returns different owner-proved app-server paths to the two callers and proves
 that endpoint discovery remains inside the same stable semantic lock while the
 attempt retains its historical endpoint evidence. Separate CLI regressions
 rewrite the request and decision after the pre-read and prove both are
 reasserted before dispatch with zero mutations. Separate
+legacy-pause regressions rewrite the owner after the pre-read and after proof
+persistence, proving zero mutation in the first case and refusal to publish a
+completed receipt in the second. Separate
 programmatic regressions rewrite the owner after the precondition read and
 after the authoritative post-read: the former proves no mutation is sent, and
 the latter proves the persisted attempt remains bound to the original owner

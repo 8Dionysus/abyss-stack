@@ -153,6 +153,44 @@ def _precondition(goal_response: dict[str, Any], state: str) -> dict[str, Any]:
     }
 
 
+def _validated_read_only_precondition(
+    value: object,
+    *,
+    owner: dict[str, Any],
+    desired_state: str,
+) -> dict[str, Any]:
+    """Validate the durable observation that completed a no-mutation attempt."""
+
+    runtime = _runtime()
+    if not isinstance(value, dict):
+        raise runtime.ExternalCodexReturnError(
+            "Goal lifecycle read-only attempt lacks its durable observation"
+        )
+    response = value.get("goal_get_response")
+    summary = value.get("goal_get")
+    if (
+        value.get("observed_state") != desired_state
+        or not isinstance(response, dict)
+        or not isinstance(summary, dict)
+        or value.get("goal_response_sha256")
+        != runtime._sha256_bytes(runtime._canonical_bytes(response))
+        or runtime._safe_response_summary(response) != summary
+        or value.get("goal_get_summary_sha256")
+        != runtime._sha256_bytes(runtime._canonical_bytes(summary))
+    ):
+        raise runtime.ExternalCodexReturnError(
+            "Goal lifecycle read-only attempt observation is not bound"
+        )
+    _validate_stored_goal_response(
+        response,
+        owner=owner,
+        expected_state=desired_state,
+        method="thread/goal/get",
+        label="read-only completion",
+    )
+    return response
+
+
 def _attempt_path(receipt_path: Path) -> Path:
     runtime = _runtime()
     return runtime._validate_output_path(
@@ -284,10 +322,14 @@ def _validate_attempt_markers(
         )
     reserved = value.get("mutation_reserved")
     dispatched = value.get("mutation_dispatched")
-    if state == "reserved":
+    if state in {"reserved", "read_only_recorded"}:
         if dispatched is not None:
             raise runtime.ExternalCodexReturnError(
-                "Goal lifecycle reserved attempt contains a dispatch marker"
+                "Goal lifecycle non-dispatched attempt contains a dispatch marker"
+            )
+        if state == "read_only_recorded" and reserved is not None:
+            raise runtime.ExternalCodexReturnError(
+                "Goal lifecycle read-only attempt contains a mutation reservation"
             )
         if reserved is not None:
             _validate_attempt_marker(
@@ -392,6 +434,12 @@ def _validate_attempt(
         owner=owner,
         desired_state=request.desired_state,
     )
+    if value.get("state") == "read_only_recorded":
+        _validated_read_only_precondition(
+            value.get("precondition"),
+            owner=owner,
+            desired_state=request.desired_state,
+        )
     return value
 
 
@@ -1020,6 +1068,27 @@ def _execute_goal_transition_unlocked(
                     "Goal lifecycle attempt lacks its original precondition response"
                 )
             before_state = request.expected_state
+        elif (
+            before_state == request.desired_state
+            and attempt is not None
+            and attempt.get("state") == "read_only_recorded"
+        ):
+            stored_read = _validated_read_only_precondition(
+                attempt.get("precondition"),
+                owner=owner,
+                desired_state=request.desired_state,
+            )
+            # The fresh read is a current-state check. Preserve the original
+            # read-only completion bytes in every replayed receipt.
+            before_response = stored_read
+            before_state = request.desired_state
+            resulting_response = stored_read
+            resulting_state = request.desired_state
+            status = "replayed"
+            method = "thread/goal/get"
+            transition_request = None
+            transition_proof = None
+            recovery = None
         elif before_state == request.desired_state and attempt is not None:
             if attempt.get("state") != "dispatched":
                 raise runtime.ExternalCodexReturnError(
@@ -1104,30 +1173,7 @@ def _execute_goal_transition_unlocked(
                 )
             before_state = request.expected_state
         elif before_state == request.desired_state:
-            resulting_response = before_response
-            resulting_state = before_state
-            status = "replayed"
-            method = "thread/goal/get"
-            transition_request = None
-            transition_proof = None
-            recovery = None
-        else:
-            if before_state != request.expected_state:
-                raise runtime.ExternalCodexReturnError(
-                    "Codex app-server Goal state does not match the accepted "
-                    "lifecycle precondition"
-                )
-            if attempt_path is None:
-                raise runtime.ExternalCodexReturnError(
-                    "Goal lifecycle mutation requires a durable attempt reservation"
-                )
-            for path, expected, label in artifact_snapshots:
-                runtime.VISIBLE._assert_file_snapshot(path, expected, label)
-            if attempt is not None:
-                raise runtime.ExternalCodexReturnError(
-                    "Goal lifecycle mutation already has a durable attempt; refusing to issue a second lifecycle set"
-                )
-            else:
+            if attempt_path is not None:
                 content_ref_type, _decision_type, _execution_type, _request_type, _scope, _assert_receipt_scope, canonical_digest = _contract_types()
                 attempt = _attempt_binding(
                     request=request,
@@ -1141,6 +1187,7 @@ def _execute_goal_transition_unlocked(
                     content_ref_type=content_ref_type,
                     canonical_digest=canonical_digest,
                 )
+                attempt["state"] = "read_only_recorded"
                 _write_attempt(
                     attempt_path,
                     attempt,
@@ -1151,6 +1198,52 @@ def _execute_goal_transition_unlocked(
                     owner_bytes=owner_bytes,
                     endpoint=endpoint,
                 )
+            resulting_response = before_response
+            resulting_state = before_state
+            status = "replayed"
+            method = "thread/goal/get"
+            transition_request = None
+            transition_proof = None
+            recovery = None
+        else:
+            if attempt is not None:
+                raise runtime.ExternalCodexReturnError(
+                    "Goal lifecycle mutation already has a durable attempt; refusing to issue a second lifecycle set"
+                )
+            if before_state != request.expected_state:
+                raise runtime.ExternalCodexReturnError(
+                    "Codex app-server Goal state does not match the accepted "
+                    "lifecycle precondition"
+                )
+            if attempt_path is None:
+                raise runtime.ExternalCodexReturnError(
+                    "Goal lifecycle mutation requires a durable attempt reservation"
+                )
+            for path, expected, label in artifact_snapshots:
+                runtime.VISIBLE._assert_file_snapshot(path, expected, label)
+            content_ref_type, _decision_type, _execution_type, _request_type, _scope, _assert_receipt_scope, canonical_digest = _contract_types()
+            attempt = _attempt_binding(
+                request=request,
+                decision=decision,
+                owner=owner,
+                owner_path=owner_path,
+                owner_bytes=owner_bytes,
+                endpoint=endpoint,
+                attempt_path=attempt_path,
+                precondition=precondition,
+                content_ref_type=content_ref_type,
+                canonical_digest=canonical_digest,
+            )
+            _write_attempt(
+                attempt_path,
+                attempt,
+                request=request,
+                decision=decision,
+                owner=owner,
+                owner_path=owner_path,
+                owner_bytes=owner_bytes,
+                endpoint=endpoint,
+            )
 
             def build_request_marker(
                 method_name: str,

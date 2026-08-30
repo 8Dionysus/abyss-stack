@@ -892,6 +892,158 @@ def test_run_pause_reserves_and_replays_without_second_transport_mutation(
     assert second == first
 
 
+def test_run_pause_reasserts_owner_immediately_before_mutation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    owner_path = tmp_path / "pause-owner-drift-before-mutation.json"
+    endpoint = tmp_path / "pause-owner-drift-before-mutation.sock"
+    owner_value = pause_owner(
+        goal="goal-pause-owner-drift-before-mutation",
+        thread="thread-pause-owner-drift-before-mutation",
+        endpoint=f"unix:{endpoint}",
+    )
+    owner_path.write_bytes(MODULE._canonical_bytes(owner_value) + b"\n")
+    pause_path = tmp_path / "pause-owner-drift-before-mutation-receipt.json"
+    fake = FakeRpc(
+        endpoint,
+        active_turn=None,
+        goal_status="active",
+        goal_set_status="paused",
+        thread_id="thread-pause-owner-drift-before-mutation",
+    )
+    original_call = fake.call
+    owner_drifted = False
+
+    def call_with_owner_drift(
+        method: str,
+        params: dict[str, object] | None = None,
+    ) -> dict[str, object]:
+        nonlocal owner_drifted
+        response = original_call(method, params)
+        if method == "thread/goal/get" and not owner_drifted:
+            owner_drifted = True
+            drifted = {**owner_value, "acceptance_posture": "owner-drifted"}
+            owner_path.write_bytes(MODULE._canonical_bytes(drifted) + b"\n")
+        return response
+
+    fake.call = call_with_owner_drift  # type: ignore[method-assign]
+    monkeypatch.setattr(
+        MODULE,
+        "discover_app_server_socket",
+        lambda _owner: (endpoint, "explicit-endpoint"),
+    )
+    pause_impl = MODULE.pause_goal
+
+    def pause_once(
+        owner_value: dict[str, object],
+        owner_file: Path,
+        target: Path,
+        *,
+        owner_bytes: bytes,
+        reservation_path: Path | None = None,
+        reservation: dict[str, object] | None = None,
+    ) -> dict[str, object]:
+        return pause_impl(
+            owner_value,
+            owner_file,
+            target,
+            owner_bytes=owner_bytes,
+            reservation_path=reservation_path,
+            reservation=reservation,
+            rpc_factory=lambda _path: fake,
+        )
+
+    monkeypatch.setattr(MODULE, "pause_goal", pause_once)
+    with pytest.raises(MODULE.VISIBLE.IncarnationHomeError, match="pause owner"):
+        MODULE.run_pause(
+            SimpleNamespace(
+                pause_owner=str(owner_path),
+                pause_receipt=str(pause_path),
+            )
+        )
+
+    assert owner_drifted is True
+    assert not any(method == "thread/goal/set" for method, _params in fake.calls)
+
+
+def test_run_pause_reasserts_owner_after_proof_persistence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    owner_path = tmp_path / "pause-owner-drift-after-proof.json"
+    endpoint = tmp_path / "pause-owner-drift-after-proof.sock"
+    owner_value = pause_owner(
+        goal="goal-pause-owner-drift-after-proof",
+        thread="thread-pause-owner-drift-after-proof",
+        endpoint=f"unix:{endpoint}",
+    )
+    owner_path.write_bytes(MODULE._canonical_bytes(owner_value) + b"\n")
+    pause_path = tmp_path / "pause-owner-drift-after-proof-receipt.json"
+    fake = FakeRpc(
+        endpoint,
+        active_turn=None,
+        goal_status="active",
+        goal_set_status="paused",
+        thread_id="thread-pause-owner-drift-after-proof",
+    )
+    monkeypatch.setattr(
+        MODULE,
+        "discover_app_server_socket",
+        lambda _owner: (endpoint, "explicit-endpoint"),
+    )
+    pause_impl = MODULE.pause_goal
+
+    def pause_once(
+        owner_value: dict[str, object],
+        owner_file: Path,
+        target: Path,
+        *,
+        owner_bytes: bytes,
+        reservation_path: Path | None = None,
+        reservation: dict[str, object] | None = None,
+    ) -> dict[str, object]:
+        return pause_impl(
+            owner_value,
+            owner_file,
+            target,
+            owner_bytes=owner_bytes,
+            reservation_path=reservation_path,
+            reservation=reservation,
+            rpc_factory=lambda _path: fake,
+        )
+
+    monkeypatch.setattr(MODULE, "pause_goal", pause_once)
+    replace_json = MODULE._replace_json
+
+    def replace_with_owner_drift(
+        path: Path,
+        value: dict[str, object],
+        label: str,
+    ) -> None:
+        replace_json(path, value, label)
+        if label == "canonical Goal pause transition proof":
+            drifted = {**owner_value, "acceptance_posture": "owner-drifted"}
+            owner_path.write_bytes(MODULE._canonical_bytes(drifted) + b"\n")
+
+    monkeypatch.setattr(MODULE, "_replace_json", replace_with_owner_drift)
+    with pytest.raises(MODULE.VISIBLE.IncarnationHomeError, match="pause owner"):
+        MODULE.run_pause(
+            SimpleNamespace(
+                pause_owner=str(owner_path),
+                pause_receipt=str(pause_path),
+            )
+        )
+
+    assert [
+        method for method, _params in fake.calls if method == "thread/goal/set"
+    ] == ["thread/goal/set"]
+    reserved = json.loads(pause_path.read_text(encoding="utf-8"))
+    assert reserved["state"] == "reserved"
+    assert isinstance(reserved.get("transition_proof"), dict)
+    assert reserved.get("paused") is not True
+
+
 def test_legacy_pause_serializes_same_goal_across_receipt_paths(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

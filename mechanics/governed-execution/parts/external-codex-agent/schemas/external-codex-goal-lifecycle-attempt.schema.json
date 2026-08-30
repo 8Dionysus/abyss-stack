@@ -12,7 +12,7 @@
   ],
   "properties": {
     "schema_version": {"const": "abyss_stack_external_codex_goal_lifecycle_attempt_v1"},
-    "state": {"enum": ["reserved", "dispatched", "proof_recorded"]},
+    "state": {"enum": ["reserved", "read_only_recorded", "dispatched", "proof_recorded"]},
     "attempt_id": {"type": "string", "minLength": 1},
     "attempt_ref": {"type": "string", "minLength": 1},
     "reserved_at": {"type": "string", "format": "date-time"},
@@ -119,6 +119,19 @@
         "properties": {"state": {"const": "reserved"}}
       },
       "then": {"not": {"required": ["mutation_dispatched"]}}
+    },
+    {
+      "if": {
+        "properties": {"state": {"const": "read_only_recorded"}}
+      },
+      "then": {
+        "not": {
+          "anyOf": [
+            {"required": ["mutation_reserved"]},
+            {"required": ["mutation_dispatched"]}
+          ]
+        }
+      }
     }
   ],
   "$defs": {

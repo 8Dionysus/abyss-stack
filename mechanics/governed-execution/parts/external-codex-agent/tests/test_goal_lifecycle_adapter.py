@@ -328,6 +328,11 @@ def test_generic_adapter_replays_an_already_desired_state_read_only(tmp_path: Pa
 
     assert receipt["status"] == "replayed"
     assert receipt["transport"]["method"] == "thread/goal/get"
+    attempt_path = tmp_path / "accepted_return.attempt.json"
+    assert receipt["attempt_artifact"]["ref"] == str(attempt_path.resolve())
+    assert json.loads(attempt_path.read_text(encoding="utf-8"))["state"] == (
+        "read_only_recorded"
+    )
     assert [method for method, _params in rpc.calls].count("thread/goal/get") == 1
     assert not any(method == "thread/goal/set" for method, _params in rpc.calls)
 
@@ -1113,6 +1118,57 @@ def test_cli_retry_after_reverse_uses_original_semantic_attempt(
         ADAPTER.run_goal_transition(second_args)
 
     assert [method for method, _params in rpc.calls].count("thread/goal/set") == 1
+    assert not ADAPTER._attempt_path(second_receipt).exists()
+    assert not second_receipt.exists()
+
+
+def test_cli_read_only_completion_blocks_later_mutation_after_reverse(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    args, request_path, decision_path, first_receipt, rpc = _cli_fixture(
+        tmp_path,
+        monkeypatch,
+        request_id="request:read-only-completion",
+    )
+    request = _request(
+        observed="active",
+        desired="active",
+        kind="accepted_return",
+        request_id="request:read-only-completion",
+    )
+    decision = _decision(request)
+    request_path.write_bytes(
+        RUNTIME._canonical_bytes(request.model_dump(mode="json")) + b"\n"
+    )
+    decision_path.write_bytes(
+        RUNTIME._canonical_bytes(decision.model_dump(mode="json")) + b"\n"
+    )
+
+    first = ADAPTER.run_goal_transition(args)
+    first_attempt = Path(first["attempt_artifact"]["ref"])
+    assert json.loads(first_attempt.read_text(encoding="utf-8"))["state"] == (
+        "read_only_recorded"
+    )
+    assert not any(method == "thread/goal/set" for method, _params in rpc.calls)
+
+    rpc.status = "paused"
+    second_receipt = tmp_path / "read-only-completion-retry.json"
+    with pytest.raises(
+        RUNTIME.ExternalCodexReturnError,
+        match="already has a durable attempt",
+    ):
+        ADAPTER.run_goal_transition(
+            SimpleNamespace(
+                request=args.request,
+                decision=args.decision,
+                owner=args.owner,
+                receipt=str(second_receipt),
+            )
+        )
+
+    assert first_attempt.exists()
+    assert not any(method == "thread/goal/set" for method, _params in rpc.calls)
     assert not ADAPTER._attempt_path(second_receipt).exists()
     assert not second_receipt.exists()
 

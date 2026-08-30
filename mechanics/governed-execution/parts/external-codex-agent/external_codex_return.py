@@ -1695,6 +1695,9 @@ def pause_goal(
                 proof_reservation,
                 "canonical Goal pause transition proof",
             )
+            VISIBLE._assert_file_snapshot(
+                owner_path, owner_bytes, "pause owner"
+            )
             reservation.clear()
             reservation.update(proof_reservation)
             return _pause_receipt(
@@ -1869,6 +1872,9 @@ def pause_goal(
         setattr(rpc, "request_prepare_callback", record_request_prepared)
         setattr(rpc, "request_issued_callback", record_request_issued)
         try:
+            VISIBLE._assert_file_snapshot(
+                owner_path, owner_bytes, "pause owner"
+            )
             goal_response = rpc.call(
                 "thread/goal/set",
                 {"threadId": owner["thread_id"], "status": "paused"},
@@ -1929,6 +1935,9 @@ def pause_goal(
             reservation_path,
             proof_reservation,
             "canonical Goal pause transition proof",
+        )
+        VISIBLE._assert_file_snapshot(
+            owner_path, owner_bytes, "pause owner"
         )
         reservation.clear()
         reservation.update(proof_reservation)
@@ -3163,6 +3172,7 @@ def _run_pause_bound(
     )
     receipt["transport"]["resolution"] = resolution
     receipt.update(binding)
+    VISIBLE._assert_file_snapshot(owner_path, owner_bytes, "pause owner")
     _replace_json(pause_path, receipt, "canonical Goal pause receipt")
     VISIBLE._assert_file_snapshot(owner_path, owner_bytes, "pause owner")
     return _load_existing_pause_receipt(

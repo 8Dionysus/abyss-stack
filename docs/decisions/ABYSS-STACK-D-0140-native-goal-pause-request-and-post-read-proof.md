@@ -52,12 +52,17 @@ replacement cannot erase the owner anchor. Alternate caller-selected receipt
 paths resolve that anchor instead of creating fresh lifecycle state; if another
 accepted transition later restores the original Goal state, a retry of the old
 idempotency key still finds the completed attempt and refuses a second mutation.
+When the first execution only observes an already-desired state, it records a
+durable `read_only_recorded` attempt at the same anchor. A later reversal cannot
+turn that no-mutation completion into permission to issue a delayed set.
 Dynamic endpoint rebinding may change the fresh transport coordinate but does
 not rewrite the attempt's historical endpoint evidence.
 The CLI reasserts the original request, decision, and owner bytes immediately
 before dispatch. The legacy pause compatibility route lacks the typed
 idempotency artifact, so it serializes by qualified Goal identity across
-receipt paths and fails closed rather than issuing a concurrent duplicate.
+receipt paths, reasserts its owner snapshot before mutation and after proof
+persistence, and fails closed rather than issuing a concurrent duplicate or
+publishing a completed receipt against rewritten owner authority.
 
 Pause evidence remains separate from transport ambiguity, wake delivery,
 semantic acceptance, owner acceptance, holder closure, and Goal completion.
@@ -88,6 +93,8 @@ route.
 - Positive: alternate receipt paths, endpoint rebinding, later state reversal,
   volatile runtime-directory loss, and concurrent legacy pause callers cannot
   cause a duplicate native set for the same admitted contour.
+- Positive: read-only completion remains idempotent after a later state
+  reversal, and legacy owner drift is detected at the mutation/proof boundary.
 - Tradeoff: without a protocol CAS/version field, a receipt proves the bound
   request and post-read observation, not server-side compare-and-set causality.
 - Follow-up: live pause, root wake, holder closure, owner acceptance, and

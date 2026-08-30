@@ -87,11 +87,14 @@ Tracking starts with the community-docs baseline for this repository.
   rebinding cannot issue duplicate lifecycle mutations. A protected semantic
   anchor in persistent owner state retains the first durable attempt across
   runtime-directory loss, later receipt paths, and state reversals; CLI
-  request/decision artifacts are reasserted immediately
+  read-only completion now records the already-desired observation at that
+  anchored attempt path, so a later reversal cannot reopen the same
+  idempotency key. CLI request/decision artifacts are reasserted immediately
   before dispatch, and the SDK binds attempt/receipt evidence to the initially
   loaded owner bytes while rejecting owner drift before dispatch and after
   proof persistence. Legacy pause callers now lock by qualified Goal identity
-  instead of receipt path.
+  instead of receipt path and reassert their owner snapshot immediately before
+  mutation, after proof persistence, and before completed-receipt publication.
 - Bind the canonical `aoa-kag` MCP adapter to an authored absolute
   `AOA_KAG_ARTIFACT_ROOT` seam for v4 cold-CAS reads, preserving fail-closed
   loader behavior and separate artifact-admission verdicts.

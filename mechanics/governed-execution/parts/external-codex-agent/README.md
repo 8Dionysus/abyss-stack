@@ -163,14 +163,16 @@ and replay only through their matching legacy wake reservation. A retry after a 
   sidecar, and bind the file-backed receipt to its canonical path. A protected
   owner/idempotency anchor in persistent owner state retains the first attempt
   path across alternate receipt paths, later reverse transitions, and volatile
-  runtime-lock loss; the CLI reasserts request, decision, and owner bytes
+  runtime-lock loss. An already-desired read records a durable no-mutation
+  completion at that path. The CLI reasserts request, decision, and owner bytes
   immediately before mutation;
 - keeps `aoa-external-codex-return pause` as a backwards-compatible legacy
   pause projection. It remains a mutating compatibility entrypoint when no
   completed receipt exists, reserving the exact precondition and issuing one
   native `thread/goal/set`; replay of a completed receipt is read-only. The
   qualified Goal identity, rather than the caller-selected receipt path, owns
-  the legacy pause lock. The
+  the legacy pause lock. Owner bytes are reasserted immediately before the set,
+  after proof persistence, and before completed-receipt publication. The
   current public `ThreadGoalSetParams` surface exposes the native
   `thread/goal/set` mutation without a CAS/version field, so this route binds
   the exact request, optional returned Goal response with raw bytes, and
