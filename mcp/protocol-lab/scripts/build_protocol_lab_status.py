@@ -107,7 +107,11 @@ def build_status(
     inspector_tasks_blocker: dict[str, Any] | None = None,
     live_modern_fleet: dict[str, Any] | None = None,
     codex_tasks_production_pair: dict[str, Any] | None = None,
+    *,
+    evaluated_at: str | None = None,
 ) -> dict[str, Any]:
+    evaluated_at = evaluated_at or observation["observed_at"]
+    _timestamp(evaluated_at)
     production_observation = production_observation or load_json(PRODUCTION_OBSERVATION_PATH)
     codex_lab_observation = codex_lab_observation or load_json(CODEX_LAB_OBSERVATION_PATH)
     stable_rollback_observation = stable_rollback_observation or load_json(STABLE_ROLLBACK_OBSERVATION_PATH)
@@ -198,7 +202,7 @@ def build_status(
             payload.get("mcp_sdk") == candidate_sdk_identity["mcp_sdk"]
             and payload.get("mcp_sdk_source_revision")
             == candidate_sdk_identity["mcp_sdk_source_revision"]
-            and _evidence_is_current(payload, observation["observed_at"])
+            and _evidence_is_current(payload, evaluated_at)
             for payload in deployment_evidence
         )
     )
@@ -242,7 +246,7 @@ def build_status(
 
     unsigned = {
         "schema_version": "abyss_mcp_protocol_lab_status_v2",
-        "evaluated_at": observation["observed_at"],
+        "evaluated_at": evaluated_at,
         "candidate_evidence_expires_at": candidate_evidence_expires_at,
         "deployment_evidence_expires_at": deployment_evidence_expires_at,
         "deployment_evidence_current": deployment_evidence_current,

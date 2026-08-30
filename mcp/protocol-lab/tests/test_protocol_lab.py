@@ -553,11 +553,24 @@ def test_deployment_receipts_must_match_candidate_sdk_for_migration(
         tasks_matrix=tasks_matrix,
         live_modern_fleet=deployment,
         codex_tasks_production_pair=tasks_pair,
+        evaluated_at="2026-09-04T07:32:30.866342Z",
     )
     assert admitted["deployment_evidence_current"] is True
     assert admitted["core_read_migration_allowed"] is True
     assert admitted["read_only_pilot_allowed"] is True
     assert admitted["internal_effect_migration_allowed"] is False
+
+    expired = builder.build_status(
+        candidate,
+        pair,
+        stable_rollback_observation=stable_rollback,
+        tasks_matrix=tasks_matrix,
+        live_modern_fleet=deployment,
+        codex_tasks_production_pair=tasks_pair,
+        evaluated_at="2026-09-06T07:32:30.866342Z",
+    )
+    assert expired["deployment_evidence_current"] is False
+    assert expired["core_read_migration_allowed"] is False
 
     pair["rollback"]["status"] = "failed"
     rejected = builder.build_status(

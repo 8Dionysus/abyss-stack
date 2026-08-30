@@ -114,6 +114,7 @@ def _consumer(matrix: dict[str, Any], consumer_id: str) -> dict[str, Any]:
 def validate(checked_at: datetime | None = None) -> list[str]:
     errors: list[str] = []
     checked_at = checked_at or datetime.now(UTC)
+    evaluated_at = checked_at.astimezone(UTC).isoformat().replace("+00:00", "Z")
     builder = _load_builder()
     matrix = _load(builder.MATRIX_PATH)
     tasks_matrix = _load(TASKS_MATRIX_PATH)
@@ -128,6 +129,20 @@ def validate(checked_at: datetime | None = None) -> list[str]:
             builder.validate_payload(payload, LAB_ROOT / "schemas" / schema_name)
             fixtures[name] = payload
         status = builder.build_status(
+            matrix,
+            observation,
+            fixtures["production"],
+            fixtures["codex_lab"],
+            fixtures["stable_rollback"],
+            tasks_matrix,
+            fixtures["tasks_pilot"],
+            fixtures["rmcp_tasks_pair"],
+            fixtures["inspector_tasks_blocker"],
+            fixtures["live_modern_fleet"],
+            fixtures["codex_tasks_production_pair"],
+            evaluated_at=evaluated_at,
+        )
+        rendered_status = builder.build_status(
             matrix,
             observation,
             fixtures["production"],
@@ -170,7 +185,12 @@ def validate(checked_at: datetime | None = None) -> list[str]:
     ):
         errors.append("generated status lost the overall earliest evidence expiry")
 
-    expected_render = json.dumps(status, indent=2, ensure_ascii=True, sort_keys=True) + "\n"
+    expected_render = json.dumps(
+        rendered_status,
+        indent=2,
+        ensure_ascii=True,
+        sort_keys=True,
+    ) + "\n"
     if not builder.OUTPUT_PATH.is_file() or builder.OUTPUT_PATH.read_text() != expected_render:
         errors.append("generated protocol-lab status is missing or stale")
 
