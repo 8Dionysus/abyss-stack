@@ -11,6 +11,7 @@ import pytest
 from abyss_stack_mcp.core import StackMCPError, canonical_json_bytes, sha256_digest
 from abyss_stack_mcp.exposure import (
     ExposureInvocationAuthorization,
+    ExposureInvocationReceipt,
     ExposureRuntime,
     StackExposurePlan,
     StackExposureTool,
@@ -590,7 +591,7 @@ def test_plan_collection_counts_are_bounded() -> None:
     payload = _payload()
     payload["refusal_reasons"] = ["bounded"] * 257
 
-    with pytest.raises(StackMCPError, match="failed stack normalization"):
+    with pytest.raises(StackMCPError, match="exposure plan"):
         StackExposurePlan.from_sdk_payload(_redigest_plan(payload))
 
 
@@ -675,13 +676,53 @@ def test_invocation_authorization_is_bounded_before_validation(
     assert receipt.authorization_id is None
 
 
-def test_recursive_preflight_rejects_large_string_without_serializing_it() -> None:
+def test_recursive_preflight_counts_ascii_without_sixfold_overestimate() -> None:
+    _bounded_json_preflight(
+        {"item": "x" * 200_000},
+        max_bytes=1_048_576,
+        max_items=256,
+    )
+
     with pytest.raises(_ExposurePayloadTooLarge):
         _bounded_json_preflight(
-            {"item": "x" * 200_000},
+            {"item": "x" * 1_048_576},
             max_bytes=1_048_576,
             max_items=256,
         )
+
+
+def test_public_plan_loader_applies_preflight_before_pydantic() -> None:
+    payload = _payload()
+    payload["approval_ref"] = {"owner_note": "x" * 1_048_576}
+
+    with pytest.raises(StackMCPError, match="canonical byte limit"):
+        StackExposurePlan.from_sdk_payload(payload)
+
+
+def test_invocation_receipt_contract_cannot_claim_execution() -> None:
+    runtime = ExposureRuntime(clock=lambda: NOW)
+    receipt = runtime.invoke(
+        digest("f"),
+        request_id="denial-only",
+        caller_id="test-caller",
+        tool_id="knowledge-inspect.inspect-knowledge",
+        arguments={},
+        authorization_ref=None,
+    )
+    payload = receipt.model_dump(mode="json")
+    payload.update(
+        {
+            "decision": "allowed",
+            "reason_codes": [],
+            "output_digest": digest("e"),
+            "invocation_authorized": True,
+        }
+    )
+    unsigned = {key: value for key, value in payload.items() if key != "receipt_id"}
+    payload["receipt_id"] = sha256_digest(unsigned)
+
+    with pytest.raises(Exception):
+        ExposureInvocationReceipt.model_validate(payload)
 
 
 def test_stack_normalization_rejects_visible_tool_schema_drift() -> None:

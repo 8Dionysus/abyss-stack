@@ -149,10 +149,23 @@ def _bounded_json_preflight(
                 raise TypeError("exposure JSON contains a non-finite float")
             add(32)
         elif isinstance(item, str):
-            # One Unicode code point needs at most six JSON bytes when escaped.
-            # This intentionally conservative bound avoids allocating encoded
-            # or escaped copies merely to discover that the value is too large.
-            add(2 + 6 * len(item))
+            add(2)
+            for character in item:
+                codepoint = ord(character)
+                if character in {'"', "\\", "\b", "\f", "\n", "\r", "\t"}:
+                    add(2)
+                elif codepoint < 0x20:
+                    add(6)
+                elif codepoint <= 0x7F:
+                    add(1)
+                elif codepoint <= 0x7FF:
+                    add(2)
+                elif 0xD800 <= codepoint <= 0xDFFF:
+                    raise TypeError("exposure JSON contains an invalid surrogate")
+                elif codepoint <= 0xFFFF:
+                    add(3)
+                else:
+                    add(4)
         elif isinstance(item, Mapping):
             if len(item) > max_items:
                 raise _ExposurePayloadTooLarge(
@@ -468,7 +481,16 @@ class StackExposurePlan(StrictExposureModel):
         """Validate the published nested SDK payload without importing SDK code."""
 
         try:
+            _bounded_json_preflight(
+                payload,
+                max_bytes=MAX_EXPOSURE_PLAN_BYTES,
+                max_items=MAX_EXPOSURE_COLLECTION_ITEMS,
+            )
+            if len(canonical_json_bytes(payload)) > MAX_EXPOSURE_PLAN_BYTES:
+                raise _ExposurePayloadTooLarge
             return cls.model_validate(payload)
+        except _ExposurePayloadTooLarge:
+            raise StackMCPError("exposure plan exceeds canonical byte limit") from None
         except Exception:
             # Pydantic ValidationError values can retain the rejected input.
             # Never chain that private payload into the public runtime error.
@@ -568,13 +590,13 @@ class ExposureInvocationReceipt(StrictExposureModel):
     tool_id: NonEmpty
     policy_family: PolicyFamily
     effect_class: EffectClass
-    decision: ExposureDecision
+    decision: Literal["denied"] = "denied"
     reason_codes: tuple[NonEmpty, ...] = ()
     input_digest: Digest
-    output_digest: Digest | None = None
+    output_digest: Literal[None] = None
     authorization_id: Digest | None = None
     observed_at: datetime
-    invocation_authorized: bool = False
+    invocation_authorized: Literal[False] = False
     runtime_effect_authorized: Literal[False] = False
     contains_secrets: Literal[False] = False
     instruction_authority: Literal["none"] = "none"
@@ -588,12 +610,7 @@ class ExposureInvocationReceipt(StrictExposureModel):
 
     @model_validator(mode="after")
     def validate_receipt(self) -> ExposureInvocationReceipt:
-        if self.decision == "allowed":
-            if self.output_digest is None or not self.invocation_authorized:
-                raise ValueError("allowed invocation requires authorization and output")
-            if self.reason_codes:
-                raise ValueError("allowed invocation cannot carry refusal reasons")
-        elif self.output_digest is not None or not self.reason_codes:
+        if not self.reason_codes:
             raise ValueError("denied invocation receipt shape is invalid")
         unsigned = {
             key: value
