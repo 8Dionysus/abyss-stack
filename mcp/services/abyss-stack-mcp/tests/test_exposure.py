@@ -14,6 +14,8 @@ from abyss_stack_mcp.exposure import (
     ExposureRuntime,
     StackExposurePlan,
     StackExposureTool,
+    _ExposurePayloadTooLarge,
+    _bounded_json_preflight,
 )
 
 
@@ -671,6 +673,15 @@ def test_invocation_authorization_is_bounded_before_validation(
 
     assert "invocation_authorization_too_large" in receipt.reason_codes
     assert receipt.authorization_id is None
+
+
+def test_recursive_preflight_rejects_large_string_without_serializing_it() -> None:
+    with pytest.raises(_ExposurePayloadTooLarge):
+        _bounded_json_preflight(
+            {"item": "x" * 200_000},
+            max_bytes=1_048_576,
+            max_items=256,
+        )
 
 
 def test_stack_normalization_rejects_visible_tool_schema_drift() -> None:

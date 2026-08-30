@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import copy
 import hashlib
+import math
 import re
 from collections.abc import Callable, Mapping
 from datetime import datetime, timedelta, timezone
@@ -79,6 +80,7 @@ MAX_INVOCATION_ARGUMENT_BYTES = 1_048_576
 MAX_INVOCATION_ARGUMENT_ITEMS = 256
 MAX_INVOCATION_AUTHORIZATION_BYTES = 65_536
 MAX_INVOCATION_AUTHORIZATION_ITEMS = 64
+MAX_EXPOSURE_JSON_DEPTH = 32
 ZERO_DIGEST = "sha256:" + "0" * 64
 BASELINE_ADMISSION_REF = "receipt://d0/baseline-ready"
 CLAIM_LIMIT = (
@@ -108,6 +110,87 @@ def _receipt_identifier_status(value: Any) -> Literal["valid", "malformed", "sec
     except StackMCPError:
         return "secret"
     return "valid"
+
+
+class _ExposurePayloadTooLarge(ValueError):
+    pass
+
+
+def _bounded_json_preflight(
+    value: Any,
+    *,
+    max_bytes: int,
+    max_items: int,
+) -> None:
+    """Reject oversized JSON before constructing its complete serialization."""
+
+    estimated_bytes = 0
+    active_containers: set[int] = set()
+
+    def add(amount: int) -> None:
+        nonlocal estimated_bytes
+        estimated_bytes += amount
+        if estimated_bytes > max_bytes:
+            raise _ExposurePayloadTooLarge("exposure JSON exceeds byte ceiling")
+
+    def visit(item: Any, depth: int) -> None:
+        if depth > MAX_EXPOSURE_JSON_DEPTH:
+            raise _ExposurePayloadTooLarge("exposure JSON exceeds depth ceiling")
+        if item is None:
+            add(4)
+        elif isinstance(item, bool):
+            add(4 if item else 5)
+        elif isinstance(item, int):
+            bit_length = abs(item).bit_length()
+            decimal_digits_upper_bound = (bit_length * 30103) // 100000 + 2
+            add(decimal_digits_upper_bound + (1 if item < 0 else 0))
+        elif isinstance(item, float):
+            if not math.isfinite(item):
+                raise TypeError("exposure JSON contains a non-finite float")
+            add(32)
+        elif isinstance(item, str):
+            # One Unicode code point needs at most six JSON bytes when escaped.
+            # This intentionally conservative bound avoids allocating encoded
+            # or escaped copies merely to discover that the value is too large.
+            add(2 + 6 * len(item))
+        elif isinstance(item, Mapping):
+            if len(item) > max_items:
+                raise _ExposurePayloadTooLarge(
+                    "exposure JSON exceeds mapping item ceiling"
+                )
+            identity = id(item)
+            if identity in active_containers:
+                raise TypeError("exposure JSON contains a cycle")
+            active_containers.add(identity)
+            add(2 + max(0, len(item) - 1))
+            try:
+                for key, nested in item.items():
+                    if not isinstance(key, str):
+                        raise TypeError("exposure JSON mapping keys must be strings")
+                    visit(key, depth + 1)
+                    add(1)
+                    visit(nested, depth + 1)
+            finally:
+                active_containers.remove(identity)
+        elif isinstance(item, (list, tuple)):
+            if len(item) > max_items:
+                raise _ExposurePayloadTooLarge(
+                    "exposure JSON exceeds collection item ceiling"
+                )
+            identity = id(item)
+            if identity in active_containers:
+                raise TypeError("exposure JSON contains a cycle")
+            active_containers.add(identity)
+            add(2 + max(0, len(item) - 1))
+            try:
+                for nested in item:
+                    visit(nested, depth + 1)
+            finally:
+                active_containers.remove(identity)
+        else:
+            raise TypeError("exposure value is not JSON-compatible")
+
+    visit(value, 0)
 
 
 class StrictExposureModel(BaseModel):
@@ -579,20 +662,26 @@ class ExposureRuntime:
         self,
         plan: StackExposurePlan | Mapping[str, Any],
     ) -> ExposureMaterializationReceipt:
-        raw_plan = copy.deepcopy(
+        raw_plan_source = (
             plan.model_dump(mode="json")
             if isinstance(plan, StackExposurePlan)
             else plan
         )
         try:
-            raw_plan_bytes = canonical_json_bytes(raw_plan)
+            _bounded_json_preflight(
+                raw_plan_source,
+                max_bytes=MAX_EXPOSURE_PLAN_BYTES,
+                max_items=MAX_EXPOSURE_COLLECTION_ITEMS,
+            )
+            raw_plan_bytes = canonical_json_bytes(raw_plan_source)
+        except _ExposurePayloadTooLarge:
+            raise StackMCPError("exposure plan exceeds canonical byte limit") from None
         except (TypeError, ValueError):
             raise StackMCPError("exposure plan failed stack normalization") from None
         if len(raw_plan_bytes) > MAX_EXPOSURE_PLAN_BYTES:
             raise StackMCPError("exposure plan exceeds canonical byte limit")
-        normalized = StackExposurePlan.from_sdk_payload(
-            raw_plan
-        )
+        raw_plan = copy.deepcopy(raw_plan_source)
+        normalized = StackExposurePlan.from_sdk_payload(raw_plan)
         now = self._now()
         self._prune_materializations(now)
         reasons: list[str] = []
@@ -747,16 +836,21 @@ class ExposureRuntime:
                     if isinstance(authorization_ref, ExposureInvocationAuthorization)
                     else authorization_ref
                 )
+                _bounded_json_preflight(
+                    raw_authorization,
+                    max_bytes=MAX_INVOCATION_AUTHORIZATION_BYTES,
+                    max_items=MAX_INVOCATION_AUTHORIZATION_ITEMS,
+                )
                 if (
-                    len(raw_authorization) > MAX_INVOCATION_AUTHORIZATION_ITEMS
-                    or len(canonical_json_bytes(raw_authorization))
+                    len(canonical_json_bytes(raw_authorization))
                     > MAX_INVOCATION_AUTHORIZATION_BYTES
                 ):
-                    reasons.append("invocation_authorization_too_large")
-                else:
-                    authorization = ExposureInvocationAuthorization.model_validate(
-                        raw_authorization
-                    )
+                    raise _ExposurePayloadTooLarge
+                authorization = ExposureInvocationAuthorization.model_validate(
+                    raw_authorization
+                )
+            except _ExposurePayloadTooLarge:
+                reasons.append("invocation_authorization_too_large")
             except Exception:
                 reasons.append("invocation_authorization_invalid")
             if authorization is not None:
@@ -784,19 +878,23 @@ class ExposureRuntime:
         normalized_arguments: dict[str, Any] = {}
         input_digest = sha256_digest(normalized_arguments)
         try:
-            if len(arguments) > MAX_INVOCATION_ARGUMENT_ITEMS:
+            _bounded_json_preflight(
+                arguments,
+                max_bytes=MAX_INVOCATION_ARGUMENT_BYTES,
+                max_items=MAX_INVOCATION_ARGUMENT_ITEMS,
+            )
+            candidate_arguments = (
+                arguments if isinstance(arguments, dict) else dict(arguments)
+            )
+            argument_bytes = canonical_json_bytes(candidate_arguments)
+            if len(argument_bytes) > MAX_INVOCATION_ARGUMENT_BYTES:
                 reasons.append("invocation_arguments_too_large")
             else:
-                candidate_arguments = (
-                    arguments if isinstance(arguments, dict) else dict(arguments)
-                )
-                argument_bytes = canonical_json_bytes(candidate_arguments)
-                if len(argument_bytes) > MAX_INVOCATION_ARGUMENT_BYTES:
-                    reasons.append("invocation_arguments_too_large")
-                else:
-                    _reject_secret_material(candidate_arguments)
-                    normalized_arguments = dict(candidate_arguments)
-                    input_digest = sha256_digest(normalized_arguments)
+                _reject_secret_material(candidate_arguments)
+                normalized_arguments = dict(candidate_arguments)
+                input_digest = sha256_digest(normalized_arguments)
+        except _ExposurePayloadTooLarge:
+            reasons.append("invocation_arguments_too_large")
         except StackMCPError:
             reasons.append("secret_material_rejected")
         except Exception:
