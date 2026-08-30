@@ -1,38 +1,117 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-STACK=/srv/AbyssOS/abyss-stack
-VENV="$STACK/Services/abyss-stack-mcp/venv/bin"
-INSTALL_SYSTEMD="$STACK/Configs/scripts/aoa-install-systemd"
-RUNTIME_REPAIR_SERVICE="abyss-stack-mcp-runtime-repair.service"
-AUTO_REPAIR_MARKER="$STACK/Secrets/Configs/abyss-stack-mcp-runtime-auto-repair.enabled"
-OPERATION_LOCK="$STACK/Services/abyss-stack-mcp/.runtime-operation.lock"
-SOURCE_LOCK="$STACK/Services/abyss-stack-mcp/.source-projection.lock"
-RUNTIME_LOCK="$STACK/Services/abyss-stack-mcp/.runtime-provision.lock"
-REPAIR_FALLBACK="$STACK/Logs/mcp/admission/runtime-repair-fallback.units"
-REGISTRY=/srv/AbyssOS/.aoa/organ-access/organ-registry.v2.source.json
-DEPLOYMENT="$STACK/Logs/mcp/deployments/latest.json"
-TARGETS="$STACK/Configs/mcp/services/abyss-stack-mcp/src/abyss_stack_mcp/runtime-targets.v1.json"
-PUBLIC_KEY="$STACK/Secrets/Configs/abyss-stack-mcp-canary-ed25519-public-key.pem"
-ROOT="$STACK/Logs/mcp/fleet-admission"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+CONFIGS_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
+STACK="${AOA_ABYSS_STACK_ROOT:-$(cd -- "${CONFIGS_ROOT}/.." && pwd)}"
+WORKSPACE_ROOT="${AOA_WORKSPACE_ROOT:-$(cd -- "${STACK}/.." && pwd)}"
+RUNTIME_CONFIG="${CONFIGS_ROOT}/mcp/services/_shared/runtime-config.v1.json"
+
+[[ -f "$RUNTIME_CONFIG" && ! -L "$RUNTIME_CONFIG" ]] || {
+  printf 'modern MCP runtime catalog is unavailable or unsafe: %s\n' \
+    "$RUNTIME_CONFIG" >&2
+  exit 1
+}
+command -v jq >/dev/null 2>&1 || {
+  printf '%s\n' 'modern MCP admission requires jq' >&2
+  exit 1
+}
+jq -e \
+  '(.schema_version == "abyss_mcp_runtime_config_v1"
+   and .mcp.sdk.major == 2
+   and .mcp.sdk.requirement == "mcp>=2,<3")
+   and ((.deployment.client_read_contours | length) > 0)' \
+  "$RUNTIME_CONFIG" >/dev/null || {
+  printf '%s\n' 'modern MCP runtime catalog failed its admission contract' >&2
+  exit 1
+}
+
+STACK_SERVICE_ID="$(jq -er '
+  [.services[] | select(.runtime_executable_mode == "stack_venv") | .service_id]
+  | if length == 1 then .[0] else error("expected one stack_venv service") end
+' "$RUNTIME_CONFIG")"
+STACK_MODULE="$(jq -er --arg service_id "$STACK_SERVICE_ID" '
+  .services[] | select(.service_id == $service_id) | .module
+' "$RUNTIME_CONFIG")"
+STACK_MODULE_PATH="${STACK_MODULE//./\/}"
+RUNTIME_PYTHON_RELATIVE="$(jq -er --arg service_id "$STACK_SERVICE_ID" '
+  .deployment.runtime_python_relative_template
+  | gsub("\\{service_id\\}"; $service_id)
+' "$RUNTIME_CONFIG")"
+VENV="$STACK/${RUNTIME_PYTHON_RELATIVE%/python}"
+INSTALL_SYSTEMD="$CONFIGS_ROOT/scripts/aoa-install-systemd"
+RUNTIME_SERVICE_ROOT="${VENV%/venv/bin}"
+CANARY_BIN="$VENV/${STACK_SERVICE_ID}-canary"
+FLEET_ADMISSION_BIN="$VENV/${STACK_SERVICE_ID}-fleet-admission"
+RUNTIME_REPAIR_SERVICE="$(jq -er '.deployment.runtime_repair_unit' "$RUNTIME_CONFIG")"
+CREDENTIALS_ROOT="$STACK/$(jq -er '.deployment.credentials_relative' "$RUNTIME_CONFIG")"
+LOGS_ROOT="$STACK/$(jq -er '.paths.stack_logs_relative_to_runtime' "$RUNTIME_CONFIG")"
+CANARY_ROOT="$STACK/$(jq -er '.paths.stack_canaries_relative_to_runtime' "$RUNTIME_CONFIG")"
+AUTO_REPAIR_MARKER="$CREDENTIALS_ROOT/$(jq -er '.deployment.auto_repair_marker_name' "$RUNTIME_CONFIG")"
+OPERATION_LOCK="$RUNTIME_SERVICE_ROOT/.runtime-operation.lock"
+SOURCE_LOCK="$RUNTIME_SERVICE_ROOT/.source-projection.lock"
+RUNTIME_LOCK="$RUNTIME_SERVICE_ROOT/.runtime-provision.lock"
+REPAIR_FALLBACK="$LOGS_ROOT/admission/runtime-repair-fallback.units"
+REGISTRY="$WORKSPACE_ROOT/$(jq -er '.deployment.registry_relative_to_workspace' "$RUNTIME_CONFIG")"
+DEPLOYMENT="$STACK/$(jq -er '.paths.stack_deployment_manifest_relative_to_runtime' "$RUNTIME_CONFIG")"
+TARGETS="$CONFIGS_ROOT/mcp/services/$STACK_SERVICE_ID/src/$STACK_MODULE_PATH/runtime-targets.v1.json"
+PUBLIC_KEY="$CREDENTIALS_ROOT/$(jq -er '.deployment.canary_public_key_name' "$RUNTIME_CONFIG")"
+ROOT="$LOGS_ROOT/fleet-admission"
 RUN="$ROOT/runs/$(date -u +%Y%m%dT%H%M%SZ)"
 LOCK="$ROOT/.refresh.lock"
 REBASE_DECISION_REF="owner://abyss-stack/decision/ABYSS-STACK-D-0109"
 REBASE_TTL_SECONDS=86400
 CANARY_WORKERS="${ABYSS_MCP_CANARY_WORKERS:-3}"
 
-organs=(
-  abyss-stack abyss-machine aoa-decisions aoa-memo aoa-session-memory
-  aoa-evals aoa-kag aoa-stats aoa-4pda-connector aoa-telegram-connector
-  aoa-discord-connector
-)
+target_rows_text="$(jq -er '
+  .targets[]
+  | select(.policy_family == "read" and .rollout_cohort == "admitted-read")
+  | [.organ_id, .unit_name]
+  | @tsv
+' "$TARGETS")" || {
+  printf 'modern MCP admitted-read target catalog is unavailable or empty: %s\n' \
+    "$TARGETS" >&2
+  exit 1
+}
+mapfile -t target_rows <<< "$target_rows_text"
+[[ "${#target_rows[@]}" -gt 0 ]] || {
+  printf 'modern MCP admitted-read target catalog is empty: %s\n' \
+    "$TARGETS" >&2
+  exit 1
+}
 
-production_units=(abyss-stack-mcp-read.service)
-bootstrap_units=(abyss-stack-mcp-read-bootstrap.service)
-for organ in "${organs[@]:1}"; do
-  production_units+=("aoa-organ-mcp-read@${organ}.service")
-  bootstrap_units+=("aoa-organ-mcp-read-bootstrap@${organ}.service")
+organs=()
+production_units=()
+bootstrap_units=()
+for target_row in "${target_rows[@]}"; do
+  IFS=$'\t' read -r organ production_unit <<< "$target_row"
+  [[ -n "$organ" && -n "$production_unit" ]] || {
+    printf '%s\n' 'modern MCP admitted-read target row is malformed' >&2
+    exit 1
+  }
+  organs+=("$organ")
+  production_units+=("$production_unit")
+  case "$production_unit" in
+    *-read.service)
+      bootstrap_units+=("${production_unit/-read.service/-read-bootstrap.service}")
+      ;;
+    *-read@*.service)
+      bootstrap_units+=("${production_unit/-read@/-read-bootstrap@}")
+      ;;
+    *)
+      printf 'modern MCP production unit has no bootstrap projection: %s\n' \
+        "$production_unit" >&2
+      exit 1
+      ;;
+  esac
 done
+EXPECTED_PRODUCTION_COUNT="${#organs[@]}"
+DECLARED_PRODUCTION_COUNT="$(jq -er '.deployment.client_read_contours | length' "$RUNTIME_CONFIG")"
+[[ "$DECLARED_PRODUCTION_COUNT" -eq "$EXPECTED_PRODUCTION_COUNT" ]] || {
+  printf 'modern MCP runtime catalog/target count mismatch: catalog=%s targets=%s\n' \
+    "$DECLARED_PRODUCTION_COUNT" "$EXPECTED_PRODUCTION_COUNT" >&2
+  exit 1
+}
 
 bootstrap_started=0
 production_handoff_state="inactive"
@@ -49,12 +128,14 @@ repair_bootstrap_organs=()
 
 case "$CANARY_WORKERS" in
   ''|*[!0-9]*)
-    printf 'modern MCP canary worker count must be an integer from 1 to 11\n' >&2
+    printf 'modern MCP canary worker count must be an integer from 1 to %s\n' \
+      "$EXPECTED_PRODUCTION_COUNT" >&2
     exit 1
     ;;
 esac
-if ((CANARY_WORKERS < 1 || CANARY_WORKERS > ${#organs[@]})); then
-  printf 'modern MCP canary worker count must be an integer from 1 to 11\n' >&2
+if ((CANARY_WORKERS < 1 || CANARY_WORKERS > EXPECTED_PRODUCTION_COUNT)); then
+  printf 'modern MCP canary worker count must be an integer from 1 to %s\n' \
+    "$EXPECTED_PRODUCTION_COUNT" >&2
   exit 1
 fi
 
@@ -124,13 +205,21 @@ capture_canary_pair() {
   local lkg_record
   local current_record
 
-  "$VENV/abyss-stack-mcp-canary" \
+  "$CANARY_BIN" \
     --organ "$organ" \
+    --targets "$TARGETS" \
+    --secret-dir "$CREDENTIALS_ROOT" \
+    --output-root "$CANARY_ROOT" \
+    --deployment-manifest "$DEPLOYMENT" \
     --process-unit "$process_unit" \
     --purpose last-known-good \
     --ttl-seconds 3600 > "$stdout_root/${organ}-lkg.json"
-  "$VENV/abyss-stack-mcp-canary" \
+  "$CANARY_BIN" \
     --organ "$organ" \
+    --targets "$TARGETS" \
+    --secret-dir "$CREDENTIALS_ROOT" \
+    --output-root "$CANARY_ROOT" \
+    --deployment-manifest "$DEPLOYMENT" \
     --process-unit "$process_unit" \
     --ttl-seconds 3600 > "$stdout_root/${organ}-current.json"
   lkg_record=$(jq -er .record_path "$stdout_root/${organ}-lkg.json")
@@ -176,7 +265,13 @@ capture_canary_family() {
   chmod 0700 "$current_root" "$lkg_root" "$stdout_root"
   canary_worker_pids=()
   for organ in "${selected_organs[@]}"; do
-    VENV="$VENV" setsid --wait bash -euo pipefail -c "$(declare -f capture_canary_pair)
+    VENV="$VENV" \
+    CANARY_BIN="$CANARY_BIN" \
+    TARGETS="$TARGETS" \
+    CREDENTIALS_ROOT="$CREDENTIALS_ROOT" \
+    CANARY_ROOT="$CANARY_ROOT" \
+    DEPLOYMENT="$DEPLOYMENT" \
+    setsid --wait bash -euo pipefail -c "$(declare -f capture_canary_pair)
 capture_canary_pair \"\$@\"" _ \
       "$process_unit" "$current_root" "$lkg_root" "$stdout_root" "$organ" &
     canary_worker_pids+=("$!")
@@ -206,14 +301,41 @@ array_contains() {
   return 1
 }
 
+production_unit_for_organ() {
+  local requested_organ=$1
+  local index
+
+  for index in "${!organs[@]}"; do
+    if [[ "${organs[$index]}" == "$requested_organ" ]]; then
+      printf '%s\n' "${production_units[$index]}"
+      return 0
+    fi
+  done
+  return 1
+}
+
+bootstrap_unit_for_production_unit() {
+  local production_unit=$1
+
+  case "$production_unit" in
+    *-read.service)
+      printf '%s\n' "${production_unit/-read.service/-read-bootstrap.service}"
+      ;;
+    *-read@*.service)
+      printf '%s\n' "${production_unit/-read@/-read-bootstrap@}"
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
 bootstrap_unit_for_organ() {
   local organ=$1
+  local production_unit
 
-  if [[ "$organ" == "abyss-stack" ]]; then
-    printf '%s\n' 'abyss-stack-mcp-read-bootstrap.service'
-  else
-    printf 'aoa-organ-mcp-read-bootstrap@%s.service\n' "$organ"
-  fi
+  production_unit=$(production_unit_for_organ "$organ") || return 1
+  bootstrap_unit_for_production_unit "$production_unit"
 }
 
 publish_admission() {
@@ -221,7 +343,7 @@ publish_admission() {
   local lkg_root=$2
   local label=$3
 
-  "$VENV/abyss-stack-mcp-fleet-admission" \
+  "$FLEET_ADMISSION_BIN" \
     --registry "$REGISTRY" \
     --deployment-manifest "$DEPLOYMENT" \
     --runtime-targets "$TARGETS" \
@@ -293,6 +415,7 @@ load_runtime_repair_fallback() {
   local fallback_unit
   local organ
   local managed_organ
+  local production_unit
 
   [[ -f "$REPAIR_FALLBACK" && ! -L "$REPAIR_FALLBACK" ]] || return 1
   [[ "$(stat -c '%a' "$REPAIR_FALLBACK")" == "600" ]] || return 1
@@ -304,12 +427,24 @@ load_runtime_repair_fallback() {
     [[ "$fallback_unit" == "abyss-stack-mcp-read-fallback.service" || \
        "$fallback_unit" =~ ^aoa-organ-mcp-read-fallback@[A-Za-z0-9_.-]+\.service$ ]] || \
       return 1
-    if [[ "$fallback_unit" == "abyss-stack-mcp-read-fallback.service" ]]; then
-      organ="abyss-stack"
-    else
-      organ="${fallback_unit#aoa-organ-mcp-read-fallback@}"
-      organ="${organ%.service}"
-    fi
+    case "$fallback_unit" in
+      *-fallback.service)
+        production_unit="${fallback_unit%-fallback.service}.service"
+        ;;
+      *-fallback@*.service)
+        production_unit="${fallback_unit/-fallback@/@}"
+        ;;
+      *)
+        return 1
+        ;;
+    esac
+    organ=$(for managed_organ in "${organs[@]}"; do
+      if [[ "$(production_unit_for_organ "$managed_organ")" == "$production_unit" ]]; then
+        printf '%s\n' "$managed_organ"
+        break
+      fi
+    done)
+    [[ -n "$organ" ]] || return 1
     array_contains "$organ" "${organs[@]}" || return 1
     ! array_contains "$organ" "${repair_fallback_organs[@]}" || return 1
     repair_fallback_units+=("$fallback_unit")
@@ -386,18 +521,21 @@ build_preflight() {
     --registry "$REGISTRY" \
     --deployment-manifest "$DEPLOYMENT" \
     --runtime-targets "$TARGETS" \
-    --canary-root "$STACK/Logs/mcp/canaries/latest" \
+    --canary-root "$CANARY_ROOT/latest" \
     --canary-public-key "$PUBLIC_KEY" \
     --deployed-root "$STACK" \
-    --output-root "$STACK/Logs/mcp/admission" \
-    --keeper-inbox-root "$STACK/Logs/mcp/admission/keeper-inbox" \
+    --output-root "$LOGS_ROOT/admission" \
+    --keeper-inbox-root "$LOGS_ROOT/admission/keeper-inbox" \
     > "$output"
-  jq -e '.preflight.all_eligible == true and .preflight.eligible_count == 11 and .preflight.blocked_count == 0' \
+  jq -e --argjson expected "$EXPECTED_PRODUCTION_COUNT" \
+    '.preflight.all_eligible == true
+     and .preflight.eligible_count == $expected
+     and .preflight.blocked_count == 0' \
     "$output" >/dev/null
 }
 
 catalog_matches_current_canaries() {
-  local catalog="$STACK/Logs/mcp/admission/managed-contours.json"
+  local catalog="$LOGS_ROOT/admission/managed-contours.json"
   local latest_canary
   local organ
   local observed_at
@@ -405,7 +543,7 @@ catalog_matches_current_canaries() {
 
   [[ -f "$catalog" && ! -L "$catalog" ]] || return 1
   for organ in "${organs[@]}"; do
-    latest_canary="$STACK/Logs/mcp/canaries/latest/${organ}.read.json"
+    latest_canary="$CANARY_ROOT/latest/${organ}.read.json"
     [[ -f "$latest_canary" && ! -L "$latest_canary" ]] || return 1
     receipt_id=$(jq -er .receipt_id "$latest_canary") || return 1
     observed_at=$(jq -er .observed_at "$latest_canary") || return 1
@@ -468,10 +606,10 @@ production_identity_count=0
 deployment_identity_count=$(jq -r --arg manifest_id "$deployment_manifest_id" '[.records[] | .contours[] | select(.contour_id == "read" and .registry_state == "admitted" and .runtime_identity.deployment_manifest_digest == $manifest_id)] | length' "$REGISTRY")
 current_canary_count=0
 active_unit_count=0
-for organ in "${organs[@]}"; do
-  latest_canary="$STACK/Logs/mcp/canaries/latest/${organ}.read.json"
-  unit="aoa-organ-mcp-read@${organ}.service"
-  [[ "$organ" == "abyss-stack" ]] && unit="abyss-stack-mcp-read.service"
+for index in "${!organs[@]}"; do
+  organ="${organs[$index]}"
+  latest_canary="$CANARY_ROOT/latest/${organ}.read.json"
+  unit="${production_units[$index]}"
   if jq -e --arg organ "$organ" --arg unit "$unit" '
     [.records[]
       | select(.organ_id == $organ)
@@ -499,10 +637,10 @@ for organ in "${organs[@]}"; do
   fi
 done
 production_admission_reusable=0
-if [[ "$admitted_count" -eq 11 \
-      && "$production_identity_count" -eq 11 \
-      && "$deployment_identity_count" -eq 11 \
-      && "$current_canary_count" -eq 11 \
+if [[ "$admitted_count" -eq "$EXPECTED_PRODUCTION_COUNT" \
+      && "$production_identity_count" -eq "$EXPECTED_PRODUCTION_COUNT" \
+      && "$deployment_identity_count" -eq "$EXPECTED_PRODUCTION_COUNT" \
+      && "$current_canary_count" -eq "$EXPECTED_PRODUCTION_COUNT" \
       && "$minimum_expiry" -gt "$now_epoch" \
       && "$registry_expiry" -gt "$now_epoch" ]] \
     && catalog_matches_current_canaries; then
@@ -510,7 +648,7 @@ if [[ "$admitted_count" -eq 11 \
 fi
 
 if [[ "$production_admission_reusable" -eq 1 \
-      && "$active_unit_count" -eq 11 ]]; then
+      && "$active_unit_count" -eq "$EXPECTED_PRODUCTION_COUNT" ]]; then
   complete_runtime_repair_fallback
   exit 0
 fi
@@ -533,7 +671,7 @@ if [[ "$registry_expiry" -le "$now_epoch" ]]; then
 fi
 
 active_unit_count=$(active_production_count)
-if [[ "$active_unit_count" -ne 11 ]]; then
+if [[ "$active_unit_count" -ne "$EXPECTED_PRODUCTION_COUNT" ]]; then
   if [[ "$production_admission_reusable" -eq 1 ]]; then
     systemctl --user reset-failed "${production_units[@]}"
   elif [[ "$repair_fallback_loaded" -eq 1 ]]; then
@@ -600,7 +738,7 @@ if [[ "$active_unit_count" -ne 11 ]]; then
   fi
   production_handoff_state="started"
   systemctl --user start "${production_units[@]}"
-  [[ "$(active_production_count)" -eq 11 ]] || {
+  [[ "$(active_production_count)" -eq "$EXPECTED_PRODUCTION_COUNT" ]] || {
     printf 'modern MCP production handoff did not start the exact fleet\n' >&2
     exit 1
   }

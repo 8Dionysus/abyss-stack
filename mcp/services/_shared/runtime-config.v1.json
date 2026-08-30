@@ -108,6 +108,9 @@
     "contour_unit_template": "{service_id}-{contour}.service",
     "codex_mcp_feature": "mcp_2026_07_28",
     "recovery_unit": "abyss-mcp-modern-admission-refresh.service",
+    "runtime_repair_unit": "abyss-stack-mcp-runtime-repair.service",
+    "auto_repair_marker_name": "abyss-stack-mcp-runtime-auto-repair.enabled",
+    "canary_public_key_name": "abyss-stack-mcp-canary-ed25519-public-key.pem",
     "approved_artifacts": {
       "aoa_sdk": {
         "distribution": "aoa-sdk",

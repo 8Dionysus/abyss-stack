@@ -4307,7 +4307,7 @@ esac
         self.assertIn("live_digest=$(sha256sum", script)
         self.assertIn("trap cleanup_recovery EXIT", script)
         self.assertIn(
-            'REPAIR_FALLBACK="$STACK/Logs/mcp/admission/'
+            'REPAIR_FALLBACK="$LOGS_ROOT/admission/'
             'runtime-repair-fallback.units"',
             script,
         )
@@ -4315,7 +4315,7 @@ esac
             'CANARY_WORKERS="${ABYSS_MCP_CANARY_WORKERS:-3}"', script
         )
         self.assertIn("CANARY_WORKERS < 1", script)
-        self.assertIn("CANARY_WORKERS > ${#organs[@]}", script)
+        self.assertIn("CANARY_WORKERS > EXPECTED_PRODUCTION_COUNT", script)
         self.assertIn("capture_canary_pair", script)
         self.assertIn("setsid --wait bash -euo pipefail -c", script)
         self.assertIn('kill -TERM -- "-${pid}"', script)
@@ -4350,7 +4350,7 @@ esac
         self.assertIn(
             'startswith("systemd-user:" + $unit + ":pid:")', script
         )
-        self.assertIn(".preflight.eligible_count == 11", script)
+        self.assertIn(".preflight.eligible_count == $expected", script)
         self.assertIn(".preflight.blocked_count == 0", script)
         self.assertIn("catalog_matches_current_canaries", script)
         self.assertIn(".canary_receipt_id == $receipt_id", script)
@@ -4358,7 +4358,7 @@ esac
         self.assertIn("production_admission_reusable=0", script)
         self.assertIn(
             'if [[ "$production_admission_reusable" -eq 1 \\\n'
-            '      && "$active_unit_count" -eq 11 ]]; then',
+            '      && "$active_unit_count" -eq "$EXPECTED_PRODUCTION_COUNT" ]]; then',
             script,
         )
         self.assertIn(
@@ -4398,14 +4398,17 @@ esac
         self.assertIn("OnUnitActiveSec=5min", timer)
         self.assertIn("ensure_stack_runtime_ready", script)
         self.assertIn(
-            'RUNTIME_REPAIR_SERVICE="abyss-stack-mcp-runtime-repair.service"',
+            'RUNTIME_REPAIR_SERVICE="$(jq -er \'.deployment.runtime_repair_unit\' "$RUNTIME_CONFIG")"',
             script,
         )
         self.assertIn(
             'systemctl --user start "$RUNTIME_REPAIR_SERVICE"',
             script,
         )
-        self.assertIn('AUTO_REPAIR_MARKER="$STACK/Secrets/Configs/', script)
+        self.assertIn(
+            'AUTO_REPAIR_MARKER="$CREDENTIALS_ROOT/$(jq -er \'.deployment.auto_repair_marker_name\' "$RUNTIME_CONFIG")"',
+            script,
+        )
         self.assertIn("automatic runtime repair is not explicitly enabled", script)
         self.assertIn(
             'systemctl --user reset-failed "$RUNTIME_REPAIR_SERVICE" \\\n'

@@ -120,12 +120,20 @@ def load_runtime_catalog(explicit: Path | None = None) -> dict[str, Any]:
         "contour_unit_template",
         "codex_mcp_feature",
         "recovery_unit",
+        "runtime_repair_unit",
+        "auto_repair_marker_name",
+        "canary_public_key_name",
     ):
         _non_empty(deployment.get(key), f"deployment.{key}")
     if _CODEX_FEATURE.fullmatch(deployment["codex_mcp_feature"]) is None:
         raise RuntimeCatalogError("deployment.codex_mcp_feature is invalid")
     if _UNIT_NAME.fullmatch(deployment["recovery_unit"]) is None:
         raise RuntimeCatalogError("deployment.recovery_unit is invalid")
+    if _UNIT_NAME.fullmatch(deployment["runtime_repair_unit"]) is None:
+        raise RuntimeCatalogError("deployment.runtime_repair_unit is invalid")
+    for key in ("auto_repair_marker_name", "canary_public_key_name"):
+        if _CREDENTIAL_NAME.fullmatch(deployment[key]) is None:
+            raise RuntimeCatalogError(f"deployment.{key} is invalid")
     client_read_contours = deployment.get("client_read_contours")
     if not isinstance(client_read_contours, list) or not client_read_contours:
         raise RuntimeCatalogError(

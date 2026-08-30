@@ -188,6 +188,9 @@
         "contour_unit_template",
         "codex_mcp_feature",
         "recovery_unit",
+        "runtime_repair_unit",
+        "auto_repair_marker_name",
+        "canary_public_key_name",
         "approved_artifacts",
         "client_read_contours",
         "nonread_probe_contours"
@@ -199,6 +202,9 @@
         "contour_unit_template": {"type": "string", "minLength": 1},
         "codex_mcp_feature": {"type": "string", "pattern": "^mcp_[0-9]{4}_[0-9]{2}_[0-9]{2}$"},
         "recovery_unit": {"type": "string", "pattern": "^[A-Za-z0-9_.@%-]+\\.service$"},
+        "runtime_repair_unit": {"type": "string", "pattern": "^[A-Za-z0-9_.@%-]+\\.service$"},
+        "auto_repair_marker_name": {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$"},
+        "canary_public_key_name": {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$"},
         "approved_artifacts": {
           "type": "object",
           "additionalProperties": false,
