@@ -40,6 +40,7 @@ from run_kag_next_pair import (
     AccessRecorder,
     build_next_server,
 )
+from runtime_catalog import deployment_settings, load_runtime_catalog, mcp_settings
 from _mcp_sdk_identity import installed_mcp_identity
 from run_live_modern_read_fleet import (
     _listener_attestation,
@@ -49,9 +50,13 @@ from run_live_modern_read_fleet import (
 )
 
 
-WIRE_VERSION = "2026-07-28"
+_RUNTIME_CATALOG = load_runtime_catalog()
+_SDK_SETTINGS, _PROTOCOL_SETTINGS, _TRANSPORT_SETTINGS = mcp_settings(_RUNTIME_CATALOG)
+WIRE_VERSION = str(_PROTOCOL_SETTINGS["version"])
+MCP_PATH = str(_PROTOCOL_SETTINGS["streamable_http_path"])
+MCP_HOST = str(_TRANSPORT_SETTINGS["default_host"])
 REGISTRATION = "aoa_kag_next_lab"
-FEATURE = "mcp_2026_07_28"
+FEATURE = str(deployment_settings(_RUNTIME_CATALOG)["codex_mcp_feature"])
 TOKEN_ENV = "AOA_KAG_NEXT_LAB_BEARER_TOKEN"
 CLIENT_ID = "https://os-abyss.invalid/codex-kag-next-lab.json"
 ISSUER = "https://auth.os-abyss.invalid"
@@ -59,9 +64,10 @@ SUBJECT = "codex-kag-next-lab"
 TRACEPARENT = "00-7d6f4bfe66cc42c7be4dfe186f08bd47-e0ad439d3c018890-01"
 CODEX_VERSION = "codex-cli 0.147.0"
 CODEX_SHA256 = "cb0a15567e9a60a5820d54b0f6ae86d504dc3805c1eab21a47f70e3eb7b73a40"
+PYTHON_MCP_VERSION = str(_SDK_SETTINGS["tested_lock"])
 MCP_SDK_SOURCE_REVISIONS = {
     "2.0.0": "6f69a3758ebf2ee55ce050f58b470ce11af71133",
-    "2.1.1": "0921d94a74db900dccd2d534842aa7b6160542d2",
+    PYTHON_MCP_VERSION: str(_SDK_SETTINGS["source_revision"]),
 }
 EXPECTED_PYTHON_MCP_ARTIFACT_DIGEST = "sha256:1ef71b1a3cfb3daba29b61d9f280896b35bdc1038474285cc8295071418b01e5"
 EXPECTED_PRODUCTION_PYTHON_MCP_ARTIFACT_DIGEST = "sha256:a638c12e432fc0444d263a55db04668cd789437fde33951cc2be491021219601"
@@ -137,7 +143,13 @@ def _regular_private(path: Path) -> bool:
 def _port_is_open(port: int) -> bool:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
         probe.settimeout(0.1)
-        return probe.connect_ex(("127.0.0.1", port)) == 0
+        return probe.connect_ex((MCP_HOST, port)) == 0
+
+
+def _free_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
+        listener.bind((MCP_HOST, 0))
+        return int(listener.getsockname()[1])
 
 
 def _wait_port(port: int, expected_open: bool, timeout: float = 15.0) -> None:
@@ -201,7 +213,7 @@ def _serve(args: argparse.Namespace) -> int:
     raw_token = os.environ.get(TOKEN_ENV)
     if raw_token is None or len(raw_token) < 32:
         raise RuntimeError(f"{TOKEN_ENV} is missing or too short")
-    url = f"http://127.0.0.1:{args.port}/mcp"
+    url = f"http://{MCP_HOST}:{args.port}{MCP_PATH}"
     recorder = PersistentAccessRecorder(args.server_record, url)
     recorder.persist()
     state = AoAKagMCPState.discover(
@@ -220,15 +232,15 @@ def _serve(args: argparse.Namespace) -> int:
         ),
     )
     app = server.streamable_http_app(
-        streamable_http_path="/mcp",
+        streamable_http_path=MCP_PATH,
         json_response=False,
         stateless_http=True,
-        host="127.0.0.1",
+        host=MCP_HOST,
     )
     try:
         uvicorn.run(
             app,
-            host="127.0.0.1",
+            host=MCP_HOST,
             port=args.port,
             log_level="warning",
             access_log=False,
@@ -716,6 +728,8 @@ def _direct_modern_request(
 
 def _run(args: argparse.Namespace) -> int:
     started_at = _utc_now()
+    if args.port == 0:
+        args.port = _free_port()
     sdk_identity = installed_mcp_identity(args.python_sdk_root)
     binary = args.codex_binary.resolve()
     if _sha256(binary) != CODEX_SHA256:
@@ -743,7 +757,7 @@ def _run(args: argparse.Namespace) -> int:
     if not _regular_private(credential):
         raise RuntimeError("lab credential is not a readable regular non-symlink 0600 file")
 
-    url = f"http://127.0.0.1:{args.port}/mcp"
+    url = f"http://{MCP_HOST}:{args.port}{MCP_PATH}"
     config = (
         f"[mcp_servers.{REGISTRATION}]\n"
         f"url = {json.dumps(url)}\n"
@@ -1312,7 +1326,7 @@ def main() -> int:
     run = subparsers.add_parser("run")
     run.add_argument("--output", required=True, type=Path)
     run.add_argument("--lab-root", required=True, type=Path)
-    run.add_argument("--port", default=5431, type=int)
+    run.add_argument("--port", default=0, type=int)
     run.add_argument("--codex-binary", required=True, type=Path)
     run.add_argument("--workspace-root", required=True, type=Path)
     run.add_argument("--aoa-kag-root", required=True, type=Path)

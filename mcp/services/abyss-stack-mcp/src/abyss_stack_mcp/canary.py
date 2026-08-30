@@ -28,6 +28,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import (
 )
 from pydantic import Field, ValidationError, field_validator, model_validator
 
+from ._runtime_config import MCP_PROTOCOL_VERSION, PATH_CONFIG, TRANSPORT_CONFIG
 from .contracts import (
     CanaryObservation,
     Digest,
@@ -51,13 +52,9 @@ from .observation import (
     _process_observation,
     _systemctl,
 )
-
-
-DEFAULT_SECRET_DIR = Path("/srv/AbyssOS/abyss-stack/Secrets/Configs")
-DEFAULT_OUTPUT_ROOT = Path("/srv/AbyssOS/abyss-stack/Logs/mcp/canaries")
-DEFAULT_DEPLOYMENT_MANIFEST = Path(
-    "/srv/AbyssOS/abyss-stack/Logs/mcp/deployments/latest.json"
-)
+DEFAULT_SECRET_DIR = PATH_CONFIG.stack_secrets_root()
+DEFAULT_OUTPUT_ROOT = PATH_CONFIG.stack_canaries_root()
+DEFAULT_DEPLOYMENT_MANIFEST = PATH_CONFIG.stack_deployment_manifest_path()
 CANARY_SIGNING_KEY_NAME = "abyss-stack-mcp-canary-ed25519-private-key.pem"
 CANARY_PUBLIC_KEY_NAME = "abyss-stack-mcp-canary-ed25519-public-key.pem"
 MAX_CREDENTIAL_BYTES = 8 * 1024
@@ -705,7 +702,7 @@ async def _wait_for_endpoint_listener(
         port = parsed.port
     except ValueError as exc:
         raise CanaryRunnerError("canary endpoint has an invalid port") from exc
-    if parsed.scheme != "http" or host not in {"127.0.0.1", "::1", "localhost"}:
+    if parsed.scheme != "http" or host not in TRANSPORT_CONFIG.loopback_hosts:
         raise CanaryRunnerError("canary endpoint must be loopback HTTP")
     if port is None:
         raise CanaryRunnerError("canary endpoint must name an explicit port")
@@ -807,7 +804,7 @@ async def live_probe(
                 raise_exceptions=True,
                 read_timeout_seconds=float(request_timeout_seconds),
             ) as client:
-                if client.protocol_version != "2026-07-28":
+                if client.protocol_version != MCP_PROTOCOL_VERSION:
                     raise CanaryRunnerError(
                         "MCP canary did not negotiate the required modern wire"
                     )
@@ -972,6 +969,8 @@ def _contains_subset(value: Any, subset: dict[str, Any]) -> bool:
 def validate_result_contract(
     result: dict[str, Any],
     contract: RuntimeCanaryContract,
+    *,
+    transport: str | None = None,
 ) -> tuple[bool, tuple[str, ...], str | None]:
     reasons: list[str] = []
     schema_identity = _json_pointer(result, contract.schema_pointer)
@@ -981,7 +980,15 @@ def validate_result_contract(
         if not _nonempty(_json_pointer(result, pointer)):
             reasons.append("canary-required-result-evidence-missing")
             break
-    for pointer, expected in contract.exact_values.items():
+    selected_transport = (
+        transport
+        if transport is not None
+        else TRANSPORT_CONFIG.streamable_http_transport
+    )
+    for pointer, expected in {
+        **contract.exact_values,
+        **contract.transport_exact_values.get(selected_transport, {}),
+    }.items():
         if _json_pointer(result, pointer) != expected:
             reasons.append("canary-exact-result-evidence-mismatch")
             break

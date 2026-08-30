@@ -73,6 +73,80 @@ def test_packaged_target_catalog_uses_physical_venv_path(tmp_path: Path) -> None
     assert loaded.targets[0].organ_id == "aoa-kag"
 
 
+def test_target_catalog_resolves_runtime_environment_references(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("AOA_WORKSPACE_ROOT", str(tmp_path / "workspace"))
+    monkeypatch.setenv("AOA_ABYSS_STACK_ROOT", str(tmp_path / "stack"))
+    payload = target_catalog()
+    payload["targets"][0]["executable_ref"] = (
+        "${AOA_WORKSPACE_ROOT}/.codex/bin/aoa-kag-mcp-server.py"
+    )
+    payload["targets"].append(
+        {
+            **payload["targets"][0],
+            "organ_id": "abyss-stack",
+            "registry_organ_id": "abyss-stack",
+            "service_id": "abyss-stack-mcp",
+            "unit_name": "abyss-stack-mcp-read.service",
+            "endpoint_ref": "http://127.0.0.1:5431/mcp",
+            "executable_ref": (
+                "${AOA_ABYSS_STACK_ROOT}/Services/abyss-stack-mcp/venv/bin/python"
+            ),
+        }
+    )
+    path = write_json(tmp_path / "runtime-targets.json", payload)
+
+    loaded, _ = _load_targets(path)
+
+    assert loaded.targets[0].executable_ref == (
+        f"{tmp_path}/workspace/.codex/bin/aoa-kag-mcp-server.py"
+    )
+    assert loaded.targets[1].executable_ref == (
+        f"{tmp_path}/stack/Services/abyss-stack-mcp/venv/bin/python"
+    )
+
+
+def test_target_catalog_prefers_explicit_runtime_roots(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("AOA_WORKSPACE_ROOT", str(tmp_path / "wrong-workspace"))
+    monkeypatch.setenv("AOA_ABYSS_STACK_ROOT", str(tmp_path / "wrong-stack"))
+    payload = target_catalog()
+    payload["targets"][0]["executable_ref"] = (
+        "${AOA_WORKSPACE_ROOT}/.codex/bin/aoa-kag-mcp-server.py"
+    )
+    payload["targets"].append(
+        {
+            **payload["targets"][0],
+            "organ_id": "abyss-stack",
+            "registry_organ_id": "abyss-stack",
+            "service_id": "abyss-stack-mcp",
+            "unit_name": "abyss-stack-mcp-read.service",
+            "endpoint_ref": "http://127.0.0.1:5431/mcp",
+            "executable_ref": (
+                "${AOA_ABYSS_STACK_ROOT}/Services/abyss-stack-mcp/venv/bin/python"
+            ),
+        }
+    )
+    path = write_json(tmp_path / "runtime-targets.json", payload)
+
+    loaded, _ = _load_targets(
+        path,
+        workspace_root=tmp_path / "workspace",
+        stack_root=tmp_path / "stack" / "Configs",
+    )
+
+    assert loaded.targets[0].executable_ref == (
+        f"{tmp_path}/workspace/.codex/bin/aoa-kag-mcp-server.py"
+    )
+    assert loaded.targets[1].executable_ref == (
+        f"{tmp_path}/stack/Services/abyss-stack-mcp/venv/bin/python"
+    )
+
+
 def target_catalog() -> dict:
     return {
         "schema_version": "abyss_stack_runtime_targets_v1",

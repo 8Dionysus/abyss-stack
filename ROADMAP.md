@@ -130,23 +130,23 @@ The current direction is:
 ## Horizon: MCP Access Fabric
 
 - Current posture:
-  the shared owner adapters retain direct, authenticated loopback access while
-  the first `abyss-stack-mcp` source candidate separates compact runtime
-  observation from immutable non-executing plan preparation. D-0106 adds one
-  exact read-service restart-and-rollback pilot as a third, separately
-  credentialed process. The three stack contours have disjoint tools, ports,
-  scopes, client identities, and
-  atomically provisioned credentials. Their managed environment binds deployed
-  source to an exact artifact-hashed lock and cannot be replaced while any
-  plane is active. No contour is admitted or live merely because its
-  package and unit files exist.
+  eleven owner-bound read contours retain direct authenticated loopback access
+  with distinct credentials, scopes, client identities, ports, registry
+  records, and rollback routes. Four additional package contours remain
+  deliberately unadmitted; candidate and internal-effect authority is still
+  manual and independent from read admission.
+- Source baseline:
+  all fifteen stack-owned MCP packages now use the native SDK-v2 `MCPServer`
+  route and consume the central runtime catalog. The catalog-tested dependency
+  pair is `mcp==2.1.1` with `mcp-types==2.1.1`; isolated fleet evidence is
+  `15/15 passed`. A bounded owner follow-up on 2026-08-30 also proved the exact
+  pair, serving bytes, listener ownership, modern wire, schemas, semantic
+  canaries, and negative auth/legacy gates for all eleven admitted read
+  contours. That closure receipt is not a perpetual live-health claim.
 - Next honest move:
-  land and deploy the typed source-to-runtime provenance spine, generate one
-  secret-free runtime observation from exact source and deployed identities,
-  then advance read and candidate processes independently through registry
-  shadow, consumer schema observation, grounded canary, central proof, owner
-  acceptance, and rollback evidence; only then execute and restore the exact
-  effect pilot from a fresh approved plan.
+  keep admission and deployment evidence fresh, verify authenticated discovery
+  after the next operator-controlled Desktop relaunch, and advance any
+  candidate or effect contour only through its own explicit owner route.
 - Guardrail:
   `abyss-stack-mcp` is runtime evidence, bounded plan preparation, and one
   literal approved pilot—not a gateway, domain authority, proof owner, generic
@@ -156,7 +156,9 @@ The current direction is:
 
 - Current posture:
   live cutover has a packet route, and the first route-api health drift was
-  closed as an operator-gated repair.
+  closed as an operator-gated repair. The bounded MCP read-fleet 2.1.1 cutover
+  follow-up is complete for its eleven admitted contours; other runtime
+  surfaces retain their own freshness and acceptance gates.
 - Next honest move:
   rerun the live cutover packet before promoting federation seams or
   runtime-loop consumers into live posture.

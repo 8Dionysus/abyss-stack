@@ -18,7 +18,7 @@ from .managed_catalog import (
     publish_private_json,
 )
 from .managed_topology import derive_managed_topology
-from .observation import RuntimeTargetCatalog
+from .observation import _load_targets
 from .preflight import PreflightError, _safe_json
 from .preflight_sweep import MCPPreflightSweepStatus, publish_status, run_sweep
 from .runtime_overlay import build_runtime_overlay
@@ -92,9 +92,7 @@ def run_admission_automation(
     now = (generated_at or datetime.now(timezone.utc)).astimezone(timezone.utc)
     registry = _safe_json(registry_path, "v2 organ registry")
     deployment = _safe_json(deployment_manifest_path, "deployment manifest")
-    targets = RuntimeTargetCatalog.model_validate(
-        _safe_json(runtime_targets_path, "runtime targets")
-    )
+    targets, _ = _load_targets(runtime_targets_path)
     overlay, skipped = build_runtime_overlay(
         registry,
         deployment,
@@ -103,6 +101,8 @@ def run_admission_automation(
         canary_public_key_path=canary_public_key_path,
         deployment_manifest_path=deployment_manifest_path,
         generated_at=now,
+        runtime_workspace_root=deployed_root.parent,
+        runtime_stack_root=deployed_root,
     )
     overlay_path = output_root / "runtime-overlay.candidate.json"
     publish_private_json(overlay, overlay_path)

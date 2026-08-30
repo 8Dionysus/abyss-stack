@@ -27,13 +27,12 @@ from typing import Any, Literal
 
 from pydantic import Field, ValidationError, field_validator, model_validator
 
+from ._runtime_config import PATH_CONFIG
 from .contracts import Digest, EvidenceRef, Identifier, NonEmpty, StrictModel
 
 
-DEFAULT_RUN_ROOT = Path(
-    "/srv/AbyssOS/abyss-stack/Logs/mcp/cross-organ-orchestrations"
-)
-DEFAULT_SDK_ROOT = Path("/srv/AbyssOS")
+DEFAULT_RUN_ROOT = PATH_CONFIG.stack_orchestration_root()
+DEFAULT_SDK_ROOT = PATH_CONFIG.workspace_root()
 MAX_INPUT_BYTES = 2 * 1024 * 1024
 ZERO_DIGEST = "sha256:" + ("0" * 64)
 StageKind = Literal[

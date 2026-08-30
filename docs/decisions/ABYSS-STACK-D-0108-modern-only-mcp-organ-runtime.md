@@ -1,7 +1,8 @@
 # Modern-Only MCP Organ Runtime
 
 - Decision ID: ABYSS-STACK-D-0108
-- Status: accepted
+- Status: superseded
+- Superseded by: `ABYSS-STACK-D-0139-mcp-sdk-2-1-1-transition.md`
 - Date: 2026-08-09
 - Owner surface: `mcp/services/_shared/modern_runtime.py`
 

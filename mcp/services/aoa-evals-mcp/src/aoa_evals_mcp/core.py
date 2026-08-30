@@ -15,8 +15,8 @@ from urllib.parse import unquote, urlparse
 import yaml
 from jsonschema import Draft202012Validator
 
+from ._runtime_config import PATH_CONFIG
 
-DEFAULT_WORKSPACE_ROOT = Path("/srv/AbyssOS")
 LOCAL_PORT_INVENTORY_CONTRACT_V2 = Path("docs/architecture/local_eval_port_inventory.contract.v2.json")
 LOCAL_PORT_INVENTORY_CONTRACT_V1 = Path("docs/architecture/local_eval_port_inventory.contract.v1.json")
 LOCAL_PORT_INVENTORY_CONTRACTS = (
@@ -1032,7 +1032,7 @@ class AoAEvalsMCPState:
         root = Path(
             workspace_root
             or os.environ.get("AOA_WORKSPACE_ROOT")
-            or DEFAULT_WORKSPACE_ROOT
+            or PATH_CONFIG.workspace_root()
         ).expanduser().resolve()
         source_root = cls._resolve_source_root(root, evals_root)
         mirror_root = cls._resolve_mirror_root(root)
@@ -1060,8 +1060,6 @@ class AoAEvalsMCPState:
         candidates.extend(
             [
                 workspace_root / "aoa-evals",
-                DEFAULT_WORKSPACE_ROOT / "aoa-evals",
-                Path.home() / "src" / "aoa-evals",
             ]
         )
         return candidates
@@ -1073,14 +1071,16 @@ class AoAEvalsMCPState:
             value = os.environ.get(env_name)
             if value:
                 candidates.append(Path(value).expanduser())
-        for env_name in ("AOA_STACK_ROOT", "AOA_ABYSS_STACK_RUNTIME_ROOT", "AOA_ABYSS_STACK_ROOT"):
-            value = os.environ.get(env_name)
-            if value:
-                candidates.append(Path(value).expanduser() / "Knowledge" / "federation" / "aoa-evals")
+        candidates.append(
+            workspace_root
+            / "abyss-stack"
+            / "Knowledge"
+            / "federation"
+            / "aoa-evals"
+        )
         candidates.extend(
             [
                 workspace_root / "abyss-stack" / "Knowledge" / "federation" / "aoa-evals",
-                DEFAULT_WORKSPACE_ROOT / "abyss-stack" / "Knowledge" / "federation" / "aoa-evals",
             ]
         )
         return candidates
@@ -1088,16 +1088,7 @@ class AoAEvalsMCPState:
     @staticmethod
     def _stack_runtime_candidates(workspace_root: Path) -> list[Path]:
         candidates: list[Path] = []
-        for env_name in ("AOA_STACK_ROOT", "AOA_ABYSS_STACK_RUNTIME_ROOT", "AOA_ABYSS_STACK_ROOT"):
-            value = os.environ.get(env_name)
-            if value:
-                candidates.append(Path(value).expanduser())
-        candidates.extend(
-            [
-                workspace_root / "abyss-stack",
-                DEFAULT_WORKSPACE_ROOT / "abyss-stack",
-            ]
-        )
+        candidates.append(workspace_root / "abyss-stack")
         return candidates
 
     @classmethod
@@ -1565,7 +1556,6 @@ class AoAEvalsMCPState:
             entry_issues: list[str] = []
             raw_repo_id = entry.get("repo_id")
             raw_repo_path = entry.get("repo_path")
-            repo_id = raw_repo_id.strip() if isinstance(raw_repo_id, str) else ""
             repo_path = raw_repo_path.strip() if isinstance(raw_repo_path, str) else ""
             if not _safe_repo_relative_ref(raw_repo_id):
                 entry_issues.append("repo_id must be workspace-relative and traversal-free")

@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 import importlib
-import os
 import sys
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
+from ._runtime_config import PATH_CONFIG
+
 SERVICE_NAME = "aoa-course-connector-mcp"
-DEFAULT_CONNECTOR_REPO = Path("/srv/AbyssOS/connectors/aoa-course-connector")
 MAX_QUERY_LENGTH = 1000
 MAX_LIMIT = 20
 OWNER_READ_TOOLS = frozenset(
@@ -53,14 +53,7 @@ class AoACourseConnectorMCPState:
 
     @classmethod
     def discover(cls) -> "AoACourseConnectorMCPState":
-        raw = os.environ.get("AOA_COURSE_CONNECTOR_REPO")
-        return cls(
-            connector_repo=(
-                Path(raw).expanduser().resolve()
-                if raw
-                else DEFAULT_CONNECTOR_REPO
-            )
-        )
+        return cls(connector_repo=PATH_CONFIG.connector_repo(SERVICE_NAME))
 
     def source_route(self) -> dict[str, object]:
         return {

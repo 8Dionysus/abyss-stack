@@ -1,6 +1,11 @@
 # MCP Services
 
-`mcp/services/` contains runnable stack-owned MCP service packages.
+`mcp/services/` contains runnable stack-owned MCP service packages.  The
+shared runtime catalog in
+[`_shared/runtime-config.v1.json`](_shared/runtime-config.v1.json) owns the
+MCP SDK major line, protocol revision, transport, contour, port, credential,
+and deployment identities; package code and operational probes consume its
+generated projections.
 
 Use this district for service packages with their own source, tests, local
 route card, and validation path.
@@ -41,9 +46,11 @@ scopes, and client identities for Decisions, Memo, Evals, KAG, Stats, Abyss
 Machine, Session Memory, ToS corpus, and all six connector adapters. Memo and
 Evals additionally use distinct candidate credentials and processes. Missing,
 short, malformed, cross-owner, cross-contour, or conflicting
-values fail before bind. Standalone package
-manifests require exact `mcp==2.1.1`, the stable SDK line implementing the
-`2026-07-28` server/discovery and streamable-HTTP contract. The shared
+values fail before bind. Standalone package manifests admit only the MCP 2.x
+line (`mcp>=2,<3`); the deterministic deployment lock currently tests
+`mcp==2.1.1` with the paired `mcp-types==2.1.1`. That SDK line implements the
+`2026-07-28` server/discovery and
+streamable-HTTP contract. The shared
 `_modern_runtime.py` projection preserves the standalone package shape while
 binding every organ server to the same fail-closed modern runtime and bearer
 contract. This route is authenticated local transport
@@ -66,7 +73,12 @@ Telegram, and Discord. ToS, Course, StackOverflow, XDA, every candidate
 contour, and the internal-effect contour remain shadow/unadmitted until their
 own package, deploy, consumer, proof, acceptance, and rollback gates pass.
 
-| Owner instance | Default port |
+The values in the following table document the catalog; they are not a second
+configuration source. The authoritative declaration is
+[`_shared/runtime-config.v1.json`](_shared/runtime-config.v1.json), checked by
+its schema, loader, and generated package projections.
+
+| Owner instance | Catalog port |
 |---|---:|
 | `aoa-decisions` | 5420 |
 | `aoa-memo` read | 5421 |
@@ -117,8 +129,9 @@ credential load, transport, or install target.
 Decisions, Memo, Evals, KAG, Stats, Abyss Machine, Session Memory, and six
 connector process contours. Dedicated Memo and Evals candidate units add only
 their finite local-port write paths. All units launch deployed workspace
-wrappers, not a source checkout. The `aoa-mcp-http.service` bundle wants
-fifteen direct processes across these contours. `tos-corpus` has the same
+wrappers, not a source checkout. The `aoa-mcp-http.service` bundle wants the
+catalog-declared admitted client-read contours; candidate and effect contours
+are never bundle startup dependencies. `tos-corpus` has the same
 source-level read credential and safety contract but remains outside the
 bundle until its workspace wrapper and live canary are source-owned.
 Installing units only links and reloads them; starting or restarting an owner
@@ -150,16 +163,20 @@ Connector registrations likewise use exact owner variables; Course,
 StackOverflow, and XDA occupy `5436`, `5437`, and `5438` so the stack MCP
 ports and PostgreSQL reservation remain intact.
 
-The client install adds one bounded function to the target user's `.zshrc`.
-For each new interactive `codex` launch, that function delegates to the
-deployed source-owned launcher, which validates the credential, waits for the
-exact eleven-member modern read fleet, and places the credential only in the
-Codex process environment before `exec`. When the fleet is incomplete, the
-launcher synchronously invokes the bounded admission recovery oneshot instead
-of allowing Codex to retain eleven failed startup handshakes for the session.
-Metadata-only Codex commands do not cause recovery. The launcher does not replace the
-Codex installer symlink, export the bearer into the parent shell, or alter
-already running shells and sessions. Remove only this managed route with
+The client install adds one bounded function to the target user's `.zshrc` and
+one managed user-scoped ChatGPT wrapper plus desktop entry. Interactive Codex
+and future Desktop launches delegate to the same deployed source-owned
+launcher, which validates the exact eleven read credentials, checks the
+eleven-member modern read fleet, and places each credential only in the
+selected child-process environment before `exec`. When the fleet is
+incomplete, the launcher requests the bounded admission recovery oneshot
+without waiting and starts the client immediately; MCP authority remains fail
+closed without turning the operator client into a lifecycle lock.
+Metadata-only Codex commands do not cause recovery. The launcher does not
+replace the Codex installer symlink or packaged ChatGPT files, export a bearer
+into the parent shell, persist bearer values in the desktop entry, or alter
+already running shells and sessions. Remove only these managed user-scoped
+routes with
 `scripts/aoa-install-systemd --remove-mcp-http-codex-client`.
 
 The systemd owner receives the same value via `LoadCredential`, so neither the

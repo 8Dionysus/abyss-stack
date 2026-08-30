@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 36435965,
+  "allowed_tracked_bytes": 41060613,
+  "approved_by": "repository-owner",
+  "base_ref": "64bdae20b3a5c885ca75755188b04803b587ab50",
+  "changed_generated_bytes": 36435965,
+  "changed_generated_files": 528,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "7394c583212ac915b41a6c358c0b70cc2e7fe77776716780853bd6c91301a34a",
+  "reason": "Refresh the exact combined owner family after preserving Codex availability across unreadable or malformed MCP admission registry state. Authorize only the measured generated-family delta required to index this reviewed client-only recovery fallback and regressions; do not weaken strict admission, mutate registry state, raise standing budgets, or admit candidate, effect, materialization, or invocation authority.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 41060613,
+  "tracked_bytes_max": 24117248
+}

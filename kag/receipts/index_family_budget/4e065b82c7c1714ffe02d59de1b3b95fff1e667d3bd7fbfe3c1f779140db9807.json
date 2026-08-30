@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 36298342,
+  "allowed_tracked_bytes": 41048324,
+  "approved_by": "repository-owner",
+  "base_ref": "64bdae20b3a5c885ca75755188b04803b587ab50",
+  "changed_generated_bytes": 36298342,
+  "changed_generated_files": 525,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "4e065b82c7c1714ffe02d59de1b3b95fff1e667d3bd7fbfe3c1f779140db9807",
+  "reason": "Refresh the exact combined owner family after preserving empty-admission recovery, the canonical AOA_SOURCE_ROOT binding, and catalog-governed loopback readiness. Authorize only the measured generated-family delta required to index these reviewed MCP boundary repairs and regressions; do not raise standing budgets or admit candidate, effect, materialization, or invocation authority.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 41048324,
+  "tracked_bytes_max": 24117248
+}

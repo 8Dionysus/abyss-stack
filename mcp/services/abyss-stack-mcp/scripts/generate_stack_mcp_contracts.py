@@ -12,7 +12,9 @@ from typing import Any
 
 SERVICE_ROOT = Path(__file__).resolve().parents[1]
 SRC_ROOT = SERVICE_ROOT / "src"
+SHARED_ROOT = SERVICE_ROOT.parent / "_shared"
 sys.path.insert(0, str(SRC_ROOT))
+sys.path.insert(0, str(SHARED_ROOT))
 
 from abyss_stack_mcp.contracts import (  # noqa: E402
     RuntimeObservation,
@@ -43,6 +45,7 @@ from abyss_stack_mcp.exposure import (  # noqa: E402
     StackExposurePlan,
     StackExposureSnapshot,
 )
+from runtime_config import load_catalog  # noqa: E402
 
 
 NOW = datetime(2026, 7, 25, 12, 0, tzinfo=timezone.utc)
@@ -92,7 +95,32 @@ def evidence(
     }
 
 
+def _runtime_example_refs() -> tuple[str, str, str]:
+    """Derive public example transport references from the MCP catalog."""
+
+    catalog = load_catalog()
+    service = catalog.service("aoa-kag-mcp")
+    contour = service.contour("read")
+    endpoint = (
+        f"http://{catalog.transport.default_host}:{contour.port}"
+        f"{catalog.transport.streamable_http_path}"
+    )
+    executable = (
+        f"${{{catalog.paths.workspace_env_var}}}/"
+        + catalog.paths.stack_codex_executable_relative_to_workspace_template.format(
+            instance=service.service_id
+        )
+    )
+    return (
+        endpoint,
+        executable,
+        catalog.transport.protocol_version,
+    )
+
+
 def observation_example() -> dict[str, Any]:
+    endpoint_ref, executable_ref, protocol_version = _runtime_example_refs()
+    unit_name = load_catalog().service("aoa-kag-mcp").read_unit_name("aoa-kag")
     return {
         "schema_version": "abyss_stack_runtime_observation_v1",
         "provider": "abyss-stack",
@@ -143,16 +171,16 @@ def observation_example() -> dict[str, Any]:
                     ),
                 },
                 "process": {
-                    "unit_name": "aoa-organ-mcp-read@aoa-kag.service",
-                    "executable_ref": "/srv/AbyssOS/.codex/bin/aoa-kag-mcp-server.py",
+                    "unit_name": unit_name,
+                    "executable_ref": executable_ref,
                     "process_identity": "aoa-kag-mcp/0.0.0-example",
                     "active": True,
                     "evidence": evidence("process"),
                 },
                 "endpoint": {
                     "transport": "streamable-http",
-                    "endpoint_ref": "http://127.0.0.1:5425/mcp",
-                    "protocol_versions": ["2026-07-28"],
+                    "endpoint_ref": endpoint_ref,
+                    "protocol_versions": [protocol_version],
                     "ready": True,
                     "server_schema_digest": DIGESTS["schema"],
                     "evidence": evidence("endpoint"),
@@ -169,7 +197,7 @@ def observation_example() -> dict[str, Any]:
                         "registration_ref": "example://consumer/aoa-kag",
                         "registered": True,
                         "observed_schema_digest": DIGESTS["schema"],
-                        "observed_protocol_versions": ["2026-07-28"],
+                        "observed_protocol_versions": [protocol_version],
                         "evidence": evidence(
                             "consumer",
                             evidence_ref="example://consumer/aoa-kag",
@@ -236,13 +264,13 @@ def observation_example() -> dict[str, Any]:
                         DIGESTS["rollback_manifest"]
                     ),
                     "last_known_good_unit_name": (
-                        "aoa-organ-mcp-read@aoa-kag.service"
+                        unit_name
                     ),
                     "last_known_good_credential_class": (
                         "aoa-kag-read-example"
                     ),
                     "last_known_good_executable_ref": (
-                        "/srv/AbyssOS/.codex/bin/aoa-kag-mcp-server.py"
+                        executable_ref
                     ),
                     "last_known_good_process_identity": (
                         "aoa-kag-mcp/0.0.0-example"
@@ -265,10 +293,10 @@ def observation_example() -> dict[str, Any]:
                             DIGESTS["rollback_manifest"]
                         ),
                         "deploy_manifest_digest": DIGESTS["rollback_manifest"],
-                        "unit_name": "aoa-organ-mcp-read@aoa-kag.service",
+                        "unit_name": unit_name,
                         "credential_class": "aoa-kag-read-example",
                         "executable_ref": (
-                            "/srv/AbyssOS/.codex/bin/aoa-kag-mcp-server.py"
+                            executable_ref
                         ),
                         "process_identity": "aoa-kag-mcp/0.0.0-example",
                         "canary_route": (

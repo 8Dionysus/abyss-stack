@@ -570,7 +570,8 @@
         "mcp/services/aoa-decisions-mcp/scripts/release_check.py",
         "mcp/services/aoa-evals-mcp/scripts/release_check.py",
         "mcp/services/abyss-machine-mcp/scripts/release_check.py",
-        "mcp/services/aoa-session-memory-mcp/scripts/release_check.py"
+        "mcp/services/aoa-session-memory-mcp/scripts/release_check.py",
+        "mcp/services/_shared/validate_systemd_projection.py"
       ],
       "protects": "MCP package-local access-plane validation and release smoke checks",
       "owner_surface": "mcp/services/AGENTS.md",

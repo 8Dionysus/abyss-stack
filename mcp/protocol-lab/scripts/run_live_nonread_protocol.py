@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Probe non-read MCP contours without invoking tools or granting authority."""
+"""Probe configured non-read MCP contours without invoking effects."""
 
 from __future__ import annotations
 
@@ -16,39 +16,15 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-
-PROTOCOL = "2026-07-28"
-STACK = Path("/srv/AbyssOS/abyss-stack")
-REGISTRY = Path("/srv/AbyssOS/.aoa/organ-access/organ-registry.v2.source.json")
-CONTOURS = (
-    (
-        "abyss-stack",
-        "candidate",
-        "abyss-stack-mcp-candidate.service",
-        5433,
-        "abyss-stack-mcp-candidate-bearer-token",
-    ),
-    (
-        "aoa-memo",
-        "candidate",
-        "aoa-memo-mcp-candidate.service",
-        5434,
-        "aoa-memo-mcp-candidate-bearer-token",
-    ),
-    (
-        "aoa-evals",
-        "candidate",
-        "aoa-evals-mcp-candidate.service",
-        5435,
-        "aoa-evals-mcp-candidate-bearer-token",
-    ),
-    (
-        "abyss-stack",
-        "internal_effect",
-        "abyss-stack-mcp-internal-effect.service",
-        5439,
-        "abyss-stack-mcp-internal-effect-bearer-token",
-    ),
+from runtime_catalog import (
+    credentials_root,
+    load_runtime_catalog,
+    mcp_settings,
+    nonread_probe_entries,
+    probe_limits,
+    registry_path,
+    runtime_config_path,
+    stack_root_from_catalog,
 )
 
 
@@ -62,8 +38,8 @@ def _state(unit: str) -> str:
     ).stdout.strip()
 
 
-def _load_token(name: str) -> str:
-    path = STACK / "Secrets/Configs" / name
+def _load_token(credentials: Path, name: str) -> str:
+    path = credentials / name
     if not path.is_file() or path.is_symlink() or path.stat().st_mode & 0o777 != 0o600:
         raise RuntimeError(f"unsafe non-read credential: {name}")
     value = path.read_text(encoding="utf-8").strip()
@@ -72,7 +48,7 @@ def _load_token(name: str) -> str:
     return value
 
 
-def _meta() -> dict[str, Any]:
+def _meta(protocol: str) -> dict[str, Any]:
     return {
         "_meta": {
             "io.modelcontextprotocol/clientInfo": {
@@ -80,7 +56,7 @@ def _meta() -> dict[str, Any]:
                 "version": "1",
             },
             "io.modelcontextprotocol/clientCapabilities": {},
-            "io.modelcontextprotocol/protocolVersion": PROTOCOL,
+            "io.modelcontextprotocol/protocolVersion": protocol,
         }
     }
 
@@ -91,7 +67,9 @@ def _request(
     method: str,
     params: dict[str, Any],
     *,
+    protocol: str,
     modern: bool = True,
+    timeout: float = 15.0,
 ) -> tuple[int, dict[str, Any] | None, dict[str, str]]:
     headers = {
         "Accept": "application/json, text/event-stream",
@@ -99,14 +77,16 @@ def _request(
         "Content-Type": "application/json",
     }
     if modern:
-        headers.update({"MCP-Method": method, "MCP-Protocol-Version": PROTOCOL})
+        headers.update({"MCP-Method": method, "MCP-Protocol-Version": protocol})
+        if method == "tools/call" and isinstance(params.get("name"), str):
+            headers["MCP-Name"] = params["name"]
     body = json.dumps(
         {"jsonrpc": "2.0", "id": 1, "method": method, "params": params},
         separators=(",", ":"),
     ).encode()
     request = urllib.request.Request(url, data=body, headers=headers, method="POST")
     try:
-        with urllib.request.urlopen(request, timeout=20) as response:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
             raw = response.read()
             return response.status, json.loads(raw) if raw else None, dict(response.headers)
     except urllib.error.HTTPError as exc:
@@ -115,23 +95,28 @@ def _request(
         return exc.code, payload, dict(exc.headers)
 
 
-def _wait_running(unit: str, port: int) -> None:
-    deadline = time.monotonic() + 60
+def _wait_running(
+    unit: str,
+    host: str,
+    port: int,
+    *,
+    server_start_timeout: float,
+    connect_timeout: float,
+) -> None:
+    deadline = time.monotonic() + server_start_timeout
     while time.monotonic() < deadline:
         if _state(unit) == "active":
-            probe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            probe.settimeout(0.2)
             try:
-                if probe.connect_ex(("127.0.0.1", port)) == 0:
+                with socket.create_connection((host, port), timeout=connect_timeout):
                     return
-            finally:
-                probe.close()
+            except OSError:
+                pass
         time.sleep(0.1)
     raise RuntimeError(f"non-read unit did not become ready: {unit}")
 
 
-def _admitted_nonread() -> set[tuple[str, str]]:
-    source = json.loads(REGISTRY.read_text(encoding="utf-8"))
+def _admitted_nonread(registry: Path) -> set[tuple[str, str]]:
+    source = json.loads(registry.read_text(encoding="utf-8"))
     return {
         (record["organ_id"], contour["contour_id"])
         for record in source["records"]
@@ -144,47 +129,86 @@ def _probe(
     organ: str,
     contour: str,
     unit: str,
-    port: int,
-    credential: str,
+    declared: dict[str, Any],
     admitted: set[tuple[str, str]],
+    *,
+    protocol: str,
+    legacy_protocol: str,
+    rejection_code: int,
+    request_timeout: float,
+    server_start_timeout: float,
+    connect_timeout: float,
+    path: str,
+    host: str,
+    credentials: Path,
 ) -> dict[str, Any]:
     if _state(unit) != "inactive":
         raise RuntimeError(f"non-read unit was not inactive before probe: {unit}")
-    token = _load_token(credential)
-    url = f"http://127.0.0.1:{port}/mcp"
+    auth = declared["auth"]
+    port = int(declared["port"])
+    token = _load_token(credentials, str(auth["credential_name"]))
+    url_host = f"[{host}]" if ":" in host else host
+    url = f"http://{url_host}:{port}{path}"
     _run("systemctl", "--user", "start", "--no-block", unit)
     try:
-        _wait_running(unit, port)
-        status, discover, _ = _request(url, token, "server/discover", _meta())
+        _wait_running(
+            unit,
+            host,
+            port,
+            server_start_timeout=server_start_timeout,
+            connect_timeout=connect_timeout,
+        )
+        status, discover, _ = _request(
+            url,
+            token,
+            "server/discover",
+            _meta(protocol),
+            protocol=protocol,
+            timeout=request_timeout,
+        )
         result = discover.get("result") if isinstance(discover, dict) else None
-        inventory_status, inventory, _ = _request(url, token, "tools/list", _meta())
+        inventory_status, inventory, _ = _request(
+            url,
+            token,
+            "tools/list",
+            _meta(protocol),
+            protocol=protocol,
+            timeout=request_timeout,
+        )
         tools = inventory.get("result", {}).get("tools") if isinstance(inventory, dict) else None
         wrong_status, _, _ = _request(
-            url, secrets.token_urlsafe(48), "server/discover", _meta()
+            url,
+            secrets.token_urlsafe(48),
+            "server/discover",
+            _meta(protocol),
+            protocol=protocol,
+            timeout=request_timeout,
         )
         legacy_status, legacy, legacy_headers = _request(
             url,
             token,
             "initialize",
             {
-                "protocolVersion": "2025-11-25",
+                "protocolVersion": legacy_protocol,
                 "capabilities": {},
                 "clientInfo": {"name": "denied-legacy", "version": "1"},
             },
+            protocol=protocol,
+            timeout=request_timeout,
             modern=False,
         )
         legacy_error = legacy.get("error") if isinstance(legacy, dict) else None
         passed = (
             status == 200
             and isinstance(result, dict)
-            and result.get("supportedVersions") == [PROTOCOL]
+            and result.get("supportedVersions") == [protocol]
             and inventory_status == 200
             and isinstance(tools, list)
             and bool(tools)
             and wrong_status == 401
             and legacy_status == 400
             and isinstance(legacy_error, dict)
-            and legacy_error.get("code") == -32022
+            and legacy_error.get("code") == rejection_code
             and legacy_headers.get("Mcp-Session-Id") is None
             and (organ, contour) not in admitted
         )
@@ -194,7 +218,7 @@ def _probe(
             "organ_id": organ,
             "contour_id": contour,
             "unit": unit,
-            "protocol_version": PROTOCOL,
+            "protocol_version": protocol,
             "tool_count": len(tools),
             "tool_invoked": False,
             "wrong_bearer_status": wrong_status,
@@ -213,17 +237,55 @@ def _probe(
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--runtime-config", type=Path)
+    parser.add_argument("--stack-root", type=Path)
+    parser.add_argument("--registry", type=Path)
     args = parser.parse_args()
-    admitted = _admitted_nonread()
+    config_path = runtime_config_path(args.runtime_config).resolve()
+    catalog = load_runtime_catalog(config_path)
+    _, protocol_settings, transport_settings = mcp_settings(catalog)
+    limits = probe_limits(catalog)
+    protocol = str(protocol_settings["version"])
+    legacy_protocol = str(protocol_settings["legacy_version"])
+    rejection_code = int(protocol_settings["modern_only_rejection_code"])
+    path = str(protocol_settings["streamable_http_path"])
+    host = str(transport_settings["default_host"])
+    stack = args.stack_root or stack_root_from_catalog(config_path)
+    if not stack.is_absolute():
+        raise RuntimeError("--stack-root must be an absolute path")
+    registry = args.registry or registry_path(catalog, stack)
+    credentials = credentials_root(catalog, stack)
+    admitted = _admitted_nonread(registry)
     if admitted:
         raise RuntimeError(f"unexpected admitted non-read contours: {sorted(admitted)}")
-    rows = [_probe(*entry, admitted) for entry in CONTOURS]
+    entries = nonread_probe_entries(catalog)
+    rows = [
+        _probe(
+            organ,
+            contour,
+            unit,
+            declared,
+            admitted,
+            protocol=protocol,
+            legacy_protocol=legacy_protocol,
+            rejection_code=rejection_code,
+            request_timeout=limits["protocol_probe_request_timeout_seconds"],
+            server_start_timeout=limits["protocol_probe_server_start_timeout_seconds"],
+            connect_timeout=limits["protocol_probe_connect_timeout_seconds"],
+            path=path,
+            host=host,
+            credentials=credentials,
+        )
+        for organ, contour, unit, _service, declared in entries
+    ]
     receipt = {
         "schema_version": "abyss_live_nonread_protocol_v1",
         "observed_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
-        "protocol_version": PROTOCOL,
-        "candidate_units_checked": 3,
-        "internal_effect_units_checked": 1,
+        "protocol_version": protocol,
+        "candidate_units_checked": sum(row["contour_id"] == "candidate" for row in rows),
+        "internal_effect_units_checked": sum(
+            row["contour_id"] == "internal_effect" for row in rows
+        ),
         "contours": rows,
         "modern_discovery_passed": True,
         "legacy_initialize_denied": True,

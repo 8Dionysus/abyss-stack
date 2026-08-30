@@ -10,7 +10,7 @@
     "expires_at": {"type": "string", "format": "date-time"},
     "source_revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
     "protocol_version": {"const": "2026-07-28"},
-    "mcp_sdk": {"enum": ["2.0.0", "2.1.1"]},
+    "mcp_sdk": {"type": "string", "pattern": "^2\\.[0-9]+\\.[0-9]+$"},
     "mcp_sdk_source_revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
     "mcp_sdk_artifact_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
     "read_fleet": {

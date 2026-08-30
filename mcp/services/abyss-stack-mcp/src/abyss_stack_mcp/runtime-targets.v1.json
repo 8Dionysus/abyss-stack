@@ -31,7 +31,7 @@
         "observe"
       ],
       "endpoint_ref": "http://127.0.0.1:5425/mcp",
-      "executable_ref": "/srv/AbyssOS/.codex/bin/aoa-kag-mcp-server.py",
+      "executable_ref": "${AOA_WORKSPACE_ROOT}/.codex/bin/aoa-kag-mcp-server.py",
       "organ_id": "aoa-kag",
       "policy_family": "read",
       "protocol_versions": [
@@ -39,6 +39,7 @@
       ],
       "registry_organ_id": "aoa-kag",
       "rollback_route": "runbook://mcp-rollback/aoa-kag/read",
+      "rollout_cohort": "admitted-read",
       "service_id": "aoa-kag-mcp",
       "unit_name": "aoa-organ-mcp-read@aoa-kag.service"
     },
@@ -64,7 +65,7 @@
         "observe"
       ],
       "endpoint_ref": "http://127.0.0.1:5430/mcp",
-      "executable_ref": "/srv/AbyssOS/.codex/bin/aoa-stats-mcp-server.py",
+      "executable_ref": "${AOA_WORKSPACE_ROOT}/.codex/bin/aoa-stats-mcp-server.py",
       "organ_id": "aoa-stats",
       "policy_family": "read",
       "protocol_versions": [
@@ -72,6 +73,7 @@
       ],
       "registry_organ_id": "aoa-stats",
       "rollback_route": "runbook://mcp-rollback/aoa-stats/read",
+      "rollout_cohort": "admitted-read",
       "service_id": "aoa-stats-mcp",
       "unit_name": "aoa-organ-mcp-read@aoa-stats.service"
     },
@@ -98,7 +100,7 @@
         "observe"
       ],
       "endpoint_ref": "http://127.0.0.1:5420/mcp",
-      "executable_ref": "/srv/AbyssOS/.codex/bin/aoa-decisions-mcp-server.py",
+      "executable_ref": "${AOA_WORKSPACE_ROOT}/.codex/bin/aoa-decisions-mcp-server.py",
       "organ_id": "aoa-decisions",
       "policy_family": "read",
       "protocol_versions": [
@@ -106,6 +108,7 @@
       ],
       "registry_organ_id": "aoa-decisions",
       "rollback_route": "runbook://mcp-rollback/aoa-decisions/read",
+      "rollout_cohort": "admitted-read",
       "service_id": "aoa-decisions-mcp",
       "unit_name": "aoa-organ-mcp-read@aoa-decisions.service"
     },
@@ -147,7 +150,7 @@
         "observe"
       ],
       "endpoint_ref": "http://127.0.0.1:5431/mcp",
-      "executable_ref": "/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/venv/bin/python",
+      "executable_ref": "${AOA_ABYSS_STACK_ROOT}/Services/abyss-stack-mcp/venv/bin/python",
       "organ_id": "abyss-stack",
       "policy_family": "read",
       "protocol_versions": [
@@ -155,6 +158,7 @@
       ],
       "registry_organ_id": "abyss-stack",
       "rollback_route": "runbook://mcp-rollback/abyss-stack/read",
+      "rollout_cohort": "admitted-read",
       "service_id": "abyss-stack-mcp",
       "unit_name": "abyss-stack-mcp-read.service"
     },
@@ -184,7 +188,7 @@
         "observe"
       ],
       "endpoint_ref": "http://127.0.0.1:5423/mcp",
-      "executable_ref": "/srv/AbyssOS/.codex/bin/abyss-machine-mcp-server.py",
+      "executable_ref": "${AOA_WORKSPACE_ROOT}/.codex/bin/abyss-machine-mcp-server.py",
       "organ_id": "abyss-machine",
       "policy_family": "read",
       "protocol_versions": [
@@ -192,6 +196,7 @@
       ],
       "registry_organ_id": "abyss-machine",
       "rollback_route": "runbook://mcp-rollback/abyss-machine/read",
+      "rollout_cohort": "admitted-read",
       "service_id": "abyss-machine-mcp",
       "unit_name": "aoa-organ-mcp-read@abyss-machine.service"
     },
@@ -216,7 +221,7 @@
         "observe"
       ],
       "endpoint_ref": "http://127.0.0.1:5429/mcp",
-      "executable_ref": "/srv/AbyssOS/.codex/bin/tos-corpus-mcp-server.py",
+      "executable_ref": "${AOA_WORKSPACE_ROOT}/.codex/bin/tos-corpus-mcp-server.py",
       "organ_id": "tree-of-sophia",
       "policy_family": "read",
       "protocol_versions": [
@@ -224,6 +229,7 @@
       ],
       "registry_organ_id": "tree-of-sophia",
       "rollback_route": "runbook://mcp-rollback/tree-of-sophia/read",
+      "rollout_cohort": "package-only-shadow",
       "service_id": "tos-corpus-mcp",
       "unit_name": "aoa-organ-mcp-read@tos-corpus.service"
     },
@@ -236,7 +242,6 @@
         },
         "array_contains": [],
         "exact_values": {
-          "/mcp_access/capability_profile": "session-evidence-read",
           "/mutates": false,
           "/requested_kind": "mcp_service"
         },
@@ -247,14 +252,19 @@
         ],
         "schema_pointer": "/artifact_type",
         "schema_value": "session_memory_literal_query_plan",
-        "tool_name": "aoa_session_literal_query_plan"
+        "tool_name": "aoa_session_literal_query_plan",
+        "transport_exact_values": {
+          "streamable-http": {
+            "/mcp_access/capability_profile": "session-evidence-read"
+          }
+        }
       },
       "canary_route": "runbook://mcp-canary/aoa-session-memory/read",
       "effect_classes": [
         "observe"
       ],
       "endpoint_ref": "http://127.0.0.1:5422/mcp",
-      "executable_ref": "/srv/AbyssOS/.codex/bin/aoa-session-memory-mcp-server.py",
+      "executable_ref": "${AOA_WORKSPACE_ROOT}/.codex/bin/aoa-session-memory-mcp-server.py",
       "organ_id": "aoa-session-memory",
       "policy_family": "read",
       "protocol_versions": [
@@ -262,6 +272,7 @@
       ],
       "registry_organ_id": "aoa-session-memory",
       "rollback_route": "runbook://mcp-rollback/aoa-session-memory/read",
+      "rollout_cohort": "admitted-read",
       "service_id": "aoa-session-memory-mcp",
       "unit_name": "aoa-organ-mcp-read@aoa-session-memory.service"
     },
@@ -290,7 +301,7 @@
         "observe"
       ],
       "endpoint_ref": "http://127.0.0.1:5421/mcp",
-      "executable_ref": "/srv/AbyssOS/.codex/bin/aoa-memo-mcp-server.py",
+      "executable_ref": "${AOA_WORKSPACE_ROOT}/.codex/bin/aoa-memo-mcp-server.py",
       "organ_id": "aoa-memo",
       "policy_family": "read",
       "protocol_versions": [
@@ -298,6 +309,7 @@
       ],
       "registry_organ_id": "aoa-memo",
       "rollback_route": "runbook://mcp-rollback/aoa-memo/read",
+      "rollout_cohort": "admitted-read",
       "service_id": "aoa-memo-mcp",
       "unit_name": "aoa-organ-mcp-read@aoa-memo.service"
     },
@@ -322,7 +334,7 @@
         "observe"
       ],
       "endpoint_ref": "http://127.0.0.1:5424/mcp",
-      "executable_ref": "/srv/AbyssOS/.codex/bin/aoa-evals-mcp-server.py",
+      "executable_ref": "${AOA_WORKSPACE_ROOT}/.codex/bin/aoa-evals-mcp-server.py",
       "organ_id": "aoa-evals",
       "policy_family": "read",
       "protocol_versions": [
@@ -330,6 +342,7 @@
       ],
       "registry_organ_id": "aoa-evals",
       "rollback_route": "runbook://mcp-rollback/aoa-evals/read",
+      "rollout_cohort": "admitted-read",
       "service_id": "aoa-evals-mcp",
       "unit_name": "aoa-organ-mcp-read@aoa-evals.service"
     },
@@ -358,7 +371,7 @@
         "observe"
       ],
       "endpoint_ref": "http://127.0.0.1:5426/mcp",
-      "executable_ref": "/srv/AbyssOS/.codex/bin/aoa-4pda-connector-mcp-server.py",
+      "executable_ref": "${AOA_WORKSPACE_ROOT}/.codex/bin/aoa-4pda-connector-mcp-server.py",
       "organ_id": "aoa-4pda-connector",
       "policy_family": "read",
       "protocol_versions": [
@@ -366,6 +379,7 @@
       ],
       "registry_organ_id": "aoa-4pda-connector",
       "rollback_route": "runbook://mcp-rollback/aoa-4pda-connector/read",
+      "rollout_cohort": "admitted-read",
       "service_id": "aoa-4pda-connector-mcp",
       "unit_name": "aoa-organ-mcp-read@aoa-4pda-connector.service"
     },
@@ -392,7 +406,7 @@
         "observe"
       ],
       "endpoint_ref": "http://127.0.0.1:5427/mcp",
-      "executable_ref": "/srv/AbyssOS/.codex/bin/aoa-telegram-connector-mcp-server.py",
+      "executable_ref": "${AOA_WORKSPACE_ROOT}/.codex/bin/aoa-telegram-connector-mcp-server.py",
       "organ_id": "aoa-telegram-connector",
       "policy_family": "read",
       "protocol_versions": [
@@ -400,6 +414,7 @@
       ],
       "registry_organ_id": "aoa-telegram-connector",
       "rollback_route": "runbook://mcp-rollback/aoa-telegram-connector/read",
+      "rollout_cohort": "admitted-read",
       "service_id": "aoa-telegram-connector-mcp",
       "unit_name": "aoa-organ-mcp-read@aoa-telegram-connector.service"
     },
@@ -426,7 +441,7 @@
         "observe"
       ],
       "endpoint_ref": "http://127.0.0.1:5428/mcp",
-      "executable_ref": "/srv/AbyssOS/.codex/bin/aoa-discord-connector-mcp-server.py",
+      "executable_ref": "${AOA_WORKSPACE_ROOT}/.codex/bin/aoa-discord-connector-mcp-server.py",
       "organ_id": "aoa-discord-connector",
       "policy_family": "read",
       "protocol_versions": [
@@ -434,6 +449,7 @@
       ],
       "registry_organ_id": "aoa-discord-connector",
       "rollback_route": "runbook://mcp-rollback/aoa-discord-connector/read",
+      "rollout_cohort": "admitted-read",
       "service_id": "aoa-discord-connector-mcp",
       "unit_name": "aoa-organ-mcp-read@aoa-discord-connector.service"
     },
@@ -459,7 +475,7 @@
         "observe"
       ],
       "endpoint_ref": "http://127.0.0.1:5436/mcp",
-      "executable_ref": "/srv/AbyssOS/.codex/bin/aoa-course-connector-mcp-server.py",
+      "executable_ref": "${AOA_WORKSPACE_ROOT}/.codex/bin/aoa-course-connector-mcp-server.py",
       "organ_id": "aoa-course-connector",
       "policy_family": "read",
       "protocol_versions": [
@@ -467,6 +483,7 @@
       ],
       "registry_organ_id": "aoa-course-connector",
       "rollback_route": "runbook://mcp-rollback/aoa-course-connector/read",
+      "rollout_cohort": "package-only-shadow",
       "service_id": "aoa-course-connector-mcp",
       "unit_name": "aoa-organ-mcp-read@aoa-course-connector.service"
     },
@@ -491,7 +508,7 @@
         "observe"
       ],
       "endpoint_ref": "http://127.0.0.1:5437/mcp",
-      "executable_ref": "/srv/AbyssOS/.codex/bin/aoa-stackoverflow-connector-mcp-server.py",
+      "executable_ref": "${AOA_WORKSPACE_ROOT}/.codex/bin/aoa-stackoverflow-connector-mcp-server.py",
       "organ_id": "aoa-stackoverflow-connector",
       "policy_family": "read",
       "protocol_versions": [
@@ -499,6 +516,7 @@
       ],
       "registry_organ_id": "aoa-stackoverflow-connector",
       "rollback_route": "runbook://mcp-rollback/aoa-stackoverflow-connector/read",
+      "rollout_cohort": "package-only-shadow",
       "service_id": "aoa-stackoverflow-connector-mcp",
       "unit_name": "aoa-organ-mcp-read@aoa-stackoverflow-connector.service"
     },
@@ -523,7 +541,7 @@
         "observe"
       ],
       "endpoint_ref": "http://127.0.0.1:5438/mcp",
-      "executable_ref": "/srv/AbyssOS/.codex/bin/aoa-xda-connector-mcp-server.py",
+      "executable_ref": "${AOA_WORKSPACE_ROOT}/.codex/bin/aoa-xda-connector-mcp-server.py",
       "organ_id": "aoa-xda-connector",
       "policy_family": "read",
       "protocol_versions": [
@@ -531,6 +549,7 @@
       ],
       "registry_organ_id": "aoa-xda-connector",
       "rollback_route": "runbook://mcp-rollback/aoa-xda-connector/read",
+      "rollout_cohort": "package-only-shadow",
       "service_id": "aoa-xda-connector-mcp",
       "unit_name": "aoa-organ-mcp-read@aoa-xda-connector.service"
     }

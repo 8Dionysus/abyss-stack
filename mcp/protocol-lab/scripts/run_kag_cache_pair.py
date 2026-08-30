@@ -29,10 +29,18 @@ from mcp_types import Implementation, ToolAnnotations
 
 from aoa_kag_mcp.core import AoAKagMCPState
 from aoa_kag_mcp.runtime import build_application
+from runtime_catalog import load_runtime_catalog, mcp_settings
 from _mcp_sdk_identity import installed_mcp_identity
 
 
-NEXT_WIRE_VERSION = "2026-07-28"
+_SDK_SETTINGS, _PROTOCOL_SETTINGS, _TRANSPORT_SETTINGS = mcp_settings(
+    load_runtime_catalog()
+)
+NEXT_WIRE_VERSION = str(_PROTOCOL_SETTINGS["version"])
+MCP_PATH = str(_PROTOCOL_SETTINGS["streamable_http_path"])
+MCP_HOST = str(_TRANSPORT_SETTINGS["default_host"])
+PYTHON_MCP_VERSION = str(_SDK_SETTINGS["tested_lock"])
+PYTHON_MCP_COMMIT = str(_SDK_SETTINGS["source_revision"])
 CACHE_TTL_MS = 30_000
 CallNext = Callable[[ServerRequestContext[Any, Any]], Awaitable[Any]]
 
@@ -164,17 +172,17 @@ def build_cache_server(
 async def _running_server(server: MCPServer) -> AsyncIterator[str]:
     listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    listener.bind(("127.0.0.1", 0))
+    listener.bind((MCP_HOST, 0))
     listener.listen(128)
     listener.setblocking(False)
     port = int(listener.getsockname()[1])
     uvicorn_server = uvicorn.Server(
         uvicorn.Config(
             server.streamable_http_app(
-                streamable_http_path="/mcp",
+                streamable_http_path=MCP_PATH,
                 json_response=True,
                 stateless_http=True,
-                host="127.0.0.1",
+                host=MCP_HOST,
             ),
             log_level="warning",
             access_log=False,
@@ -191,7 +199,7 @@ async def _running_server(server: MCPServer) -> AsyncIterator[str]:
             while not uvicorn_server.started:
                 await anyio.sleep(0.01)
         try:
-            yield f"http://127.0.0.1:{port}/mcp"
+            yield f"http://{MCP_HOST}:{port}{MCP_PATH}"
         finally:
             uvicorn_server.should_exit = True
 

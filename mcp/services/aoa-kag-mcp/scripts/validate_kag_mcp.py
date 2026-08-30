@@ -56,11 +56,8 @@ def _read_object(path: Path) -> dict[str, Any]:
     return payload
 
 
-def _field(value: Any, *names: str) -> Any:
-    for name in names:
-        if hasattr(value, name):
-            return getattr(value, name)
-    return None
+def _field(value: Any, name: str) -> Any:
+    return getattr(value, name, None)
 
 
 def _validate_owner_contract(state: AoAKagMCPState) -> int:
@@ -124,22 +121,22 @@ def _validate_server_contract(state: AoAKagMCPState) -> tuple[int, int]:
     for tool in tools.values():
         annotations = tool.annotations
         if (
-            not _field(tool, "output_schema", "outputSchema")
+            not _field(tool, "output_schema")
             or annotations is None
-            or _field(annotations, "read_only_hint", "readOnlyHint") is not True
-            or _field(annotations, "destructive_hint", "destructiveHint") is not False
-            or _field(annotations, "idempotent_hint", "idempotentHint") is not True
-            or _field(annotations, "open_world_hint", "openWorldHint") is not False
+            or annotations.read_only_hint is not True
+            or annotations.destructive_hint is not False
+            or annotations.idempotent_hint is not True
+            or annotations.open_world_hint is not False
         ):
             raise SystemExit(f"{tool.name} must keep its read-only structured contract")
 
-    search_limit = _field(tools["kag_search"], "input_schema", "inputSchema")[
+    search_limit = _field(tools["kag_search"], "input_schema")[
         "properties"
     ]["limit"]
-    traversal_depth = _field(tools["kag_traverse"], "input_schema", "inputSchema")[
+    traversal_depth = _field(tools["kag_traverse"], "input_schema")[
         "properties"
     ]["max_depth"]
-    traversal_limit = _field(tools["kag_traverse"], "input_schema", "inputSchema")[
+    traversal_limit = _field(tools["kag_traverse"], "input_schema")[
         "properties"
     ]["limit"]
     if (search_limit.get("minimum"), search_limit.get("maximum")) != (1, 10):
@@ -151,7 +148,7 @@ def _validate_server_contract(state: AoAKagMCPState) -> tuple[int, int]:
 
     resources = {str(item.uri) for item in asyncio.run(server.list_resources())}
     resources.update(
-        str(_field(item, "uri_template", "uriTemplate"))
+        str(_field(item, "uri_template"))
         for item in asyncio.run(server.list_resource_templates())
     )
     if resources != EXPECTED_RESOURCES:

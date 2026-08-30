@@ -1,0 +1,422 @@
+{
+  "schema_version": "abyss_stack_runtime_target_source_v1",
+  "targets": [
+    {
+      "canary_contract": {
+        "arguments": {
+          "detail": "compact",
+          "owner": "aoa-kag"
+        },
+        "array_contains": [
+          {
+            "pointer": "/owners",
+            "subset": {
+              "manifest_uri": "aoa-kag://owners/aoa-kag/manifest",
+              "repo": "aoa-kag"
+            }
+          }
+        ],
+        "exact_values": {},
+        "required_pointers": [
+          "/owners",
+          "/projection/distribution/state",
+          "/resource_templates"
+        ],
+        "schema_pointer": "/schema_version",
+        "schema_value": "aoa-kag-mcp-capabilities-v1",
+        "tool_name": "kag_discover"
+      },
+      "canary_route": "runbook://mcp-canary/aoa-kag/read",
+      "effect_classes": [
+        "observe"
+      ],
+      "policy_family": "read",
+      "rollback_route": "runbook://mcp-rollback/aoa-kag/read",
+      "service_id": "aoa-kag-mcp"
+    },
+    {
+      "canary_contract": {
+        "arguments": {},
+        "array_contains": [],
+        "exact_values": {
+          "/artifact_identity/owner_repo": "aoa-stats",
+          "/owner_repo": "aoa-stats"
+        },
+        "required_pointers": [
+          "/artifact_identity/content_identity",
+          "/generated_from/latest_observed_at",
+          "/surfaces"
+        ],
+        "schema_pointer": "/schema_version",
+        "schema_value": "aoa_stats_summary_surface_catalog_v2",
+        "tool_name": "stats_catalog"
+      },
+      "canary_route": "runbook://mcp-canary/aoa-stats/read",
+      "effect_classes": [
+        "observe"
+      ],
+      "policy_family": "read",
+      "rollback_route": "runbook://mcp-rollback/aoa-stats/read",
+      "service_id": "aoa-stats-mcp"
+    },
+    {
+      "canary_contract": {
+        "arguments": {},
+        "array_contains": [],
+        "exact_values": {
+          "/cache_write_allowed": false,
+          "/freshness_scope": "local_workspace_filesystem",
+          "/remote_freshness_checked": false
+        },
+        "required_pointers": [
+          "/status",
+          "/current_input_fingerprint",
+          "/claim_limits"
+        ],
+        "schema_pointer": "/schema",
+        "schema_value": "aoa_decisions_graph_cache_posture_v1",
+        "tool_name": "aoa_decisions_status"
+      },
+      "canary_route": "runbook://mcp-canary/aoa-decisions/read",
+      "effect_classes": [
+        "observe"
+      ],
+      "policy_family": "read",
+      "rollback_route": "runbook://mcp-rollback/aoa-decisions/read",
+      "service_id": "aoa-decisions-mcp"
+    },
+    {
+      "canary_contract": {
+        "arguments": {
+          "byte_budget": 8192,
+          "max_results": 1,
+          "organ_id": "abyss-stack",
+          "policy_family": "read"
+        },
+        "array_contains": [
+          {
+            "pointer": "/owner_payload/entries",
+            "subset": {
+              "organ_id": "abyss-stack",
+              "policy_family": "read"
+            }
+          }
+        ],
+        "exact_values": {
+          "/metadata/applied_state": "not_applied",
+          "/metadata/authority_ceiling": "read",
+          "/metadata/effect_class": "observe",
+          "/metadata/execution_authorized": false,
+          "/owner_payload/schema_bytes_loaded": 0
+        },
+        "required_pointers": [
+          "/metadata/observation_digest",
+          "/metadata/provider_watermark",
+          "/owner_payload/entries"
+        ],
+        "schema_pointer": "/metadata/contract_version",
+        "schema_value": "abyss_stack_mcp_result_v1",
+        "tool_name": "stack_runtime_catalog"
+      },
+      "canary_route": "runbook://mcp-canary/abyss-stack/read",
+      "effect_classes": [
+        "observe"
+      ],
+      "policy_family": "read",
+      "rollback_route": "runbook://mcp-rollback/abyss-stack/read",
+      "service_id": "abyss-stack-mcp"
+    },
+    {
+      "canary_contract": {
+        "arguments": {
+          "evidence_limit": 8,
+          "profile": "fast"
+        },
+        "array_contains": [],
+        "exact_values": {
+          "/authority_boundary/schema": "abyss_machine_mcp_authority_boundary_v1",
+          "/profile": "fast"
+        },
+        "required_pointers": [
+          "/generated_at",
+          "/authority_boundary",
+          "/owner_layers",
+          "/safe_next_route"
+        ],
+        "schema_pointer": "/schema",
+        "schema_value": "abyss_machine_mcp_brief_v1",
+        "tool_name": "abyss_machine_brief"
+      },
+      "canary_route": "runbook://mcp-canary/abyss-machine/read",
+      "effect_classes": [
+        "observe"
+      ],
+      "policy_family": "read",
+      "rollback_route": "runbook://mcp-rollback/abyss-machine/read",
+      "service_id": "abyss-machine-mcp"
+    },
+    {
+      "canary_contract": {
+        "arguments": {},
+        "array_contains": [],
+        "exact_values": {
+          "/owner_repo": "Tree-of-Sophia"
+        },
+        "required_pointers": [
+          "/index_path",
+          "/authority_order",
+          "/runtime_projection_boundary"
+        ],
+        "schema_pointer": "/schema",
+        "schema_value": "tos_corpus_mcp_status_v1",
+        "tool_name": "tos_corpus_status"
+      },
+      "canary_route": "runbook://mcp-canary/tree-of-sophia/read",
+      "effect_classes": [
+        "observe"
+      ],
+      "policy_family": "read",
+      "rollback_route": "runbook://mcp-rollback/tree-of-sophia/read",
+      "service_id": "tos-corpus-mcp"
+    },
+    {
+      "canary_contract": {
+        "arguments": {
+          "filters": {},
+          "kind": "mcp_service",
+          "query": "MCP"
+        },
+        "array_contains": [],
+        "exact_values": {
+          "/mutates": false,
+          "/requested_kind": "mcp_service"
+        },
+        "transport_exact_values": {
+          "streamable-http": {
+            "/mcp_access/capability_profile": "session-evidence-read"
+          }
+        },
+        "required_pointers": [
+          "/primary_route",
+          "/fallback_plan",
+          "/mcp_access"
+        ],
+        "schema_pointer": "/artifact_type",
+        "schema_value": "session_memory_literal_query_plan",
+        "tool_name": "aoa_session_literal_query_plan"
+      },
+      "canary_route": "runbook://mcp-canary/aoa-session-memory/read",
+      "effect_classes": [
+        "observe"
+      ],
+      "policy_family": "read",
+      "rollback_route": "runbook://mcp-rollback/aoa-session-memory/read",
+      "service_id": "aoa-session-memory-mcp"
+    },
+    {
+      "canary_contract": {
+        "arguments": {
+          "intent": "",
+          "repo": "aoa-memo"
+        },
+        "array_contains": [],
+        "exact_values": {
+          "/repo": "aoa-memo"
+        },
+        "required_pointers": [
+          "/reviewed_memory",
+          "/source_owner",
+          "/source_catalog",
+          "/authority_boundary"
+        ],
+        "schema_pointer": "/schema",
+        "schema_value": "aoa_memo_reviewed_brief_v1",
+        "tool_name": "aoa_memo_recall_brief"
+      },
+      "canary_route": "runbook://mcp-canary/aoa-memo/read",
+      "effect_classes": [
+        "observe"
+      ],
+      "policy_family": "read",
+      "rollback_route": "runbook://mcp-rollback/aoa-memo/read",
+      "service_id": "aoa-memo-mcp"
+    },
+    {
+      "canary_contract": {
+        "arguments": {},
+        "array_contains": [],
+        "exact_values": {
+          "/freshness/mirror_is_authority": false
+        },
+        "required_pointers": [
+          "/source",
+          "/freshness",
+          "/authority_boundary"
+        ],
+        "schema_pointer": "/schema",
+        "schema_value": "aoa_evals_runtime_status_v1",
+        "tool_name": "aoa_evals_runtime_status"
+      },
+      "canary_route": "runbook://mcp-canary/aoa-evals/read",
+      "effect_classes": [
+        "observe"
+      ],
+      "policy_family": "read",
+      "rollback_route": "runbook://mcp-rollback/aoa-evals/read",
+      "service_id": "aoa-evals-mcp"
+    },
+    {
+      "canary_contract": {
+        "arguments": {
+          "run": "latest"
+        },
+        "array_contains": [],
+        "exact_values": {
+          "/network_touched": false,
+          "/read_only": true
+        },
+        "required_pointers": [
+          "/source_route",
+          "/doctor",
+          "/storage",
+          "/ready"
+        ],
+        "schema_pointer": "/schema",
+        "schema_value": "aoa_4pda_connector_mcp_status_v1",
+        "tool_name": "aoa_4pda_connector_status"
+      },
+      "canary_route": "runbook://mcp-canary/aoa-4pda-connector/read",
+      "effect_classes": [
+        "observe"
+      ],
+      "policy_family": "read",
+      "rollback_route": "runbook://mcp-rollback/aoa-4pda-connector/read",
+      "service_id": "aoa-4pda-connector-mcp"
+    },
+    {
+      "canary_contract": {
+        "arguments": {},
+        "array_contains": [],
+        "exact_values": {
+          "/network_touched": false,
+          "/read_only": true
+        },
+        "required_pointers": [
+          "/source_route",
+          "/doctor",
+          "/storage",
+          "/policy"
+        ],
+        "schema_pointer": "/schema",
+        "schema_value": "aoa_telegram_connector_mcp_status_v1",
+        "tool_name": "aoa_telegram_connector_status"
+      },
+      "canary_route": "runbook://mcp-canary/aoa-telegram-connector/read",
+      "effect_classes": [
+        "observe"
+      ],
+      "policy_family": "read",
+      "rollback_route": "runbook://mcp-rollback/aoa-telegram-connector/read",
+      "service_id": "aoa-telegram-connector-mcp"
+    },
+    {
+      "canary_contract": {
+        "arguments": {},
+        "array_contains": [],
+        "exact_values": {
+          "/network_touched": false,
+          "/read_only": true
+        },
+        "required_pointers": [
+          "/source_route",
+          "/doctor",
+          "/storage",
+          "/policy"
+        ],
+        "schema_pointer": "/schema",
+        "schema_value": "aoa_discord_connector_mcp_status_v1",
+        "tool_name": "aoa_discord_connector_status"
+      },
+      "canary_route": "runbook://mcp-canary/aoa-discord-connector/read",
+      "effect_classes": [
+        "observe"
+      ],
+      "policy_family": "read",
+      "rollback_route": "runbook://mcp-rollback/aoa-discord-connector/read",
+      "service_id": "aoa-discord-connector-mcp"
+    },
+    {
+      "canary_contract": {
+        "arguments": {},
+        "array_contains": [],
+        "exact_values": {
+          "/authority": "owner-result-preserved",
+          "/network_touched": false,
+          "/owner_tool": "connector_readiness",
+          "/read_only": true
+        },
+        "required_pointers": [
+          "/owner_result"
+        ],
+        "schema_pointer": "/schema",
+        "schema_value": "aoa_course_connector_mcp_read_result_v1",
+        "tool_name": "aoa_course_connector_status"
+      },
+      "canary_route": "runbook://mcp-canary/aoa-course-connector/read",
+      "effect_classes": [
+        "observe"
+      ],
+      "policy_family": "read",
+      "rollback_route": "runbook://mcp-rollback/aoa-course-connector/read",
+      "service_id": "aoa-course-connector-mcp"
+    },
+    {
+      "canary_contract": {
+        "arguments": {},
+        "array_contains": [],
+        "exact_values": {
+          "/network_touched": false,
+          "/read_only": true
+        },
+        "required_pointers": [
+          "/source_route",
+          "/commands"
+        ],
+        "schema_pointer": "/schema",
+        "schema_value": "aoa_stackoverflow_connector_mcp_status_v1",
+        "tool_name": "aoa_stackoverflow_connector_status"
+      },
+      "canary_route": "runbook://mcp-canary/aoa-stackoverflow-connector/read",
+      "effect_classes": [
+        "observe"
+      ],
+      "policy_family": "read",
+      "rollback_route": "runbook://mcp-rollback/aoa-stackoverflow-connector/read",
+      "service_id": "aoa-stackoverflow-connector-mcp"
+    },
+    {
+      "canary_contract": {
+        "arguments": {},
+        "array_contains": [],
+        "exact_values": {
+          "/network_touched": false,
+          "/read_only": true
+        },
+        "required_pointers": [
+          "/source_route",
+          "/commands"
+        ],
+        "schema_pointer": "/schema",
+        "schema_value": "aoa_xda_connector_mcp_status_v1",
+        "tool_name": "aoa_xda_connector_status"
+      },
+      "canary_route": "runbook://mcp-canary/aoa-xda-connector/read",
+      "effect_classes": [
+        "observe"
+      ],
+      "policy_family": "read",
+      "rollback_route": "runbook://mcp-rollback/aoa-xda-connector/read",
+      "service_id": "aoa-xda-connector-mcp"
+    }
+  ]
+}

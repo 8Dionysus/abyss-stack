@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 36427371,
+  "allowed_tracked_bytes": 41051147,
+  "approved_by": "repository-owner",
+  "base_ref": "64bdae20b3a5c885ca75755188b04803b587ab50",
+  "changed_generated_bytes": 36427371,
+  "changed_generated_files": 528,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "601fd234c5c809d36db6389d6e242a1e82db4dee3c251b352c8720ed5f02a315",
+  "reason": "Refresh the exact combined owner family after measuring all executable MCP runtime bytecode. Authorize only the measured generated-family delta required to index the reviewed sourceless-bytecode integrity repair and regression; do not raise standing budgets or admit candidate, effect, materialization, or invocation authority.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 41051147,
+  "tracked_bytes_max": 24117248
+}

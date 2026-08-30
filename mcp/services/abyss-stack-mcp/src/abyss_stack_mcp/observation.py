@@ -13,16 +13,18 @@ import errno
 import hashlib
 import json
 import os
+import re
 import stat
 import subprocess
 import tempfile
 from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, Mapping
 
 from pydantic import Field, ValidationError, field_validator
 
+from ._runtime_config import PATH_CONFIG
 from .contracts import (
     CanaryObservation,
     CentralProofObservation,
@@ -48,18 +50,10 @@ from .contracts import (
 from .core import MAX_OBSERVATION_BYTES, _reject_secret_material, canonical_json_bytes
 
 
-DEFAULT_DEPLOYMENT_MANIFEST_PATH = Path(
-    "/srv/AbyssOS/abyss-stack/Logs/mcp/deployments/latest.json"
-)
-DEFAULT_REGISTRY_PATH = Path(
-    "/srv/AbyssOS/.aoa/organ-access/organ-registry.source.json"
-)
-DEFAULT_OUTPUT_PATH = Path(
-    "/srv/AbyssOS/abyss-stack/Logs/mcp/observations/current.json"
-)
-DEFAULT_OVERLAY_PATH = Path(
-    "/srv/AbyssOS/abyss-stack/Logs/mcp/observations/evidence-overlay.json"
-)
+DEFAULT_DEPLOYMENT_MANIFEST_PATH = PATH_CONFIG.stack_deployment_manifest_path()
+DEFAULT_REGISTRY_PATH = PATH_CONFIG.stack_registry_path()
+DEFAULT_OUTPUT_PATH = PATH_CONFIG.stack_observation_path()
+DEFAULT_OVERLAY_PATH = PATH_CONFIG.stack_overlay_path()
 def _packaged_targets_path(module_path: Path) -> Path:
     """Bind the packaged catalog to the physical installed package directory.
 
@@ -77,6 +71,20 @@ MAX_INPUT_BYTES = 2 * 1024 * 1024
 MAX_OVERLAY_FUTURE_SKEW = timedelta(seconds=30)
 UNKNOWN_DIGEST = "sha256:" + ("0" * 64)
 ObservationCanaryPurpose = Literal["current", "last-known-good"]
+_ENV_REF = re.compile(r"\$\{([A-Z][A-Z0-9_]*)\}")
+
+
+def _resolve_runtime_env_ref(
+    match: re.Match[str],
+    environment: Mapping[str, str] | None = None,
+) -> str:
+    configured = environment if environment is not None else os.environ
+    value = configured.get(match.group(1))
+    if value is None:
+        return match.group(0)
+    if match.group(1) == PATH_CONFIG.stack_root_env_var:
+        return str(PATH_CONFIG.stack_runtime_root(value))
+    return value
 
 
 class ObservationProducerError(ValueError):
@@ -102,6 +110,9 @@ class RuntimeCanaryContract(StrictModel):
     schema_value: NonEmpty
     required_pointers: tuple[NonEmpty, ...] = ()
     exact_values: dict[NonEmpty, Any] = Field(default_factory=dict)
+    transport_exact_values: dict[NonEmpty, dict[NonEmpty, Any]] = Field(
+        default_factory=dict
+    )
     array_contains: tuple[CanaryArrayContains, ...] = ()
 
     @field_validator("schema_pointer")
@@ -135,6 +146,21 @@ class RuntimeCanaryContract(StrictModel):
             )
         return value
 
+    @field_validator("transport_exact_values")
+    @classmethod
+    def require_absolute_transport_exact_pointers(
+        cls,
+        value: dict[str, dict[str, Any]],
+    ) -> dict[str, dict[str, Any]]:
+        for transport, assertions in value.items():
+            if not transport.strip():
+                raise ValueError("canary transport names must be non-empty")
+            if any(not pointer.startswith("/") for pointer in assertions):
+                raise ValueError(
+                    "canary transport exact-value pointers must be absolute JSON pointers"
+                )
+        return value
+
 
 class RuntimeTarget(StrictModel):
     organ_id: Identifier
@@ -152,6 +178,7 @@ class RuntimeTarget(StrictModel):
     canary_route: NonEmpty
     canary_contract: RuntimeCanaryContract | None = None
     rollback_route: NonEmpty
+    rollout_cohort: Literal["admitted-read", "package-only-shadow"] = "admitted-read"
 
 
 class RuntimeTargetCatalog(StrictModel):
@@ -345,7 +372,12 @@ def _write_atomic(path: Path, payload: dict[str, Any]) -> None:
         temporary.unlink(missing_ok=True)
 
 
-def _load_targets(path: Path) -> tuple[RuntimeTargetCatalog, str]:
+def _load_targets(
+    path: Path,
+    *,
+    workspace_root: str | Path | None = None,
+    stack_root: str | Path | None = None,
+) -> tuple[RuntimeTargetCatalog, str]:
     payload, _ = _read_json(path, "runtime target catalog")
     _reject_secret_material(payload)
     try:
@@ -354,7 +386,55 @@ def _load_targets(path: Path) -> tuple[RuntimeTargetCatalog, str]:
         raise ObservationProducerError(
             "runtime target catalog failed contract validation"
         ) from exc
-    return catalog, _digest(catalog.model_dump(mode="json"))
+    catalog_digest = _digest(catalog.model_dump(mode="json"))
+    return (
+        _resolve_runtime_target_catalog(
+            catalog,
+            workspace_root=workspace_root,
+            stack_root=stack_root,
+        ),
+        catalog_digest,
+    )
+
+
+def _resolve_runtime_target_catalog(
+    catalog: RuntimeTargetCatalog,
+    *,
+    workspace_root: str | Path | None = None,
+    stack_root: str | Path | None = None,
+) -> RuntimeTargetCatalog:
+    """Resolve deployment-owned target references before any consumer uses them.
+
+    A caller that already owns an explicit deployed root supplies it here so a
+    systemd invocation does not depend on ambient environment variables.  The
+    environment remains a compatibility fallback for standalone consumers.
+    """
+
+    environment: dict[str, str] = {}
+    if workspace_root is not None:
+        environment[PATH_CONFIG.workspace_env_var] = str(
+            Path(workspace_root).expanduser().resolve()
+        )
+    if stack_root is not None:
+        environment[PATH_CONFIG.stack_root_env_var] = str(
+            Path(stack_root).expanduser().resolve()
+        )
+    resolved_payload = catalog.model_dump(mode="json")
+    for target in resolved_payload["targets"]:
+        target["executable_ref"] = _ENV_REF.sub(
+            lambda match: _resolve_runtime_env_ref(
+                match,
+                environment if environment else None,
+            ),
+            target["executable_ref"],
+        )
+    try:
+        catalog = RuntimeTargetCatalog.model_validate(resolved_payload)
+    except ValidationError as exc:
+        raise ObservationProducerError(
+            "runtime target catalog failed resolved executable contract"
+        ) from exc
+    return catalog
 
 
 def _load_deployment(path: Path) -> tuple[dict[str, Any], str]:
@@ -375,13 +455,14 @@ def _load_deployment(path: Path) -> tuple[dict[str, Any], str]:
         if key not in {"manifest_id", "record_ref", "latest_ref"}
     }
     expected = _digest(unsigned)
+    manifest_relative = Path(PATH_CONFIG.stack_deployment_manifest_relative_to_runtime)
     expected_ref = (
-        "Logs/mcp/deployments/records/" + expected.removeprefix("sha256:") + ".json"
-    )
+        manifest_relative.parent / "records" / f"{expected.removeprefix('sha256:')}.json"
+    ).as_posix()
     if (
         payload.get("manifest_id") != expected
         or payload.get("record_ref") != expected_ref
-        or payload.get("latest_ref") != "Logs/mcp/deployments/latest.json"
+        or payload.get("latest_ref") != manifest_relative.as_posix()
     ):
         raise ObservationProducerError("deployment manifest content address is invalid")
     if path.name == "latest.json":
@@ -1136,6 +1217,8 @@ def produce_observation(
     registry_path: Path = DEFAULT_REGISTRY_PATH,
     output_path: Path = DEFAULT_OUTPUT_PATH,
     targets_path: Path = DEFAULT_TARGETS_PATH,
+    runtime_workspace_root: Path | None = None,
+    runtime_stack_root: Path | None = None,
     overlay_path: Path | None = DEFAULT_OVERLAY_PATH,
     allow_missing_overlay: bool = True,
     canary_purpose: ObservationCanaryPurpose = "current",
@@ -1147,7 +1230,11 @@ def produce_observation(
         raise ObservationProducerError("observation TTL must be 30..3600 seconds")
     observed_at = clock().astimezone(timezone.utc)
     expires_at = observed_at + timedelta(seconds=ttl_seconds)
-    catalog, catalog_digest = _load_targets(targets_path)
+    catalog, catalog_digest = _load_targets(
+        targets_path,
+        workspace_root=runtime_workspace_root,
+        stack_root=runtime_stack_root,
+    )
     manifest, manifest_digest = _load_deployment(deployment_manifest_path)
     registry, registry_digest = _load_registry(registry_path)
     overlay, overlay_digest = _load_overlay(
@@ -1220,6 +1307,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--registry", type=Path, default=DEFAULT_REGISTRY_PATH)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT_PATH)
     parser.add_argument("--targets", type=Path, default=DEFAULT_TARGETS_PATH)
+    parser.add_argument("--runtime-workspace-root", type=Path)
+    parser.add_argument("--runtime-stack-root", type=Path)
     parser.add_argument("--overlay", type=Path, default=DEFAULT_OVERLAY_PATH)
     parser.add_argument("--require-overlay", action="store_true")
     parser.add_argument(
@@ -1243,6 +1332,8 @@ def main() -> int:
             registry_path=args.registry,
             output_path=args.output,
             targets_path=args.targets,
+            runtime_workspace_root=args.runtime_workspace_root,
+            runtime_stack_root=args.runtime_stack_root,
             overlay_path=args.overlay,
             allow_missing_overlay=not args.require_overlay,
             canary_purpose=args.canary_purpose,

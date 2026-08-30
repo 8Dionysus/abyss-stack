@@ -110,6 +110,3 @@ RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 IPAddressDeny=any
 IPAddressAllow=localhost
 UMask=0077
-
-[Install]
-WantedBy=default.target

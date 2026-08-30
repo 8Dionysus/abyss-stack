@@ -12,7 +12,8 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any, Iterator
 
-DEFAULT_WORKSPACE_ROOT = Path("/srv/AbyssOS")
+from ._runtime_config import PATH_CONFIG
+
 BUILDER_RELATIVE_PATH = Path("scripts") / "build_workspace_decision_graph.py"
 
 
@@ -39,7 +40,8 @@ def discover_stack_root(
     env = environ if environ is not None else os.environ
     candidates = [
         package_file or __file__,
-        env.get("AOA_SOURCE_ROOT"),
+        env.get(PATH_CONFIG.stack_source_env_var),
+        env.get(PATH_CONFIG.stack_root_env_var),
         cwd or Path.cwd(),
     ]
     for candidate in candidates:
@@ -134,7 +136,7 @@ class AoADecisionsMCPState:
         stack = (
             Path(
                 stack_root
-                or os.environ.get("AOA_ABYSS_STACK_ROOT")
+                or os.environ.get(PATH_CONFIG.stack_root_env_var)
                 or discover_stack_root()
             )
             .expanduser()
@@ -151,7 +153,7 @@ class AoADecisionsMCPState:
             workspace_root=Path(
                 workspace_root
                 or os.environ.get("AOA_WORKSPACE_ROOT")
-                or DEFAULT_WORKSPACE_ROOT
+                or PATH_CONFIG.workspace_root()
             )
             .expanduser()
             .resolve(),

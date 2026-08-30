@@ -390,6 +390,7 @@
         "mcp/services/abyss-machine-mcp/scripts/release_check.py",
         "mcp/services/abyss-machine-mcp/scripts/validate_machine_mcp.py",
         "mcp/services/abyss-stack-mcp/scripts/abyss_stack_mcp_server.py",
+        "mcp/services/abyss-stack-mcp/scripts/build_runtime_targets.py",
         "mcp/services/abyss-stack-mcp/scripts/generate_stack_mcp_contracts.py",
         "mcp/services/abyss-stack-mcp/scripts/validate_stack_mcp.py",
         "mcp/services/aoa-decisions-mcp/scripts/aoa_decisions_mcp_server.py",
@@ -421,7 +422,8 @@
         "mcp/services/aoa-xda-connector-mcp/scripts/aoa_xda_connector_mcp_server.py",
         "mcp/services/aoa-xda-connector-mcp/scripts/validate_xda_connector_mcp.py",
         "mcp/services/tos-corpus-mcp/scripts/tos_corpus_mcp_server.py",
-        "mcp/services/tos-corpus-mcp/scripts/validate_tos_corpus_mcp.py"
+        "mcp/services/tos-corpus-mcp/scripts/validate_tos_corpus_mcp.py",
+        "mcp/services/_shared/validate_systemd_projection.py"
       ],
       "organ_lane": "MCP access plane",
       "owner_surface": "mcp/services/AGENTS.md",
@@ -459,9 +461,12 @@
         "mcp/protocol-lab/scripts/run_live_modern_read_fleet.py",
         "mcp/protocol-lab/scripts/run_live_nonread_protocol.py",
         "mcp/protocol-lab/scripts/run_modern_organ_fleet_matrix.py",
+        "mcp/protocol-lab/scripts/run_modern_organ_stdio_matrix.py",
         "mcp/protocol-lab/scripts/run_rust_tasks_adapter_pair.py",
         "mcp/protocol-lab/scripts/run_tasks_adapter_pilot.py",
         "mcp/protocol-lab/scripts/rust_tasks_adapter_client.rs",
+        "mcp/protocol-lab/scripts/canary_contract.py",
+        "mcp/protocol-lab/scripts/runtime_catalog.py",
         "mcp/protocol-lab/scripts/validate_protocol_lab.py"
       ],
       "organ_lane": "MCP protocol compatibility gate",

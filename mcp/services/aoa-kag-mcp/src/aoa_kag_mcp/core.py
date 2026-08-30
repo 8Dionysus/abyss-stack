@@ -6,8 +6,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from ._runtime_config import PATH_CONFIG
 
-DEFAULT_WORKSPACE_ROOT = Path("/srv/AbyssOS")
 PROVIDER_MAP_RELATIVE_PATH = Path("generated/local_kag_provider_map.min.json")
 READINESS_RELATIVE_PATH = Path("manifests/local_kag_readiness.json")
 REPO_LOCAL_COVERAGE_RELATIVE_PATH = Path("generated/repo_local_kag_coverage.min.json")
@@ -65,7 +65,7 @@ class AoAKagMCPState:
             Path(
                 workspace_root
                 or os.environ.get("AOA_WORKSPACE_ROOT")
-                or DEFAULT_WORKSPACE_ROOT
+                or PATH_CONFIG.workspace_root()
             )
             .expanduser()
             .resolve()

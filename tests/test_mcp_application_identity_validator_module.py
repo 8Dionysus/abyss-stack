@@ -9,9 +9,8 @@ def _write_service(
     root: Path,
     *,
     project_version: str = "1.2.3",
-    server_version: str = "1.2.3",
-    application_body: str = "return APPLICATION_VERSION",
-    import_line: str = "",
+    version_expression: str = "SERVICE_CONFIG.package_version",
+    import_line: str = "from ._runtime_config import SERVICE_CONFIG\n",
 ) -> None:
     package_root = root / "mcp" / "services" / "example-mcp"
     server_path = package_root / "src" / "example_mcp" / "server.py"
@@ -24,15 +23,8 @@ def _write_service(
     )
     server_path.write_text(
         f"{import_line}"
-        f'APPLICATION_VERSION = "{server_version}"\n\n'
-        "def _application_version() -> str:\n"
-        f"    {application_body}\n\n"
-        "def _bind_server_info_version(mcp) -> None:\n"
-        "    mcp._mcp_server.version = _application_version()\n\n"
         "def build_server():\n"
-        "    mcp = object()\n"
-        "    _bind_server_info_version(mcp)\n"
-        "    return mcp\n",
+        f"    return ModernMCPServer('example', version={version_expression})\n",
         encoding="utf-8",
     )
 
@@ -47,29 +39,36 @@ def test_accepts_source_bound_application_identity(tmp_path: Path) -> None:
 
 
 def test_rejects_stale_embedded_version(tmp_path: Path) -> None:
-    _write_service(tmp_path, project_version="2.0.0", server_version="1.0.0")
+    _write_service(tmp_path, project_version="")
 
     errors: list[str] = []
     mcp_application_identity.validate(errors, root=tmp_path)
 
-    assert any("must equal pyproject project.version" in error for error in errors)
+    assert any("cannot validate its package version" in error for error in errors)
 
 
 def test_rejects_ambient_distribution_metadata(tmp_path: Path) -> None:
     _write_service(
         tmp_path,
         import_line="from importlib.metadata import distribution\n",
-        application_body='return distribution("example-mcp").version',
     )
 
     errors: list[str] = []
     mcp_application_identity.validate(errors, root=tmp_path)
 
     assert any("ambient importlib.metadata" in error for error in errors)
-    assert any("must return APPLICATION_VERSION directly" in error for error in errors)
 
 
-def test_rejects_server_builder_without_version_binding(tmp_path: Path) -> None:
+def test_rejects_non_catalog_version_binding(tmp_path: Path) -> None:
+    _write_service(tmp_path, version_expression="\"1.2.3\"")
+
+    errors: list[str] = []
+    mcp_application_identity.validate(errors, root=tmp_path)
+
+    assert any("SERVICE_CONFIG.package_version" in error for error in errors)
+
+
+def test_rejects_builder_without_native_server(tmp_path: Path) -> None:
     _write_service(tmp_path)
     server_path = (
         tmp_path
@@ -81,45 +80,13 @@ def test_rejects_server_builder_without_version_binding(tmp_path: Path) -> None:
         / "server.py"
     )
     server_path.write_text(
-        server_path.read_text(encoding="utf-8").replace(
-            "    _bind_server_info_version(mcp)\n",
-            "",
-        ),
+        "from ._runtime_config import SERVICE_CONFIG\n"
+        "def build_server():\n"
+        "    return object()\n",
         encoding="utf-8",
     )
 
     errors: list[str] = []
     mcp_application_identity.validate(errors, root=tmp_path)
 
-    assert any(
-        "build_server must call _bind_server_info_version(mcp)" in error
-        for error in errors
-    )
-
-
-def test_rejects_version_assignment_to_unproven_receiver(tmp_path: Path) -> None:
-    _write_service(tmp_path)
-    server_path = (
-        tmp_path
-        / "mcp"
-        / "services"
-        / "example-mcp"
-        / "src"
-        / "example_mcp"
-        / "server.py"
-    )
-    server_path.write_text(
-        server_path.read_text(encoding="utf-8").replace(
-            "mcp._mcp_server.version = _application_version()",
-            "telemetry.version = _application_version()",
-        ),
-        encoding="utf-8",
-    )
-
-    errors: list[str] = []
-    mcp_application_identity.validate(errors, root=tmp_path)
-
-    assert any(
-        "_bind_server_info_version must assign server version" in error
-        for error in errors
-    )
+    assert any("construct native ModernMCPServer" in error for error in errors)

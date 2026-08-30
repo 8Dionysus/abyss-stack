@@ -36,6 +36,7 @@ def main() -> None:
 
     status = sub.add_parser("status")
     status.add_argument("--include-live", action="store_true")
+    status.add_argument("--refresh-maintenance", action="store_true")
 
     sub.add_parser("transport-preflight")
 
@@ -276,6 +277,7 @@ def main() -> None:
 
     projection_status = sub.add_parser("projection-status")
     projection_status.add_argument("--include-payload", action="store_true")
+    projection_status.add_argument("--refresh-maintenance", action="store_true")
 
     graph_neighborhood = sub.add_parser("graph-neighborhood")
     graph_neighborhood.add_argument("anchor")
@@ -345,7 +347,12 @@ def main() -> None:
     )
 
     if args.command == "status":
-        _print(state.session_memory_status(include_live=args.include_live))
+        _print(
+            state.session_memory_status(
+                include_live=args.include_live,
+                refresh_maintenance=args.refresh_maintenance,
+            )
+        )
     elif args.command == "transport-preflight":
         _print(state.session_mcp_transport_preflight())
     elif args.command == "search":
@@ -602,7 +609,12 @@ def main() -> None:
             )
         )
     elif args.command == "projection-status":
-        _print(state.session_projection_status(include_payload=args.include_payload))
+        _print(
+            state.session_projection_status(
+                include_payload=args.include_payload,
+                refresh_maintenance=args.refresh_maintenance,
+            )
+        )
     elif args.command == "graph-neighborhood":
         _print(
             state.graph_neighborhood(

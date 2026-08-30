@@ -6,15 +6,22 @@ because a specification, SDK, or client advertises support.
 
 Current posture after the 2026-07-28 final release:
 
-- admitted OS Abyss production wire remains final `2026-07-28` on the
-  deployment-bound Python MCP `2.0.0` runtime;
-- source candidate: Python MCP `2.1.1`, with TypeScript client/server still
-  pinned to stable `2.0.0`;
-- all fifteen standalone stack-owned organ packages pin exact `mcp==2.1.1`;
+- admitted OS Abyss production wire: final `2026-07-28`;
+- stable next SDKs: Python `2.1.1`, TypeScript client/server `2.0.0`;
+- all fifteen standalone stack-owned organ packages admit only `mcp>=2,<3`,
+  while the deterministic deployment lock currently tests exact `2.1.1`;
+- source transition is now pinned to Python MCP `2.1.1` plus
+  `mcp-types==2.1.1` at source revision
+  `0921d94a74db900dccd2d534842aa7b6160542d2`;
 - eleven production read units are deployment-bound, canary-proven, admitted,
   and observed through `server/discover` and `tools/list` on the exact modern
-  wire with deployment evidence still pinned to MCP `2.0.0`; wrong bearers and
-  legacy `initialize` are denied before session issue;
+  wire. A separate bounded 2026-08-30 owner deployment proved the exact 2.1.1
+  serving bytes, listener ownership, schemas, semantic canaries, and negative
+  auth/legacy gates for all eleven;
+- the checked-in live-fleet, rollback, and Tasks fixtures intentionally remain
+  historical expired 2.0.0 evidence. The generated source status therefore
+  stays blocked instead of treating the separate runtime closure as a fixture
+  rewrite or re-admitting Tasks;
 - no active or enabled legacy owner instance remains; the old shared template
   is a non-startable tombstone and the MCP 1 runtime is cold rollback material;
 - OS Abyss Codex `0.147.0-abyss.2` selects modern MCP only for the explicit
@@ -75,8 +82,9 @@ Current posture after the 2026-07-28 final release:
   raw `tasks/get` omits task-bound `Mcp-Name`; the adapter correctly retains
   the boundary with JSON-RPC `-32020` / HTTP `400`;
 - isolated read-only MCP `2.1.1` modern pair and rollback: passed;
-- production core-read migration: blocked until deployment-bound MCP `2.1.1`
-  pair evidence is refreshed;
+- production core-read migration: completed by the bounded live owner route;
+  the checked-in protocol-lab migration gate remains blocked until its
+  deployment-bound fixtures are deliberately refreshed;
 - derived status keeps candidate and deployment evidence deadlines separate;
   the overall deadline is the earliest of both, and expired deployment-bound
   receipts remain a hard blocker even if their recorded SDK labels are edited;
@@ -93,7 +101,8 @@ Current posture after the 2026-07-28 final release:
 The matrix pins exact specification, SDK, conformance-suite, and consumer
 observations. All fourteen P1 compatibility gates pass for their stated
 evidence, including the independently evidenced bounded Tasks gate; production
-cutover remains blocked until deployment-bound receipts match MCP `2.1.1`.
+fixture cutover remains blocked until deployment-bound receipts match MCP
+`2.1.1`, while the separately evidenced live read cutover is complete.
 The generated v2 status reports separate core-read, Tasks, candidate,
 internal-effect, and external-effect verdicts. Protocol readiness never grants
 candidate or effect authority.
@@ -171,10 +180,11 @@ can execute.
 | `scripts/validate_protocol_lab.py` | fail-closed source and stack-pin validator |
 | `tests/` | mutation and migration-gate tests |
 
-The modern deployment receipts admit only the eleven read contours and the
-bounded Tasks lifecycle on `abyss-stack` read, and remain bound to MCP `2.0.0`
-until a deployment refresh proves the `2.1.1` candidate. They do not prove
-subscription fan-out across replicas or authorize candidate/effect migration.
+The checked-in modern deployment fixtures remain bound to MCP `2.0.0` and are
+historical inputs to the source gate. The separate 2026-08-30 runtime closure
+admits only the eleven read contours on exact 2.1.1; it does not refresh the
+bounded Tasks fixture, prove subscription fan-out across replicas, or authorize
+candidate/effect migration.
 
 Read [CONTRACT.md](CONTRACT.md) for admission law and
 [docs/COMPATIBILITY_MATRIX.md](docs/COMPATIBILITY_MATRIX.md) for the core

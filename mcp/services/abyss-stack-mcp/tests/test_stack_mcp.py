@@ -32,8 +32,8 @@ from abyss_stack_mcp.core import (
     StackMCPError,
 )
 from abyss_stack_mcp.server import (
-    APPLICATION_VERSION,
-    _auth_kwargs,
+    SERVICE_CONFIG,
+    _auth_config,
     _configured_audit_journal,
     _contour,
     _policy_identity,
@@ -3166,11 +3166,8 @@ def test_read_and_candidate_servers_expose_disjoint_tools(tmp_path: Path) -> Non
     path = write_observation(tmp_path / "observation.json")
     read = build_server(path, policy_family="read")
     candidate = build_server(path, policy_family="candidate")
-    assert read._mcp_server.create_initialization_options().server_version == "0.5.2"
-    assert (
-        candidate._mcp_server.create_initialization_options().server_version
-        == "0.5.2"
-    )
+    assert read.application_version == "0.5.2"
+    assert candidate.application_version == "0.5.2"
     read_tools = {tool.name for tool in asyncio.run(read.list_tools())}
     candidate_tools = {tool.name for tool in asyncio.run(candidate.list_tools())}
     assert read_tools == {
@@ -3245,7 +3242,7 @@ def test_server_info_fallback_version_matches_package_metadata() -> None:
         (package_root / "pyproject.toml").read_text(encoding="utf-8")
     )
 
-    assert project["project"]["version"] == APPLICATION_VERSION
+    assert project["project"]["version"] == SERVICE_CONFIG.package_version
 
 
 @pytest.mark.parametrize("view", ("proof", "acceptance"))
@@ -3337,24 +3334,12 @@ def test_policy_contours_use_distinct_ports_credentials_and_scopes(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    assert _contour("read") == (
-        5431,
-        "ABYSS_STACK_MCP_READ_BEARER_TOKEN",
-        "abyss-stack-mcp-read-bearer-token",
-        "abyss-stack-mcp:read",
-    )
-    assert _contour("candidate") == (
-        5433,
-        "ABYSS_STACK_MCP_CANDIDATE_BEARER_TOKEN",
-        "abyss-stack-mcp-candidate-bearer-token",
-        "abyss-stack-mcp:candidate",
-    )
-    assert _contour("internal_effect") == (
-        5439,
-        "ABYSS_STACK_MCP_INTERNAL_EFFECT_BEARER_TOKEN",
-        "abyss-stack-mcp-internal-effect-bearer-token",
-        "abyss-stack-mcp:internal_effect",
-    )
+    assert _contour("read").port == 5431
+    assert _contour("read").auth.auth_scope == "abyss-stack-mcp:read"
+    assert _contour("candidate").port == 5433
+    assert _contour("candidate").auth.auth_scope == "abyss-stack-mcp:candidate"
+    assert _contour("internal_effect").port == 5439
+    assert _contour("internal_effect").auth.auth_scope == "abyss-stack-mcp:internal_effect"
     credentials = tmp_path / "credentials"
     credentials.mkdir()
     (credentials / "aoa-mcp-http-bearer-token").write_text(
@@ -3365,24 +3350,24 @@ def test_policy_contours_use_distinct_ports_credentials_and_scopes(
     monkeypatch.setenv("CREDENTIALS_DIRECTORY", str(credentials))
     monkeypatch.delenv("ABYSS_STACK_MCP_READ_BEARER_TOKEN", raising=False)
     with pytest.raises(SystemExit, match="abyss-stack-mcp-read-bearer-token"):
-        _auth_kwargs("read")
+        _auth_config("read")
 
     (credentials / "abyss-stack-mcp-read-bearer-token").write_text(
         "r" * 64,
         encoding="utf-8",
     )
-    assert "auth" in _auth_kwargs("read")
+    assert "auth" in _auth_config("read").server_kwargs
     with pytest.raises(
         SystemExit,
         match="abyss-stack-mcp-candidate-bearer-token",
     ):
-        _auth_kwargs("candidate")
+        _auth_config("candidate")
 
     (credentials / "abyss-stack-mcp-candidate-bearer-token").write_text(
         "c" * 64,
         encoding="utf-8",
     )
-    assert "auth" in _auth_kwargs("candidate")
+    assert "auth" in _auth_config("candidate").server_kwargs
 
 
 def test_managed_startup_rejects_copied_or_equal_contour_credentials(
@@ -3421,15 +3406,15 @@ def test_managed_startup_rejects_copied_or_equal_contour_credentials(
         "ABYSS_STACK_MCP_INTERNAL_EFFECT_BEARER_TOKEN", raising=False
     )
 
-    assert "auth" in _auth_kwargs("read")
-    assert "auth" in _auth_kwargs("candidate")
-    assert "auth" in _auth_kwargs("internal_effect")
+    assert "auth" in _auth_config("read").server_kwargs
+    assert "auth" in _auth_config("candidate").server_kwargs
+    assert "auth" in _auth_config("internal_effect").server_kwargs
 
     candidate_path.write_text(read_token, encoding="utf-8")
     with pytest.raises(SystemExit, match="does not match"):
-        _auth_kwargs("candidate")
+        _auth_config("candidate")
 
     manifest["candidate_sha256"] = manifest["read_sha256"]
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
     with pytest.raises(SystemExit, match="must be distinct"):
-        _auth_kwargs("read")
+        _auth_config("read")

@@ -6,8 +6,9 @@ import os
 from pathlib import Path
 from typing import Any, Literal
 
-from ._http_auth import http_auth_kwargs as _http_auth_kwargs
-from ._http_auth import transport_settings as _transport_settings
+from ._http_auth import http_auth_config
+from ._modern_runtime import run_server
+from ._runtime_config import SERVICE_CONFIG
 from .core import AoAEvalsMCPState
 from .organ_access import DISCOVERY_CAPABILITY_ID
 from .organ_access import PROOF_RESULT_CAPABILITY_ID
@@ -17,11 +18,7 @@ from .organ_access import validate_runtime_bindings
 
 
 LOGGER = logging.getLogger(__name__)
-PACKAGE_NAME = "aoa-evals-mcp"
-APPLICATION_VERSION = "0.2.0"
-READ_HTTP_PORT = 5424
-CANDIDATE_HTTP_PORT = 5435
-DEFAULT_HTTP_PORT = READ_HTTP_PORT
+SUPPORTED_CONTOURS = frozenset(SERVICE_CONFIG.contours)
 PolicyFamily = Literal["read", "candidate"]
 CapabilityProfile = Literal[
     "complete",
@@ -29,30 +26,6 @@ CapabilityProfile = Literal[
     "eval-request-prepare",
     "proof-result-read",
 ]
-
-READ_TOKEN_ENV_VAR = "AOA_EVALS_MCP_READ_BEARER_TOKEN"
-READ_CREDENTIAL_NAME = "aoa-evals-mcp-read-bearer-token"
-READ_AUTH_SCOPE = "mcp:aoa-evals:read"
-READ_CLIENT_ID = "aoa-loopback-codex:aoa-evals:read"
-
-CANDIDATE_TOKEN_ENV_VAR = "AOA_EVALS_MCP_CANDIDATE_BEARER_TOKEN"
-CANDIDATE_CREDENTIAL_NAME = "aoa-evals-mcp-candidate-bearer-token"
-CANDIDATE_AUTH_SCOPE = "mcp:aoa-evals:candidate"
-CANDIDATE_CLIENT_ID = "aoa-loopback-codex:aoa-evals:candidate"
-
-
-def _application_version() -> str:
-    return APPLICATION_VERSION
-
-
-def _bind_server_info_version(mcp: Any) -> None:
-    low_level_server = getattr(mcp, "_mcp_server", None)
-    if low_level_server is None or not hasattr(low_level_server, "version"):
-        raise RuntimeError(
-            "the pinned MCP SDK no longer exposes the server identity seam"
-        )
-    low_level_server.version = _application_version()
-
 
 def configured_policy_family() -> PolicyFamily:
     value = os.environ.get("AOA_MCP_POLICY_FAMILY", "read").strip()
@@ -82,55 +55,26 @@ def configured_capability_profile(
 
 def _contour(
     policy_family: PolicyFamily,
-) -> tuple[int, str, str, str, str]:
-    if policy_family == "read":
-        return (
-            READ_HTTP_PORT,
-            READ_TOKEN_ENV_VAR,
-            READ_CREDENTIAL_NAME,
-            READ_AUTH_SCOPE,
-            READ_CLIENT_ID,
-        )
-    return (
-        CANDIDATE_HTTP_PORT,
-        CANDIDATE_TOKEN_ENV_VAR,
-        CANDIDATE_CREDENTIAL_NAME,
-        CANDIDATE_AUTH_SCOPE,
-        CANDIDATE_CLIENT_ID,
-    )
+) -> Any:
+    try:
+        return SERVICE_CONFIG.contour(policy_family)
+    except ValueError as exc:
+        raise ValueError(
+            f"unsupported evals MCP contour {policy_family!r}; "
+            f"expected one of {sorted(SUPPORTED_CONTOURS)}"
+        ) from exc
 
 
-def _contour_http_auth_kwargs(
+def _contour_http_auth_config(
     policy_family: PolicyFamily,
-) -> dict[str, Any]:
-    port, token_env_var, credential_name, auth_scope, client_id = _contour(
-        policy_family
-    )
-    return _http_auth_kwargs(
-        port,
-        token_env_var=token_env_var,
-        credential_name=credential_name,
-        auth_scope=auth_scope,
-        client_id=client_id,
-    )
-
-
-def _read_http_auth_kwargs() -> dict[str, Any]:
-    return _contour_http_auth_kwargs("read")
+) -> Any:
+    contour = _contour(policy_family)
+    return http_auth_config(contour.port, **contour.auth.as_kwargs())
 
 
 def _run_server(server: Any) -> None:
     policy_family = configured_policy_family()
-    port, *_ = _contour(policy_family)
-    settings = _transport_settings(port)
-    _contour_http_auth_kwargs(policy_family)
-    if settings.transport == "stdio":
-        server.run(transport="stdio")
-        return
-    assert settings.host is not None
-    assert settings.port is not None
-    server.configure_http(settings.host, settings.port)
-    server.run(transport="streamable-http")
+    run_server(server, _contour_http_auth_config(policy_family))
 
 
 def build_server(
@@ -141,7 +85,7 @@ def build_server(
     capability_profile: CapabilityProfile | None = None,
 ) -> Any:
     try:
-        from ._modern_runtime import AbyssMCPServer  # type: ignore[import-not-found]
+        from ._modern_runtime import ModernMCPServer  # type: ignore[import-not-found]
         from mcp.types import ToolAnnotations  # type: ignore[import-not-found]
     except ImportError as exc:
         raise SystemExit(
@@ -160,12 +104,11 @@ def build_server(
                 f"aoa-evals capability profile {profile!r} is incompatible with "
                 f"{contour!r}"
             )
-    mcp = AbyssMCPServer(
-        f"aoa-evals-mcp-{contour}-{profile}",
-        json_response=True,
-        **_contour_http_auth_kwargs(contour),
+    mcp = ModernMCPServer(
+        SERVICE_CONFIG.server_name(contour, profile),
+        version=SERVICE_CONFIG.package_version,
+        **_contour_http_auth_config(contour).server_kwargs,
     )
-    _bind_server_info_version(mcp)
     read_only_tool = mcp.tool(
         annotations=ToolAnnotations(
             read_only_hint=True,

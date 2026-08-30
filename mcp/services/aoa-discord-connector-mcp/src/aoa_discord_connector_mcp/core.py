@@ -12,13 +12,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from ._runtime_config import PATH_CONFIG
+
 SERVICE_NAME = "aoa-discord-connector-mcp"
 SOURCE_NAME = "discord"
 SOURCE_LABEL = "Discord"
 CONNECTOR_REPO_NAME = "aoa-discord-connector"
 CONNECTOR_PACKAGE = "aoa_discord_connector"
 CONNECTOR_BIN = "aoa-discord"
-DEFAULT_CONNECTOR_REPO = Path("/srv/AbyssOS/connectors/aoa-discord-connector")
 DEFAULT_RUN = "starter-fixture"
 DEFAULT_TIMEOUT_SECONDS = 30.0
 
@@ -175,7 +176,7 @@ class AoADiscordConnectorMCPState:
 
     @classmethod
     def discover(cls) -> "AoADiscordConnectorMCPState":
-        connector_repo = _env_path("AOA_DISCORD_CONNECTOR_REPO") or DEFAULT_CONNECTOR_REPO
+        connector_repo = PATH_CONFIG.connector_repo(SERVICE_NAME)
         connector_bin = os.environ.get("AOA_DISCORD_CONNECTOR_BIN") or os.environ.get("AOA_DISCORD_BIN")
         return cls(
             connector_repo=connector_repo,

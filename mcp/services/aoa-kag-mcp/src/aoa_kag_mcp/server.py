@@ -8,20 +8,13 @@ from urllib.parse import quote, unquote
 
 from pydantic import Field
 
-from ._http_auth import http_auth_kwargs as _http_auth_kwargs
-from ._http_auth import transport_settings as _transport_settings
+from ._http_auth import http_auth_config
+from ._runtime_config import SERVICE_CONFIG
 from .core import AoAKagMCPState
 from .runtime import build_application
 
 
 LOGGER = logging.getLogger(__name__)
-PACKAGE_NAME = "aoa-kag-mcp"
-APPLICATION_VERSION = "0.1.0"
-DEFAULT_HTTP_PORT = 5425
-READ_TOKEN_ENV_VAR = "AOA_KAG_MCP_READ_BEARER_TOKEN"
-READ_CREDENTIAL_NAME = "aoa-kag-mcp-read-bearer-token"
-READ_AUTH_SCOPE = "mcp:aoa-kag:read"
-READ_CLIENT_ID = "aoa-loopback-codex:aoa-kag:read"
 Detail = Literal["compact", "summary", "full"]
 Strategy = Literal["auto", "exact", "lexical", "semantic", "hybrid", "graph"]
 Direction = Literal["outgoing", "incoming", "both"]
@@ -29,39 +22,15 @@ PageLimit = Annotated[int, Field(ge=1, le=10)]
 TraversalDepth = Annotated[int, Field(ge=1, le=4)]
 
 
-def _application_version() -> str:
-    return APPLICATION_VERSION
-
-
-def _bind_server_info_version(mcp: Any) -> None:
-    low_level_server = getattr(mcp, "_mcp_server", None)
-    if low_level_server is None or not hasattr(low_level_server, "version"):
-        raise RuntimeError(
-            "the pinned MCP SDK no longer exposes the server identity seam"
-        )
-    low_level_server.version = _application_version()
-
-
 def _run_server(server: Any) -> None:
-    settings = _transport_settings(DEFAULT_HTTP_PORT)
-    _read_http_auth_kwargs()
-    if settings.transport == "stdio":
-        server.run(transport="stdio")
-        return
-    assert settings.host is not None
-    assert settings.port is not None
-    server.configure_http(settings.host, settings.port)
-    server.run(transport="streamable-http")
+    from ._modern_runtime import run_server
+
+    run_server(server, _read_http_auth_config())
 
 
-def _read_http_auth_kwargs() -> dict[str, Any]:
-    return _http_auth_kwargs(
-        DEFAULT_HTTP_PORT,
-        token_env_var=READ_TOKEN_ENV_VAR,
-        credential_name=READ_CREDENTIAL_NAME,
-        auth_scope=READ_AUTH_SCOPE,
-        client_id=READ_CLIENT_ID,
-    )
+def _read_http_auth_config() -> Any:
+    contour = SERVICE_CONFIG.contour("read")
+    return http_auth_config(contour.port, **contour.auth.as_kwargs())
 
 
 def _json(payload: dict[str, Any]) -> str:
@@ -86,7 +55,7 @@ def build_server(
     stack_root: str | Path | None = None,
 ) -> Any:
     try:
-        from ._modern_runtime import AbyssMCPServer  # type: ignore[import-not-found]
+        from ._modern_runtime import ModernMCPServer  # type: ignore[import-not-found]
         from mcp.types import ToolAnnotations  # type: ignore[import-not-found]
     except ImportError as exc:
         raise SystemExit(
@@ -108,17 +77,16 @@ def build_server(
         idempotent_hint=True,
         open_world_hint=False,
     )
-    mcp = AbyssMCPServer(
-        "aoa-kag-mcp",
+    mcp = ModernMCPServer(
+        SERVICE_CONFIG.server_name("read"),
+        version=SERVICE_CONFIG.package_version,
         instructions=(
             "Discover KAG capabilities, search owner-qualified repository knowledge, "
             "read returned aoa-kag:// resources, traverse bounded relations, and inspect "
             "the evidence trace used for each answer."
         ),
-        json_response=True,
-        **_read_http_auth_kwargs(),
+        **_read_http_auth_config().server_kwargs,
     )
-    _bind_server_info_version(mcp)
 
     @mcp.tool(annotations=annotations, structured_output=True)
     def kag_discover(

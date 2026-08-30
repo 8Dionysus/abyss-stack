@@ -1,4 +1,4 @@
-"""Canonical authenticated loopback transport helper for vendored MCP packages."""
+"""Canonical authenticated loopback transport helper for MCP 2.x packages."""
 
 from __future__ import annotations
 
@@ -8,21 +8,29 @@ import re
 from pathlib import Path
 from typing import Any, NamedTuple
 
+try:
+    from ._runtime_config import TRANSPORT_CONFIG
+except ImportError:  # pragma: no cover - canonical helper import
+    from runtime_config import TRANSPORT_CONFIG  # type: ignore[import-not-found]
 
-TOKEN_ENV_VAR = "AOA_MCP_HTTP_BEARER_TOKEN"
-CREDENTIAL_NAME = "aoa-mcp-http-bearer-token"
-AUTH_SCOPE = "mcp:access"
+
 _TOKEN_PATTERN = re.compile(r"[A-Za-z0-9._~-]{43,512}")
 _CREDENTIAL_NAME_PATTERN = re.compile(r"[A-Za-z0-9_.-]{1,128}")
 _ENV_NAME_PATTERN = re.compile(r"[A-Z][A-Z0-9_]{0,127}")
 _SCOPE_PATTERN = re.compile(r"[A-Za-z0-9:._/-]{1,128}")
-_LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
 
 
 class TransportSettings(NamedTuple):
     transport: str
     host: str | None
     port: int | None
+    streamable_http_path: str
+
+
+class HTTPAuthConfig(NamedTuple):
+    transport: TransportSettings
+    server_kwargs: dict[str, Any]
+    transport_security: Any | None
 
 
 class StaticBearerTokenVerifier:
@@ -36,8 +44,8 @@ class StaticBearerTokenVerifier:
         *,
         issuer: str,
         resource: str,
-        scope: str = AUTH_SCOPE,
-        client_id: str = "aoa-loopback-codex",
+        scope: str,
+        client_id: str,
     ) -> None:
         self._expected = token.encode("utf-8")
         self._issuer = issuer
@@ -61,27 +69,57 @@ class StaticBearerTokenVerifier:
 
 
 def transport_settings(default_port: int) -> TransportSettings:
-    transport = os.environ.get("AOA_MCP_TRANSPORT", "stdio").strip() or "stdio"
-    if transport == "stdio":
-        return TransportSettings(transport="stdio", host=None, port=None)
-    if transport != "streamable-http":
-        raise SystemExit(f"unsupported AOA_MCP_TRANSPORT: {transport}")
+    """Resolve transport from the central runtime contract and environment."""
 
-    host = os.environ.get("AOA_MCP_HOST", "127.0.0.1").strip()
-    if host not in _LOOPBACK_HOSTS:
-        raise SystemExit("AOA_MCP_HOST must remain loopback-only")
+    transport = os.environ.get(
+        TRANSPORT_CONFIG.transport_env_var,
+        TRANSPORT_CONFIG.default_transport,
+    ).strip() or TRANSPORT_CONFIG.default_transport
+    if transport == TRANSPORT_CONFIG.default_transport:
+        return TransportSettings(
+            transport=TRANSPORT_CONFIG.default_transport,
+            host=None,
+            port=None,
+            streamable_http_path=TRANSPORT_CONFIG.streamable_http_path,
+        )
+    if transport != TRANSPORT_CONFIG.streamable_http_transport:
+        raise SystemExit(
+            f"unsupported {TRANSPORT_CONFIG.transport_env_var}: {transport}"
+        )
 
-    raw_port = str(os.environ.get("AOA_MCP_PORT", default_port)).strip()
+    host = os.environ.get(
+        TRANSPORT_CONFIG.host_env_var,
+        TRANSPORT_CONFIG.default_host,
+    ).strip()
+    if host not in TRANSPORT_CONFIG.loopback_hosts:
+        raise SystemExit(
+            f"{TRANSPORT_CONFIG.host_env_var} must remain loopback-only"
+        )
+
+    raw_port = str(
+        os.environ.get(TRANSPORT_CONFIG.port_env_var, default_port)
+    ).strip()
     try:
         port = int(raw_port)
     except ValueError as exc:
-        raise SystemExit("AOA_MCP_PORT must be an integer from 1 through 65535") from exc
-    if not 1 <= port <= 65535:
-        raise SystemExit("AOA_MCP_PORT must be an integer from 1 through 65535")
-    return TransportSettings(transport=transport, host=host, port=port)
+        raise SystemExit(
+            f"{TRANSPORT_CONFIG.port_env_var} must be an integer from "
+            f"{TRANSPORT_CONFIG.port_min} through {TRANSPORT_CONFIG.port_max}"
+        ) from exc
+    if not TRANSPORT_CONFIG.port_min <= port <= TRANSPORT_CONFIG.port_max:
+        raise SystemExit(
+            f"{TRANSPORT_CONFIG.port_env_var} must be an integer from "
+            f"{TRANSPORT_CONFIG.port_min} through {TRANSPORT_CONFIG.port_max}"
+        )
+    return TransportSettings(
+        transport=TRANSPORT_CONFIG.streamable_http_transport,
+        host=host,
+        port=port,
+        streamable_http_path=TRANSPORT_CONFIG.streamable_http_path,
+    )
 
 
-def _credential_token(credential_name: str = CREDENTIAL_NAME) -> str | None:
+def _credential_token(credential_name: str) -> str | None:
     credential_dir = os.environ.get("CREDENTIALS_DIRECTORY", "").strip()
     if not credential_dir:
         return None
@@ -97,11 +135,7 @@ def _credential_token(credential_name: str = CREDENTIAL_NAME) -> str | None:
     return raw.removesuffix("\n")
 
 
-def _bearer_token(
-    *,
-    token_env_var: str = TOKEN_ENV_VAR,
-    credential_name: str = CREDENTIAL_NAME,
-) -> str:
+def _bearer_token(*, token_env_var: str, credential_name: str) -> str:
     env_token = os.environ.get(token_env_var)
     credential_token = _credential_token(credential_name)
     for candidate in (env_token, credential_token):
@@ -120,7 +154,7 @@ def _bearer_token(
 
 
 def _http_authority(host: str, port: int) -> str:
-    rendered_host = f"[{host}]" if host == "::1" else host
+    rendered_host = f"[{host}]" if ":" in host and not host.startswith("[") else host
     return f"http://{rendered_host}:{port}"
 
 
@@ -129,11 +163,10 @@ def _loopback_transport_security(port: int) -> Any:
         TransportSecuritySettings,
     )
 
-    authorities = [
-        f"127.0.0.1:{port}",
-        f"localhost:{port}",
-        f"[::1]:{port}",
-    ]
+    authorities = []
+    for host in TRANSPORT_CONFIG.loopback_hosts:
+        rendered_host = f"[{host}]" if ":" in host else host
+        authorities.append(f"{rendered_host}:{port}")
     return TransportSecuritySettings(
         enable_dns_rebinding_protection=True,
         allowed_hosts=authorities,
@@ -141,14 +174,16 @@ def _loopback_transport_security(port: int) -> Any:
     )
 
 
-def http_auth_kwargs(
+def http_auth_config(
     default_port: int,
     *,
-    token_env_var: str = TOKEN_ENV_VAR,
-    credential_name: str = CREDENTIAL_NAME,
-    auth_scope: str = AUTH_SCOPE,
-    client_id: str = "aoa-loopback-codex",
-) -> dict[str, Any]:
+    token_env_var: str,
+    credential_name: str,
+    auth_scope: str,
+    client_id: str,
+) -> HTTPAuthConfig:
+    """Build native MCP 2.x auth settings for one declared service contour."""
+
     if _ENV_NAME_PATTERN.fullmatch(token_env_var) is None:
         raise SystemExit("invalid MCP bearer environment-variable name")
     if _CREDENTIAL_NAME_PATTERN.fullmatch(credential_name) is None:
@@ -157,9 +192,10 @@ def http_auth_kwargs(
         raise SystemExit("invalid MCP authorization scope")
     if not client_id or len(client_id) > 128:
         raise SystemExit("invalid MCP client identity")
+
     settings = transport_settings(default_port)
     if settings.transport == "stdio":
-        return {}
+        return HTTPAuthConfig(settings, {}, None)
     assert settings.host is not None
     assert settings.port is not None
 
@@ -169,11 +205,11 @@ def http_auth_kwargs(
     )
     authority = _http_authority(settings.host, settings.port)
     issuer = f"{authority}/"
-    resource = f"{authority}/mcp"
+    resource = f"{authority}{settings.streamable_http_path}"
 
     from mcp.server.auth.settings import AuthSettings  # type: ignore[import-not-found]
 
-    return {
+    server_kwargs = {
         "auth": AuthSettings(
             issuer_url=issuer,
             required_scopes=[auth_scope],
@@ -186,5 +222,9 @@ def http_auth_kwargs(
             scope=auth_scope,
             client_id=client_id,
         ),
-        "transport_security": _loopback_transport_security(settings.port),
     }
+    return HTTPAuthConfig(
+        settings,
+        server_kwargs,
+        _loopback_transport_security(settings.port),
+    )

@@ -164,4 +164,4 @@ def test_query_wrappers_remain_read_only_and_local(tmp_path: Path) -> None:
 def test_server_builds() -> None:
     server = build_server()
     assert server is not None
-    assert server._mcp_server.version == "0.2.0"
+    assert server.application_version == "0.2.0"

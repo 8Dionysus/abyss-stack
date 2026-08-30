@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 36111165,
+  "allowed_tracked_bytes": 40844239,
+  "approved_by": "repository-owner",
+  "base_ref": "19bc0ee28c98bd6fbb39984f14b322a6815afcfe",
+  "changed_generated_bytes": 36111165,
+  "changed_generated_files": 523,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "27d28cba4c68b9d0ecc85bed1b8d84ab879fe797f073b1ad828d1b9fc3d5933a",
+  "reason": "Reconcile the exact MCP 2.1.1 runtime-catalog and serving-process attestation merge with current main. Authorize only this measured portable-family and tracked-size exceedance needed to index the merged source, decision, and documentation surfaces; do not raise standing budgets or admit candidate or effect MCP authority.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 40844239,
+  "tracked_bytes_max": 24117248
+}

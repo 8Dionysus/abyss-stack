@@ -25,16 +25,22 @@ from importlib.metadata import PackageNotFoundError, distribution
 from pathlib import Path
 from typing import Any
 
+try:
+    from ._runtime_config import (
+        MCP_SDK_DISTRIBUTION_RECORD_DIGESTS,
+        MCP_SDK_SOURCE_REVISION,
+        MCP_TESTED_SDK_LOCK,
+    )
+except ImportError:  # direct shared-source validation
+    from runtime_config import (  # type: ignore[no-redef]
+        MCP_SDK_DISTRIBUTION_RECORD_DIGESTS,
+        MCP_SDK_SOURCE_REVISION,
+        MCP_TESTED_SDK_LOCK,
+    )
 
-SUPPORTED_MCP_SDK = "2.1.1"
+SUPPORTED_MCP_SDK = MCP_TESTED_SDK_LOCK
 MCP_SDK_SOURCE_REVISIONS = {
-    "2.1.1": "0921d94a74db900dccd2d534842aa7b6160542d2",
-}
-MCP_SDK_DISTRIBUTION_RECORD_DIGESTS = {
-    "2.1.1": {
-        "mcp": "sha256:8023abb83ccd24e167d5ad39a5296ce87040c52972f714b3576fcb8ce1b28a14",
-        "mcp-types": "sha256:d315ab265f62420dc87baadbb9373013330833aeced8950d9951f8b9d71eee0c",
-    },
+    SUPPORTED_MCP_SDK: MCP_SDK_SOURCE_REVISION,
 }
 RUNTIME_IDENTITY_HEADER = "X-Abyss-MCP-Runtime-Identity"
 
@@ -253,9 +259,7 @@ def _distribution_record_digest(
         ",".join(row) for row in sorted(canonical_rows)
     ).encode("utf-8")
     actual_record_digest = f"sha256:{hashlib.sha256(canonical_payload).hexdigest()}"
-    expected_record_digest = MCP_SDK_DISTRIBUTION_RECORD_DIGESTS[sdk_version][
-        distribution_name
-    ]
+    expected_record_digest = MCP_SDK_DISTRIBUTION_RECORD_DIGESTS[distribution_name]
     if actual_record_digest != expected_record_digest:
         raise RuntimeError(
             f"the serving {distribution_name} distribution bytes are not the reviewed "

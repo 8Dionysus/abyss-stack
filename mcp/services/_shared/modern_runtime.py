@@ -1,27 +1,101 @@
-"""Canonical MCP 2026-07-28 runtime seam for standalone organ packages.
+"""Canonical MCP 2.x runtime policy for standalone organ packages.
 
-The organ packages keep their owner-specific tools, resources, prompts, and
-authorization policy.  This module owns only the shared server/transport seam
-needed to run those catalogs on the stable Python MCP 2.x implementation.
+Owner packages keep their own tools, resources, prompts, and authorization
+policy. This module owns only the shared native MCP 2.x launch seam and the
+modern protocol admission policy. It deliberately does not emulate the
+removed FastMCP/settings surface or expose private SDK aliases.
 """
 
 from __future__ import annotations
 
 import json
+import re
 from importlib.metadata import PackageNotFoundError, version
-from typing import Any, Literal
+from typing import Any
 
 from mcp.server import MCPServer
 
-from ._runtime_identity import RUNTIME_IDENTITY_HEADER, runtime_mcp_sdk_identity
+try:
+    from ._runtime_config import (
+        MCP_PROTOCOL_PATH,
+        MCP_PROTOCOL_VERSION,
+        MCP_SDK_MAJOR,
+        MCP_TESTED_SDK_LOCK,
+        TRANSPORT_CONFIG,
+    )
+    from ._runtime_identity import (
+        RUNTIME_IDENTITY_HEADER,
+        runtime_mcp_sdk_identity,
+    )
+except ImportError:  # pragma: no cover - canonical helper import
+    from runtime_config import (  # type: ignore[import-not-found]
+        MCP_PROTOCOL_PATH,
+        MCP_PROTOCOL_VERSION,
+        MCP_SDK_MAJOR,
+        MCP_TESTED_SDK_LOCK,
+        TRANSPORT_CONFIG,
+    )
+    from runtime_identity import (  # type: ignore[import-not-found]
+        RUNTIME_IDENTITY_HEADER,
+        runtime_mcp_sdk_identity,
+    )
 
 
-PROTOCOL_VERSION = "2026-07-28"
-SUPPORTED_MCP_SDK = "2.1.1"
+_VERSION_MAJOR = re.compile(r"^(\d+)(?:\.|$)")
+
+
+def _major(version_text: str) -> int:
+    match = _VERSION_MAJOR.match(version_text.strip())
+    if match is None:
+        raise RuntimeError(f"unable to determine MCP SDK major from {version_text!r}")
+    return int(match.group(1))
+
+
+def require_supported_sdk() -> None:
+    """Fail closed unless the exact reviewed MCP SDK pair is installed."""
+
+    try:
+        installed = version(TRANSPORT_CONFIG.sdk_distribution)
+    except PackageNotFoundError as exc:  # pragma: no cover - import guard
+        raise RuntimeError("the MCP SDK is not installed") from exc
+    if _major(installed) != MCP_SDK_MAJOR or installed != MCP_TESTED_SDK_LOCK:
+        raise RuntimeError(
+            "OS Abyss organ servers require exact MCP SDK "
+            f"{MCP_TESTED_SDK_LOCK}; observed {installed}"
+        )
+
+    try:
+        installed_types = version(TRANSPORT_CONFIG.sdk_companion_distribution)
+    except PackageNotFoundError as exc:
+        raise RuntimeError(
+            "OS Abyss organ servers require the exact MCP companion distribution "
+            f"{TRANSPORT_CONFIG.sdk_companion_distribution}=={MCP_TESTED_SDK_LOCK}"
+        ) from exc
+    if (
+        _major(installed_types) != MCP_SDK_MAJOR
+        or installed_types != MCP_TESTED_SDK_LOCK
+    ):
+        raise RuntimeError(
+            "OS Abyss organ servers require exact MCP companion distribution "
+            f"{TRANSPORT_CONFIG.sdk_companion_distribution}=={MCP_TESTED_SDK_LOCK}; "
+            f"observed {installed_types}"
+        )
+
+    required_methods = (
+        "run",
+        "streamable_http_app",
+        "run_streamable_http_async",
+    )
+    missing = [name for name in required_methods if not hasattr(MCPServer, name)]
+    if missing:
+        raise RuntimeError(
+            "installed MCP SDK lacks the native MCP 2.x API: "
+            + ", ".join(missing)
+        )
 
 
 class _ModernOnlyHTTPApp:
-    """Reject handshake-era traffic before the dual-era SDK can admit it."""
+    """Reject non-modern protocol handshakes before the SDK dispatches them."""
 
     def __init__(
         self,
@@ -63,19 +137,19 @@ class _ModernOnlyHTTPApp:
                 for key, value in scope.get("headers", ())
             }
             requested = headers.get("mcp-protocol-version")
-            if requested != PROTOCOL_VERSION:
+            if requested != MCP_PROTOCOL_VERSION:
                 payload = json.dumps(
                     {
                         "jsonrpc": "2.0",
                         "id": None,
                         "error": {
-                            "code": -32022,
+                            "code": TRANSPORT_CONFIG.modern_only_rejection_code,
                             "message": (
                                 "OS Abyss organ endpoints require modern MCP "
-                                f"{PROTOCOL_VERSION}"
+                                f"{MCP_PROTOCOL_VERSION}"
                             ),
                             "data": {
-                                "supported": [PROTOCOL_VERSION],
+                                "supported": [MCP_PROTOCOL_VERSION],
                                 "requested": requested or "missing",
                             },
                         },
@@ -88,7 +162,10 @@ class _ModernOnlyHTTPApp:
                         "status": 400,
                         "headers": [
                             (b"content-type", b"application/json"),
-                            (b"mcp-protocol-version", PROTOCOL_VERSION.encode("ascii")),
+                            (
+                                b"mcp-protocol-version",
+                                MCP_PROTOCOL_VERSION.encode("ascii"),
+                            ),
                             (b"content-length", str(len(payload)).encode("ascii")),
                         ],
                     }
@@ -100,88 +177,55 @@ class _ModernOnlyHTTPApp:
         await self.app(scope, receive, send)
 
 
-def require_supported_sdk() -> None:
-    """Fail closed instead of silently negotiating through an older SDK."""
+class ModernMCPServer(MCPServer):
+    """Native MCP 2.x server with the reviewed modern-only HTTP policy."""
 
-    try:
-        installed = version("mcp")
-    except PackageNotFoundError as exc:  # pragma: no cover - import guard
-        raise RuntimeError("the MCP SDK is not installed") from exc
-    if installed != SUPPORTED_MCP_SDK:
-        raise RuntimeError(
-            "OS Abyss organ servers require the exact modern MCP SDK "
-            f"{SUPPORTED_MCP_SDK}; observed {installed}"
-        )
-
-
-class AbyssMCPServer(MCPServer):
-    """Small compatibility seam from the former FastMCP surface to MCP 2.x.
-
-    MCP 2.x deliberately replaced ``FastMCP`` with ``MCPServer``.  The owner
-    packages already use the decorator/managers that MCPServer retains; only
-    constructor-owned HTTP settings and the low-level identity alias need a
-    bounded bridge while the packages are migrated without rewriting their
-    domain logic.
-    """
-
-    def __init__(
-        self,
-        *args: Any,
-        json_response: bool = False,
-        stateless_http: bool = True,
-        transport_security: Any | None = None,
-        modern_only_http: bool = True,
-        host: str = "127.0.0.1",
-        port: int = 8000,
-        **kwargs: Any,
-    ) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         require_supported_sdk()
         super().__init__(*args, **kwargs)
-        self._abyss_json_response = json_response
-        self._abyss_stateless_http = stateless_http
-        self._abyss_transport_security = transport_security
-        self._abyss_modern_only_http = modern_only_http
-        # Existing owner packages bind application-owned serverInfo.version
-        # through this reviewed seam.  It aliases the same MCP 2.x server.
-        self._mcp_server = self._lowlevel_server
-        # Preserve the package-local launch shape until every package can pass
-        # host/port directly.  Pydantic settings intentionally has no such
-        # source fields, so these are runtime-only attributes.
-        object.__setattr__(self.settings, "host", host)
-        object.__setattr__(self.settings, "port", port)
 
-    def configure_http(self, host: str, port: int) -> None:
-        """Bind the reviewed loopback address used by the package launcher."""
+    @property
+    def application_version(self) -> str | None:
+        """Read the server identity stored by the MCP 2.x server."""
 
-        object.__setattr__(self.settings, "host", host)
-        object.__setattr__(self.settings, "port", port)
-
-    def run(
-        self,
-        transport: Literal["stdio", "sse", "streamable-http"] = "stdio",
-        **kwargs: Any,
-    ) -> None:
-        if transport == "streamable-http":
-            kwargs.setdefault("host", self.settings.host)
-            kwargs.setdefault("port", self.settings.port)
-            kwargs.setdefault("json_response", self._abyss_json_response)
-            kwargs.setdefault("stateless_http", self._abyss_stateless_http)
-            kwargs.setdefault(
-                "transport_security", self._abyss_transport_security
-            )
-        super().run(transport=transport, **kwargs)
+        return self.version
 
     def streamable_http_app(self, **kwargs: Any) -> Any:
-        streamable_http_path = kwargs.get("streamable_http_path", "/mcp")
-        kwargs.setdefault("host", self.settings.host)
-        kwargs.setdefault("json_response", self._abyss_json_response)
-        kwargs.setdefault("stateless_http", self._abyss_stateless_http)
-        kwargs.setdefault("transport_security", self._abyss_transport_security)
+        streamable_http_path = kwargs.get(
+            "streamable_http_path", MCP_PROTOCOL_PATH
+        )
+        if streamable_http_path != MCP_PROTOCOL_PATH:
+            raise ValueError(
+                "MCP streamable HTTP path must remain "
+                f"{MCP_PROTOCOL_PATH!r}; observed {streamable_http_path!r}"
+            )
         app = super().streamable_http_app(**kwargs)
-        if not self._abyss_modern_only_http:
+        if not TRANSPORT_CONFIG.modern_only:
             return app
         return _ModernOnlyHTTPApp(
             app,
             mcp_path=streamable_http_path,
             runtime_identity=runtime_mcp_sdk_identity(),
         )
+
+
+def run_server(server: ModernMCPServer, auth_config: Any) -> None:
+    """Run one package through the native MCP 2.x transport API."""
+
+    settings = auth_config.transport
+    if settings.transport == TRANSPORT_CONFIG.default_transport:
+        server.run(TRANSPORT_CONFIG.default_transport)
+        return
+    if settings.transport != TRANSPORT_CONFIG.streamable_http_transport:
+        raise RuntimeError(f"unsupported MCP transport: {settings.transport}")
+    if settings.host is None or settings.port is None:
+        raise RuntimeError("streamable HTTP transport requires host and port")
+    server.run(
+        TRANSPORT_CONFIG.streamable_http_transport,
+        host=settings.host,
+        port=settings.port,
+        streamable_http_path=settings.streamable_http_path,
+        json_response=True,
+        stateless_http=True,
+        transport_security=auth_config.transport_security,
+    )

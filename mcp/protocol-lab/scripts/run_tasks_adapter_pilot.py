@@ -14,6 +14,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+from runtime_catalog import load_runtime_catalog, mcp_settings
+
 
 TASKS_EXTENSION_ID = "io.modelcontextprotocol/tasks"
 
@@ -33,6 +35,11 @@ def _digest(value: Any) -> str:
 
 def _wire_time(value: datetime) -> str:
     return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _protocol_version() -> str:
+    _sdk, protocol, _transport = mcp_settings(load_runtime_catalog())
+    return str(protocol["version"])
 
 
 def _safe_root(path: Path) -> Path:
@@ -92,7 +99,7 @@ def _context(
         principal_id=principal,
         organ_id="abyss-stack",
         contour_id="read",
-        protocol_version="2026-07-28",
+        protocol_version=_protocol_version(),
         client_capabilities=capabilities,
         transport="streamable_http",
         headers={"Mcp-Method": method, "Mcp-Name": name},
@@ -779,7 +786,7 @@ def _run(args: argparse.Namespace) -> dict[str, Any]:
         "run_id": run_id,
         "started_at": _wire_time(started_at),
         "finished_at": _wire_time(finished_at),
-        "protocol_version": "2026-07-28",
+        "protocol_version": _protocol_version(),
         "extension_id": TASKS_EXTENSION_ID,
         "adapter_feature_gate_enabled": True,
         "production_enabled": False,
@@ -846,9 +853,16 @@ def main() -> int:
     parser.add_argument("--state-root", required=True)
     parser.add_argument(
         "--deployed-stack-root",
-        default="/srv/AbyssOS/abyss-stack",
+        default=(
+            os.environ.get("AOA_ABYSS_STACK_ROOT")
+            or os.environ.get("AOA_STACK_ROOT")
+        ),
     )
     args = parser.parse_args()
+    if not args.deployed_stack_root:
+        parser.error(
+            "--deployed-stack-root or AOA_ABYSS_STACK_ROOT/AOA_STACK_ROOT is required"
+        )
     result = _run(args)
     print(json.dumps(result, ensure_ascii=False, sort_keys=True))
     return 0 if result["all_cases_passed"] else 1

@@ -9,7 +9,6 @@ import sqlite3
 import subprocess
 import sys
 import time
-from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
@@ -17,7 +16,14 @@ import pytest
 from mcp import ClientSession
 from mcp.client.stdio import StdioServerParameters, stdio_client
 
-from aoa_session_memory_mcp.core import AoASessionMemoryMCPState, CommandOutput
+from aoa_session_memory_mcp._runtime_config import RUNTIME_LIMITS
+from aoa_session_memory_mcp.core import (
+    EVIDENCE_PACKET_TIMEOUT_SECONDS,
+    ROUTE_ROLLUP_QUERY_TIMEOUT_SECONDS,
+    STATUS_TIMEOUT_SECONDS,
+    AoASessionMemoryMCPState,
+    CommandOutput,
+)
 from aoa_session_memory_mcp.server import build_server
 
 
@@ -46,6 +52,13 @@ def test_validator_help_does_not_run_live_smoke() -> None:
     assert result.returncode == 0
     assert "Validate the aoa-session-memory MCP service" in result.stdout
     assert "usage:" in result.stdout
+
+
+def test_validator_defaults_to_mcp_only_and_exposes_owner_smoke_flag() -> None:
+    validator = load_validator_module()
+
+    assert validator.parse_args([]).owner_smoke is False
+    assert validator.parse_args(["--owner-smoke"]).owner_smoke is True
 
 
 def test_cli_transport_preflight_reports_schema() -> None:
@@ -2050,7 +2063,7 @@ def test_latest_session_resolution_falls_back_to_registry_date_sequence(tmp_path
 def test_status_reads_provider_atlas_and_latest_diagnostics(tmp_path: Path) -> None:
     runner = FakeRunner()
     state = state_with_fixture(tmp_path, runner)
-    status = state.session_memory_status()
+    status = state.session_memory_status(refresh_maintenance=True)
 
     assert status["schema"] == "aoa_session_memory_status_v1"
     assert status["provider"]["ok"] is True
@@ -2088,6 +2101,117 @@ def test_status_reads_provider_atlas_and_latest_diagnostics(tmp_path: Path) -> N
     provider_resource = state.read_resource("aoa-session-memory://provider/status")
     assert provider_resource["status_mode"] == "fast_presence_probe"
     assert not any(call[0] == "search-provider-status" for call in runner.calls)
+
+
+def test_status_default_uses_cached_maintenance_without_running_heavy_route(tmp_path: Path) -> None:
+    runner = FakeRunner()
+    state = state_with_fixture(tmp_path, runner)
+
+    status = state.session_memory_status()
+
+    assert status["maintenance_status"]["source"] == "not_refreshed"
+    assert status["maintenance_status"]["mcp_access"]["archive_command"] is None
+    assert status["maintenance_status"]["mcp_access"]["does_not_invoke_maintenance_status"] is True
+    assert status["graph"]["decision_source"] == "cached_graph_freshness_diagnostic"
+    assert not any(call[0] == "maintenance-status" for call in runner.calls)
+
+
+def test_archive_timeout_is_reported_as_timeout_not_invalid_json(tmp_path: Path) -> None:
+    class TimeoutRunner(FakeRunner):
+        def __call__(self, argv: list[str], timeout: float) -> CommandOutput:
+            self.calls.append((argv[2], tuple(argv[3:])))
+            self.timeouts.append((argv[2], timeout))
+            return CommandOutput(argv, 124, "", f"command timed out after {timeout}s", timeout * 1000)
+
+    state = state_with_fixture(tmp_path, TimeoutRunner())
+
+    payload = state._archive_command("trace-route", ["aoa-session-memory-mcp"])
+
+    assert payload["ok"] is False
+    assert payload["diagnostics"] == ["command timed out"]
+    assert payload["timeout_seconds"] == 2.0
+    assert payload["mcp_access"]["returncode"] == 124
+
+
+def test_nonzero_archive_exit_cannot_preserve_ok_true_json(tmp_path: Path) -> None:
+    class FailedRunner(FakeRunner):
+        def __call__(self, argv: list[str], timeout: float) -> CommandOutput:
+            self.calls.append((argv[2], tuple(argv[3:])))
+            self.timeouts.append((argv[2], timeout))
+            return CommandOutput(
+                argv,
+                1,
+                json.dumps({"ok": True, "artifact_type": "route_trace"}),
+                "backend unavailable",
+                1.0,
+            )
+
+    state = state_with_fixture(tmp_path, FailedRunner())
+
+    payload = state._archive_command("trace-route", ["aoa-session-memory-mcp"], allow_nonzero_json=True)
+
+    assert payload["ok"] is False
+    assert "archive command failed" in payload["diagnostics"]
+    assert payload["mcp_access"]["outcome"] == "backend_error"
+    assert payload["mcp_access"]["response_kind"] == "degraded"
+    assert payload["mcp_access"]["degraded"] is True
+
+
+def test_trace_returns_structured_degradation_when_backend_has_no_route_candidates(tmp_path: Path) -> None:
+    class FailedTraceRunner(FakeRunner):
+        def __call__(self, argv: list[str], timeout: float) -> CommandOutput:
+            if argv[2] == "trace-route":
+                self.calls.append((argv[2], tuple(argv[3:])))
+                self.timeouts.append((argv[2], timeout))
+                return CommandOutput(
+                    argv,
+                    1,
+                    json.dumps({"ok": True, "artifact_type": "route_trace"}),
+                    "route backend unavailable",
+                    1.0,
+                )
+            return super().__call__(argv, timeout)
+
+    state = state_with_fixture(tmp_path, FailedTraceRunner())
+
+    trace = state.session_trace("aoa-session-memory-mcp", kind="mcp", limit=1, per_route_limit=1)
+
+    assert trace["ok"] is False
+    assert trace["route_candidates"] == []
+    assert trace["route_candidate_count"] == 0
+    assert trace["route_status"] == "degraded"
+    assert trace["degraded"] is True
+    assert "backend_command_failed" in trace["reason_codes"]
+    assert "route_candidates_unavailable" in trace["reason_codes"]
+    assert trace["mcp_access"]["response_kind"] == "degraded"
+
+
+def test_search_returns_bounded_degradation_when_backend_is_unavailable(tmp_path: Path) -> None:
+    class FailedSearchRunner(FakeRunner):
+        def __call__(self, argv: list[str], timeout: float) -> CommandOutput:
+            if argv[2] == "search":
+                self.calls.append((argv[2], tuple(argv[3:])))
+                self.timeouts.append((argv[2], timeout))
+                return CommandOutput(
+                    argv,
+                    1,
+                    json.dumps({"ok": True, "artifact_type": "search_results", "results": []}),
+                    "search backend unavailable",
+                    1.0,
+                )
+            return super().__call__(argv, timeout)
+
+    state = state_with_fixture(tmp_path, FailedSearchRunner())
+
+    search = state.session_search("aoa-session-memory", limit=1)
+
+    assert search["ok"] is False
+    assert search["results"] == []
+    assert search["result_count"] == 0
+    assert search["degraded"] is True
+    assert search["search_status"] == "backend_unavailable"
+    assert "backend_command_failed" in search["reason_codes"]
+    assert search["mcp_access"]["response_kind"] == "degraded"
 
 
 def test_runtime_identity_reports_reload_boundary(tmp_path: Path, monkeypatch: Any) -> None:
@@ -2140,7 +2264,7 @@ def test_status_live_readiness_uses_fast_gate_without_evidence_samples(tmp_path:
     runner = FakeRunner()
     state = state_with_fixture(tmp_path, runner)
 
-    status = state.session_memory_status(include_live=True)
+    status = state.session_memory_status(include_live=True, refresh_maintenance=True)
 
     route_calls = [call for call in runner.calls if call[0] == "route-readiness"]
     assert len(route_calls) == 1
@@ -2194,7 +2318,7 @@ def test_status_distinguishes_sqlite_graph_store_from_missing_sidecar(tmp_path: 
         command_runner=FakeRunner(),
         timeout_seconds=2,
     )
-    status = state.session_memory_status()
+    status = state.session_memory_status(refresh_maintenance=True)
     plan = state.maintenance_plan()
     graph_resource = state.read_resource("aoa-session-memory://graph/status")
 
@@ -2262,7 +2386,7 @@ def test_graph_summary_uses_non_ok_maintenance_packet_for_decisions(tmp_path: Pa
         timeout_seconds=2,
     )
 
-    status = state.session_memory_status()
+    status = state.session_memory_status(refresh_maintenance=True)
 
     assert status["graph"]["decision_source"] == "maintenance_status"
     assert status["graph"]["maintenance_status"] == "dirty"
@@ -2274,7 +2398,7 @@ def test_projection_status_reads_latest_completeness_without_running_catchup(tmp
     runner = FakeRunner()
     state = state_with_fixture(tmp_path, runner)
 
-    status = state.session_projection_status()
+    status = state.session_projection_status(refresh_maintenance=True)
 
     assert status["schema"] == "aoa_session_memory_projection_status_v1"
     assert status["ok"] is True
@@ -2285,6 +2409,7 @@ def test_projection_status_reads_latest_completeness_without_running_catchup(tmp
     assert status["next_operator_route"]["id"] == "verify_projection_status"
     assert status["mcp_access"]["archive_command"] is None
     assert status["mcp_access"]["does_not_run_projection_catchup"] is True
+    assert status["mcp_access"]["maintenance_refresh_requested"] is True
     assert any(call[0] == "maintenance-status" for call in runner.calls)
     assert not any(call[0] == "projection-catchup" for call in runner.calls)
 
@@ -2375,7 +2500,9 @@ def test_maintenance_status_delegates_to_archive_status_route(tmp_path: Path) ->
     assert args[:3] == ("--deep", "--no-timers", "--full")
     assert args[args.index("--workspace-root") + 1] == tmp_path.as_posix()
     assert args[args.index("--aoa-root") + 1] == (tmp_path / ".aoa").as_posix()
-    assert [timeout for command, timeout in runner.timeouts if command == "maintenance-status"] == [60.0]
+    assert [timeout for command, timeout in runner.timeouts if command == "maintenance-status"] == [
+        min(state.timeout_seconds, STATUS_TIMEOUT_SECONDS)
+    ]
     assert payload["artifact_type"] == "session_memory_maintenance_status"
     assert payload["mutates"] is False
     assert payload["runtime"]["source_matches_loaded"] is True
@@ -2417,7 +2544,9 @@ def test_operational_route_rollup_query_delegates_to_read_only_archive_route(tmp
     assert args[args.index("--ref-limit") + 1] == "2"
     assert "--apply" not in args
     assert "--max-shards" not in args
-    assert [timeout for command, timeout in runner.timeouts if command == "search-operational-route-rollup-query"] == [30.0]
+    assert [timeout for command, timeout in runner.timeouts if command == "search-operational-route-rollup-query"] == [
+        min(state.timeout_seconds, ROUTE_ROLLUP_QUERY_TIMEOUT_SECONDS)
+    ]
     assert payload["artifact_type"] == "session_memory_search_operational_route_rollup_query"
     assert payload["mutates"] is False
     assert payload["quality"]["raw_or_segment_ref_present"] is True
@@ -2459,7 +2588,9 @@ def test_operational_direct_event_rollup_query_delegates_to_read_only_archive_ro
     assert args[args.index("--ref-limit") + 1] == "2"
     assert "--apply" not in args
     assert "--max-shards" not in args
-    assert [timeout for command, timeout in runner.timeouts if command == "search-operational-direct-event-rollup-query"] == [30.0]
+    assert [timeout for command, timeout in runner.timeouts if command == "search-operational-direct-event-rollup-query"] == [
+        min(state.timeout_seconds, ROUTE_ROLLUP_QUERY_TIMEOUT_SECONDS)
+    ]
     assert payload["artifact_type"] == "session_memory_search_operational_direct_event_rollup_query"
     assert payload["mutates"] is False
     assert payload["quality"]["raw_or_segment_ref_present"] is True
@@ -2697,6 +2828,40 @@ def test_literal_query_plan_routes_to_allowlisted_archive_command(tmp_path: Path
     assert args[args.index("--route-layer") + 1] == "mcp"
     assert args[args.index("--max-shards") + 1] == "3"
     assert not any(call[0] == "search" for call in runner.calls)
+
+
+def test_unfiltered_mcp_literal_plan_uses_generated_registry_fast_path(tmp_path: Path) -> None:
+    runner = FakeRunner()
+    state = state_with_fixture(tmp_path, runner)
+
+    plan = state.session_literal_query_plan("MCP", kind="mcp_service", filters={})
+
+    assert plan["artifact_type"] == "session_memory_literal_query_plan"
+    assert plan["kind"] == "mcp"
+    assert plan["requested_kind"] == "mcp_service"
+    assert plan["primary_route"]["route_id"] == "entity_registry_class"
+    assert plan["fallback_plan"]["route_id"] == "monolith_raw_text_fallback"
+    assert plan["mcp_access"]["mcp_local_fast_path"] is True
+    assert plan["mcp_access"]["archive_command"] is None
+    assert plan["mcp_access"]["owner_freshness_consulted"] is False
+    assert not runner.calls
+
+
+def test_known_mcp_literal_plan_uses_registry_anchor_without_owner_cli(tmp_path: Path) -> None:
+    runner = FakeRunner()
+    state = state_with_fixture(tmp_path, runner)
+
+    plan = state.session_literal_query_plan(
+        "aoa-session-memory-mcp",
+        kind="mcp_service",
+        filters={},
+    )
+
+    assert plan["query_shape"]["primary"] == "entity_anchor"
+    assert plan["route_anchor"] == "aoa_session_memory_mcp"
+    assert plan["primary_route"]["route_id"] == "entity_usage_chain"
+    assert plan["mcp_access"]["mcp_local_fast_path"] is True
+    assert not runner.calls
 
 
 def test_archive_command_rejects_unlisted_commands_and_persistence_flags(
@@ -3353,7 +3518,10 @@ def test_goal_lifecycle_route_wraps_archive_cli_and_compacts_payload(tmp_path: P
     assert args[args.index("--status") + 1] == "complete"
     assert args[args.index("--event-kind") + 1] == "goal_completed"
     assert args[args.index("--order") + 1] == "chronological"
-    assert dict(runner.timeouts)["goal-lifecycles"] == 60.0
+    assert dict(runner.timeouts)["goal-lifecycles"] == min(
+        state.timeout_seconds,
+        RUNTIME_LIMITS.goal_lifecycle_timeout_seconds,
+    )
 
 
 def test_goal_lifecycle_route_rejects_invalid_order_before_cli(tmp_path: Path) -> None:
@@ -4662,6 +4830,8 @@ def test_published_tool_schema_allows_route_only_search_and_usage_neighborhood(t
     assert tools["aoa_session_direct_event_rollup_query"].input_schema["properties"]["limit"]["default"] == 12
     assert tools["aoa_session_direct_event_rollup_query"].input_schema["properties"]["ref_limit"]["default"] == 3
     assert tools["aoa_session_projection_status"].input_schema["properties"]["include_payload"]["default"] is False
+    assert tools["aoa_session_projection_status"].input_schema["properties"]["refresh_maintenance"]["default"] is False
+    assert tools["aoa_session_memory_status"].input_schema["properties"]["refresh_maintenance"]["default"] is False
     assert tools["aoa_session_graph_neighborhood"].input_schema["properties"]["edge_limit"]["default"] is None
     assert tools["aoa_session_entity_usage_chain"].input_schema["properties"]["limit"]["default"] == 6
     assert tools["aoa_session_entity_usage_chain"].input_schema["properties"]["per_route_limit"]["default"] == 12
@@ -4979,7 +5149,10 @@ def test_freshness_check_resolves_raw_line_refs_with_session_context(tmp_path: P
     freshness_calls = [args for command, args in runner.calls if command == "search-provider-status"]
     assert "--session" not in freshness_calls[0]
     assert freshness_calls[1][freshness_calls[1].index("--session") + 1] == "2026-05-26__001__session-memory-mcp"
-    assert [timeout for command, timeout in runner.timeouts if command == "search-provider-status"] == [60.0, 60.0]
+    assert [timeout for command, timeout in runner.timeouts if command == "search-provider-status"] == [
+        min(state.timeout_seconds, STATUS_TIMEOUT_SECONDS),
+        min(state.timeout_seconds, STATUS_TIMEOUT_SECONDS),
+    ]
 
 
 def test_freshness_check_resolves_latest_before_provider_scope(tmp_path: Path) -> None:
@@ -5163,7 +5336,7 @@ def test_entity_usage_audit_routes_to_allowlisted_archive_command(tmp_path: Path
     assert args[args.index("--per-route-limit") + 1] == "4"
     assert args[args.index("--consequence-window") + 1] == "3"
     assert "--full" in args
-    assert runner.timeouts[-1] == ("entity-usage-audit", 90.0)
+    assert runner.timeouts[-1] == ("entity-usage-audit", min(state.timeout_seconds, EVIDENCE_PACKET_TIMEOUT_SECONDS))
 
     agent_event_audit = state.session_entity_usage_audit(
         "assistant_answer",
@@ -5254,7 +5427,7 @@ def test_entity_usage_chain_routes_to_allowlisted_archive_command(tmp_path: Path
     assert args[args.index("--consequence-window") + 1] == "4"
     assert args[args.index("--document-limit") + 1] == "9"
     assert args[args.index("--session") + 1] == "session-1"
-    assert runner.timeouts[-1] == ("usage-chain", 90.0)
+    assert runner.timeouts[-1] == ("usage-chain", min(state.timeout_seconds, EVIDENCE_PACKET_TIMEOUT_SECONDS))
 
 
 def test_entity_dossier_composes_first_route_packet(tmp_path: Path) -> None:
@@ -6311,7 +6484,10 @@ def test_entity_usage_scenario_audit_routes_to_allowlisted_archive_command(tmp_p
     assert args[args.index("--per-route-limit") + 1] == "4"
     assert args[args.index("--raw-preview-limit") + 1] == "2"
     assert "--full" in args
-    assert runner.timeouts[-1] == ("entity-usage-scenario-audit", 90.0)
+    assert runner.timeouts[-1] == (
+        "entity-usage-scenario-audit",
+        min(state.timeout_seconds, EVIDENCE_PACKET_TIMEOUT_SECONDS),
+    )
 
 
 def test_live_scenario_audit_routes_to_canonical_archive_command(tmp_path: Path) -> None:
@@ -6363,7 +6539,7 @@ def test_live_scenario_audit_routes_to_canonical_archive_command(tmp_path: Path)
     assert args.count("--profile") == 10
     assert "entity_registry_lookup" in args
     assert "route_rollup_query" in args
-    assert runner.timeouts[-1] == ("live-scenario-audit", 90.0)
+    assert runner.timeouts[-1] == ("live-scenario-audit", min(state.timeout_seconds, EVIDENCE_PACKET_TIMEOUT_SECONDS))
 
 
 def test_live_scenario_corpus_check_routes_to_archive_corpus(tmp_path: Path) -> None:
@@ -6382,7 +6558,7 @@ def test_live_scenario_corpus_check_routes_to_archive_corpus(tmp_path: Path) -> 
     assert args[0] == "check"
     assert args[args.index("--case-limit") + 1] == "1"
     assert "--full" in args
-    assert runner.timeouts[-1] == ("live-scenario-corpus", 90.0)
+    assert runner.timeouts[-1] == ("live-scenario-corpus", min(state.timeout_seconds, EVIDENCE_PACKET_TIMEOUT_SECONDS))
 
 
 def test_live_scenario_corpus_inventory_routes_to_archive_list(tmp_path: Path) -> None:
@@ -6401,7 +6577,7 @@ def test_live_scenario_corpus_inventory_routes_to_archive_list(tmp_path: Path) -
     assert command == "live-scenario-corpus"
     assert args[0] == "list"
     assert "--full" in args
-    assert runner.timeouts[-1] == ("live-scenario-corpus", 90.0)
+    assert runner.timeouts[-1] == ("live-scenario-corpus", min(state.timeout_seconds, EVIDENCE_PACKET_TIMEOUT_SECONDS))
 
 
 def test_live_scenario_audit_preserves_failed_archive_payload(tmp_path: Path) -> None:
@@ -7173,7 +7349,7 @@ def test_read_resource_and_server_build(tmp_path: Path) -> None:
         script_path=tmp_path / ".aoa/scripts/aoa_session_memory.py",
     )
     assert server is not None
-    assert server._mcp_server.version == "0.2.0"
+    assert server.application_version == "0.2.0"
 
 
 def test_server_auto_reloads_stale_core_implementation(monkeypatch: Any) -> None:

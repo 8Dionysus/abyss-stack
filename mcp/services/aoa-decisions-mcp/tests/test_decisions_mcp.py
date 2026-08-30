@@ -234,8 +234,8 @@ def test_read_and_internal_effect_servers_have_disjoint_tools(tmp_path: Path) ->
         tool.name: tool for tool in asyncio.run(internal_effect.list_tools())
     }
 
-    assert read._mcp_server.version == "0.2.0"
-    assert internal_effect._mcp_server.version == "0.2.0"
+    assert read.application_version == "0.2.0"
+    assert internal_effect.application_version == "0.2.0"
     assert "aoa_decisions_refresh" not in read_tools
     assert (
         "force_refresh"

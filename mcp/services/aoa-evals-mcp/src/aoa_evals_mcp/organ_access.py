@@ -7,6 +7,8 @@ import os
 from pathlib import Path
 from typing import Any
 
+from ._runtime_config import PATH_CONFIG
+
 
 DISCOVERY_CAPABILITY_ID = "eval-discovery-read"
 REQUEST_CAPABILITY_ID = "eval-request-prepare"
@@ -59,9 +61,7 @@ def owner_manifest_path(
         return Path(explicit).expanduser().resolve()
     if evals_root is not None:
         return Path(evals_root).expanduser().resolve() / OWNER_MANIFEST_RELATIVE_PATH
-    root = Path(
-        workspace_root or os.environ.get("AOA_WORKSPACE_ROOT") or "/srv/AbyssOS"
-    ).expanduser().resolve()
+    root = PATH_CONFIG.workspace_root(workspace_root)
     return root / "aoa-evals" / OWNER_MANIFEST_RELATIVE_PATH
 
 

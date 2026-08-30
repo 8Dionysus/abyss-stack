@@ -20,7 +20,8 @@ This directory stores user-unit skeletons for the deployed runtime.
   route used only to obtain the first deployment-bound canary before admission
 - `aoa-memo-mcp-candidate.service` and
   `aoa-evals-mcp-candidate.service`, the finite-write candidate contours
-- `aoa-mcp-http.service`, the fifteen-process local organ bundle
+- `aoa-mcp-http.service`, the catalog-generated admitted client-read organ
+  bundle; candidate and effect contours are excluded from its startup graph
 - `abyss-stack-mcp-read.service`, the stack-owned runtime-observation plane
 - `abyss-stack-mcp-read-bootstrap.service`, the equivalent manual bootstrap
   route for the stack-owned read contour

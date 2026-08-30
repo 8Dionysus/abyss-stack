@@ -40,8 +40,24 @@ def _load_validator() -> Any:
     return module
 
 
+def _load_runtime_catalog() -> Any:
+    path = LAB_ROOT / "scripts" / "runtime_catalog.py"
+    spec = importlib.util.spec_from_file_location(
+        "runtime_catalog_under_test",
+        path,
+    )
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def _load_tasks_runner() -> Any:
     runner_path = LAB_ROOT / "scripts" / "run_codex_stack_tasks_pair.py"
+    scripts_path = str(runner_path.parent)
+    if scripts_path not in sys.path:
+        sys.path.insert(0, scripts_path)
     spec = importlib.util.spec_from_file_location(
         "codex_stack_tasks_pair_under_test",
         runner_path,
@@ -55,6 +71,9 @@ def _load_tasks_runner() -> Any:
 
 def _load_live_fleet_runner() -> Any:
     runner_path = LAB_ROOT / "scripts" / "run_live_modern_read_fleet.py"
+    scripts_path = str(runner_path.parent)
+    if scripts_path not in sys.path:
+        sys.path.insert(0, scripts_path)
     spec = importlib.util.spec_from_file_location(
         "live_modern_read_fleet_under_test",
         runner_path,
@@ -88,6 +107,153 @@ def _load_kag_next_runner() -> Any:
 
 def _load(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def test_runtime_identity_does_not_accept_an_old_major_two_patch_release(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    runtime_catalog = _load_runtime_catalog()
+
+    class Completed:
+        stdout = '{"mcp": "2.0.0", "mcp-types": "2.1.1"}\n'
+
+    monkeypatch.setattr(runtime_catalog.subprocess, "run", lambda *args, **kwargs: Completed())
+    identity = runtime_catalog.runtime_identity(
+        Path("/opt/mcp/bin/python"),
+        {
+            "distribution": "mcp",
+            "companion_distribution": "mcp-types",
+            "tested_lock": "2.1.1",
+        },
+    )
+
+    assert identity["exact_pair"] is False
+    assert identity["expected"] == {"mcp": "2.1.1", "mcp-types": "2.1.1"}
+
+
+def test_codex_client_uses_declared_recovery_rows_when_admission_is_empty() -> None:
+    runtime_catalog = _load_runtime_catalog()
+    catalog = runtime_catalog.load_runtime_catalog()
+
+    declared = runtime_catalog.declared_client_read_entries(catalog)
+    projected = runtime_catalog.client_read_entries(catalog, {"records": []})
+
+    assert projected == declared
+    assert len(projected) == len(
+        catalog["deployment"]["client_read_contours"]
+    )
+    with pytest.raises(
+        runtime_catalog.RuntimeCatalogError,
+        match="no admitted read contours",
+    ):
+        runtime_catalog.admitted_read_entries(catalog, {"records": []})
+
+
+def test_codex_client_uses_complete_recovery_rows_for_partial_admission() -> None:
+    runtime_catalog = _load_runtime_catalog()
+    catalog = runtime_catalog.load_runtime_catalog()
+    declared = runtime_catalog.declared_client_read_entries(catalog)
+    admitted_organ = declared[0][0]
+    partial_registry = {
+        "records": [
+            {
+                "organ_id": admitted_organ,
+                "contours": [
+                    {
+                        "contour_id": "read",
+                        "registry_state": "admitted",
+                    }
+                ],
+            },
+            {"organ_id": declared[1][0], "contours": "malformed"},
+        ]
+    }
+
+    projected = runtime_catalog.client_read_entries(catalog, partial_registry)
+
+    assert projected == declared
+
+
+def test_codex_client_normalizes_complete_admission_to_declared_order() -> None:
+    runtime_catalog = _load_runtime_catalog()
+    catalog = runtime_catalog.load_runtime_catalog()
+    declared = runtime_catalog.declared_client_read_entries(catalog)
+    complete_registry = {
+        "records": [
+            {
+                "organ_id": organ_id,
+                "contours": [
+                    {
+                        "contour_id": "read",
+                        "registry_state": "admitted",
+                    }
+                ],
+            }
+            for organ_id, _service_id, _service, _contour in reversed(declared)
+        ]
+    }
+
+    projected = runtime_catalog.client_read_entries(catalog, complete_registry)
+
+    assert projected == declared
+
+
+@pytest.mark.parametrize(
+    "registry_payload",
+    (
+        "{",
+        "[]",
+        '{"records": {}}',
+    ),
+)
+def test_codex_client_settings_degrade_malformed_registry_to_declared_rows(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    registry_payload: str,
+) -> None:
+    runtime_catalog = _load_runtime_catalog()
+    catalog = runtime_catalog.load_runtime_catalog()
+    stack_root = tmp_path / "abyss-stack"
+    registry = runtime_catalog.registry_path(catalog, stack_root)
+    registry.parent.mkdir(parents=True)
+    registry.write_text(registry_payload, encoding="utf-8")
+
+    _feature, _recovery, rows = runtime_catalog.codex_client_settings(
+        catalog,
+        stack_root,
+    )
+
+    assert len(rows) == len(catalog["deployment"]["client_read_contours"])
+    assert "using declared recovery rows" in capsys.readouterr().err
+
+
+def test_codex_client_settings_degrade_unreadable_registry_to_declared_rows(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    runtime_catalog = _load_runtime_catalog()
+    catalog = runtime_catalog.load_runtime_catalog()
+    stack_root = tmp_path / "abyss-stack"
+    registry = runtime_catalog.registry_path(catalog, stack_root)
+    registry.parent.mkdir(parents=True)
+    registry.write_text('{"records": []}', encoding="utf-8")
+    original_read_text = Path.read_text
+
+    def deny_registry_read(path: Path, *args: Any, **kwargs: Any) -> str:
+        if path == registry:
+            raise PermissionError("registry read denied")
+        return original_read_text(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", deny_registry_read)
+
+    _feature, _recovery, rows = runtime_catalog.codex_client_settings(
+        catalog,
+        stack_root,
+    )
+
+    assert len(rows) == len(catalog["deployment"]["client_read_contours"])
+    assert "using declared recovery rows" in capsys.readouterr().err
 
 
 @pytest.fixture

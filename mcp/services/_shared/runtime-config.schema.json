@@ -1,0 +1,325 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://abyss.local/schemas/abyss-mcp-runtime-config-v1.json",
+  "title": "OS Abyss MCP runtime configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "mcp", "paths", "limits", "deployment", "reserved_ports", "services"],
+  "properties": {
+    "schema_version": {"const": "abyss_mcp_runtime_config_v1"},
+    "mcp": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sdk", "protocol", "transport"],
+      "properties": {
+        "sdk": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["distribution", "major", "requirement", "companion_distribution", "tested_lock", "source_revision", "distribution_record_digests"],
+          "properties": {
+            "distribution": {"const": "mcp"},
+            "major": {"const": 2},
+            "requirement": {"const": "mcp>=2,<3"},
+            "companion_distribution": {"type": "string", "minLength": 1},
+            "tested_lock": {"type": "string", "pattern": "^2\\.[0-9]+\\.[0-9]+(?:[+-][0-9A-Za-z.-]+)?$"},
+            "source_revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+            "distribution_record_digests": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["mcp", "mcp-types"],
+              "properties": {
+                "mcp": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+                "mcp-types": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+              }
+            }
+          }
+        },
+        "protocol": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["version", "legacy_version", "modern_only_rejection_code", "streamable_http_path", "modern_only"],
+          "properties": {
+            "version": {"type": "string", "pattern": "^20[0-9]{2}-[0-9]{2}-[0-9]{2}$"},
+            "legacy_version": {"type": "string", "pattern": "^20[0-9]{2}-[0-9]{2}-[0-9]{2}$"},
+            "modern_only_rejection_code": {"type": "integer", "minimum": -32099, "maximum": -32000},
+            "streamable_http_path": {"const": "/mcp"},
+            "modern_only": {"const": true}
+          }
+        },
+        "transport": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "transport_env_var",
+            "host_env_var",
+            "port_env_var",
+            "default_transport",
+            "streamable_http_transport",
+            "default_host",
+            "loopback_hosts",
+            "port_min",
+            "port_max"
+          ],
+          "properties": {
+            "transport_env_var": {"const": "AOA_MCP_TRANSPORT"},
+            "host_env_var": {"const": "AOA_MCP_HOST"},
+            "port_env_var": {"const": "AOA_MCP_PORT"},
+            "default_transport": {"const": "stdio"},
+            "streamable_http_transport": {"const": "streamable-http"},
+            "default_host": {"const": "127.0.0.1"},
+            "loopback_hosts": {
+              "type": "array",
+              "items": {"type": "string"},
+              "minItems": 1,
+              "uniqueItems": true
+            },
+            "port_min": {"const": 1},
+            "port_max": {"const": 65535}
+          }
+        }
+      }
+    },
+    "paths": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workspace_env_var",
+        "stack_root_env_var",
+        "stack_source_env_var",
+        "tos_root_env_var",
+        "tos_root_fallback_env_var",
+        "connector_repo_bindings",
+        "connector_relative_template",
+        "tos_relative_to_workspace",
+        "stack_runtime_relative_to_workspace",
+        "stack_source_relative_to_workspace",
+        "stack_logs_relative_to_runtime",
+        "stack_secrets_relative_to_runtime",
+        "stack_services_relative_to_runtime",
+        "stack_configs_relative_to_runtime",
+        "stack_deployment_manifest_relative_to_runtime",
+        "stack_observation_relative_to_runtime",
+        "stack_overlay_relative_to_runtime",
+        "stack_registry_relative_to_workspace",
+        "stack_codex_executable_relative_to_workspace_template",
+        "stack_orchestration_relative_to_runtime",
+        "stack_canaries_relative_to_runtime",
+        "stack_effects_relative_to_runtime",
+        "abyss_machine_policy_env_var",
+        "abyss_machine_state_env_var",
+        "abyss_machine_policy_fallback_env_var",
+        "abyss_machine_state_fallback_env_var"
+      ],
+      "properties": {
+        "workspace_env_var": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,127}$"},
+        "stack_root_env_var": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,127}$"},
+        "stack_source_env_var": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,127}$"},
+        "tos_root_env_var": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,127}$"},
+        "tos_root_fallback_env_var": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,127}$"},
+        "connector_repo_bindings": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["connector_id", "env_var"],
+            "properties": {
+              "connector_id": {"type": "string", "pattern": "^[A-Za-z0-9_.:-]{1,160}$"},
+              "env_var": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,127}$"}
+            }
+          }
+        },
+        "connector_relative_template": {"type": "string", "pattern": "^[^/].*[^/]$"},
+        "tos_relative_to_workspace": {"type": "string", "pattern": "^[^/].*[^/]$"},
+        "stack_runtime_relative_to_workspace": {"type": "string", "pattern": "^[^/].*[^/]$"},
+        "stack_source_relative_to_workspace": {"type": "string", "pattern": "^[^/].*[^/]$"},
+        "stack_logs_relative_to_runtime": {"type": "string", "pattern": "^[^/].*[^/]$"},
+        "stack_secrets_relative_to_runtime": {"type": "string", "pattern": "^[^/].*[^/]$"},
+        "stack_services_relative_to_runtime": {"type": "string", "pattern": "^[^/].*[^/]$"},
+        "stack_configs_relative_to_runtime": {"type": "string", "pattern": "^[^/].*[^/]$"},
+        "stack_deployment_manifest_relative_to_runtime": {"type": "string", "pattern": "^[^/].*[^/]$"},
+        "stack_observation_relative_to_runtime": {"type": "string", "pattern": "^[^/].*[^/]$"},
+        "stack_overlay_relative_to_runtime": {"type": "string", "pattern": "^[^/].*[^/]$"},
+        "stack_registry_relative_to_workspace": {"type": "string", "pattern": "^[^/].*[^/]$"},
+        "stack_codex_executable_relative_to_workspace_template": {"type": "string", "pattern": "^[^/].*[^/]$"},
+        "stack_orchestration_relative_to_runtime": {"type": "string", "pattern": "^[^/].*[^/]$"},
+        "stack_canaries_relative_to_runtime": {"type": "string", "pattern": "^[^/].*[^/]$"},
+        "stack_effects_relative_to_runtime": {"type": "string", "pattern": "^[^/].*[^/]$"},
+        "abyss_machine_policy_env_var": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,127}$"},
+        "abyss_machine_state_env_var": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,127}$"},
+        "abyss_machine_policy_fallback_env_var": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,127}$"},
+        "abyss_machine_state_fallback_env_var": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,127}$"}
+      }
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status_timeout_seconds",
+        "search_timeout_seconds",
+        "goal_lifecycle_timeout_seconds",
+        "evidence_packet_timeout_seconds",
+        "usage_neighborhood_timeout_seconds",
+        "route_rollup_query_timeout_seconds",
+        "direct_event_rollup_query_timeout_seconds",
+        "protocol_probe_server_start_timeout_seconds",
+        "protocol_probe_request_timeout_seconds",
+        "protocol_probe_stdio_call_timeout_seconds",
+        "protocol_probe_stdio_timeout_seconds",
+        "protocol_probe_connect_timeout_seconds",
+        "protocol_probe_process_shutdown_timeout_seconds",
+        "protocol_probe_process_kill_timeout_seconds"
+      ],
+      "properties": {
+        "status_timeout_seconds": {"type": "number", "exclusiveMinimum": 0, "maximum": 600},
+        "search_timeout_seconds": {"type": "number", "exclusiveMinimum": 0, "maximum": 600},
+        "goal_lifecycle_timeout_seconds": {"type": "number", "exclusiveMinimum": 0, "maximum": 600},
+        "evidence_packet_timeout_seconds": {"type": "number", "exclusiveMinimum": 0, "maximum": 600},
+        "usage_neighborhood_timeout_seconds": {"type": "number", "exclusiveMinimum": 0, "maximum": 600},
+        "route_rollup_query_timeout_seconds": {"type": "number", "exclusiveMinimum": 0, "maximum": 600},
+        "direct_event_rollup_query_timeout_seconds": {"type": "number", "exclusiveMinimum": 0, "maximum": 600},
+        "protocol_probe_server_start_timeout_seconds": {"type": "number", "exclusiveMinimum": 0, "maximum": 600},
+        "protocol_probe_request_timeout_seconds": {"type": "number", "exclusiveMinimum": 0, "maximum": 600},
+        "protocol_probe_stdio_call_timeout_seconds": {"type": "number", "exclusiveMinimum": 0, "maximum": 600},
+        "protocol_probe_stdio_timeout_seconds": {"type": "number", "exclusiveMinimum": 0, "maximum": 600},
+        "protocol_probe_connect_timeout_seconds": {"type": "number", "exclusiveMinimum": 0, "maximum": 60},
+        "protocol_probe_process_shutdown_timeout_seconds": {"type": "number", "exclusiveMinimum": 0, "maximum": 600},
+        "protocol_probe_process_kill_timeout_seconds": {"type": "number", "exclusiveMinimum": 0, "maximum": 600}
+      }
+    },
+    "deployment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "credentials_relative",
+        "runtime_python_relative_template",
+        "registry_relative_to_workspace",
+        "contour_unit_template",
+        "codex_mcp_feature",
+        "recovery_unit",
+        "runtime_repair_unit",
+        "auto_repair_marker_name",
+        "canary_public_key_name",
+        "approved_artifacts",
+        "client_read_contours",
+        "nonread_probe_contours"
+      ],
+      "properties": {
+        "credentials_relative": {"type": "string", "pattern": "^[^/].*[^/]$"},
+        "runtime_python_relative_template": {"type": "string", "pattern": "^[^/].*[^/]$"},
+        "registry_relative_to_workspace": {"type": "string", "pattern": "^[^/].*[^/]$"},
+        "contour_unit_template": {"type": "string", "minLength": 1},
+        "codex_mcp_feature": {"type": "string", "pattern": "^mcp_[0-9]{4}_[0-9]{2}_[0-9]{2}$"},
+        "recovery_unit": {"type": "string", "pattern": "^[A-Za-z0-9_.@%-]+\\.service$"},
+        "runtime_repair_unit": {"type": "string", "pattern": "^[A-Za-z0-9_.@%-]+\\.service$"},
+        "auto_repair_marker_name": {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$"},
+        "canary_public_key_name": {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$"},
+        "approved_artifacts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["aoa_sdk"],
+          "properties": {
+            "aoa_sdk": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["distribution", "version", "wheel_url", "sha256"],
+              "properties": {
+                "distribution": {"const": "aoa-sdk"},
+                "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+                "wheel_url": {"type": "string", "pattern": "^https://.+\\.whl$"},
+                "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+              }
+            }
+          }
+        },
+        "client_read_contours": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["service_id", "contour_id", "organ_id"],
+            "properties": {
+              "service_id": {"type": "string", "minLength": 1},
+              "contour_id": {"const": "read"},
+              "organ_id": {"type": "string", "minLength": 1}
+            }
+          },
+          "uniqueItems": true
+        },
+        "nonread_probe_contours": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["service_id", "contour_id"],
+            "properties": {
+              "service_id": {"type": "string", "minLength": 1},
+              "contour_id": {"type": "string", "minLength": 1}
+            }
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "reserved_ports": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["port", "owner", "reason"],
+        "properties": {
+          "port": {"type": "integer", "minimum": 1, "maximum": 65535},
+          "owner": {"type": "string", "minLength": 1},
+          "reason": {"type": "string", "minLength": 1}
+        }
+      },
+      "uniqueItems": true
+    },
+    "services": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["service_id", "organ_id", "registry_organ_id", "runtime_executable_mode", "module", "server_name_template", "read_unit_template", "read_unit_instance", "contours"],
+        "properties": {
+          "service_id": {"type": "string", "minLength": 1},
+          "organ_id": {"type": "string", "minLength": 1},
+          "registry_organ_id": {"type": "string", "minLength": 1},
+          "runtime_executable_mode": {"enum": ["workspace_codex", "stack_venv"]},
+          "module": {"type": "string", "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$"},
+          "server_name_template": {"type": "string", "minLength": 1},
+          "read_unit_template": {"type": "string", "pattern": "^[A-Za-z0-9_.@%{}-]+\\.service$"},
+          "read_unit_instance": {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$"},
+          "auth_manifest_credential": {"type": "string", "minLength": 1},
+          "auth_manifest_schema": {"type": "string", "minLength": 1},
+          "contours": {
+            "type": "object",
+            "minProperties": 1,
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["port", "auth"],
+              "properties": {
+                "port": {"type": "integer", "minimum": 1, "maximum": 65535},
+                "auth": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["token_env_var", "credential_name", "auth_scope", "client_id"],
+                  "properties": {
+                    "token_env_var": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,127}$"},
+                    "credential_name": {"type": "string", "pattern": "^[A-Za-z0-9_.-]{1,128}$"},
+                    "auth_scope": {"type": "string", "pattern": "^[A-Za-z0-9:._/-]{1,128}$"},
+                    "client_id": {"type": "string", "minLength": 1, "maxLength": 128}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -11,8 +11,8 @@ from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import unquote, urlparse
 
+from ._runtime_config import PATH_CONFIG
 
-DEFAULT_WORKSPACE_ROOT = Path("/srv/AbyssOS")
 DEFAULT_ABYSS_MACHINE_BIN = "abyss-machine"
 DEFAULT_TIMEOUT_SECONDS = 12.0
 SURFACE_TIMEOUT_SECONDS = {
@@ -35,45 +35,56 @@ STOP_LINES = [
     "Do not bind HTTP beyond loopback or bypass the source-owned MCP lifecycle decision.",
 ]
 
-OWNER_LAYERS = [
-    {
-        "layer": "abyss-machine",
-        "owns": [
-            "host facts",
-            "host policies",
-            "hardware evidence",
-            "generated latest read models",
-            "resource and memory planning",
-            "typing and nervous state",
-            "heartbeats, reactions, responses, and change ledger",
-        ],
-        "truth_roots": ["/etc/abyss-machine", "/var/lib/abyss-machine", "/srv/abyss-machine"],
-    },
-    {
-        "layer": "abyss-stack",
-        "owns": [
-            "runnable MCP package",
-            "local transport service topology",
-            "stack-side access-plane decision record",
-        ],
-        "truth_roots": ["mcp/services/abyss-machine-mcp", "docs/decisions"],
-    },
-    {
-        "layer": "aoa-memo",
-        "owns": ["durable reviewed memory and memory object review"],
-        "truth_roots": ["/srv/AbyssOS/aoa-memo"],
-    },
-    {
-        "layer": "aoa-evals",
-        "owns": ["proof bundles, bounded verdict logic, and report authority"],
-        "truth_roots": ["/srv/AbyssOS/aoa-evals"],
-    },
-    {
-        "layer": "operator",
-        "owns": ["intent, authorization, private context permission, and destructive action approval"],
-        "truth_roots": ["current session and explicit operator authorization"],
-    },
-]
+def _owner_layers() -> list[dict[str, Any]]:
+    policy_root = PATH_CONFIG.abyss_machine_policy_root()
+    state_root = PATH_CONFIG.abyss_machine_state_root()
+    machine_roots = [
+        str(path)
+        for path in (policy_root, state_root)
+        if path is not None
+    ]
+    if not machine_roots:
+        machine_roots = ["configured abyss-machine policy and state roots"]
+    workspace = PATH_CONFIG.workspace_root()
+    return [
+        {
+            "layer": "abyss-machine",
+            "owns": [
+                "host facts",
+                "host policies",
+                "hardware evidence",
+                "generated latest read models",
+                "resource and memory planning",
+                "typing and nervous state",
+                "heartbeats, reactions, responses, and change ledger",
+            ],
+            "truth_roots": machine_roots,
+        },
+        {
+            "layer": "abyss-stack",
+            "owns": [
+                "runnable MCP package",
+                "local transport service topology",
+                "stack-side access-plane decision record",
+            ],
+            "truth_roots": ["mcp/services/abyss-machine-mcp", "docs/decisions"],
+        },
+        {
+            "layer": "aoa-memo",
+            "owns": ["durable reviewed memory and memory object review"],
+            "truth_roots": [str(workspace / "aoa-memo")],
+        },
+        {
+            "layer": "aoa-evals",
+            "owns": ["proof bundles, bounded verdict logic, and report authority"],
+            "truth_roots": [str(workspace / "aoa-evals")],
+        },
+        {
+            "layer": "operator",
+            "owns": ["intent, authorization, private context permission, and destructive action approval"],
+            "truth_roots": ["current session and explicit operator authorization"],
+        },
+    ]
 
 READ_SURFACE_META: dict[str, dict[str, str]] = {
     "stack-bridge": {
@@ -457,11 +468,7 @@ class AbyssMachineMCPState:
         command_runner: CommandRunner | None = None,
         timeout_seconds: float | None = None,
     ) -> "AbyssMachineMCPState":
-        root = Path(
-            workspace_root
-            or os.environ.get("AOA_WORKSPACE_ROOT")
-            or DEFAULT_WORKSPACE_ROOT
-        ).expanduser().resolve()
+        root = PATH_CONFIG.workspace_root(workspace_root)
         return cls(
             workspace_root=root,
             abyss_machine_bin=abyss_machine_bin or os.environ.get("ABYSS_MACHINE_BIN") or DEFAULT_ABYSS_MACHINE_BIN,
@@ -475,16 +482,16 @@ class AbyssMachineMCPState:
             "mcp_role": "local read-only access plane over abyss-machine host read models",
             "service_owner": "abyss-stack owns the runnable MCP package only",
             "stronger_owners": [
-                "abyss-machine source contracts under /etc/abyss-machine",
-                "abyss-machine generated facts and histories under /var/lib/abyss-machine",
+                "abyss-machine source contracts under the configured policy root",
+                "abyss-machine generated facts and histories under the configured state root",
                 "operator authorization for mutation or private context",
                 "aoa-memo for durable reviewed memory",
                 "aoa-evals for proof and verdict authority",
             ],
             "source_hierarchy": [
-                "/etc/abyss-machine source contracts and policy JSON",
-                "nearest /var/lib/abyss-machine/*/AGENTS.md owner card",
-                "/var/lib/abyss-machine generated latest/index JSON",
+                "configured abyss-machine source contracts and policy JSON",
+                "nearest generated abyss-machine AGENTS.md owner card",
+                "configured abyss-machine generated latest/index JSON",
                 "append-only host histories and evidence refs",
                 "MCP compact summaries",
             ],
@@ -494,7 +501,7 @@ class AbyssMachineMCPState:
         }
 
     def owner_layers(self) -> list[dict[str, Any]]:
-        return OWNER_LAYERS
+        return _owner_layers()
 
     def available_surfaces(self) -> dict[str, Any]:
         return {

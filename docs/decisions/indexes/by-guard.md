@@ -464,6 +464,10 @@
 
 - [ABYSS-STACK-D-0102 R1 Memory Runtime Is Exact Pull Delivery](../ABYSS-STACK-D-0102-r1-memory-runtime-is-exact-pull-delivery.md) (`docs/decisions/ABYSS-STACK-D-0102-r1-memory-runtime-is-exact-pull-delivery.md`)
 
+## exact dependency identity
+
+- [ABYSS-STACK-D-0139 MCP SDK 2.1.1 Transition And Central Runtime Identity](../ABYSS-STACK-D-0139-mcp-sdk-2-1-1-transition.md) (`docs/decisions/ABYSS-STACK-D-0139-mcp-sdk-2-1-1-transition.md`)
+
 ## exact identity
 
 - [ABYSS-STACK-D-0107 Fail Closed MCP Admission Maintenance](../ABYSS-STACK-D-0107-fail-closed-mcp-admission-maintenance.md) (`docs/decisions/ABYSS-STACK-D-0107-fail-closed-mcp-admission-maintenance.md`)
@@ -531,6 +535,7 @@
 - [ABYSS-STACK-D-0116 Bind Terminal Validation Suite After Command-Sandbox Settlement](../ABYSS-STACK-D-0116-bind-terminal-validation-suite-after-command-sandbox-settlement.md) (`docs/decisions/ABYSS-STACK-D-0116-bind-terminal-validation-suite-after-command-sandbox-settlement.md`)
 - [ABYSS-STACK-D-0117 Recover Review Inputs Without Rewriting Owner Writers](../ABYSS-STACK-D-0117-recover-review-inputs-without-rewriting-owner-writers.md) (`docs/decisions/ABYSS-STACK-D-0117-recover-review-inputs-without-rewriting-owner-writers.md`)
 - [ABYSS-STACK-D-0121 Close Nested Review Evidence Before Inference](../ABYSS-STACK-D-0121-close-nested-review-evidence-before-inference.md) (`docs/decisions/ABYSS-STACK-D-0121-close-nested-review-evidence-before-inference.md`)
+- [ABYSS-STACK-D-0139 MCP SDK 2.1.1 Transition And Central Runtime Identity](../ABYSS-STACK-D-0139-mcp-sdk-2-1-1-transition.md) (`docs/decisions/ABYSS-STACK-D-0139-mcp-sdk-2-1-1-transition.md`)
 
 ## fail open client
 
@@ -585,6 +590,10 @@
 ## generated index handoff
 
 - [ABYSS-STACK-D-0056 Decision Surface Validator Module](../ABYSS-STACK-D-0056-decision-surface-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0056-decision-surface-validator-module.md`)
+
+## generated projection
+
+- [ABYSS-STACK-D-0139 MCP SDK 2.1.1 Transition And Central Runtime Identity](../ABYSS-STACK-D-0139-mcp-sdk-2-1-1-transition.md) (`docs/decisions/ABYSS-STACK-D-0139-mcp-sdk-2-1-1-transition.md`)
 
 ## generated read-model
 
@@ -1069,6 +1078,10 @@
 ## source/deployed parity
 
 - [ABYSS-STACK-D-0077 Loopback MCP Owner Lifecycle](../ABYSS-STACK-D-0077-loopback-mcp-owner-lifecycle.md) (`docs/decisions/ABYSS-STACK-D-0077-loopback-mcp-owner-lifecycle.md`)
+
+## source/runtime parity
+
+- [ABYSS-STACK-D-0139 MCP SDK 2.1.1 Transition And Central Runtime Identity](../ABYSS-STACK-D-0139-mcp-sdk-2-1-1-transition.md) (`docs/decisions/ABYSS-STACK-D-0139-mcp-sdk-2-1-1-transition.md`)
 
 ## source/runtime separation
 

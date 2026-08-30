@@ -78,6 +78,7 @@
 - [ABYSS-STACK-D-0135 Typed Incarnation Capability Projection](../ABYSS-STACK-D-0135-typed-incarnation-capability-projection.md) (`docs/decisions/ABYSS-STACK-D-0135-typed-incarnation-capability-projection.md`)
 - [ABYSS-STACK-D-0136 Canonical KAG Cold-CAS Binding](../ABYSS-STACK-D-0136-canonical-kag-cold-cas-binding.md) (`docs/decisions/ABYSS-STACK-D-0136-canonical-kag-cold-cas-binding.md`)
 - [ABYSS-STACK-D-0137 Canonical Codex 0.149.1 Runtime Subject Admission](../ABYSS-STACK-D-0137-canonical-codex-0-149-1-runtime-subject-admission.md) (`docs/decisions/ABYSS-STACK-D-0137-canonical-codex-0-149-1-runtime-subject-admission.md`)
+- [ABYSS-STACK-D-0139 MCP SDK 2.1.1 Transition And Central Runtime Identity](../ABYSS-STACK-D-0139-mcp-sdk-2-1-1-transition.md) (`docs/decisions/ABYSS-STACK-D-0139-mcp-sdk-2-1-1-transition.md`)
 
 ## mechanic package
 
@@ -126,6 +127,7 @@
 - [ABYSS-STACK-D-0109 Recover Expired Modern MCP Read Admission](../ABYSS-STACK-D-0109-recover-expired-modern-mcp-read-admission.md) (`docs/decisions/ABYSS-STACK-D-0109-recover-expired-modern-mcp-read-admission.md`)
 - [ABYSS-STACK-D-0125 Decouple Codex Availability From MCP Recovery](../ABYSS-STACK-D-0125-decouple-codex-availability-from-mcp-recovery.md) (`docs/decisions/ABYSS-STACK-D-0125-decouple-codex-availability-from-mcp-recovery.md`)
 - [ABYSS-STACK-D-0136 Canonical KAG Cold-CAS Binding](../ABYSS-STACK-D-0136-canonical-kag-cold-cas-binding.md) (`docs/decisions/ABYSS-STACK-D-0136-canonical-kag-cold-cas-binding.md`)
+- [ABYSS-STACK-D-0139 MCP SDK 2.1.1 Transition And Central Runtime Identity](../ABYSS-STACK-D-0139-mcp-sdk-2-1-1-transition.md) (`docs/decisions/ABYSS-STACK-D-0139-mcp-sdk-2-1-1-transition.md`)
 
 ## federation/read-model
 
@@ -377,6 +379,10 @@
 ## decision route
 
 - [ABYSS-STACK-D-0056 Decision Surface Validator Module](../ABYSS-STACK-D-0056-decision-surface-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0056-decision-surface-validator-module.md`)
+
+## dependency boundary
+
+- [ABYSS-STACK-D-0139 MCP SDK 2.1.1 Transition And Central Runtime Identity](../ABYSS-STACK-D-0139-mcp-sdk-2-1-1-transition.md) (`docs/decisions/ABYSS-STACK-D-0139-mcp-sdk-2-1-1-transition.md`)
 
 ## diagnostic surface
 

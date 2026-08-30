@@ -102,6 +102,15 @@ filters, scoped full-text shards, or monolith fallback. Class questions with
 use/error/consequence intent include a bounded entity-usage scenario route
 before broad raw-text recall.
 
+For an unfiltered `kind="mcp_service"` request, the MCP may build this route
+plan directly from the generated entity-registry snapshot. This keeps a health
+probe independent from the startup cost of the owner archive CLI while
+preserving the owner search command as an explicit fallback. The local plan is
+navigation advice only: it does not inspect owner freshness, claim current
+session evidence, or refresh any projection. Requests with structured search
+filters remain on the owner route so filter semantics are not silently
+broadened.
+
 Skill evidence remains producer-owned. When `.aoa` returns a typed skill
 candidate summary, the MCP compact adapter preserves the complete accepted
 state vocabulary, separate rejection-edge vocabulary, candidate/claim

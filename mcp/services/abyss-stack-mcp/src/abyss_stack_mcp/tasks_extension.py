@@ -38,10 +38,11 @@ from mcp_types import CallToolRequestParams, RequestParams, ToolAnnotations
 from pydantic import ConfigDict, Field
 
 from .core import StackMCPApplication
+from ._runtime_config import MCP_PROTOCOL_VERSION
 
 
 TASKS_EXTENSION_ID = "io.modelcontextprotocol/tasks"
-TASKS_PROTOCOL_VERSION = "2026-07-28"
+TASKS_PROTOCOL_VERSION = MCP_PROTOCOL_VERSION
 TASK_TOOL = "stack_runtime_inspect_task"
 DEFAULT_TASK_ROOT = Path(
     "/srv/AbyssOS/abyss-stack/Logs/mcp/tasks/abyss-stack-read"
@@ -141,7 +142,15 @@ def tasks_enabled_from_environment() -> bool:
 
 
 def task_root_from_environment() -> Path:
-    return Path(os.environ.get("ABYSS_STACK_MCP_TASK_ROOT", str(DEFAULT_TASK_ROOT)))
+    raw = os.environ.get("ABYSS_STACK_MCP_TASK_ROOT", "").strip()
+    if not raw:
+        raise SystemExit(
+            "ABYSS_STACK_MCP_TASK_ROOT must be an explicit absolute path when tasks are enabled"
+        )
+    root = Path(raw).expanduser()
+    if not root.is_absolute():
+        raise SystemExit("ABYSS_STACK_MCP_TASK_ROOT must be an absolute path")
+    return root
 
 
 def running_mcp_sdk_version() -> str:

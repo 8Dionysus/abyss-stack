@@ -42,6 +42,11 @@ Canonical fallback reads the tracked portable-v3 family manifest and bounded
 JSONL shards directly; the seven v2 monolith paths remain logical compatibility
 coordinates and are not required to exist in Git.
 
+For a foreign owner, that fallback may explicitly observe an internally
+coherent retained v1 family-budget receipt. This compatibility route never
+applies to `aoa-kag` itself and does not grant owner admission, proof, or
+acceptance; strict current identity remains the default query-loader contract.
+
 The current protocol uses five static tools and nine resource shapes. New
 record kinds and owner-specific domain catalogs enter through capabilities and
 data instead of adding tool names.

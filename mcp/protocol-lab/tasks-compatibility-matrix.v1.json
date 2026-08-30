@@ -114,9 +114,9 @@
     {
       "consumer_id": "python-sdk",
       "kind": "official_sdk",
-      "version": "2.0.0",
+      "version": "2.1.1",
       "release_status": "stable",
-      "source_revision": "6f69a3758ebf2ee55ce050f58b470ce11af71133",
+      "source_revision": "0921d94a74db900dccd2d534842aa7b6160542d2",
       "artifact_digest": null,
       "core_2026_07_28": "conformance_pass",
       "features": {

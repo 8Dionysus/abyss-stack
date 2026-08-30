@@ -46,7 +46,7 @@ def test_server_is_small_and_annotated(tmp_path: Path) -> None:
         AoAXDAConnectorMCPState(connector_repo=tmp_path, runner=runner)
     )
     tools = asyncio.run(server.list_tools())
-    assert server._mcp_server.version == "0.1.0"
+    assert server.application_version == "0.1.0"
     assert {tool.name for tool in tools} == {
         "aoa_xda_connector_answer",
         "aoa_xda_connector_query_graph",

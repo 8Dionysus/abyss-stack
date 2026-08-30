@@ -9,8 +9,8 @@ from pathlib import Path
 from typing import Any, Literal
 
 from . import core as core_module
-from ._http_auth import http_auth_kwargs as _http_auth_kwargs
-from ._http_auth import transport_settings as _transport_settings
+from ._http_auth import http_auth_config, transport_settings
+from ._runtime_config import SERVICE_CONFIG
 from .organ_access import (
     CAPABILITY_ID,
     RESOURCE_TEMPLATE_BINDINGS,
@@ -19,13 +19,6 @@ from .organ_access import (
 
 
 LOGGER = logging.getLogger(__name__)
-PACKAGE_NAME = "aoa-session-memory-mcp"
-APPLICATION_VERSION = "0.2.0"
-DEFAULT_HTTP_PORT = 5422
-READ_TOKEN_ENV_VAR = "AOA_SESSION_MEMORY_MCP_READ_BEARER_TOKEN"
-READ_CREDENTIAL_NAME = "aoa-session-memory-mcp-read-bearer-token"
-READ_AUTH_SCOPE = "mcp:aoa-session-memory:read"
-READ_CLIENT_ID = "aoa-loopback-codex:aoa-session-memory:read"
 CAPABILITY_PROFILE_ENV_VAR = "AOA_SESSION_MEMORY_MCP_CAPABILITY_PROFILE"
 CAPABILITY_PROFILE_MAX_OUTPUT_BYTES = 32_768
 CAPABILITY_RETRIEVE_MAX_CANDIDATES = 50
@@ -41,39 +34,15 @@ CAPABILITY_RETRIEVAL_CONTROL_MARKERS = (
 )
 
 
-def _application_version() -> str:
-    return APPLICATION_VERSION
-
-
-def _bind_server_info_version(mcp: Any) -> None:
-    low_level_server = getattr(mcp, "_mcp_server", None)
-    if low_level_server is None or not hasattr(low_level_server, "version"):
-        raise RuntimeError(
-            "the pinned MCP SDK no longer exposes the server identity seam"
-        )
-    low_level_server.version = _application_version()
-
-
-def _read_http_auth_kwargs() -> dict[str, Any]:
-    return _http_auth_kwargs(
-        DEFAULT_HTTP_PORT,
-        token_env_var=READ_TOKEN_ENV_VAR,
-        credential_name=READ_CREDENTIAL_NAME,
-        auth_scope=READ_AUTH_SCOPE,
-        client_id=READ_CLIENT_ID,
-    )
+def _read_http_auth_config() -> Any:
+    contour = SERVICE_CONFIG.contour("read")
+    return http_auth_config(contour.port, **contour.auth.as_kwargs())
 
 
 def _run_server(server: Any) -> None:
-    settings = _transport_settings(DEFAULT_HTTP_PORT)
-    _read_http_auth_kwargs()
-    if settings.transport == "stdio":
-        server.run(transport="stdio")
-        return
-    assert settings.host is not None
-    assert settings.port is not None
-    server.configure_http(settings.host, settings.port)
-    server.run(transport="streamable-http")
+    from ._modern_runtime import run_server
+
+    run_server(server, _read_http_auth_config())
 
 
 def _core_auto_reload_enabled() -> bool:
@@ -345,7 +314,7 @@ def _default_http_capability_profile() -> str | None:
     explicit = os.environ.get(CAPABILITY_PROFILE_ENV_VAR, "").strip()
     if explicit:
         return explicit
-    if _transport_settings(DEFAULT_HTTP_PORT).transport == "streamable-http":
+    if transport_settings(SERVICE_CONFIG.contour("read").port).transport == "streamable-http":
         return CAPABILITY_ID
     return None
 
@@ -356,17 +325,16 @@ def build_server(
     script_path: str | Path | None = None,
 ) -> Any:
     try:
-        from ._modern_runtime import AbyssMCPServer  # type: ignore[import-not-found]
+        from ._modern_runtime import ModernMCPServer  # type: ignore[import-not-found]
         from mcp.types import ToolAnnotations  # type: ignore[import-not-found]
     except ImportError as exc:
         raise SystemExit("Missing dependency 'mcp'. Install with: python -m pip install -e .") from exc
 
-    mcp = AbyssMCPServer(
-        "aoa-session-memory-mcp",
-        json_response=True,
-        **_read_http_auth_kwargs(),
+    mcp = ModernMCPServer(
+        SERVICE_CONFIG.server_name("read"),
+        version=SERVICE_CONFIG.package_version,
+        **_read_http_auth_config().server_kwargs,
     )
-    _bind_server_info_version(mcp)
     read_only_tool = mcp.tool(
         annotations=ToolAnnotations(
             read_only_hint=True,
@@ -385,9 +353,15 @@ def build_server(
         )
 
     @read_only_tool
-    def aoa_session_memory_status(include_live: bool = False) -> dict[str, Any]:
-        """Report .aoa search, atlas, route-readiness, and freshness posture."""
-        return current_state().session_memory_status(include_live=include_live)
+    def aoa_session_memory_status(
+        include_live: bool = False,
+        refresh_maintenance: bool = False,
+    ) -> dict[str, Any]:
+        """Report .aoa posture; optionally refresh the bounded maintenance verdict."""
+        return current_state().session_memory_status(
+            include_live=include_live,
+            refresh_maintenance=refresh_maintenance,
+        )
 
     @read_only_tool
     def aoa_session_transport_preflight() -> dict[str, Any]:
@@ -881,9 +855,15 @@ def build_server(
         )
 
     @read_only_tool
-    def aoa_session_projection_status(include_payload: bool = False) -> dict[str, Any]:
-        """Read the latest projection-catchup completeness diagnostic without running maintenance."""
-        return current_state().session_projection_status(include_payload=include_payload)
+    def aoa_session_projection_status(
+        include_payload: bool = False,
+        refresh_maintenance: bool = False,
+    ) -> dict[str, Any]:
+        """Read projection completeness; maintenance refresh remains optional and read-only."""
+        return current_state().session_projection_status(
+            include_payload=include_payload,
+            refresh_maintenance=refresh_maintenance,
+        )
 
     @read_only_tool
     def aoa_session_graph_neighborhood(

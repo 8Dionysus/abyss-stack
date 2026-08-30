@@ -6,8 +6,9 @@ import os
 from pathlib import Path
 from typing import Any, Literal
 
-from ._http_auth import http_auth_kwargs as _http_auth_kwargs
-from ._http_auth import transport_settings as _transport_settings
+from ._http_auth import http_auth_config, transport_settings
+from ._modern_runtime import run_server
+from ._runtime_config import SERVICE_CONFIG
 from .core import AoAMemoMCPState
 from .organ_access import CANDIDATE_CAPABILITY_ID
 from .organ_access import CANDIDATE_TOOL_BINDINGS
@@ -18,36 +19,8 @@ from .organ_access import load_owner_manifest
 from .organ_access import validate_runtime_bindings
 
 LOGGER = logging.getLogger(__name__)
-PACKAGE_NAME = "aoa-memo-mcp"
-APPLICATION_VERSION = "0.2.0"
-READ_HTTP_PORT = 5421
-CANDIDATE_HTTP_PORT = 5434
-DEFAULT_HTTP_PORT = READ_HTTP_PORT
 PolicyFamily = Literal["read", "candidate"]
-
-READ_TOKEN_ENV_VAR = "AOA_MEMO_MCP_READ_BEARER_TOKEN"
-READ_CREDENTIAL_NAME = "aoa-memo-mcp-read-bearer-token"
-READ_AUTH_SCOPE = "mcp:aoa-memo:read"
-READ_CLIENT_ID = "aoa-loopback-codex:aoa-memo:read"
-
-CANDIDATE_TOKEN_ENV_VAR = "AOA_MEMO_MCP_CANDIDATE_BEARER_TOKEN"
-CANDIDATE_CREDENTIAL_NAME = "aoa-memo-mcp-candidate-bearer-token"
-CANDIDATE_AUTH_SCOPE = "mcp:aoa-memo:candidate"
-CANDIDATE_CLIENT_ID = "aoa-loopback-codex:aoa-memo:candidate"
 CAPABILITY_PROFILE_ENV_VAR = "AOA_MEMO_MCP_CAPABILITY_PROFILE"
-
-
-def _application_version() -> str:
-    return APPLICATION_VERSION
-
-
-def _bind_server_info_version(mcp: Any) -> None:
-    low_level_server = getattr(mcp, "_mcp_server", None)
-    if low_level_server is None or not hasattr(low_level_server, "version"):
-        raise RuntimeError(
-            "the pinned MCP SDK no longer exposes the server identity seam"
-        )
-    low_level_server.version = _application_version()
 
 
 def configured_policy_family() -> PolicyFamily:
@@ -59,41 +32,15 @@ def configured_policy_family() -> PolicyFamily:
 
 def _contour(
     policy_family: PolicyFamily,
-) -> tuple[int, str, str, str, str]:
-    if policy_family == "read":
-        return (
-            READ_HTTP_PORT,
-            READ_TOKEN_ENV_VAR,
-            READ_CREDENTIAL_NAME,
-            READ_AUTH_SCOPE,
-            READ_CLIENT_ID,
-        )
-    return (
-        CANDIDATE_HTTP_PORT,
-        CANDIDATE_TOKEN_ENV_VAR,
-        CANDIDATE_CREDENTIAL_NAME,
-        CANDIDATE_AUTH_SCOPE,
-        CANDIDATE_CLIENT_ID,
-    )
+) -> Any:
+    return SERVICE_CONFIG.contour(policy_family)
 
 
-def _contour_http_auth_kwargs(
+def _contour_http_auth_config(
     policy_family: PolicyFamily,
-) -> dict[str, Any]:
-    port, token_env_var, credential_name, auth_scope, client_id = _contour(
-        policy_family
-    )
-    return _http_auth_kwargs(
-        port,
-        token_env_var=token_env_var,
-        credential_name=credential_name,
-        auth_scope=auth_scope,
-        client_id=client_id,
-    )
-
-
-def _read_http_auth_kwargs() -> dict[str, Any]:
-    return _contour_http_auth_kwargs("read")
+) -> Any:
+    contour = _contour(policy_family)
+    return http_auth_config(contour.port, **contour.auth.as_kwargs())
 
 
 def _expected_capability(policy_family: PolicyFamily) -> str:
@@ -156,24 +103,15 @@ def _default_http_capability_profile(policy_family: PolicyFamily) -> str | None:
     explicit = os.environ.get(CAPABILITY_PROFILE_ENV_VAR, "").strip()
     if explicit:
         return explicit
-    port, *_ = _contour(policy_family)
-    if _transport_settings(port).transport == "streamable-http":
+    port = _contour(policy_family).port
+    if transport_settings(port).transport == "streamable-http":
         return _expected_capability(policy_family)
     return None
 
 
 def _run_server(server: Any) -> None:
     policy_family = configured_policy_family()
-    port, *_ = _contour(policy_family)
-    settings = _transport_settings(port)
-    _contour_http_auth_kwargs(policy_family)
-    if settings.transport == "stdio":
-        server.run(transport="stdio")
-        return
-    assert settings.host is not None
-    assert settings.port is not None
-    server.configure_http(settings.host, settings.port)
-    server.run(transport="streamable-http")
+    run_server(server, _contour_http_auth_config(policy_family))
 
 
 def build_server(
@@ -182,7 +120,7 @@ def build_server(
     policy_family: PolicyFamily | None = None,
 ) -> Any:
     try:
-        from ._modern_runtime import AbyssMCPServer  # type: ignore[import-not-found]
+        from ._modern_runtime import ModernMCPServer  # type: ignore[import-not-found]
         from mcp.types import ToolAnnotations  # type: ignore[import-not-found]
     except ImportError as exc:
         raise SystemExit(
@@ -190,12 +128,11 @@ def build_server(
         ) from exc
 
     contour = policy_family or configured_policy_family()
-    mcp = AbyssMCPServer(
-        f"aoa-memo-mcp-{contour}",
-        json_response=True,
-        **_contour_http_auth_kwargs(contour),
+    mcp = ModernMCPServer(
+        SERVICE_CONFIG.server_name(contour),
+        version=SERVICE_CONFIG.package_version,
+        **_contour_http_auth_config(contour).server_kwargs,
     )
-    _bind_server_info_version(mcp)
     read_only_tool = mcp.tool(
         annotations=ToolAnnotations(
             read_only_hint=True,

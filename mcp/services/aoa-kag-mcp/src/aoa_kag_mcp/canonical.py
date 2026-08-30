@@ -75,6 +75,71 @@ class CanonicalRepoKag:
         path = self.state.canonical_family_path(repo)
         return path if path and path.is_file() else None
 
+    def _load_foreign_portable_family(
+        self,
+        module: Any,
+        provider_root: Path,
+    ) -> Any | None:
+        """Use the owner loader's bounded foreign-observation seam.
+
+        Older query facades do not expose the two receipt-observation keywords,
+        but they import the same state-bearing portable loader and validator.
+        This adapter bridge is used only for a foreign tracked manifest. Self
+        reads and legacy monolith reads retain the facade's strict behavior.
+        """
+
+        manifest_relative = getattr(module, "MANIFEST_RELATIVE_PATH", None)
+        state_loader = getattr(module, "load_portable_family_with_state", None)
+        validator = getattr(
+            module,
+            "validate_repo_local_kag_repository_index_family",
+            None,
+        )
+        if not isinstance(manifest_relative, Path):
+            return None
+        if (
+            manifest_relative.is_absolute()
+            or ".." in manifest_relative.parts
+            or not (provider_root / manifest_relative).is_file()
+            or not callable(state_loader)
+            or not callable(validator)
+        ):
+            return None
+        parameters = inspect.signature(state_loader).parameters
+        required = {
+            "require_current_producer_identity",
+            "allow_legacy_external_receipt",
+        }
+        if self.state.artifact_root is not None:
+            required.update({"artifact_root", "allow_shadow_git"})
+        accepts_keywords = any(
+            parameter.kind is inspect.Parameter.VAR_KEYWORD
+            for parameter in parameters.values()
+        )
+        if not required.issubset(parameters) and not accepts_keywords:
+            return None
+        kwargs: dict[str, Any] = {
+            "require_current_producer_identity": False,
+            "allow_legacy_external_receipt": True,
+        }
+        if self.state.artifact_root is not None:
+            kwargs.update(
+                {
+                    "artifact_root": self.state.artifact_root,
+                    "allow_shadow_git": False,
+                }
+            )
+        source_index, family, manifest, delivery_state = state_loader(
+            provider_root,
+            **kwargs,
+        )
+        validated = validator(
+            family,
+            source_payload=source_index,
+            label=f"{provider_root.name} query family",
+        )
+        return source_index, validated, manifest, delivery_state
+
     def _query(self, repo: str) -> Any:
         family_path = self._family_path(repo)
         if family_path is None:
@@ -88,18 +153,36 @@ class CanonicalRepoKag:
                 return cached[1]
         module = self._query_module()
         provider_root = self.state.provider_root(repo)
-        if self.state.artifact_root is None:
-            # Keep the pre-v4 portable loader ABI available for owners whose
-            # query module has not adopted the optional delivery arguments.
-            loaded = module.load_family(provider_root)
-        else:
-            load_parameters = inspect.signature(module.load_family).parameters
-            query_parameters = inspect.signature(module.RepoKagQuery).parameters
-            accepts_loader_keywords = any(
-                parameter.kind is inspect.Parameter.VAR_KEYWORD
-                for parameter in load_parameters.values()
+        load_parameters = inspect.signature(module.load_family).parameters
+        accepts_loader_keywords = any(
+            parameter.kind is inspect.Parameter.VAR_KEYWORD
+            for parameter in load_parameters.values()
+        )
+        loader_kwargs: dict[str, Any] = {}
+        receipt_keywords = {
+            "require_current_producer_identity",
+            "allow_legacy_external_receipt",
+        }
+        supports_receipt_keywords = (
+            receipt_keywords.issubset(load_parameters) or accepts_loader_keywords
+        )
+        foreign_owner = provider_root.resolve() != self.state.aoa_kag_root.resolve()
+        loaded = (
+            self._load_foreign_portable_family(module, provider_root)
+            if foreign_owner and not supports_receipt_keywords
+            else None
+        )
+        if supports_receipt_keywords:
+            loader_kwargs.update(
+                {
+                    "require_current_producer_identity": not foreign_owner,
+                    "allow_legacy_external_receipt": foreign_owner,
+                }
             )
-            if not (
+
+        if self.state.artifact_root is not None:
+            query_parameters = inspect.signature(module.RepoKagQuery).parameters
+            if loaded is None and not (
                 {
                     "artifact_root",
                     "allow_shadow_git",
@@ -115,11 +198,18 @@ class CanonicalRepoKag:
                     "configured canonical KAG artifact delivery requires the "
                     "owner v4 RepoKagQuery interface"
                 )
-            loaded = module.load_family(
-                provider_root,
-                artifact_root=self.state.artifact_root,
-                allow_shadow_git=False,
-            )
+            if loaded is None:
+                loader_kwargs.update(
+                    {
+                        "artifact_root": self.state.artifact_root,
+                        "allow_shadow_git": False,
+                    }
+                )
+        # Keep the pre-v4 portable loader ABI available during a rolling
+        # owner deployment. A loader without the observation keywords retains
+        # its strict historical behavior until aoa-kag is upgraded.
+        if loaded is None:
+            loaded = module.load_family(provider_root, **loader_kwargs)
         if not isinstance(loaded, (tuple, list)) or len(loaded) < 2:
             raise RuntimeError("canonical KAG load_family returned an invalid family")
         source_index, family = loaded[0], loaded[1]

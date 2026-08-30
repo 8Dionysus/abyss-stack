@@ -180,11 +180,17 @@ action preserves the inactive rollback credential, validates or provisions the
 fourteen source-isolated owner-read and two candidate credentials, and adds one
 managed Zsh function that
 delegates new
-interactive Codex launches to the deployed client-side launcher. The named
-bearers are inherited only by Codex, the managed Codex binary symlink is
-unchanged, and running shells and sessions are untouched. The ToS bearer is
-staged only; this route does not create its workspace wrapper, start it, or add
-it to the owner bundle.
+interactive Codex launches to the deployed client-side launcher. It also adds
+a managed `~/.local/bin/chatgpt` wrapper and a user-scoped `chatgpt.desktop`
+projection of the installed official entry. That route launches the official
+`/usr/bin/chatgpt` executable in explicit desktop mode, so the same eleven
+read-contour bearer variables reach the Desktop process and its embedded Codex
+app server without persisting any bearer value in the wrapper, desktop entry,
+or shell configuration. The named bearers are inherited only by the selected
+Codex or Desktop process, the managed Codex binary symlink and packaged
+ChatGPT files are unchanged, and running shells and sessions are untouched.
+The ToS bearer is staged only; this route does not create its workspace
+wrapper, start it, or add it to the owner bundle.
 The launcher treats modern MCP availability as a recoverable dependency. It
 checks the exact eleven production units and ports and requests the bounded
 modern admission recovery oneshot when a member is absent, but never waits for
@@ -194,7 +200,9 @@ units repair MCP independently. `AOA_MCP_READINESS_SKIP=1` suppresses even the
 background request for one diagnostic launch.
 The candidate values remain separate named variables for separate Memo/Evals
 candidate registrations; inheriting them does not merge endpoint authority.
-`--remove-mcp-http-codex-client` removes only that managed Zsh block.
+`--remove-mcp-http-codex-client` removes only the managed Zsh block, ChatGPT
+wrapper, and user-scoped desktop projection; it preserves packaged launchers
+and any unrelated user file that was not created by this route.
 
 The stack-owned read and non-executing candidate planes have separate
 credentials provisioned by
@@ -221,7 +229,9 @@ host-backed Python base cannot pass on the private file digest alone. Generated 
 shebangs are rewritten from the private staging root to the stable published
 venv path before this digest is recorded and before the atomic rename. Bytecode writes are
 disabled while provisioning, verifying, and running the managed units so the
-measured closure remains stable. Replacement is refused while either plane is
+measured closure remains stable; any bytecode that is nevertheless present,
+including importable sourceless `.pyc`, is part of the runtime content digest.
+Replacement is refused while either plane is
 active or its user-systemd state cannot be observed. It never stops or starts
 those units implicitly. Run `--all-user-units` first so the loaded unit
 definitions participate in the runtime lock. Each plane then holds a shared

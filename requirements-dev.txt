@@ -5,4 +5,5 @@ fastapi
 httpx
 jsonschema
 mcp==2.1.1
+mcp-types==2.1.1
 playwright

@@ -4,54 +4,21 @@ import logging
 from pathlib import Path
 from typing import Any, Mapping
 
-from ._http_auth import http_auth_kwargs as _http_auth_kwargs
-from ._http_auth import transport_settings as _transport_settings
+from ._http_auth import http_auth_config
+from ._runtime_config import SERVICE_CONFIG
 from .core import AoAStatsMCPState
 
 
 LOGGER = logging.getLogger(__name__)
-PACKAGE_NAME = "aoa-stats-mcp"
-APPLICATION_VERSION = "0.1.0"
-DEFAULT_HTTP_PORT = 5430
-READ_TOKEN_ENV_VAR = "AOA_STATS_MCP_READ_BEARER_TOKEN"
-READ_CREDENTIAL_NAME = "aoa-stats-mcp-read-bearer-token"
-READ_AUTH_SCOPE = "mcp:aoa-stats:read"
-READ_CLIENT_ID = "aoa-loopback-codex:aoa-stats:read"
-
-
-def _application_version() -> str:
-    return APPLICATION_VERSION
-
-
-def _bind_server_info_version(mcp: Any) -> None:
-    low_level_server = getattr(mcp, "_mcp_server", None)
-    if low_level_server is None or not hasattr(low_level_server, "version"):
-        raise RuntimeError(
-            "the pinned MCP SDK no longer exposes the server identity seam"
-        )
-    low_level_server.version = _application_version()
-
-
 def _run_server(server: Any) -> None:
-    settings = _transport_settings(DEFAULT_HTTP_PORT)
-    _read_http_auth_kwargs()
-    if settings.transport == "stdio":
-        server.run(transport="stdio")
-        return
-    assert settings.host is not None
-    assert settings.port is not None
-    server.configure_http(settings.host, settings.port)
-    server.run(transport="streamable-http")
+    from ._modern_runtime import run_server
+
+    run_server(server, _read_http_auth_config())
 
 
-def _read_http_auth_kwargs() -> dict[str, Any]:
-    return _http_auth_kwargs(
-        DEFAULT_HTTP_PORT,
-        token_env_var=READ_TOKEN_ENV_VAR,
-        credential_name=READ_CREDENTIAL_NAME,
-        auth_scope=READ_AUTH_SCOPE,
-        client_id=READ_CLIENT_ID,
-    )
+def _read_http_auth_config() -> Any:
+    contour = SERVICE_CONFIG.contour("read")
+    return http_auth_config(contour.port, **contour.auth.as_kwargs())
 
 
 def build_server(
@@ -60,19 +27,18 @@ def build_server(
     source_roots: Mapping[str, str | Path] | None = None,
 ) -> Any:
     try:
-        from ._modern_runtime import AbyssMCPServer  # type: ignore[import-not-found]
+        from ._modern_runtime import ModernMCPServer  # type: ignore[import-not-found]
         from mcp.types import ToolAnnotations  # type: ignore[import-not-found]
     except ImportError as exc:
         raise SystemExit(
             "Missing dependency 'mcp'. Install with: python -m pip install -e ."
         ) from exc
 
-    mcp = AbyssMCPServer(
-        "aoa-stats-mcp",
-        json_response=True,
-        **_read_http_auth_kwargs(),
+    mcp = ModernMCPServer(
+        SERVICE_CONFIG.server_name("read"),
+        version=SERVICE_CONFIG.package_version,
+        **_read_http_auth_config().server_kwargs,
     )
-    _bind_server_info_version(mcp)
     read_only_tool = mcp.tool(
         annotations=ToolAnnotations(
             read_only_hint=True,

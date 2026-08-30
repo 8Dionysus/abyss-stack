@@ -13,7 +13,8 @@ import sys
 from typing import Any
 import uuid
 
-from ._http_auth import transport_settings
+from ._modern_runtime import run_server
+from ._runtime_config import SERVICE_CONFIG
 from .core import _reject_secret_material, canonical_json_bytes
 from .effect import (
     DEFAULT_EFFECT_ROOT,
@@ -25,9 +26,7 @@ from .effect import (
     _open_private_lock,
 )
 from .server import (
-    INTERNAL_EFFECT_PORT,
-    _auth_kwargs,
-    _bind_server_info_version,
+    _auth_config,
     _policy_identity,
 )
 
@@ -134,12 +133,12 @@ async def _run_worker(
 
 def build_effect_server() -> Any:
     try:
-        from ._modern_runtime import AbyssMCPServer
+        from ._modern_runtime import ModernMCPServer
         from mcp.types import ToolAnnotations
     except ImportError as exc:
         raise SystemExit("Missing dependency 'mcp'.") from exc
 
-    auth_kwargs = _auth_kwargs("internal_effect")
+    auth_config = _auth_config("internal_effect")
     effect_root = Path(
         os.environ.get("ABYSS_STACK_MCP_EFFECT_ROOT", str(DEFAULT_EFFECT_ROOT))
     )
@@ -148,17 +147,16 @@ def build_effect_server() -> Any:
             "ABYSS_STACK_MCP_OBSERVATION_PATH", str(DEFAULT_OBSERVATION_PATH)
         )
     )
-    mcp = AbyssMCPServer(
-        "abyss-stack-mcp-internal-effect",
+    mcp = ModernMCPServer(
+        SERVICE_CONFIG.server_name("internal_effect"),
+        version=SERVICE_CONFIG.package_version,
         instructions=(
             "Execute only one content-addressed, explicitly approved restart-and-"
             "rollback pilot for abyss-stack-mcp-read.service. No other target, "
             "command, source mutation, or external effect exists in this process."
         ),
-        json_response=True,
-        **auth_kwargs,
+        **auth_config.server_kwargs,
     )
-    _bind_server_info_version(mcp)
     annotations = ToolAnnotations(
         read_only_hint=False,
         destructive_hint=True,
@@ -204,15 +202,9 @@ def build_effect_server() -> Any:
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO)
-    settings = transport_settings(INTERNAL_EFFECT_PORT)
     server = build_effect_server()
-    if settings.transport == "stdio":
-        server.run(transport="stdio")
-        return
-    assert settings.host is not None and settings.port is not None
-    server.configure_http(settings.host, settings.port)
     LOGGER.info("abyss-stack MCP internal-effect plane ready")
-    server.run(transport="streamable-http")
+    run_server(server, _auth_config("internal_effect"))
 
 
 if __name__ == "__main__":

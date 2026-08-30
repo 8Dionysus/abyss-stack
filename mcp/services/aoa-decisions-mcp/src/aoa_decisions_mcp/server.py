@@ -6,59 +6,28 @@ import os
 from pathlib import Path
 from typing import Any, Literal
 
-from ._http_auth import http_auth_kwargs as _http_auth_kwargs
-from ._http_auth import transport_settings as _transport_settings
+from ._http_auth import http_auth_config
+from ._modern_runtime import run_server
+from ._runtime_config import SERVICE_CONFIG
 from .core import AoADecisionsMCPState
 from .organ_access import CAPABILITY_ID
 from .organ_access import load_organ_access_manifest
 from .organ_access import validate_runtime_bindings
 
 LOGGER = logging.getLogger(__name__)
-PACKAGE_NAME = "aoa-decisions-mcp"
-APPLICATION_VERSION = "0.2.0"
-DEFAULT_HTTP_PORT = 5420
-SUPPORTED_CONTOURS = frozenset({"read", "internal_effect"})
+SUPPORTED_CONTOURS = frozenset(SERVICE_CONFIG.contours)
 CAPABILITY_PROFILE_ENV_VAR = "AOA_DECISIONS_MCP_CAPABILITY_PROFILE"
 CAPABILITY_PROFILE_MAX_OUTPUT_BYTES = 32_768
 CapabilityProfile = Literal["complete", "decision-retrieval"]
-CONTOUR_AUTH = {
-    "read": {
-        "token_env_var": "AOA_DECISIONS_MCP_READ_BEARER_TOKEN",
-        "credential_name": "aoa-decisions-mcp-read-bearer-token",
-        "auth_scope": "mcp:aoa-decisions:read",
-        "client_id": "aoa-loopback-codex:aoa-decisions:read",
-    },
-    "internal_effect": {
-        "token_env_var": "AOA_DECISIONS_MCP_INTERNAL_EFFECT_BEARER_TOKEN",
-        "credential_name": "aoa-decisions-mcp-internal-effect-bearer-token",
-        "auth_scope": "mcp:aoa-decisions:internal-effect",
-        "client_id": "aoa-loopback-codex:aoa-decisions:internal-effect",
-    },
-}
-
-
-def _application_version() -> str:
-    return APPLICATION_VERSION
-
-
-def _bind_server_info_version(mcp: Any) -> None:
-    low_level_server = getattr(mcp, "_mcp_server", None)
-    if low_level_server is None or not hasattr(low_level_server, "version"):
-        raise RuntimeError(
-            "the pinned MCP SDK no longer exposes the server identity seam"
-        )
-    low_level_server.version = _application_version()
-
-
-def _contour_http_auth_kwargs(contour: str) -> dict[str, Any]:
+def _contour_http_auth_config(contour: str) -> Any:
     try:
-        auth = CONTOUR_AUTH[contour]
-    except KeyError as exc:
+        declared = SERVICE_CONFIG.contour(contour)
+    except ValueError as exc:
         raise ValueError(
             f"unsupported decisions MCP contour {contour!r}; "
             f"expected one of {sorted(SUPPORTED_CONTOURS)}"
         ) from exc
-    return _http_auth_kwargs(DEFAULT_HTTP_PORT, **auth)
+    return http_auth_config(declared.port, **declared.auth.as_kwargs())
 
 
 def configured_capability_profile(contour: str) -> CapabilityProfile:
@@ -122,15 +91,7 @@ def _profile_packet(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def _run_server(server: Any, *, contour: str = "read") -> None:
-    settings = _transport_settings(DEFAULT_HTTP_PORT)
-    _contour_http_auth_kwargs(contour)
-    if settings.transport == "stdio":
-        server.run(transport="stdio")
-        return
-    assert settings.host is not None
-    assert settings.port is not None
-    server.configure_http(settings.host, settings.port)
-    server.run(transport="streamable-http")
+    run_server(server, _contour_http_auth_config(contour))
 
 
 def build_server(
@@ -141,7 +102,7 @@ def build_server(
     capability_profile: CapabilityProfile | None = None,
 ) -> Any:
     try:
-        from ._modern_runtime import AbyssMCPServer  # type: ignore[import-not-found]
+        from ._modern_runtime import ModernMCPServer  # type: ignore[import-not-found]
         from mcp.types import ToolAnnotations  # type: ignore[import-not-found]
     except ImportError as exc:
         raise SystemExit(
@@ -163,12 +124,11 @@ def build_server(
             f"{contour!r}; expected one of: {expected}"
         )
 
-    mcp = AbyssMCPServer(
-        f"aoa-decisions-mcp-{contour.replace('_', '-')}-{profile}",
-        json_response=True,
-        **_contour_http_auth_kwargs(contour),
+    mcp = ModernMCPServer(
+        SERVICE_CONFIG.server_name(contour, profile),
+        version=SERVICE_CONFIG.package_version,
+        **_contour_http_auth_config(contour).server_kwargs,
     )
-    _bind_server_info_version(mcp)
     read_only_tool = mcp.tool(
         annotations=ToolAnnotations(
             read_only_hint=True,

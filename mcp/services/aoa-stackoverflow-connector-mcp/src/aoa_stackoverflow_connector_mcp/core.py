@@ -13,13 +13,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from ._runtime_config import PATH_CONFIG
+
 SERVICE_NAME = "aoa-stackoverflow-connector-mcp"
 CONNECTOR_REPO_NAME = "aoa-stackoverflow-connector"
 CONNECTOR_PACKAGE = "aoa_stackoverflow_connector"
 CONNECTOR_BIN = "aoa-stackoverflow"
-DEFAULT_CONNECTOR_REPO = Path(
-    "/srv/AbyssOS/connectors/aoa-stackoverflow-connector"
-)
 DEFAULT_RUN = "starter-fixture"
 MAX_QUERY_LENGTH = 500
 MAX_LIMIT = 20
@@ -83,9 +82,8 @@ class AoAStackOverflowConnectorMCPState:
 
     @classmethod
     def discover(cls) -> "AoAStackOverflowConnectorMCPState":
-        repo = os.environ.get("AOA_STACKOVERFLOW_CONNECTOR_REPO")
         return cls(
-            connector_repo=Path(repo).expanduser() if repo else DEFAULT_CONNECTOR_REPO,
+            connector_repo=PATH_CONFIG.connector_repo(SERVICE_NAME),
             connector_bin=os.environ.get("AOA_STACKOVERFLOW_CONNECTOR_BIN"),
             data_root=_env_path("CONNECTOR_DATA_ROOT"),
             cache_root=_env_path("CONNECTOR_CACHE_ROOT"),

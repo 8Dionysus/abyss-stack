@@ -5,10 +5,13 @@ from __future__ import annotations
 import hashlib
 import json
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Annotated, Literal
 from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from ._runtime_config import PATH_CONFIG, TRANSPORT_CONFIG
 
 
 Identifier = Annotated[
@@ -20,7 +23,12 @@ NonEmpty = Annotated[
     Field(min_length=1, max_length=2048, pattern=r"\S"),
 ]
 Digest = Annotated[str, Field(pattern=r"^sha256:[0-9a-f]{64}$")]
-DEPLOYMENT_MANIFEST_RECORD_PREFIX = "Logs/mcp/deployments/records/"
+_DEPLOYMENT_MANIFEST_PATH = Path(
+    PATH_CONFIG.stack_deployment_manifest_relative_to_runtime
+)
+DEPLOYMENT_MANIFEST_RECORD_PREFIX = (
+    (_DEPLOYMENT_MANIFEST_PATH.parent / "records").as_posix().rstrip("/") + "/"
+)
 UnitName = Annotated[
     str,
     Field(
@@ -312,7 +320,7 @@ class EndpointObservation(StrictModel):
             parsed = urlsplit(self.endpoint_ref)
             if parsed.scheme not in {"http", "https"}:
                 raise ValueError("HTTP endpoint_ref must be an absolute URL")
-            if parsed.hostname not in {"127.0.0.1", "localhost", "::1"}:
+            if parsed.hostname not in TRANSPORT_CONFIG.loopback_hosts:
                 raise ValueError("stack MCP observations are loopback-only")
             try:
                 port = parsed.port

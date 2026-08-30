@@ -14,16 +14,17 @@ from .managed_catalog import (
 )
 from .canary import _bootstrap_unit_name, _fallback_unit_name
 from .preflight import PreflightError, _bundle_digest, _safe_json, _sha256_file
+from ._runtime_config import PATH_CONFIG
 
 
 def _organ_read_unit_exec_start_binding(deployed_root: Path) -> str:
-    runtime_root = deployed_root / "Services/abyss-stack-mcp"
+    runtime_root = PATH_CONFIG.stack_services_root(deployed_root) / "abyss-stack-mcp"
     return (
         "ExecStart=/usr/bin/flock --shared --no-fork "
         f"{runtime_root}/.runtime-provision.lock "
         f"{runtime_root}/venv/bin/python -I -B -m "
         "abyss_stack_mcp.process_launcher --executable "
-        "/srv/AbyssOS/.codex/bin/%i-mcp-server.py"
+        f"{PATH_CONFIG.stack_codex_executable('%i', deployed_root.parent)}"
     )
 
 
@@ -32,7 +33,7 @@ def _managed_unit_template_path(
     production_unit_name: str,
     observed_unit_name: str,
 ) -> Path:
-    unit_root = deployed_root / "Configs/systemd/user"
+    unit_root = PATH_CONFIG.stack_configs_root(deployed_root) / "systemd/user"
     if production_unit_name == "abyss-stack-mcp-read.service":
         paths = {
             production_unit_name: unit_root / "abyss-stack-mcp-read.service",
@@ -108,17 +109,18 @@ def derive_managed_topology(
                 deployed_root, unit_name, canary_process_unit_name
             )
             credential_name = f"abyss-stack-mcp-{policy.replace('_', '-')}-bearer-token"
-            auth_manifest = (
-                deployed_root / "Secrets/Configs/abyss-stack-mcp-auth-manifest.json"
+            auth_manifest = PATH_CONFIG.stack_secrets_root(deployed_root) / (
+                "abyss-stack-mcp-auth-manifest.json"
             )
             auth_key = policy
             required_environment = {"ABYSS_STACK_MCP_POLICY_FAMILY": policy}
             unit_credential_binding = (
                 f"LoadCredential={credential_name}:"
-                f"{deployed_root / 'Secrets/Configs' / credential_name}"
+                f"{PATH_CONFIG.stack_secrets_root(deployed_root) / credential_name}"
             )
             expected_executable = str(
-                deployed_root / "Services/abyss-stack-mcp/venv/bin/python"
+                PATH_CONFIG.stack_services_root(deployed_root)
+                / "abyss-stack-mcp/venv/bin/python"
             )
             if process_ref != expected_executable:
                 raise PreflightError(
@@ -126,10 +128,10 @@ def derive_managed_topology(
                 )
             unit_exec_start_binding = (
                 "ExecStart=/usr/bin/flock --shared --no-fork "
-                f"{deployed_root}/Services/abyss-stack-mcp/.source-projection.lock "
+                f"{PATH_CONFIG.stack_services_root(deployed_root) / 'abyss-stack-mcp'}/.source-projection.lock "
                 "/usr/bin/flock --shared --no-fork "
-                f"{deployed_root}/Services/abyss-stack-mcp/.runtime-provision.lock "
-                f"/usr/bin/env {deployed_root}/Configs/scripts/aoa-install-systemd "
+                f"{PATH_CONFIG.stack_services_root(deployed_root) / 'abyss-stack-mcp'}/.runtime-provision.lock "
+                f"/usr/bin/env {PATH_CONFIG.stack_configs_root(deployed_root) / 'scripts' / 'aoa-install-systemd'} "
                 f"--launch-verified-abyss-stack-mcp={policy}"
             )
         else:
@@ -140,16 +142,18 @@ def derive_managed_topology(
                 deployed_root, unit_name, canary_process_unit_name
             )
             credential_name = f"{instance}-mcp-{policy.replace('_', '-')}-bearer-token"
-            auth_manifest = (
-                deployed_root / "Secrets/Configs/organ-mcp-read-auth-manifest.json"
+            auth_manifest = PATH_CONFIG.stack_secrets_root(deployed_root) / (
+                "organ-mcp-read-auth-manifest.json"
             )
             auth_key = instance
             required_environment = {"AOA_MCP_POLICY_FAMILY": policy}
             unit_credential_binding = (
                 "LoadCredential=%i-mcp-read-bearer-token:"
-                f"{deployed_root}/Secrets/Configs/%i-mcp-read-bearer-token"
+                f"{PATH_CONFIG.stack_secrets_root(deployed_root)}/%i-mcp-read-bearer-token"
             )
-            expected_executable = f"/srv/AbyssOS/.codex/bin/{instance}-mcp-server.py"
+            expected_executable = str(
+                PATH_CONFIG.stack_codex_executable(instance, deployed_root.parent)
+            )
             if process_ref != expected_executable:
                 raise PreflightError(
                     "organ unit executable conflicts with its instance template"
@@ -169,7 +173,7 @@ def derive_managed_topology(
                 endpoint_ref=_required(endpoint, "endpoint_ref"),
                 protocol_version=_single_protocol(endpoint),
                 credential_path=str(
-                    deployed_root / "Secrets/Configs" / credential_name
+                    PATH_CONFIG.stack_secrets_root(deployed_root) / credential_name
                 ),
                 auth_manifest_path=str(auth_manifest),
                 auth_manifest_key=auth_key,

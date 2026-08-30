@@ -8,10 +8,19 @@ import sys
 import tomllib
 from pathlib import Path
 
+from packaging.requirements import Requirement
+from packaging.version import Version
+
 
 SERVICE_ROOT = Path(__file__).resolve().parents[1]
 SRC_ROOT = SERVICE_ROOT / "src"
+RUNTIME_TARGET_BUILDER = SERVICE_ROOT / "scripts" / "build_runtime_targets.py"
 sys.path.insert(0, str(SRC_ROOT))
+SHARED_ROOT = SERVICE_ROOT.parent / "_shared"
+sys.path.insert(0, str(SHARED_ROOT))
+
+from runtime_config import load_catalog, raw_config  # noqa: E402
+from validate_systemd_projection import validate_systemd_projection  # noqa: E402
 
 from abyss_stack_mcp.audit import PolicyAuditJournal  # noqa: E402
 from abyss_stack_mcp.canary import (  # noqa: E402
@@ -47,13 +56,122 @@ LOCK_DIRECT_URL_RE = re.compile(
     r"(?P<url>https://[^\s\\]+)\s+\\$"
 )
 HASH_RE = re.compile(r"--hash=sha256:[0-9a-f]{64}$")
-AOA_SDK_WHEEL_URL = (
-    "https://github.com/8Dionysus/aoa-sdk/releases/download/v0.10.2/"
-    "aoa_sdk-0.10.2-py3-none-any.whl"
-)
-AOA_SDK_WHEEL_HASH = (
-    "--hash=sha256:cf512a7b0a00f8707e21b3950b147d01b7fd2317d64ce7fbcba004a2d1846e2f"
-)
+
+
+def approved_aoa_sdk_artifact() -> dict[str, str]:
+    """Read the approved SDK artifact from the central runtime catalog."""
+
+    artifacts = raw_config().get("deployment", {}).get("approved_artifacts", {})
+    artifact = artifacts.get("aoa_sdk") if isinstance(artifacts, dict) else None
+    if not isinstance(artifact, dict):
+        raise SystemExit("runtime catalog lacks the approved aoa-sdk artifact")
+    required = ("distribution", "version", "wheel_url", "sha256")
+    if any(not isinstance(artifact.get(key), str) or not artifact[key] for key in required):
+        raise SystemExit("approved aoa-sdk artifact is incomplete")
+    if artifact["distribution"] != "aoa-sdk" or not re.fullmatch(
+        r"[0-9]+\.[0-9]+\.[0-9]+", artifact["version"]
+    ) or not re.fullmatch(r"[0-9a-f]{64}", artifact["sha256"]):
+        raise SystemExit("approved aoa-sdk artifact is malformed")
+    return {key: str(artifact[key]) for key in required}
+
+
+def validate_runtime_target_projection(targets: RuntimeTargetCatalog) -> None:
+    """Ensure the canary target projection has one current runtime authority."""
+    catalog = load_catalog()
+    config = raw_config()
+    paths = config["paths"]
+    deployment = config["deployment"]
+    admitted_service_ids = {
+        item["service_id"] for item in deployment["client_read_contours"]
+    }
+    if len(targets.targets) != len(catalog.services):
+        raise SystemExit(
+            "runtime target catalog and declarative MCP catalog have different sizes"
+        )
+    seen_services: set[str] = set()
+    for target in targets.targets:
+        if target.service_id in seen_services:
+            raise SystemExit(f"runtime target service is duplicated: {target.service_id}")
+        seen_services.add(target.service_id)
+        try:
+            service = catalog.service(target.service_id)
+            contour = service.contour(target.policy_family)
+        except ValueError as exc:
+            raise SystemExit(str(exc)) from exc
+        if target.organ_id != service.organ_id:
+            raise SystemExit(
+                f"runtime target organ drifted for {target.service_id}: "
+                f"{target.organ_id} != {service.organ_id}"
+            )
+        if target.registry_organ_id != service.registry_organ_id:
+            raise SystemExit(
+                f"runtime target registry organ drifted for {target.service_id}: "
+                f"{target.registry_organ_id} != {service.registry_organ_id}"
+            )
+        expected_endpoint = (
+            f"http://{catalog.transport.default_host}:{contour.port}"
+            f"{catalog.transport.streamable_http_path}"
+        )
+        expected_unit = service.read_unit_name(target.organ_id)
+        if target.endpoint_ref != expected_endpoint:
+            raise SystemExit(
+                f"runtime target endpoint drifted for {target.service_id}: "
+                f"{target.endpoint_ref} != {expected_endpoint}"
+            )
+        if target.unit_name != expected_unit:
+            raise SystemExit(
+                f"runtime target unit drifted for {target.service_id}: "
+                f"{target.unit_name} != {expected_unit}"
+            )
+        if target.protocol_versions != (catalog.transport.protocol_version,):
+            raise SystemExit(
+                f"runtime target protocol drifted for {target.service_id}"
+            )
+        expected_executable = (
+            f"${{{paths['workspace_env_var']}}}/"
+            f"{paths['stack_codex_executable_relative_to_workspace_template'].format(instance=service.read_unit_instance)}"
+            if service.runtime_executable_mode == "workspace_codex"
+            else f"${{{paths['stack_root_env_var']}}}/"
+            f"{deployment['runtime_python_relative_template'].format(service_id=service.service_id)}"
+        )
+        if target.executable_ref != expected_executable:
+            raise SystemExit(
+                f"runtime target executable drifted for {target.service_id}: "
+                f"{target.executable_ref} != {expected_executable}"
+            )
+        expected_cohort = (
+            "admitted-read"
+            if target.service_id in admitted_service_ids
+            else "package-only-shadow"
+        )
+        if target.rollout_cohort != expected_cohort:
+            raise SystemExit(
+                f"runtime target rollout cohort drifted for {target.service_id}: "
+                f"{target.rollout_cohort} != {expected_cohort}"
+            )
+    if seen_services != set(catalog.services):
+        raise SystemExit("runtime target catalog lost a declarative MCP service")
+
+
+def validate_generated_runtime_targets() -> None:
+    if not RUNTIME_TARGET_BUILDER.is_file():
+        raise SystemExit("runtime target generator is unavailable")
+    completed = subprocess.run(
+        [sys.executable, str(RUNTIME_TARGET_BUILDER), "--check"],
+        cwd=SERVICE_ROOT,
+        capture_output=True,
+        text=True,
+    )
+    if completed.returncode != 0:
+        detail = (completed.stdout + completed.stderr).strip()
+        raise SystemExit(detail or "generated runtime target projection is stale")
+
+
+def validate_systemd_projection_gate() -> None:
+    try:
+        validate_systemd_projection(raw_config())
+    except (OSError, ValueError) as exc:
+        raise SystemExit(str(exc)) from exc
 
 
 def normalized_package(name: str) -> str:
@@ -61,6 +179,9 @@ def normalized_package(name: str) -> str:
 
 
 def validate_runtime_lock() -> None:
+    artifact = approved_aoa_sdk_artifact()
+    aoa_sdk_wheel_url = artifact["wheel_url"]
+    aoa_sdk_wheel_hash = f"--hash=sha256:{artifact['sha256']}"
     pyproject_path = SERVICE_ROOT / "pyproject.toml"
     constraints_path = SERVICE_ROOT / "requirements.constraints"
     lock_path = SERVICE_ROOT / "requirements.lock"
@@ -91,7 +212,7 @@ def validate_runtime_lock() -> None:
             raise SystemExit(f"duplicate constraint pin: {name}")
         if direct_match is not None:
             url = direct_match.group("url")
-            if name != "aoa-sdk" or url != AOA_SDK_WHEEL_URL:
+            if name != "aoa-sdk" or url != aoa_sdk_wheel_url:
                 raise SystemExit("only the approved aoa-sdk release wheel is allowed")
             constraints[name] = url
         else:
@@ -135,8 +256,8 @@ def validate_runtime_lock() -> None:
             url = direct_match.group("url")
             if (
                 name != "aoa-sdk"
-                or url != AOA_SDK_WHEEL_URL
-                or hashes != [AOA_SDK_WHEEL_HASH]
+                or url != aoa_sdk_wheel_url
+                or hashes != [aoa_sdk_wheel_hash]
             ):
                 raise SystemExit("aoa-sdk lock must bind the approved wheel and digest")
             locked[name] = url
@@ -157,6 +278,9 @@ def validate_runtime_lock() -> None:
         )
 
     pyproject = tomllib.loads(pyproject_path.read_text(encoding="utf-8"))
+    flexible_mcp_requirement = Requirement(
+        load_catalog().transport.sdk_requirement
+    )
     declared = [
         *pyproject["build-system"]["requires"],
         *pyproject["project"]["dependencies"],
@@ -165,7 +289,25 @@ def validate_runtime_lock() -> None:
         match = PIN_RE.fullmatch(requirement)
         direct_match = DIRECT_URL_RE.fullmatch(requirement)
         if match is None and direct_match is None:
-            raise SystemExit(f"pyproject dependency must be exact: {requirement}")
+            try:
+                flexible = Requirement(requirement)
+            except (TypeError, ValueError) as exc:
+                raise SystemExit(
+                    f"pyproject dependency is not a valid requirement: {requirement}"
+                ) from exc
+            name = normalized_package(flexible.name)
+            expected_name = normalized_package(flexible_mcp_requirement.name)
+            if (
+                name != expected_name
+                or flexible.specifier != flexible_mcp_requirement.specifier
+                or name not in constraints
+                or Version(constraints[name]) not in flexible.specifier
+            ):
+                raise SystemExit(
+                    "only the central MCP major-line requirement may be flexible: "
+                    f"{requirement}"
+                )
+            continue
         selected = match or direct_match
         assert selected is not None
         name = normalized_package(selected.group("name"))
@@ -175,7 +317,7 @@ def validate_runtime_lock() -> None:
             else match.group("version")
         )
         if direct_match is not None and (
-            name != "aoa-sdk" or value != AOA_SDK_WHEEL_URL
+            name != "aoa-sdk" or value != aoa_sdk_wheel_url
         ):
             raise SystemExit("pyproject aoa-sdk dependency is not the approved wheel")
         if constraints.get(name) != value:
@@ -185,6 +327,10 @@ def validate_runtime_lock() -> None:
 
 
 def main() -> int:
+    catalog = load_catalog()
+    internal_effect_port = catalog.service("abyss-stack-mcp").contour(
+        "internal_effect"
+    ).port
     generator = SERVICE_ROOT / "scripts" / "generate_stack_mcp_contracts.py"
     result = subprocess.run(
         [sys.executable, str(generator), "--check"],
@@ -293,8 +439,9 @@ def main() -> int:
     targets = RuntimeTargetCatalog.model_validate(
         json.loads(targets_path.read_text(encoding="utf-8"))
     )
-    if len(targets.targets) != 15:
-        raise SystemExit("runtime observation target catalog must name 15 contours")
+    validate_generated_runtime_targets()
+    validate_systemd_projection_gate()
+    validate_runtime_target_projection(targets)
     reviewed_canaries = {
         target.organ_id
         for target in targets.targets
@@ -370,7 +517,7 @@ def main() -> int:
             "tamper-evident",
             "observation producer",
             "host receipt",
-            "port-`5439` internal-effect process",
+            f"port-`{internal_effect_port}` internal-effect process",
         ),
     }
     for relative, needles in required.items():

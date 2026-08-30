@@ -296,18 +296,25 @@ def test_canonical_query_loads_portable_family_without_v2_monolith(
     query_path = state.aoa_kag_root / "scripts" / "query_repo_local_kag.py"
     query_path.parent.mkdir(parents=True, exist_ok=True)
     query_path.write_text(
+        "SEEN = {}\n"
         "class RepoKagQuery:\n"
         "    def __init__(self, source_index, family, repo_root=None):\n"
         "        self.source_index = source_index\n"
         "    def discover(self):\n"
         "        return {'storage': self.source_index['storage']}\n"
         "def load_family(repo_root, **kwargs):\n"
+        "    SEEN['kwargs'] = kwargs\n"
         "    return {'storage': 'portable-v3'}, {}, None, None\n",
         encoding="utf-8",
     )
 
-    assert CanonicalRepoKag(state).discover_owner("repo-a") == {
+    canonical = CanonicalRepoKag(state)
+    assert canonical.discover_owner("repo-a") == {
         "storage": "portable-v3"
+    }
+    assert canonical._query_module().SEEN["kwargs"] == {
+        "require_current_producer_identity": False,
+        "allow_legacy_external_receipt": True,
     }
 
 
@@ -337,6 +344,90 @@ def test_canonical_query_preserves_legacy_portable_loader_interface(
     module = canonical._query_module()
     assert module.SEEN["loader_repo_root"] == state.provider_root("repo-a")
     assert module.SEEN["family"] == {}
+
+
+def test_canonical_query_bridges_pre_api_foreign_portable_observation(
+    tmp_path: Path,
+) -> None:
+    state = _state(tmp_path)
+    _use_portable_family(state)
+    query_path = state.aoa_kag_root / "scripts" / "query_repo_local_kag.py"
+    query_path.parent.mkdir(parents=True, exist_ok=True)
+    query_path.write_text(
+        "from pathlib import Path\n"
+        "SEEN = {}\n"
+        "MANIFEST_RELATIVE_PATH = Path('kag/indexes/index_family.manifest.json')\n"
+        "class RepoKagQuery:\n"
+        "    def __init__(self, source_index, family):\n"
+        "        self.source_index = source_index\n"
+        "    def discover(self):\n"
+        "        return {'storage': self.source_index['storage']}\n"
+        "def load_family(repo_root, artifact_root=None, allow_shadow_git=True):\n"
+        "    raise AssertionError('strict facade must not handle foreign v1')\n"
+        "def load_portable_family_with_state(repo_root, **kwargs):\n"
+        "    SEEN['kwargs'] = kwargs\n"
+        "    return {'storage': 'portable-v3-bridge'}, {'entity': {'ok': True}}, {}, {'complete': True}\n"
+        "def validate_repo_local_kag_repository_index_family(family, **kwargs):\n"
+        "    SEEN['validation'] = kwargs\n"
+        "    return family\n",
+        encoding="utf-8",
+    )
+
+    canonical = CanonicalRepoKag(state)
+    assert canonical.discover_owner("repo-a") == {
+        "storage": "portable-v3-bridge"
+    }
+    module = canonical._query_module()
+    assert module.SEEN["kwargs"] == {
+        "require_current_producer_identity": False,
+        "allow_legacy_external_receipt": True,
+    }
+    assert module.SEEN["validation"] == {
+        "source_payload": {"storage": "portable-v3-bridge"},
+        "label": "repo-a query family",
+    }
+
+
+def test_canonical_query_keeps_self_receipt_admission_strict(
+    tmp_path: Path,
+) -> None:
+    state = _state(tmp_path)
+    provider_map = state.provider_map()
+    provider_map["providers"].append(
+        {
+            "repo": "aoa-kag",
+            "provider_status": "provider_ready",
+            "repo_local_index": {
+                "source_index_ref": "kag/indexes/source_surface_index.json"
+            },
+        }
+    )
+    _write_json(state.provider_map_path, provider_map)
+    _write_json(
+        state.aoa_kag_root / "kag" / "indexes" / "source_surface_index.json",
+        {"index_identity": {"content_digest": "self-source-fixture-digest"}},
+    )
+    query_path = state.aoa_kag_root / "scripts" / "query_repo_local_kag.py"
+    query_path.parent.mkdir(parents=True, exist_ok=True)
+    query_path.write_text(
+        "SEEN = {}\n"
+        "class RepoKagQuery:\n"
+        "    def __init__(self, source_index, family):\n"
+        "        self.source_index = source_index\n"
+        "    def discover(self):\n"
+        "        return {'storage': self.source_index['storage']}\n"
+        "def load_family(repo_root, **kwargs):\n"
+        "    SEEN['kwargs'] = kwargs\n"
+        "    return {'storage': 'self-v3'}, {}, None, None\n",
+        encoding="utf-8",
+    )
+
+    canonical = CanonicalRepoKag(state)
+    assert canonical.discover_owner("aoa-kag") == {"storage": "self-v3"}
+    assert canonical._query_module().SEEN["kwargs"] == {
+        "require_current_producer_identity": True,
+        "allow_legacy_external_receipt": False,
+    }
 
 
 def test_canonical_query_passes_cold_cas_binding_to_owner_loader(
@@ -376,6 +467,8 @@ def test_canonical_query_passes_cold_cas_binding_to_owner_loader(
     assert module.SEEN["loader_repo_root"] == state.provider_root("repo-a")
     assert module.SEEN["query_repo_root"] == state.provider_root("repo-a")
     assert module.SEEN["kwargs"] == {
+        "require_current_producer_identity": False,
+        "allow_legacy_external_receipt": True,
         "artifact_root": artifact_root.resolve(),
         "allow_shadow_git": False,
     }
@@ -427,7 +520,7 @@ def test_server_exposes_compact_read_only_kag_surface(tmp_path: Path) -> None:
         for resource in asyncio.run(server.list_resource_templates())
     }
 
-    assert server._mcp_server.version == "0.1.0"
+    assert server.application_version == "0.1.0"
     assert set(tools) == {
         "kag_discover",
         "kag_search",

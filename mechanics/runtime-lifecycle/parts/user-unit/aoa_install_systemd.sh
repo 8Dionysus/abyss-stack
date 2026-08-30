@@ -399,6 +399,14 @@ mcp_http_codex_zshrc="${ZDOTDIR:-${HOME}}/.zshrc"
 mcp_http_codex_block_start="# >>> abyss-stack MCP HTTP Codex client >>>"
 mcp_http_codex_block_end="# <<< abyss-stack MCP HTTP Codex client <<<"
 mcp_http_codex_block_present=0
+mcp_http_chatgpt_executable="${AOA_CHATGPT_DESKTOP_EXECUTABLE:-/usr/bin/chatgpt}"
+mcp_http_chatgpt_wrapper="${HOME}/.local/bin/chatgpt"
+mcp_http_chatgpt_marker="# Managed by abyss-stack MCP HTTP Codex client"
+mcp_http_chatgpt_wrapper_present=0
+mcp_http_chatgpt_desktop_source="${AOA_CHATGPT_DESKTOP_ENTRY:-/usr/share/applications/chatgpt.desktop}"
+mcp_http_chatgpt_desktop_target="${XDG_DATA_HOME:-${HOME}/.local/share}/applications/chatgpt.desktop"
+mcp_http_chatgpt_desktop_marker="X-AbyssStackMcpHttpClient=true"
+mcp_http_chatgpt_desktop_present=0
 
 aoa_run_isolated_python() {
   local python_executable="$1"
@@ -406,6 +414,15 @@ aoa_run_isolated_python() {
 
   /usr/bin/env -u PYTHONHOME -u PYTHONPATH \
     "$python_executable" -I "$@"
+}
+
+aoa_mcp_approved_aoa_sdk_version() {
+  local catalog_path="${AOA_CONFIGS_ROOT}/mcp/services/_shared/runtime-config.v1.json"
+
+  [[ -f "$catalog_path" && ! -L "$catalog_path" ]] || return 1
+  aoa_run_isolated_python python3 -c \
+    'import json, sys; value = json.load(open(sys.argv[1], encoding="utf-8"))["deployment"]["approved_artifacts"]["aoa_sdk"]["version"]; assert isinstance(value, str) and value; print(value)' \
+    "$catalog_path"
 }
 
 aoa_set_abyss_stack_mcp_auto_repair_policy() {
@@ -1804,9 +1821,14 @@ aoa_digest_abyss_stack_mcp_runtime() {
 }
 
 aoa_verify_abyss_stack_mcp_runtime_imports() {
+  local approved_aoa_sdk_version="${1:-}"
+  if [[ -z "$approved_aoa_sdk_version" ]]; then
+    approved_aoa_sdk_version="$(aoa_mcp_approved_aoa_sdk_version)" || return 1
+  fi
   PYTHONDONTWRITEBYTECODE=1 \
     aoa_run_isolated_python "${abyss_stack_mcp_venv}/bin/python" -c \
-      'import encodings, importlib.metadata, ssl; import abyss_stack_mcp, aoa_sdk, mcp, pydantic; assert importlib.metadata.version("aoa-sdk") == "0.10.2"'
+      'import encodings, importlib.metadata, ssl, sys; import abyss_stack_mcp, aoa_sdk, mcp, pydantic; assert importlib.metadata.version("aoa-sdk") == sys.argv[1]' \
+      "$approved_aoa_sdk_version"
 }
 
 aoa_verify_abyss_stack_mcp_read_rollback_grant() {
@@ -1856,6 +1878,7 @@ aoa_verify_abyss_stack_mcp_runtime() {
   local marker=".abyss-stack-mcp-runtime-identity"
   local content_marker=".abyss-stack-mcp-runtime-content-digest"
   local lock_path="${abyss_stack_mcp_service_root}/requirements.lock"
+  local approved_aoa_sdk_version=""
   local source_digest=""
   local lock_digest=""
   local expected_identity=""
@@ -1909,6 +1932,8 @@ aoa_verify_abyss_stack_mcp_runtime() {
   [[ -f "${abyss_stack_mcp_venv}/${content_marker}" && \
      ! -L "${abyss_stack_mcp_venv}/${content_marker}" ]] || \
     aoa_die "abyss-stack MCP runtime content marker is unavailable"
+  approved_aoa_sdk_version="$(aoa_mcp_approved_aoa_sdk_version)" || \
+    aoa_die "deployed abyss-stack MCP runtime catalog is unavailable or lacks the approved aoa-sdk version"
 
   source_digest="$(
     aoa_digest_abyss_stack_mcp_package "$abyss_stack_mcp_service_root"
@@ -1939,7 +1964,7 @@ aoa_verify_abyss_stack_mcp_runtime() {
       aoa_die "abyss-stack MCP runtime content digest mismatch"
     fi
   fi
-  aoa_verify_abyss_stack_mcp_runtime_imports >/dev/null || \
+  aoa_verify_abyss_stack_mcp_runtime_imports "$approved_aoa_sdk_version" >/dev/null || \
     aoa_die "abyss-stack MCP runtime Python dependency/import check failed"
   exec {runtime_lock_fd}>&-
   exec {source_lock_fd}>&-
@@ -2071,6 +2096,9 @@ aoa_provision_abyss_stack_mcp_runtime() {
       aoa_die "unsupported abyss-stack MCP runtime provision mode: ${provision_mode}"
       ;;
   esac
+
+  approved_aoa_sdk_version="$(aoa_mcp_approved_aoa_sdk_version)" || \
+    aoa_die "runtime catalog lacks the approved aoa-sdk version"
 
   aoa_restore_abyss_stack_mcp_runtime_consumers() {
     local consumer_unit=""
@@ -2532,7 +2560,8 @@ aoa_provision_abyss_stack_mcp_runtime() {
          "${temp_venv}/bin/python" -m pip check >/dev/null || \
      ! PYTHONDONTWRITEBYTECODE=1 \
        aoa_run_isolated_python "${temp_venv}/bin/python" -c \
-         'import abyss_stack_mcp, aoa_sdk, mcp, pydantic; from importlib.metadata import version; assert version("aoa-sdk") == "0.10.2"' >/dev/null; then
+         'import abyss_stack_mcp, aoa_sdk, mcp, pydantic, sys; from importlib.metadata import version; assert version("aoa-sdk") == sys.argv[1]' \
+         "$approved_aoa_sdk_version" >/dev/null; then
     rm -rf -- "$temp_venv"
     aoa_die "provisioned abyss-stack MCP runtime failed dependency verification"
   fi
@@ -2846,21 +2875,218 @@ aoa_write_mcp_http_codex_zshrc() {
   fi
 }
 
+aoa_validate_mcp_http_chatgpt_wrapper() {
+  local marker_count=0
+
+  mcp_http_chatgpt_wrapper_present=0
+  if [[ ! -e "$mcp_http_chatgpt_wrapper" && ! -L "$mcp_http_chatgpt_wrapper" ]]; then
+    return 0
+  fi
+  [[ -f "$mcp_http_chatgpt_wrapper" && ! -L "$mcp_http_chatgpt_wrapper" ]] || \
+    aoa_die "ChatGPT client install target must be a regular non-symlink file"
+  marker_count="$(grep -Fxc -- "$mcp_http_chatgpt_marker" "$mcp_http_chatgpt_wrapper" || true)"
+  if ((marker_count == 0)); then
+    return 0
+  fi
+  ((marker_count == 1)) || \
+    aoa_die "managed MCP HTTP ChatGPT client wrapper is malformed"
+  mcp_http_chatgpt_wrapper_present=1
+}
+
+aoa_render_mcp_http_chatgpt_wrapper() {
+  printf '%s\n' '#!/usr/bin/env bash'
+  printf '%s\n' 'set -euo pipefail'
+  printf '%s\n' "$mcp_http_chatgpt_marker"
+  printf 'export AOA_CODEX_CLIENT_MODE=desktop\n'
+  printf 'export AOA_CODEX_EXECUTABLE=%q\n' "$mcp_http_chatgpt_executable"
+  printf 'exec %q "$@"\n' "$mcp_http_codex_launcher"
+}
+
+aoa_write_mcp_http_chatgpt_wrapper() {
+  local mode="$1"
+  local target_dir=""
+  local temp_path=""
+
+  aoa_validate_mcp_http_chatgpt_wrapper
+  if [[ "$mode" == "remove" ]]; then
+    if ((!mcp_http_chatgpt_wrapper_present)); then
+      aoa_note "managed MCP HTTP ChatGPT client wrapper is already absent"
+      return 0
+    fi
+    rm -f -- "$mcp_http_chatgpt_wrapper"
+    return 0
+  fi
+  [[ "$mode" == "install" ]] || \
+    aoa_die "invalid MCP HTTP ChatGPT client wrapper update mode"
+  if [[ -e "$mcp_http_chatgpt_wrapper" && \
+        "$mcp_http_chatgpt_wrapper_present" -ne 1 ]]; then
+    aoa_die "refusing to replace an unmanaged ChatGPT client wrapper: ${mcp_http_chatgpt_wrapper}"
+  fi
+  [[ -f "$mcp_http_codex_launcher" && ! -L "$mcp_http_codex_launcher" && -x "$mcp_http_codex_launcher" ]] || \
+    aoa_die "deployed MCP HTTP Codex client launcher is unavailable: ${mcp_http_codex_launcher}"
+  [[ -x "$mcp_http_chatgpt_executable" && ! -d "$mcp_http_chatgpt_executable" ]] || \
+    aoa_die "official ChatGPT launcher is unavailable: ${mcp_http_chatgpt_executable}"
+
+  target_dir="$(dirname -- "$mcp_http_chatgpt_wrapper")"
+  mkdir -p -- "$target_dir"
+  [[ -d "$target_dir" && ! -L "$target_dir" ]] || \
+    aoa_die "ChatGPT client wrapper parent must be a regular directory"
+  [[ "$(readlink -f "$mcp_http_chatgpt_executable")" != \
+     "$(readlink -f "$mcp_http_chatgpt_wrapper")" ]] || \
+    aoa_die "official ChatGPT launcher resolves back to the managed wrapper"
+
+  temp_path="$(mktemp "${target_dir}/.chatgpt.abyss-stack.XXXXXX")"
+  if ! aoa_render_mcp_http_chatgpt_wrapper > "$temp_path"; then
+    rm -f -- "$temp_path"
+    aoa_die "failed to render the MCP HTTP ChatGPT client wrapper"
+  fi
+  chmod 0755 "$temp_path"
+  if ! mv -T -- "$temp_path" "$mcp_http_chatgpt_wrapper"; then
+    rm -f -- "$temp_path"
+    aoa_die "failed to install the MCP HTTP ChatGPT client wrapper"
+  fi
+}
+
+aoa_validate_mcp_http_chatgpt_desktop_entry() {
+  local marker_count=0
+
+  mcp_http_chatgpt_desktop_present=0
+  if [[ ! -e "$mcp_http_chatgpt_desktop_target" && \
+        ! -L "$mcp_http_chatgpt_desktop_target" ]]; then
+    return 0
+  fi
+  [[ -f "$mcp_http_chatgpt_desktop_target" && \
+     ! -L "$mcp_http_chatgpt_desktop_target" ]] || \
+    aoa_die "ChatGPT desktop entry target must be a regular non-symlink file"
+  marker_count="$(grep -Fxc -- "$mcp_http_chatgpt_desktop_marker" "$mcp_http_chatgpt_desktop_target" || true)"
+  if ((marker_count == 0)); then
+    return 0
+  fi
+  ((marker_count == 1)) || \
+    aoa_die "managed MCP HTTP ChatGPT desktop entry is malformed"
+  mcp_http_chatgpt_desktop_present=1
+}
+
+aoa_render_mcp_http_chatgpt_desktop_entry() {
+  local line=""
+
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    if [[ "$line" == Exec=* ]]; then
+      printf 'Exec=%s %%U\n' "$mcp_http_chatgpt_wrapper"
+    elif [[ "$line" != "$mcp_http_chatgpt_desktop_marker" ]]; then
+      printf '%s\n' "$line"
+    fi
+  done < "$mcp_http_chatgpt_desktop_source"
+  printf '%s\n' "$mcp_http_chatgpt_desktop_marker"
+}
+
+aoa_write_mcp_http_chatgpt_desktop_entry() {
+  local mode="$1"
+  local target_dir=""
+  local temp_path=""
+  local validation_output=""
+
+  aoa_validate_mcp_http_chatgpt_desktop_entry
+  if [[ "$mode" == "remove" ]]; then
+    if ((!mcp_http_chatgpt_desktop_present)); then
+      aoa_note "managed MCP HTTP ChatGPT desktop entry is already absent"
+      return 0
+    fi
+    rm -f -- "$mcp_http_chatgpt_desktop_target"
+    if command -v update-desktop-database >/dev/null 2>&1; then
+      update-desktop-database \
+        "$(dirname -- "$mcp_http_chatgpt_desktop_target")" \
+        >/dev/null 2>&1 || true
+    fi
+    return 0
+  fi
+  [[ "$mode" == "install" ]] || \
+    aoa_die "invalid MCP HTTP ChatGPT desktop entry update mode"
+  if [[ -e "$mcp_http_chatgpt_desktop_target" && \
+        "$mcp_http_chatgpt_desktop_present" -ne 1 ]]; then
+    aoa_die "refusing to replace an unmanaged ChatGPT desktop entry: ${mcp_http_chatgpt_desktop_target}"
+  fi
+  [[ -f "$mcp_http_chatgpt_desktop_source" && \
+     ! -L "$mcp_http_chatgpt_desktop_source" ]] || \
+    aoa_die "official ChatGPT desktop entry is unavailable: ${mcp_http_chatgpt_desktop_source}"
+  [[ "$(grep -c '^\[Desktop Entry\]$' "$mcp_http_chatgpt_desktop_source" || true)" -eq 1 && \
+     "$(grep -c '^Exec=' "$mcp_http_chatgpt_desktop_source" || true)" -eq 1 ]] || \
+    aoa_die "official ChatGPT desktop entry has an unsupported shape"
+  [[ "$mcp_http_chatgpt_wrapper" =~ ^/[A-Za-z0-9._/-]+$ ]] || \
+    aoa_die "managed ChatGPT wrapper path cannot be encoded safely in a desktop entry"
+
+  target_dir="$(dirname -- "$mcp_http_chatgpt_desktop_target")"
+  mkdir -p -- "$target_dir"
+  [[ -d "$target_dir" && ! -L "$target_dir" ]] || \
+    aoa_die "ChatGPT desktop entry parent must be a regular directory"
+  temp_path="$(mktemp --suffix=.desktop "${target_dir}/.chatgpt.abyss-stack.XXXXXX")"
+  if ! aoa_render_mcp_http_chatgpt_desktop_entry > "$temp_path"; then
+    rm -f -- "$temp_path"
+    aoa_die "failed to render the MCP HTTP ChatGPT desktop entry"
+  fi
+  chmod 0644 "$temp_path"
+  if command -v desktop-file-validate >/dev/null 2>&1; then
+    if ! validation_output="$(desktop-file-validate "$temp_path" 2>&1)"; then
+      rm -f -- "$temp_path"
+      [[ -z "$validation_output" ]] || printf '%s\n' "$validation_output" >&2
+      aoa_die "rendered MCP HTTP ChatGPT desktop entry failed validation"
+    fi
+  fi
+  if ! mv -T -- "$temp_path" "$mcp_http_chatgpt_desktop_target"; then
+    rm -f -- "$temp_path"
+    aoa_die "failed to install the MCP HTTP ChatGPT desktop entry"
+  fi
+  if command -v update-desktop-database >/dev/null 2>&1; then
+    update-desktop-database "$target_dir" >/dev/null 2>&1 || true
+  fi
+}
+
+aoa_preflight_mcp_http_chatgpt_install() {
+  [[ -f "$mcp_http_codex_launcher" && ! -L "$mcp_http_codex_launcher" && \
+     -x "$mcp_http_codex_launcher" ]] || \
+    aoa_die "deployed MCP HTTP Codex client launcher is unavailable: ${mcp_http_codex_launcher}"
+  [[ -x "$mcp_http_chatgpt_executable" && ! -d "$mcp_http_chatgpt_executable" ]] || \
+    aoa_die "official ChatGPT launcher is unavailable: ${mcp_http_chatgpt_executable}"
+  [[ -f "$mcp_http_chatgpt_desktop_source" && \
+     ! -L "$mcp_http_chatgpt_desktop_source" ]] || \
+    aoa_die "official ChatGPT desktop entry is unavailable: ${mcp_http_chatgpt_desktop_source}"
+  [[ "$(grep -c '^\[Desktop Entry\]$' "$mcp_http_chatgpt_desktop_source" || true)" -eq 1 && \
+     "$(grep -c '^Exec=' "$mcp_http_chatgpt_desktop_source" || true)" -eq 1 ]] || \
+    aoa_die "official ChatGPT desktop entry has an unsupported shape"
+  [[ "$mcp_http_chatgpt_wrapper" =~ ^/[A-Za-z0-9._/-]+$ ]] || \
+    aoa_die "managed ChatGPT wrapper path cannot be encoded safely in a desktop entry"
+  aoa_validate_mcp_http_chatgpt_wrapper
+  if [[ -e "$mcp_http_chatgpt_wrapper" && \
+        "$mcp_http_chatgpt_wrapper_present" -ne 1 ]]; then
+    aoa_die "refusing to replace an unmanaged ChatGPT client wrapper: ${mcp_http_chatgpt_wrapper}"
+  fi
+  aoa_validate_mcp_http_chatgpt_desktop_entry
+  if [[ -e "$mcp_http_chatgpt_desktop_target" && \
+        "$mcp_http_chatgpt_desktop_present" -ne 1 ]]; then
+    aoa_die "refusing to replace an unmanaged ChatGPT desktop entry: ${mcp_http_chatgpt_desktop_target}"
+  fi
+}
+
 aoa_install_mcp_http_codex_client() {
+  aoa_preflight_mcp_http_chatgpt_install
   aoa_write_mcp_http_codex_zshrc install
-  aoa_note "MCP HTTP Codex client installed for new interactive Zsh launches"
-  aoa_note "existing shells and running Codex processes were not changed"
+  aoa_write_mcp_http_chatgpt_wrapper install
+  aoa_write_mcp_http_chatgpt_desktop_entry install
+  aoa_note "MCP HTTP Codex client installed for new interactive Zsh and ChatGPT Desktop launches"
+  aoa_note "existing shells and running Codex or ChatGPT processes were not changed"
 }
 
 aoa_remove_mcp_http_codex_client() {
   aoa_validate_mcp_http_codex_zshrc
   if ((!mcp_http_codex_block_present)); then
     aoa_note "MCP HTTP Codex client block is already absent from .zshrc"
-    return 0
+  else
+    aoa_write_mcp_http_codex_zshrc remove
   fi
-  aoa_write_mcp_http_codex_zshrc remove
-  aoa_note "MCP HTTP Codex client removed from future interactive Zsh launches"
-  aoa_note "existing shells and running Codex processes were not changed"
+  aoa_write_mcp_http_chatgpt_desktop_entry remove
+  aoa_write_mcp_http_chatgpt_wrapper remove
+  aoa_note "MCP HTTP Codex client removed from future interactive Zsh and ChatGPT Desktop launches"
+  aoa_note "existing shells and running Codex or ChatGPT processes were not changed"
 }
 
 if ((provision_mcp_http_auth || install_mcp_http_codex_client)); then

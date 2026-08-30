@@ -8,8 +8,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping
 
+from ._runtime_config import PATH_CONFIG
 
-DEFAULT_WORKSPACE_ROOT = Path("/srv/AbyssOS")
 CATALOG_RELATIVE = Path("generated/summary_surface_catalog.min.json")
 LIVE_CATALOG_RELATIVE = Path("state/generated/summary_surface_catalog.min.json")
 OWNER_INVENTORY_RELATIVE = Path("stats/federation/owner-inventory.json")
@@ -108,7 +108,7 @@ class AoAStatsMCPState:
         workspace = Path(
             workspace_root
             or os.environ.get("AOA_WORKSPACE_ROOT")
-            or DEFAULT_WORKSPACE_ROOT
+            or PATH_CONFIG.workspace_root()
         ).expanduser().resolve()
         stats_root = Path(
             aoa_stats_root
@@ -120,8 +120,8 @@ class AoAStatsMCPState:
             stats_root = workspace / stats_root
 
         resolved_sources = _parse_source_roots(source_roots)
-        stack_source = os.environ.get("AOA_SOURCE_ROOT") or os.environ.get(
-            "AOA_ABYSS_STACK_ROOT"
+        stack_source = os.environ.get(PATH_CONFIG.stack_source_env_var) or os.environ.get(
+            PATH_CONFIG.stack_root_env_var
         )
         if stack_source and "abyss-stack" not in resolved_sources:
             resolved_sources["abyss-stack"] = Path(stack_source).expanduser().resolve()

@@ -1,4 +1,4 @@
-"""Authenticated AbyssMCPServer read contour for aoa-course-connector."""
+"""Authenticated MCP 2.x read contour for aoa-course-connector."""
 
 from __future__ import annotations
 
@@ -6,55 +6,30 @@ import json
 import logging
 from typing import Any
 
-from ._modern_runtime import AbyssMCPServer
 from mcp.types import ToolAnnotations
 
-from ._http_auth import http_auth_kwargs, transport_settings
+from ._http_auth import http_auth_config
+from ._modern_runtime import ModernMCPServer, run_server
+from ._runtime_config import SERVICE_CONFIG
 from .core import AoACourseConnectorMCPState
 
 LOGGER = logging.getLogger(__name__)
-PACKAGE_NAME = "aoa-course-connector-mcp"
-APPLICATION_VERSION = "0.1.0"
-DEFAULT_HTTP_PORT = 5436
-READ_TOKEN_ENV = "AOA_COURSE_CONNECTOR_MCP_READ_BEARER_TOKEN"
-READ_CREDENTIAL = "aoa-course-connector-mcp-read-bearer-token"
-READ_SCOPE = "mcp:aoa-course-connector:read"
-READ_CLIENT_ID = "aoa-loopback-codex:aoa-course-connector:read"
 
 
-def _application_version() -> str:
-    return APPLICATION_VERSION
-
-
-def _bind_server_info_version(mcp: Any) -> None:
-    low_level_server = getattr(mcp, "_mcp_server", None)
-    if low_level_server is None or not hasattr(low_level_server, "version"):
-        raise RuntimeError(
-            "the pinned MCP SDK no longer exposes the server identity seam"
-        )
-    low_level_server.version = _application_version()
-
-
-def _read_http_auth_kwargs() -> dict[str, Any]:
-    return http_auth_kwargs(
-        DEFAULT_HTTP_PORT,
-        token_env_var=READ_TOKEN_ENV,
-        credential_name=READ_CREDENTIAL,
-        auth_scope=READ_SCOPE,
-        client_id=READ_CLIENT_ID,
-    )
+def _read_http_auth_config() -> Any:
+    contour = SERVICE_CONFIG.contour("read")
+    return http_auth_config(contour.port, **contour.auth.as_kwargs())
 
 
 def build_server(
     state: AoACourseConnectorMCPState | None = None,
-) -> AbyssMCPServer:
+) -> ModernMCPServer:
     service_state = state or AoACourseConnectorMCPState.discover()
-    mcp = AbyssMCPServer(
-        "aoa-course-connector-mcp",
-        json_response=True,
-        **_read_http_auth_kwargs(),
+    mcp = ModernMCPServer(
+        SERVICE_CONFIG.server_name("read"),
+        version=SERVICE_CONFIG.package_version,
+        **_read_http_auth_config().server_kwargs,
     )
-    _bind_server_info_version(mcp)
     read_tool = mcp.tool(
         annotations=ToolAnnotations(
             read_only_hint=True,
@@ -154,13 +129,7 @@ def build_server(
 
 
 def _run_server(server: Any) -> None:
-    settings = transport_settings(DEFAULT_HTTP_PORT)
-    _read_http_auth_kwargs()
-    if settings.transport == "stdio":
-        server.run(transport="stdio")
-        return
-    server.configure_http(settings.host, settings.port)
-    server.run(transport="streamable-http")
+    run_server(server, _read_http_auth_config())
 
 
 def main() -> None:

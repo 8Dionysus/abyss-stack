@@ -5,6 +5,7 @@ import hashlib
 import importlib
 import json
 import os
+import py_compile
 import signal
 import shutil
 import socket
@@ -62,6 +63,9 @@ EVALS_MCP_CANDIDATE_UNIT = (
     REPO_ROOT / "systemd" / "user" / "aoa-evals-mcp-candidate.service"
 )
 MCP_HTTP_BUNDLE = REPO_ROOT / "systemd" / "user" / "aoa-mcp-http.service"
+MCP_RUNTIME_CONFIG = (
+    REPO_ROOT / "mcp" / "services" / "_shared" / "runtime-config.v1.json"
+)
 STACK_MCP_READ_UNIT = REPO_ROOT / "systemd" / "user" / "abyss-stack-mcp-read.service"
 STACK_MCP_READ_BOOTSTRAP_UNIT = (
     REPO_ROOT / "systemd" / "user" / "abyss-stack-mcp-read-bootstrap.service"
@@ -308,23 +312,16 @@ MCP_SERVER_PACKAGES = {
     ),
     "aoa_xda_connector_mcp": ("aoa-xda-connector-mcp", 5438),
 }
-EXPECTED_MCP_HTTP_INSTANCES = {
-    "aoa-organ-mcp-read@aoa-decisions.service",
-    "aoa-organ-mcp-read@aoa-memo.service",
-    "aoa-memo-mcp-candidate.service",
-    "aoa-organ-mcp-read@aoa-session-memory.service",
-    "aoa-organ-mcp-read@abyss-machine.service",
-    "aoa-organ-mcp-read@aoa-evals.service",
-    "aoa-evals-mcp-candidate.service",
-    "aoa-organ-mcp-read@aoa-kag.service",
-    "aoa-organ-mcp-read@aoa-stats.service",
-    "aoa-organ-mcp-read@aoa-4pda-connector.service",
-    "aoa-organ-mcp-read@aoa-course-connector.service",
-    "aoa-organ-mcp-read@aoa-discord-connector.service",
-    "aoa-organ-mcp-read@aoa-stackoverflow-connector.service",
-    "aoa-organ-mcp-read@aoa-telegram-connector.service",
-    "aoa-organ-mcp-read@aoa-xda-connector.service",
-}
+def expected_mcp_http_instances() -> set[str]:
+    shared_root = REPO_ROOT / "mcp" / "services" / "_shared"
+    if str(shared_root) not in sys.path:
+        sys.path.insert(0, str(shared_root))
+    from build_mcp_bundle_unit import bundle_read_units
+
+    payload = json.loads(
+        (shared_root / "runtime-config.v1.json").read_text(encoding="utf-8")
+    )
+    return set(bundle_read_units(payload))
 
 
 class DummySettings:
@@ -336,13 +333,13 @@ class DummyServer:
     def __init__(self) -> None:
         self.settings = DummySettings()
         self.transports: list[str] = []
+        self.run_kwargs: list[dict[str, object]] = []
 
-    def run(self, *, transport: str) -> None:
+    def run(self, transport: str, **kwargs: object) -> None:
         self.transports.append(transport)
-
-    def configure_http(self, host: str, port: int) -> None:
-        self.settings.host = host
-        self.settings.port = port
+        self.run_kwargs.append(kwargs)
+        self.settings.host = kwargs.get("host", self.settings.host)
+        self.settings.port = kwargs.get("port", self.settings.port)
 
 
 def mcp_environment(**overrides: str) -> dict[str, str]:
@@ -378,10 +375,12 @@ def mcp_environment(**overrides: str) -> dict[str, str]:
 
 def mcp_server_auth_kwargs(module, package: str):
     if package == "aoa_decisions_mcp":
-        return module._contour_http_auth_kwargs("read")
-    if package in ORGAN_MCP_READ_AUTH:
-        return module._read_http_auth_kwargs()
-    return module._http_auth_kwargs(module.DEFAULT_HTTP_PORT)
+        config = module._contour_http_auth_config("read")
+    elif package in {"aoa_memo_mcp", "aoa_evals_mcp"}:
+        config = module._contour_http_auth_config("read")
+    else:
+        config = module._read_http_auth_config()
+    return {**config.server_kwargs, "transport_security": config.transport_security}
 
 
 def mcp_server_token_environment(package: str) -> str:
@@ -1413,7 +1412,9 @@ esac
     def test_stack_mcp_runtime_requires_the_released_aoa_sdk(self) -> None:
         installer = INSTALL_SYSTEMD.read_text(encoding="utf-8")
         self.assertIn("import abyss_stack_mcp, aoa_sdk, mcp, pydantic", installer)
-        self.assertIn('version("aoa-sdk") == "0.10.2"', installer)
+        self.assertIn("aoa_mcp_approved_aoa_sdk_version", installer)
+        self.assertIn('version("aoa-sdk") == sys.argv[1]', installer)
+        self.assertNotIn('version("aoa-sdk") == "0.10.2"', installer)
 
     def test_stack_mcp_runtime_fallback_activation_is_transactional(self) -> None:
         installer = INSTALL_SYSTEMD.read_text(encoding="utf-8")
@@ -1469,6 +1470,23 @@ esac
                 stack_root / "Configs" / "mcp" / "services" / "abyss-stack-mcp"
             )
             service_root.mkdir(parents=True)
+            runtime_config = json.loads(
+                MCP_RUNTIME_CONFIG.read_text(encoding="utf-8")
+            )
+            shared_config_root = service_root.parent / "_shared"
+            shared_config_root.mkdir(parents=True)
+            (shared_config_root / "runtime-config.v1.json").write_text(
+                json.dumps(
+                    {
+                        "deployment": {
+                            "approved_artifacts": runtime_config["deployment"][
+                                "approved_artifacts"
+                            ]
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
             (service_root / "pyproject.toml").write_text(
                 '[project]\nname = "abyss-stack-mcp"\nversion = "0.1.0"\n',
                 encoding="utf-8",
@@ -1946,6 +1964,38 @@ esac
                 first_content_digest,
                 r"\A[0-9a-f]{64}\Z",
             )
+            sourceless_bytecode = (
+                venv
+                / "lib"
+                / "python"
+                / "site-packages"
+                / "sitecustomize.pyc"
+            )
+            bytecode_source = root / "sitecustomize.py"
+            bytecode_source.write_text(
+                "raise RuntimeError('unmeasured bytecode executed')\n",
+                encoding="utf-8",
+            )
+            py_compile.compile(
+                str(bytecode_source),
+                cfile=str(sourceless_bytecode),
+                doraise=True,
+            )
+            bytecode_source.unlink()
+            bytecode_only_verify = subprocess.run(
+                read_verify_command,
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(bytecode_only_verify.returncode, 0)
+            self.assertIn(
+                "abyss-stack MCP runtime content digest mismatch",
+                bytecode_only_verify.stderr,
+            )
+            sourceless_bytecode.unlink()
             self.assertTrue((venv / "bin" / "python").is_file())
             self.assertFalse((venv / "bin" / "python").is_symlink())
             entrypoint = venv / "bin" / "abyss-stack-mcp"
@@ -2988,6 +3038,24 @@ esac
                 first_identity,
             )
 
+            runtime_config_path = shared_config_root / "runtime-config.v1.json"
+            runtime_config_bytes = runtime_config_path.read_bytes()
+            runtime_config_path.unlink()
+            missing_catalog = subprocess.run(
+                verify_command,
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(missing_catalog.returncode, 0)
+            self.assertIn(
+                "runtime catalog is unavailable or lacks the approved aoa-sdk version",
+                missing_catalog.stderr,
+            )
+            runtime_config_path.write_bytes(runtime_config_bytes)
+
             source_file.write_text("VALUE = 2\n", encoding="utf-8")
             source_drift = subprocess.run(
                 verify_command,
@@ -3631,6 +3699,7 @@ esac
                 "ABYSS_MACHINE_MCP_READ_BEARER_TOKEN",
                 "TOS_CORPUS_MCP_READ_BEARER_TOKEN",
                 "ABYSS_STACK_MCP_READ_BEARER_TOKEN",
+                "AOA_CODEX_CLIENT_MODE",
             ):
                 env.pop(environment_name, None)
 
@@ -3654,6 +3723,36 @@ esac
             )
             self.assertNotIn(MCP_HTTP_AUTH_TOKEN, result.stdout + result.stderr)
 
+            env["AOA_CODEX_CLIENT_MODE"] = "desktop"
+            desktop = subprocess.run(
+                [str(MCP_HTTP_CODEX_CLIENT), "codex://open-test"],
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(desktop.returncode, 0, desktop.stderr)
+            self.assertEqual(
+                capture_args.read_text(encoding="utf-8").splitlines(),
+                ["codex://open-test"],
+            )
+            self.assertNotIn(MCP_HTTP_AUTH_TOKEN, desktop.stdout + desktop.stderr)
+
+            env["AOA_CODEX_CLIENT_MODE"] = "unsupported"
+            unsupported = subprocess.run(
+                [str(MCP_HTTP_CODEX_CLIENT), "--version"],
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(unsupported.returncode, 0)
+            self.assertIn("must be codex or desktop", unsupported.stderr)
+            self.assertNotIn(MCP_HTTP_AUTH_TOKEN, unsupported.stdout + unsupported.stderr)
+            env.pop("AOA_CODEX_CLIENT_MODE")
+
             env["AOA_MEMO_MCP_READ_BEARER_TOKEN"] = "different-" + ("b" * 54)
             conflict = subprocess.run(
                 [str(MCP_HTTP_CODEX_CLIENT), "--version"],
@@ -3671,6 +3770,9 @@ esac
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
             stack_root = root / "stack"
+            registry = root / ".aoa" / "organ-access" / "organ-registry.v2.source.json"
+            registry.parent.mkdir(parents=True)
+            registry.write_text('{"records": []}\n', encoding="utf-8")
             secret_root = stack_root / "Secrets" / "Configs"
             secret_root.mkdir(parents=True)
             for index, name in enumerate(CODEX_MCP_READ_CREDENTIAL_NAMES):
@@ -3707,7 +3809,7 @@ esac
                 "set -euo pipefail\n"
                 "[[ -f \"$READINESS_MARKER\" ]]\n"
                 "for port in 5420 5421 5422 5423 5424 5425 5426 5427 5428 5430 5431; do\n"
-                "  printf 'LISTEN 0 128 127.0.0.1:%s 0.0.0.0:*\\n' \"$port\"\n"
+                "  printf 'LISTEN 0 128 %s:%s 0.0.0.0:*\\n' \"$LISTENER_HOST\" \"$port\"\n"
                 "done\n",
                 encoding="utf-8",
             )
@@ -3728,6 +3830,7 @@ esac
                     "AOA_CODEX_EXECUTABLE": str(fake_codex),
                     "CODEX_EXECUTED": str(executed),
                     "PATH": f"{fake_bin}:{env['PATH']}",
+                    "LISTENER_HOST": "127.0.0.1",
                     "READINESS_MARKER": str(ready_marker),
                     "SYSTEMCTL_LOG": str(systemctl_log),
                 }
@@ -3793,6 +3896,69 @@ esac
                 ],
             )
 
+            registry.write_text("{", encoding="utf-8")
+            executed.unlink()
+            malformed_registry = subprocess.run(
+                [str(MCP_HTTP_CODEX_CLIENT), "exec", "malformed-registry"],
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(
+                malformed_registry.returncode,
+                0,
+                malformed_registry.stderr,
+            )
+            self.assertTrue(executed.exists())
+            self.assertIn(
+                "using declared recovery rows",
+                malformed_registry.stderr,
+            )
+            self.assertIn(
+                "background recovery requested",
+                malformed_registry.stderr,
+            )
+            self.assertEqual(
+                len(systemctl_log.read_text(encoding="utf-8").splitlines()),
+                3,
+            )
+            registry.write_text('{"records": []}\n', encoding="utf-8")
+
+            ready_marker.touch()
+            env["LISTENER_HOST"] = "0.0.0.0"
+            exposed = subprocess.run(
+                [str(MCP_HTTP_CODEX_CLIENT), "exec", "exposed-listener"],
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(exposed.returncode, 0, exposed.stderr)
+            self.assertIn("background recovery requested", exposed.stderr)
+            self.assertEqual(
+                len(systemctl_log.read_text(encoding="utf-8").splitlines()),
+                4,
+            )
+
+            env["LISTENER_HOST"] = "127.0.0.1"
+            loopback = subprocess.run(
+                [str(MCP_HTTP_CODEX_CLIENT), "exec", "loopback-listener"],
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(loopback.returncode, 0, loopback.stderr)
+            self.assertNotIn("background recovery requested", loopback.stderr)
+            self.assertEqual(
+                len(systemctl_log.read_text(encoding="utf-8").splitlines()),
+                4,
+            )
+
     @unittest.skipIf(
         hasattr(os, "geteuid") and os.geteuid() == 0,
         "MCP HTTP Codex client installs are user-scoped",
@@ -3808,6 +3974,28 @@ esac
             deployed_launcher.parent.mkdir(parents=True)
             deployed_launcher.write_bytes(MCP_HTTP_CODEX_CLIENT.read_bytes())
             deployed_launcher.chmod(0o755)
+            deployed_catalog = (
+                configs_root / "mcp" / "protocol-lab" / "scripts" / "runtime_catalog.py"
+            )
+            deployed_catalog.parent.mkdir(parents=True)
+            deployed_catalog.write_bytes(
+                (
+                    REPO_ROOT
+                    / "mcp"
+                    / "protocol-lab"
+                    / "scripts"
+                    / "runtime_catalog.py"
+                ).read_bytes()
+            )
+            (configs_root / "mcp" / "services" / "_shared" / "runtime-config.v1.json").write_bytes(
+                (
+                    REPO_ROOT
+                    / "mcp"
+                    / "services"
+                    / "_shared"
+                    / "runtime-config.v1.json"
+                ).read_bytes()
+            )
             credential = stack_root / MCP_HTTP_SECRET_RELATIVE
             credential.parent.mkdir(parents=True)
             credential.write_text(f"{MCP_HTTP_AUTH_TOKEN}\n", encoding="utf-8")
@@ -3822,12 +4010,22 @@ esac
             zshrc.chmod(0o640)
             fake_codex = root / "codex"
             capture_token = root / "captured-token"
+            capture_args = root / "captured-args"
             fake_codex.write_text(
                 "#!/usr/bin/env bash\n"
-                'printf \'%s\' "$ABYSS_STACK_MCP_READ_BEARER_TOKEN" > "$CAPTURE_TOKEN"\n',
+                'printf \'%s\' "$ABYSS_STACK_MCP_READ_BEARER_TOKEN" > "$CAPTURE_TOKEN"\n'
+                'printf \'%s\\n\' "$@" > "$CAPTURE_ARGS"\n',
                 encoding="utf-8",
             )
             fake_codex.chmod(0o755)
+            desktop_source = root / "chatgpt.desktop"
+            desktop_source.write_text(
+                "[Desktop Entry]\n"
+                "Name=ChatGPT\n"
+                "Exec=chatgpt %U\n"
+                "Type=Application\n",
+                encoding="utf-8",
+            )
             env = mcp_environment()
             env.update(
                 {
@@ -3837,6 +4035,10 @@ esac
                     "AOA_CODEX_EXECUTABLE": str(fake_codex),
                     "AOA_MCP_READINESS_SKIP": "1",
                     "CAPTURE_TOKEN": str(capture_token),
+                    "CAPTURE_ARGS": str(capture_args),
+                    "AOA_CHATGPT_DESKTOP_EXECUTABLE": str(fake_codex),
+                    "AOA_CHATGPT_DESKTOP_ENTRY": str(desktop_source),
+                    "XDG_DATA_HOME": str(home / ".local" / "share"),
                 }
             )
             env.pop("ZDOTDIR", None)
@@ -3868,6 +4070,31 @@ esac
                 MCP_HTTP_AUTH_TOKEN, first_zshrc + first.stdout + first.stderr
             )
             self.assertEqual(zshrc.stat().st_mode & 0o777, 0o640)
+            chatgpt_wrapper = home / ".local" / "bin" / "chatgpt"
+            chatgpt_desktop = home / ".local" / "share" / "applications" / "chatgpt.desktop"
+            self.assertTrue(chatgpt_wrapper.is_file())
+            self.assertEqual(chatgpt_wrapper.stat().st_mode & 0o777, 0o755)
+            self.assertIn(str(deployed_launcher), chatgpt_wrapper.read_text(encoding="utf-8"))
+            self.assertNotIn(MCP_HTTP_AUTH_TOKEN, chatgpt_wrapper.read_text(encoding="utf-8"))
+            self.assertTrue(chatgpt_desktop.is_file())
+            self.assertEqual(chatgpt_desktop.stat().st_mode & 0o777, 0o644)
+            self.assertIn(f"Exec={chatgpt_wrapper} %U", chatgpt_desktop.read_text(encoding="utf-8"))
+            self.assertIn("X-AbyssStackMcpHttpClient=true", chatgpt_desktop.read_text(encoding="utf-8"))
+
+            desktop_launch = subprocess.run(
+                [str(chatgpt_wrapper), "codex://desktop-test"],
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(desktop_launch.returncode, 0, desktop_launch.stderr)
+            self.assertEqual(capture_token.read_text(encoding="utf-8"), "s" * 64)
+            self.assertEqual(
+                capture_args.read_text(encoding="utf-8").splitlines(),
+                ["codex://desktop-test"],
+            )
 
             second = subprocess.run(
                 ["bash", str(INSTALL_SYSTEMD), "--install-mcp-http-codex-client"],
@@ -3917,6 +4144,41 @@ esac
             self.assertEqual(removed_zshrc, "export KEEP_EXISTING=1\n")
             self.assertNotIn("MCP HTTP Codex client", removed_zshrc)
             self.assertEqual(zshrc.stat().st_mode & 0o777, 0o640)
+            self.assertFalse(chatgpt_wrapper.exists())
+            self.assertFalse(chatgpt_desktop.exists())
+
+            chatgpt_wrapper.write_text("#!/usr/bin/env bash\nexit 7\n", encoding="utf-8")
+            chatgpt_wrapper.chmod(0o755)
+            chatgpt_desktop.write_text(
+                "[Desktop Entry]\nName=Local ChatGPT\nExec=/usr/bin/false\nType=Application\n",
+                encoding="utf-8",
+            )
+            unmanaged_install = subprocess.run(
+                ["bash", str(INSTALL_SYSTEMD), "--install-mcp-http-codex-client"],
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(unmanaged_install.returncode, 0)
+            self.assertIn("unmanaged ChatGPT client wrapper", unmanaged_install.stderr)
+            self.assertEqual(zshrc.read_text(encoding="utf-8"), "export KEEP_EXISTING=1\n")
+            self.assertEqual(
+                chatgpt_wrapper.read_text(encoding="utf-8"),
+                "#!/usr/bin/env bash\nexit 7\n",
+            )
+            unmanaged_remove = subprocess.run(
+                ["bash", str(INSTALL_SYSTEMD), "--remove-mcp-http-codex-client"],
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(unmanaged_remove.returncode, 0, unmanaged_remove.stderr)
+            self.assertTrue(chatgpt_wrapper.exists())
+            self.assertTrue(chatgpt_desktop.exists())
 
     def test_loopback_mcp_units_keep_owner_processes_and_deployed_paths(self) -> None:
         installer = INSTALL_SYSTEMD.read_text(encoding="utf-8")
@@ -3987,7 +4249,9 @@ esac
             for line in bundle.splitlines()
             if line.startswith("Wants=")
         }
-        self.assertEqual(wants, EXPECTED_MCP_HTTP_INSTANCES)
+        self.assertEqual(wants, expected_mcp_http_instances())
+        self.assertNotIn("aoa-memo-mcp-candidate.service", wants)
+        self.assertNotIn("aoa-evals-mcp-candidate.service", wants)
         self.assertIn("Type=oneshot", bundle)
         self.assertIn("RemainAfterExit=yes", bundle)
 
@@ -4248,7 +4512,7 @@ esac
         self.assertIn("live_digest=$(sha256sum", script)
         self.assertIn("trap cleanup_recovery EXIT", script)
         self.assertIn(
-            'REPAIR_FALLBACK="$STACK/Logs/mcp/admission/'
+            'REPAIR_FALLBACK="$LOGS_ROOT/admission/'
             'runtime-repair-fallback.units"',
             script,
         )
@@ -4256,7 +4520,7 @@ esac
             'CANARY_WORKERS="${ABYSS_MCP_CANARY_WORKERS:-3}"', script
         )
         self.assertIn("CANARY_WORKERS < 1", script)
-        self.assertIn("CANARY_WORKERS > ${#organs[@]}", script)
+        self.assertIn("CANARY_WORKERS > EXPECTED_PRODUCTION_COUNT", script)
         self.assertIn("capture_canary_pair", script)
         self.assertIn("setsid --wait bash -euo pipefail -c", script)
         self.assertIn('kill -TERM -- "-${pid}"', script)
@@ -4291,7 +4555,7 @@ esac
         self.assertIn(
             'startswith("systemd-user:" + $unit + ":pid:")', script
         )
-        self.assertIn(".preflight.eligible_count == 11", script)
+        self.assertIn(".preflight.eligible_count == $expected", script)
         self.assertIn(".preflight.blocked_count == 0", script)
         self.assertIn("catalog_matches_current_canaries", script)
         self.assertIn(".canary_receipt_id == $receipt_id", script)
@@ -4299,7 +4563,7 @@ esac
         self.assertIn("production_admission_reusable=0", script)
         self.assertIn(
             'if [[ "$production_admission_reusable" -eq 1 \\\n'
-            '      && "$active_unit_count" -eq 11 ]]; then',
+            '      && "$active_unit_count" -eq "$EXPECTED_PRODUCTION_COUNT" ]]; then',
             script,
         )
         self.assertIn(
@@ -4339,14 +4603,17 @@ esac
         self.assertIn("OnUnitActiveSec=5min", timer)
         self.assertIn("ensure_stack_runtime_ready", script)
         self.assertIn(
-            'RUNTIME_REPAIR_SERVICE="abyss-stack-mcp-runtime-repair.service"',
+            'RUNTIME_REPAIR_SERVICE="$(jq -er \'.deployment.runtime_repair_unit\' "$RUNTIME_CONFIG")"',
             script,
         )
         self.assertIn(
             'systemctl --user start "$RUNTIME_REPAIR_SERVICE"',
             script,
         )
-        self.assertIn('AUTO_REPAIR_MARKER="$STACK/Secrets/Configs/', script)
+        self.assertIn(
+            'AUTO_REPAIR_MARKER="$CREDENTIALS_ROOT/$(jq -er \'.deployment.auto_repair_marker_name\' "$RUNTIME_CONFIG")"',
+            script,
+        )
         self.assertIn("automatic runtime repair is not explicitly enabled", script)
         self.assertIn(
             'systemctl --user reset-failed "$RUNTIME_REPAIR_SERVICE" \\\n'
@@ -4690,6 +4957,11 @@ esac
             "--registry /srv/AbyssOS/.aoa/organ-access/organ-registry.v2.source.json",
             unit,
         )
+        self.assertIn("--runtime-workspace-root /srv/AbyssOS", unit)
+        self.assertIn(
+            "--runtime-stack-root /srv/AbyssOS/abyss-stack",
+            unit,
+        )
         self.assertIn(
             "--output /srv/AbyssOS/abyss-stack/Logs/mcp/observations/current.json",
             unit,
@@ -4787,7 +5059,10 @@ esac
 class McpLoopbackLifecycleTests(unittest.TestCase):
     def test_release_dependencies_retain_the_tested_mcp_auth_api(self) -> None:
         requirements = (REPO_ROOT / "requirements-dev.txt").read_text(encoding="utf-8")
-        self.assertIn("mcp==2.1.1", requirements.splitlines())
+        tested_lock = json.loads(
+            MCP_RUNTIME_CONFIG.read_text(encoding="utf-8")
+        )["mcp"]["sdk"]["tested_lock"]
+        self.assertIn(f"mcp=={tested_lock}", requirements.splitlines())
 
     def test_all_standalone_packages_require_the_tested_mcp_auth_api(self) -> None:
         for directory, _ in MCP_SERVER_PACKAGES.values():
@@ -4795,7 +5070,29 @@ class McpLoopbackLifecycleTests(unittest.TestCase):
                 pyproject = (
                     REPO_ROOT / "mcp" / "services" / directory / "pyproject.toml"
                 ).read_text(encoding="utf-8")
-                self.assertIn('"mcp==2.1.1",', pyproject)
+                self.assertIn('"mcp>=2,<3",', pyproject)
+        lock = (
+            REPO_ROOT
+            / "mcp"
+            / "services"
+            / "abyss-stack-mcp"
+            / "requirements.lock"
+        ).read_text(encoding="utf-8")
+        tested_lock = json.loads(
+            MCP_RUNTIME_CONFIG.read_text(encoding="utf-8")
+        )["mcp"]["sdk"]["tested_lock"]
+        self.assertTrue(
+            any(
+                line.strip().startswith(f"mcp=={tested_lock}")
+                for line in lock.splitlines()
+            )
+        )
+        self.assertTrue(
+            any(
+                line.strip().startswith(f"mcp-types=={tested_lock}")
+                for line in lock.splitlines()
+            )
+        )
 
     def test_generated_http_auth_helpers_are_current(self) -> None:
         result = subprocess.run(
@@ -4822,8 +5119,8 @@ class McpLoopbackLifecycleTests(unittest.TestCase):
         for package, (directory, expected_port) in MCP_SERVER_PACKAGES.items():
             with self.subTest(package=package):
                 module = import_mcp_server(package, directory)
-                self.assertEqual(module.DEFAULT_HTTP_PORT, expected_port)
-                ports.add(module.DEFAULT_HTTP_PORT)
+                self.assertEqual(module.SERVICE_CONFIG.contour("read").port, expected_port)
+                ports.add(module.SERVICE_CONFIG.contour("read").port)
 
                 server = DummyServer()
                 with mock.patch.dict(os.environ, mcp_environment(), clear=True):
@@ -4997,7 +5294,7 @@ class McpLoopbackLifecycleTests(unittest.TestCase):
             clear=True,
         ):
             with self.assertRaisesRegex(SystemExit, "bearer authentication"):
-                decisions._contour_http_auth_kwargs("internal_effect")
+                decisions._contour_http_auth_config("internal_effect")
 
         with mock.patch.dict(
             os.environ,
@@ -5007,7 +5304,7 @@ class McpLoopbackLifecycleTests(unittest.TestCase):
             ),
             clear=True,
         ):
-            kwargs = decisions._contour_http_auth_kwargs("internal_effect")
+            kwargs = decisions._contour_http_auth_config("internal_effect").server_kwargs
         self.assertEqual(
             kwargs["auth"].required_scopes,
             ["mcp:aoa-decisions:internal-effect"],
@@ -5063,7 +5360,7 @@ class McpLoopbackLifecycleTests(unittest.TestCase):
                         SystemExit,
                         "bearer authentication",
                     ):
-                        module._contour_http_auth_kwargs("candidate")
+                        module._contour_http_auth_config("candidate")
             with mock.patch.dict(
                 os.environ,
                 mcp_environment(
@@ -5072,7 +5369,7 @@ class McpLoopbackLifecycleTests(unittest.TestCase):
                 ),
                 clear=True,
             ):
-                kwargs = module._contour_http_auth_kwargs("candidate")
+                kwargs = module._contour_http_auth_config("candidate").server_kwargs
             self.assertEqual(kwargs["auth"].required_scopes, [scope])
             access = asyncio.run(
                 kwargs["token_verifier"].verify_token(MCP_HTTP_AUTH_TOKEN)
@@ -5083,9 +5380,10 @@ class McpLoopbackLifecycleTests(unittest.TestCase):
 
     def test_http_auth_accepts_systemd_credential_and_rejects_conflict(self) -> None:
         module = import_mcp_server("aoa_decisions_mcp", "aoa-decisions-mcp")
+        read_auth = module.SERVICE_CONFIG.contour("read").auth
         with tempfile.TemporaryDirectory() as tmpdir:
             credential_dir = Path(tmpdir)
-            credential_dir.joinpath(MCP_HTTP_CREDENTIAL_NAME).write_text(
+            credential_dir.joinpath(read_auth.credential_name).write_text(
                 MCP_HTTP_AUTH_TOKEN + "\n",
                 encoding="utf-8",
             )
@@ -5097,7 +5395,7 @@ class McpLoopbackLifecycleTests(unittest.TestCase):
                 ),
                 clear=True,
             ):
-                kwargs = module._http_auth_kwargs(module.DEFAULT_HTTP_PORT)
+                kwargs = module._contour_http_auth_config("read").server_kwargs
             access = asyncio.run(
                 kwargs["token_verifier"].verify_token(MCP_HTTP_AUTH_TOKEN)
             )
@@ -5107,7 +5405,7 @@ class McpLoopbackLifecycleTests(unittest.TestCase):
                 os.environ,
                 mcp_environment(
                     AOA_MCP_TRANSPORT="streamable-http",
-                    AOA_MCP_HTTP_BEARER_TOKEN="different-" + ("b" * 54),
+                    **{read_auth.token_env_var: "different-" + ("b" * 54)},
                     CREDENTIALS_DIRECTORY=str(credential_dir),
                 ),
                 clear=True,
@@ -5115,27 +5413,28 @@ class McpLoopbackLifecycleTests(unittest.TestCase):
                 with self.assertRaisesRegex(
                     SystemExit, "conflicting bearer credentials"
                 ):
-                    module._http_auth_kwargs(module.DEFAULT_HTTP_PORT)
+                    module._contour_http_auth_config("read")
 
             with mock.patch.dict(
                 os.environ,
                 mcp_environment(
                     AOA_MCP_TRANSPORT="streamable-http",
-                    AOA_MCP_HTTP_BEARER_TOKEN="too-short",
+                    **{read_auth.token_env_var: "too-short"},
                     CREDENTIALS_DIRECTORY=str(credential_dir),
                 ),
                 clear=True,
             ):
                 with self.assertRaisesRegex(SystemExit, "invalid bearer credential"):
-                    module._http_auth_kwargs(module.DEFAULT_HTTP_PORT)
+                    module._contour_http_auth_config("read")
 
     def test_http_auth_rejects_symlinked_systemd_credential(self) -> None:
         module = import_mcp_server("aoa_decisions_mcp", "aoa-decisions-mcp")
+        read_auth = module.SERVICE_CONFIG.contour("read").auth
         with tempfile.TemporaryDirectory() as tmpdir:
             credential_dir = Path(tmpdir)
             target = credential_dir / "outside-token"
             target.write_text(MCP_HTTP_AUTH_TOKEN, encoding="utf-8")
-            credential_dir.joinpath(MCP_HTTP_CREDENTIAL_NAME).symlink_to(target)
+            credential_dir.joinpath(read_auth.credential_name).symlink_to(target)
 
             with mock.patch.dict(
                 os.environ,
@@ -5146,7 +5445,7 @@ class McpLoopbackLifecycleTests(unittest.TestCase):
                 clear=True,
             ):
                 with self.assertRaisesRegex(SystemExit, "regular non-symlink"):
-                    module._http_auth_kwargs(module.DEFAULT_HTTP_PORT)
+                    module._contour_http_auth_config("read")
 
     def test_http_transport_rejects_invalid_port(self) -> None:
         module = import_mcp_server("aoa_decisions_mcp", "aoa-decisions-mcp")

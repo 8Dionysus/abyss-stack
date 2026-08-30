@@ -5,6 +5,12 @@ The authoritative machine-readable comparison is
 
 ## Current decision
 
+The source transition is now pinned to Python MCP `2.1.1` with the paired
+`mcp-types==2.1.1`; the production paragraphs below intentionally preserve the
+previous `2.0.0` deployment receipt as historical evidence until a fresh
+owner-approved deployment receipt exists. They must not be read as proof that
+the deployed fleet has already moved to 2.1.1.
+
 Production uses MCP `2026-07-28` for the eleven admitted OS Abyss organ read
 registrations. Each deployment-bound listener is still evidenced on exact
 Python MCP `2.0.0`, advertises only the modern wire, rejects wrong bearer and

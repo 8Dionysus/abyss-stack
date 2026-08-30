@@ -16,10 +16,26 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Pass the eleven admitted read-contour bearer variables to future
+  ChatGPT/Codex Desktop launches through a managed user wrapper and desktop
+  entry, while leaving the running GUI, packaged files, and credential values
+  untouched on disk.
+- Restore bounded foreign KAG family observation when an older owner facade
+  lacks the current receipt-identity keywords, while keeping self-owned reads
+  strict and refusing to promote compatibility observation into admission,
+  proof, or acceptance.
+- Move the stack-owned MCP source/test baseline to the native SDK v2 runtime
+  with a centrally declared Python `2.1.1`/`mcp-types==2.1.1` pair, generated
+  package projections, and explicit stale-evidence detection so a source
+  transition cannot be mistaken for a live deployment.
 - Bind MCP 2.1.1 protocol-lab and KAG receipts to the actually imported SDK
   from a clean attested checkout and source revision; carry the same identity
   through deployment-bound evidence and use the SDK's typed snake-case
   annotation fields across all stack-owned MCP service validators.
+- Complete the bounded eleven-contour read deployment follow-up on exact MCP
+  2.1.1 with serving-process byte identity, listener ownership, modern
+  discovery, schema and semantic canaries, and auth/legacy denial; keep four
+  non-read contours unadmitted and the checked-in historical fixtures honest.
 - Keep protocol-lab readiness fail-closed when deployment-bound rollback,
   Tasks-matrix, live-fleet, or Codex Tasks evidence expires; expose separate
   candidate/deployment deadlines and derive live Tasks receipts from the
