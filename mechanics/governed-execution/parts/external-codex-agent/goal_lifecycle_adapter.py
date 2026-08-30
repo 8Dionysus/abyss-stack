@@ -2057,8 +2057,29 @@ def _resolve_semantic_attempt_path(
             raise runtime.ExternalCodexReturnError(
                 "Goal lifecycle semantic attempt anchor binding mismatch"
             )
+        anchored_path = Path(anchor["attempt_ref"])
+        if not anchored_path.is_absolute() or anchored_path.is_symlink():
+            raise runtime.ExternalCodexReturnError(
+                "Goal lifecycle semantic attempt anchor path binding mismatch"
+            )
+        if (
+            current_anchor
+            and not anchor["attempt_started"]
+            and not anchored_path.exists()
+            and not anchored_path.parent.exists()
+        ):
+            rebound_anchor = {
+                **anchor,
+                "attempt_ref": str(requested_path.resolve()),
+            }
+            runtime._replace_json(
+                anchor_path,
+                rebound_anchor,
+                "Goal lifecycle semantic attempt anchor",
+            )
+            return requested_path
         anchored_path = runtime._validate_output_path(
-            Path(anchor["attempt_ref"]),
+            anchored_path,
             "Goal lifecycle anchored attempt reservation",
         )
         if (

@@ -1545,6 +1545,65 @@ def test_cli_unstarted_anchor_allows_retry_after_transient_transport_failure(
     assert [method for method, _params in rpc.calls].count("thread/goal/set") == 1
 
 
+def test_cli_unstarted_anchor_rebinds_after_original_parent_cleanup(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    args, _request_path, _decision_path, _receipt_path, rpc = _cli_fixture(
+        tmp_path,
+        monkeypatch,
+        request_id="request:unstarted-anchor-parent-cleanup",
+    )
+    original_job = tmp_path / "original-job"
+    original_job.mkdir(mode=0o700)
+    original_receipt = original_job / "receipt.json"
+    args.receipt = str(original_receipt)
+    failed_once = False
+
+    def flaky_discovery(
+        _owner: dict[str, Any], **_kwargs: object
+    ) -> tuple[Path, str]:
+        nonlocal failed_once
+        if not failed_once:
+            failed_once = True
+            raise RUNTIME.ExternalCodexReturnError(
+                "simulated transient endpoint discovery failure"
+            )
+        return rpc.endpoint, "test-fixture"
+
+    monkeypatch.setattr(RUNTIME, "discover_app_server_socket", flaky_discovery)
+
+    with pytest.raises(
+        RUNTIME.ExternalCodexReturnError,
+        match="simulated transient",
+    ):
+        ADAPTER.run_goal_transition(args)
+
+    anchors = list((tmp_path / "semantic-attempt-state").glob("*.json"))
+    assert len(anchors) == 1
+    initial_anchor = json.loads(anchors[0].read_text(encoding="utf-8"))
+    assert initial_anchor["attempt_started"] is False
+    assert initial_anchor["attempt_ref"] == str(
+        ADAPTER._attempt_path(original_receipt).resolve()
+    )
+    original_job.rmdir()
+
+    replacement_job = tmp_path / "replacement-job"
+    replacement_job.mkdir(mode=0o700)
+    replacement_receipt = replacement_job / "receipt.json"
+    args.receipt = str(replacement_receipt)
+
+    result = ADAPTER.run_goal_transition(args)
+
+    rebound_anchor = json.loads(anchors[0].read_text(encoding="utf-8"))
+    replacement_attempt = ADAPTER._attempt_path(replacement_receipt)
+    assert result["status"] == "executed"
+    assert rebound_anchor["attempt_started"] is True
+    assert rebound_anchor["attempt_ref"] == str(replacement_attempt.resolve())
+    assert replacement_attempt.exists()
+    assert [method for method, _params in rpc.calls].count("thread/goal/set") == 1
+
+
 def test_cli_retry_after_runtime_reset_uses_persistent_semantic_attempt(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

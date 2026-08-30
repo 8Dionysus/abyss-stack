@@ -98,7 +98,9 @@ Tracking starts with the community-docs baseline for this repository.
   anchored attempt path, so a later reversal cannot reopen the same
   idempotency key. The v2 anchor remains explicitly unstarted until a valid
   attempt is persisted, so transient endpoint discovery or RPC setup failures
-  can retry without burning the key. If a started anchored sidecar is later
+  can retry without burning the key; if cleanup removes the old attempt parent,
+  that unstarted anchor can rebind to the retry's newly validated durable path.
+  If a started anchored sidecar is later
   removed, the surviving owner-state anchor is terminal and refuses to recreate it; replayed
   read-only receipts must also match the exact recorded observation. CLI
   request/decision artifacts are reasserted immediately before dispatch and

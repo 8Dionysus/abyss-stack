@@ -164,6 +164,8 @@ Operations are:
   attempt from a persisted lifecycle attempt: endpoint discovery or RPC setup
   failure before persistence may retry, while removal of a started anchored
   sidecar is terminal and the adapter refuses to recreate it.
+  If the original attempt parent is cleaned before persistence, only an
+  explicitly unstarted v2 anchor may rebind to a newly validated retry path.
   Replayed read-only receipts are bound byte-for-byte to the stored
   `read_only_recorded` observation.
   Attempt and receipt owner digests come only from the initially

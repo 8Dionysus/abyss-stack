@@ -174,7 +174,9 @@ and replay only through their matching legacy wake reservation. A retry after a 
   the desired state. An already-desired
   read records a durable no-mutation
   completion at that path. The v2 anchor stays unstarted until a valid attempt
-  is persisted, so a transient transport failure before that point may retry.
+  is persisted, so a transient transport failure before that point may retry;
+  if cleanup removes the old attempt parent, the unstarted anchor may rebind to
+  the retry's newly validated durable path.
   A started anchor with a missing attempt is terminal rather than permission to recreate the attempt, and replayed
   read-only receipts must match the recorded observation. The CLI reasserts
   request, decision, and owner bytes immediately before mutation and after

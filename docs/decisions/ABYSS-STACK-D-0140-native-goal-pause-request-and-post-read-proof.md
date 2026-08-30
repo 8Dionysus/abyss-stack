@@ -59,7 +59,9 @@ anchor remains authoritative if a caller later cleans the referenced sidecar:
 the missing target is terminal and must not be recreated. The v2 anchor records
 whether a valid attempt has actually started; endpoint discovery or RPC setup
 failure before that point leaves an explicit unstarted anchor that a retry may
-reuse. A replayed read-only
+reuse. If cleanup removes the original attempt parent before any attempt was
+persisted, that unstarted anchor may rebind to the retry's newly validated
+durable path; a started anchor never receives this permission. A replayed read-only
 receipt is accepted only when its historical response bytes, summaries, and
 digests match the anchored `read_only_recorded` observation.
 Dynamic endpoint rebinding may change the fresh transport coordinate but does
