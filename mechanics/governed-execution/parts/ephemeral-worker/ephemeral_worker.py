@@ -26,6 +26,7 @@ DISABLED_ACTIVATION = "disabled"
 EXPLICIT_ACTIVATION = "explicit"
 MAX_BYTE_CEILING = 16 * 1024 * 1024
 MAX_ACTIVE_WALL_SECONDS = 365 * 24 * 60 * 60
+MAX_ACTIVE_WALL_RENDER_BYTES = len(f"{MAX_ACTIVE_WALL_SECONDS:.6f}".encode("ascii"))
 MAX_INPUT_COUNT = 1024
 MAX_STRING_LENGTH = 4096
 MAX_JSON_DEPTH = 8
@@ -560,6 +561,7 @@ def _projected_result_base_bytes(
         "result_digest": "sha256:" + "0" * 64,
     }
     projected = len(_canonical_bytes(skeleton))
+    projected += MAX_ACTIVE_WALL_RENDER_BYTES - len(_canonical_bytes(0.0))
     for item in inputs:
         projected += len(
             _canonical_bytes(

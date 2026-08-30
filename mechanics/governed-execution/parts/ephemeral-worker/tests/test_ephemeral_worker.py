@@ -15,6 +15,7 @@ sys.path.insert(0, str(PART_ROOT))
 
 from ephemeral_worker import (
     MAX_ACTIVE_WALL_SECONDS,
+    MAX_ACTIVE_WALL_RENDER_BYTES,
     MAX_BYTE_CEILING,
     MAX_INPUT_COUNT,
     MAX_STRING_LENGTH,
@@ -28,6 +29,7 @@ from ephemeral_worker import (
     run_ephemeral_read_worker,
     snapshot_digest_for_request,
     validate_ephemeral_read_result,
+    _projected_result_base_bytes,
     _normalize_json_value,
 )
 
@@ -578,6 +580,37 @@ def test_worker_accounts_metadata_before_base64_encoding(
 
     def unexpected_encode(_content: bytes) -> bytes:
         raise AssertionError("metadata overflow must reject before base64 encoding")
+
+    worker_base64 = run_ephemeral_read_worker.__globals__["base64"]
+    monkeypatch.setattr(worker_base64, "b64encode", unexpected_encode)
+
+    with pytest.raises(EphemeralWorkerError, match="projected result"):
+        run_ephemeral_read_worker(request)
+
+
+def test_worker_reserves_wall_time_before_base64_encoding(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    content = b"x"
+    path = tmp_path / "wall-time-bound.txt"
+    path.write_bytes(content)
+    request = _request(path, content)
+    projected_base = _projected_result_base_bytes(
+        request["request_id"],  # type: ignore[arg-type]
+        request["parent_holder_ref"],  # type: ignore[arg-type]
+        request["inputs"],  # type: ignore[arg-type]
+    )
+    assert MAX_ACTIVE_WALL_RENDER_BYTES > len(b"0.0")
+    request["max_transport_bytes"] = projected_base - 1
+    request["input_snapshot_digest"] = snapshot_digest_for_request(
+        request["inputs"],  # type: ignore[arg-type]
+        max_input_bytes=request["max_input_bytes"],
+        max_output_bytes=request["max_output_bytes"],
+        max_transport_bytes=request["max_transport_bytes"],
+    )
+
+    def unexpected_encode(_content: bytes) -> bytes:
+        raise AssertionError("wall-time overflow must reject before base64 encoding")
 
     worker_base64 = run_ephemeral_read_worker.__globals__["base64"]
     monkeypatch.setattr(worker_base64, "b64encode", unexpected_encode)
