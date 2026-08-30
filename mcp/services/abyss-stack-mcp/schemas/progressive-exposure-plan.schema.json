@@ -165,6 +165,7 @@
             "minLength": 1,
             "type": "string"
           },
+          "maxItems": 256,
           "title": "Reason Codes",
           "type": "array"
         },

@@ -642,6 +642,37 @@ def test_invocation_arguments_are_bounded_before_hashing(arguments: dict) -> Non
     assert receipt.input_digest == sha256_digest({})
 
 
+@pytest.mark.parametrize(
+    "authorization_ref",
+    [
+        {"owner": "x" * 65_536},
+        {f"item-{index}": index for index in range(65)},
+    ],
+)
+def test_invocation_authorization_is_bounded_before_validation(
+    authorization_ref: dict,
+) -> None:
+    runtime = ExposureRuntime(
+        progressive_exposure_enabled=True,
+        baseline_admitted=True,
+        baseline_admission_ref="receipt://d0/baseline-ready",
+        clock=lambda: NOW,
+    )
+    materialization = runtime.materialize(_payload())
+
+    receipt = runtime.invoke(
+        materialization.receipt_id,
+        request_id="bounded-authorization",
+        caller_id="test-caller",
+        tool_id="knowledge-inspect.inspect-knowledge",
+        arguments={},
+        authorization_ref=authorization_ref,
+    )
+
+    assert "invocation_authorization_too_large" in receipt.reason_codes
+    assert receipt.authorization_id is None
+
+
 def test_stack_normalization_rejects_visible_tool_schema_drift() -> None:
     payload = _payload()
     payload["rendered_snapshot"]["visible_tool_ids"] = ["unexpected"]

@@ -77,6 +77,8 @@ MAX_EXPOSURE_COLLECTION_ITEMS = 256
 MAX_EXPOSURE_MAPPING_ITEMS = 64
 MAX_INVOCATION_ARGUMENT_BYTES = 1_048_576
 MAX_INVOCATION_ARGUMENT_ITEMS = 256
+MAX_INVOCATION_AUTHORIZATION_BYTES = 65_536
+MAX_INVOCATION_AUTHORIZATION_ITEMS = 64
 ZERO_DIGEST = "sha256:" + "0" * 64
 BASELINE_ADMISSION_REF = "receipt://d0/baseline-ready"
 CLAIM_LIMIT = (
@@ -209,7 +211,9 @@ class StackExposureFreshness(StrictExposureModel):
     expires_at: datetime | None = None
     ttl_seconds: Annotated[int | None, Field(ge=0)] = None
     provider_watermark: NonEmpty | None = None
-    reason_codes: tuple[NonEmpty, ...] = ()
+    reason_codes: Annotated[
+        tuple[NonEmpty, ...], Field(max_length=MAX_EXPOSURE_COLLECTION_ITEMS)
+    ] = ()
 
     @field_validator("observed_at", "expires_at")
     @classmethod
@@ -738,13 +742,21 @@ class ExposureRuntime:
             reasons.append("invocation_authorization_required")
         else:
             try:
-                authorization = (
-                    authorization_ref
+                raw_authorization = (
+                    authorization_ref.model_dump(mode="json")
                     if isinstance(authorization_ref, ExposureInvocationAuthorization)
-                    else ExposureInvocationAuthorization.model_validate(
-                        authorization_ref
-                    )
+                    else authorization_ref
                 )
+                if (
+                    len(raw_authorization) > MAX_INVOCATION_AUTHORIZATION_ITEMS
+                    or len(canonical_json_bytes(raw_authorization))
+                    > MAX_INVOCATION_AUTHORIZATION_BYTES
+                ):
+                    reasons.append("invocation_authorization_too_large")
+                else:
+                    authorization = ExposureInvocationAuthorization.model_validate(
+                        raw_authorization
+                    )
             except Exception:
                 reasons.append("invocation_authorization_invalid")
             if authorization is not None:
