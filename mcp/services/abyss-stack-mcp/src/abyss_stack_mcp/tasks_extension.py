@@ -434,8 +434,8 @@ def _installed_mcp_sdk_artifact_digest(
     return f"sha256:{hashlib.sha256(combined).hexdigest()}"
 
 
-def running_mcp_sdk_identity() -> tuple[str, str, str]:
-    """Return SDK identity only after its source and installed bytes are attested."""
+def _measured_mcp_sdk_identity() -> tuple[str, str, str]:
+    """Measure the SDK identity from the interpreter serving this process."""
     sdk_version = running_mcp_sdk_version()
     try:
         source_revision = MCP_SDK_SOURCE_REVISIONS[sdk_version]
@@ -446,6 +446,28 @@ def running_mcp_sdk_identity() -> tuple[str, str, str]:
         ) from exc
     artifact_digest = _installed_mcp_sdk_artifact_digest(sdk_version, source_revision)
     return sdk_version, source_revision, artifact_digest
+
+
+# Importing the Tasks extension happens before the server starts accepting
+# requests.  Retain that process-start identity and reject an in-place wheel
+# replacement later: a fresh distribution lookup must not relabel already
+# imported MCP modules as a different artifact.
+_PROCESS_STARTUP_MCP_SDK_PID = os.getpid()
+_PROCESS_STARTUP_MCP_SDK_IDENTITY = _measured_mcp_sdk_identity()
+
+
+def running_mcp_sdk_identity() -> tuple[str, str, str]:
+    """Return the SDK identity only while the process-start bytes remain stable."""
+    if os.getpid() != _PROCESS_STARTUP_MCP_SDK_PID:
+        raise RuntimeError(
+            "the serving MCP Tasks process changed after SDK startup; re-exec is required"
+        )
+    current = _measured_mcp_sdk_identity()
+    if current != _PROCESS_STARTUP_MCP_SDK_IDENTITY:
+        raise RuntimeError(
+            "the serving MCP SDK identity changed after process startup; restart is required"
+        )
+    return current
 
 
 class StackReadTasksExtension(Extension):
@@ -632,6 +654,12 @@ class StackReadTasksExtension(Extension):
                     "mcp_sdk": mcp_sdk,
                     "mcp_sdk_source_revision": mcp_sdk_source_revision,
                     "mcp_sdk_artifact_digest": mcp_sdk_artifact_digest,
+                    "mcp_sdk_process_id": os.getpid(),
+                    "mcp_sdk_runtime_attestation": {
+                        "state": "passed",
+                        "method": "process_startup_sdk_identity_snapshot",
+                        "pid": os.getpid(),
+                    },
                 },
             }
             result = {

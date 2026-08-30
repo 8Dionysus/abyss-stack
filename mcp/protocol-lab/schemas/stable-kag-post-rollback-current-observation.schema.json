@@ -78,6 +78,47 @@
           },
           "required": ["state", "method", "header", "pid", "checked_during_discovery"]
         },
+        "listener_attestation": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "state": {"const": "passed"},
+            "method": {"const": "proc_net_tcp_listener_inode_owned_by_main_pid"},
+            "port": {"type": "integer", "minimum": 1, "maximum": 65535},
+            "pid": {"type": "integer", "minimum": 1},
+            "socket_inodes": {
+              "type": "array",
+              "items": {"type": "string", "pattern": "^[0-9]+$"},
+              "minItems": 1,
+              "uniqueItems": true
+            },
+            "checked_before_and_after_probe": {"const": true}
+          },
+          "required": ["state", "method", "port", "pid", "socket_inodes", "checked_before_and_after_probe"]
+        },
+        "contacted_server_probe": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "state": {"const": "passed"},
+            "method": {"const": "direct_modern_server_discover_with_runtime_identity_header"},
+            "endpoint_ref": {"type": "string", "pattern": "^https?://[^\\s]+$"},
+            "http_status": {"const": 200},
+            "runtime_identity_attestation": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "state": {"const": "passed"},
+                "method": {"const": "server_emitted_startup_runtime_identity_header"},
+                "header": {"const": "X-Abyss-MCP-Runtime-Identity"},
+                "pid": {"type": "integer", "minimum": 1},
+                "checked_during_discovery": {"const": true}
+              },
+              "required": ["state", "method", "header", "pid", "checked_during_discovery"]
+            }
+          },
+          "required": ["state", "method", "endpoint_ref", "http_status", "runtime_identity_attestation"]
+        },
         "sdk_identity_matches_fleet": {"const": true},
         "sdk_identity_stable": {"const": true},
         "checked_before_and_after_tool_call": {"const": true}
@@ -99,6 +140,8 @@
         "python_executable_realpath",
         "sdk_identity",
         "runtime_identity_attestation",
+        "listener_attestation",
+        "contacted_server_probe",
         "sdk_identity_matches_fleet",
         "sdk_identity_stable",
         "checked_before_and_after_tool_call"

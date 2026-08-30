@@ -18,6 +18,7 @@
     "mcp_sdk_source_revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
     "mcp_sdk_artifact_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
     "runtime_observation_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "runtime_process_id": {"type": "integer", "minimum": 1},
     "production_pair": {"const": true},
     "lifecycle": {
       "type": "object",
@@ -47,7 +48,7 @@
         "required": ["mcp_sdk"]
       },
       "then": {
-        "required": ["mcp_sdk_artifact_digest", "runtime_observation_digest"]
+        "required": ["mcp_sdk_artifact_digest", "runtime_observation_digest", "runtime_process_id"]
       }
     }
   ]

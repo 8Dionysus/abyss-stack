@@ -90,6 +90,7 @@ def _live_fleet_identity_attested(payload: dict[str, Any]) -> bool:
         and read_fleet.get("sdk_identity_count") == 11
         and read_fleet.get("sdk_identity_unique_count") == 1
         and read_fleet.get("runtime_identity_attested") is True
+        and read_fleet.get("listener_attested") is True
     )
 
 
@@ -126,6 +127,35 @@ def _stable_rollback_identity_bound(payload: dict[str, Any]) -> bool:
         == "X-Abyss-MCP-Runtime-Identity"
         and binding["runtime_identity_attestation"].get("checked_during_discovery")
         is True
+        and isinstance(binding.get("listener_attestation"), dict)
+        and binding["listener_attestation"].get("state") == "passed"
+        and binding["listener_attestation"].get("method")
+        == "proc_net_tcp_listener_inode_owned_by_main_pid"
+        and binding["listener_attestation"].get("pid")
+        == binding["runtime_identity_attestation"].get("pid")
+        and binding["listener_attestation"].get(
+            "checked_before_and_after_probe"
+        )
+        is True
+        and isinstance(binding.get("contacted_server_probe"), dict)
+        and binding["contacted_server_probe"].get("state") == "passed"
+        and binding["contacted_server_probe"].get("method")
+        == "direct_modern_server_discover_with_runtime_identity_header"
+        and binding["contacted_server_probe"].get("endpoint_ref")
+        == binding.get("configured_endpoint_ref")
+        and binding["contacted_server_probe"].get("http_status") == 200
+        and isinstance(
+            binding["contacted_server_probe"].get("runtime_identity_attestation"),
+            dict,
+        )
+        and binding["contacted_server_probe"][
+            "runtime_identity_attestation"
+        ].get("state")
+        == "passed"
+        and binding["contacted_server_probe"][
+            "runtime_identity_attestation"
+        ].get("pid")
+        == binding["runtime_identity_attestation"].get("pid")
     )
 
 
@@ -196,7 +226,9 @@ def build_status(
     *,
     evaluated_at: str | None = None,
 ) -> dict[str, Any]:
-    evaluated_at = evaluated_at or observation["observed_at"]
+    evaluated_at = evaluated_at or datetime.now(UTC).isoformat().replace(
+        "+00:00", "Z"
+    )
     _timestamp(evaluated_at)
     production_observation = production_observation or load_json(PRODUCTION_OBSERVATION_PATH)
     codex_lab_observation = codex_lab_observation or load_json(CODEX_LAB_OBSERVATION_PATH)
@@ -431,9 +463,14 @@ def build_status(
         "production_cutover_blockers": production_cutover_blockers,
         "reason_codes": observation["reason_codes"],
         "next_action": (
-            "Keep production on its evidenced MCP 2.0.0 deployment; refresh the "
-            "deployment-bound 2.1.1 pair, rollback, and Tasks receipts before any "
-            "production cutover or non-read admission."
+            "Perform a bounded MCP 2.1.1 core-read rollout; keep Tasks and non-read "
+            "authority disabled until their separate evidence is current."
+            if production_pair_ready
+            else (
+                "Keep production on its evidenced MCP 2.0.0 deployment; refresh the "
+                "deployment-bound 2.1.1 pair, rollback, and Tasks receipts before "
+                "any production cutover or non-read admission."
+            )
         ),
         "claim_limits": matrix["claim_limits"],
     }

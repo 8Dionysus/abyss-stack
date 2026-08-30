@@ -110,8 +110,13 @@ def test_current_status_is_deterministic_and_keeps_deployment_cutover_blocked(
     matrix: dict[str, Any],
     observation: dict[str, Any],
 ) -> None:
-    first = builder.build_status(matrix, observation)
-    second = builder.build_status(copy.deepcopy(matrix), copy.deepcopy(observation))
+    evaluated_at = "2026-08-30T06:00:00Z"
+    first = builder.build_status(matrix, observation, evaluated_at=evaluated_at)
+    second = builder.build_status(
+        copy.deepcopy(matrix),
+        copy.deepcopy(observation),
+        evaluated_at=evaluated_at,
+    )
 
     assert first == second
     assert first["evidence_expires_at"] == "2026-08-15T08:33:46.547214Z"
@@ -147,6 +152,126 @@ def test_current_status_is_deterministic_and_keeps_deployment_cutover_blocked(
         "deployment_bound_evidence_not_refreshed_for_mcp_2_1_1"
     ]
     assert first["stable_registration_retained"] is True
+
+
+def test_build_status_defaults_to_current_evaluation_time(
+    builder: Any,
+    matrix: dict[str, Any],
+    observation: dict[str, Any],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return cls(2026, 8, 30, 6, 0, tzinfo=tz)
+
+    monkeypatch.setattr(builder, "datetime", _Clock)
+    status = builder.build_status(matrix, observation)
+
+    assert status["evaluated_at"] == "2026-08-30T06:00:00Z"
+
+
+def test_next_action_changes_when_core_read_migration_is_admitted(
+    builder: Any,
+    matrix: dict[str, Any],
+    observation: dict[str, Any],
+) -> None:
+    candidate = copy.deepcopy(matrix)
+    pair = copy.deepcopy(observation)
+    deployment = _load(LAB_ROOT / "fixtures" / "live-modern-fleet-20260809.json")
+    tasks_pair = _load(
+        LAB_ROOT / "fixtures" / "codex-tasks-production-pair-20260809.json"
+    )
+    stable_rollback = _load(
+        LAB_ROOT
+        / "fixtures"
+        / "codex-0.147.0-stable-kag-post-rollback-observation.json"
+    )
+    tasks_matrix = _load(LAB_ROOT / "tasks-compatibility-matrix.v1.json")
+    candidate_commit = "0921d94a74db900dccd2d534842aa7b6160542d2"
+    for payload in (deployment, tasks_pair, stable_rollback, tasks_matrix):
+        payload["mcp_sdk"] = "2.1.1"
+        payload["mcp_sdk_source_revision"] = candidate_commit
+        payload["expires_at"] = "2026-09-05T07:32:30.866342Z"
+    deployment["mcp_sdk_artifact_digest"] = builder.EXPECTED_PRODUCTION_MCP_ARTIFACT_DIGEST
+    deployment["read_fleet"].update(
+        {
+            "sdk_identity_attested": True,
+            "sdk_identity_count": 11,
+            "sdk_identity_unique_count": 1,
+            "runtime_identity_attested": True,
+            "listener_attested": True,
+        }
+    )
+    tasks_pair["mcp_sdk_artifact_digest"] = builder.EXPECTED_PRODUCTION_MCP_ARTIFACT_DIGEST
+    tasks_pair["runtime_observation_digest"] = "sha256:" + ("a" * 64)
+    tasks_pair["runtime_process_id"] = 4321
+    stable_rollback["server_binding"] = {
+        "binding_method": "configured_codex_endpoint_to_per_unit_fleet_identity",
+        "organ_id": "aoa-kag",
+        "unit": "aoa-organ-mcp-read@aoa-kag.service",
+        "fleet_endpoint_ref": "http://127.0.0.1:5425/mcp",
+        "configured_endpoint_ref": "http://127.0.0.1:5425/mcp",
+        "status_endpoint_ref": "http://127.0.0.1:5425/mcp",
+        "status_entry_observed": True,
+        "endpoint_matches": True,
+        "fleet_process_identity": "systemd-user:aoa-kag:pid:1234:start:1",
+        "process_identity_before": "systemd-user:aoa-kag:pid:1234:start:1",
+        "process_identity_after": "systemd-user:aoa-kag:pid:1234:start:1",
+        "process_identity_matches_fleet": True,
+        "process_identity_stable": True,
+        "python_executable_realpath": "/srv/abyss-machine/runtimes/python/bin/python",
+        "sdk_identity": {
+            "version": "2.1.1",
+            "commit": candidate_commit,
+            "artifact_digest": builder.EXPECTED_PRODUCTION_MCP_ARTIFACT_DIGEST,
+            "mcp_distribution_digest": "sha256:" + ("a" * 64),
+            "mcp_types_distribution_digest": "sha256:" + ("b" * 64),
+        },
+        "runtime_identity_attestation": {
+            "state": "passed",
+            "method": "server_emitted_startup_runtime_identity_header",
+            "header": "X-Abyss-MCP-Runtime-Identity",
+            "pid": 1234,
+            "checked_during_discovery": True,
+        },
+        "listener_attestation": {
+            "state": "passed",
+            "method": "proc_net_tcp_listener_inode_owned_by_main_pid",
+            "port": 5425,
+            "pid": 1234,
+            "socket_inodes": ["12345"],
+            "checked_before_and_after_probe": True,
+        },
+        "contacted_server_probe": {
+            "state": "passed",
+            "method": "direct_modern_server_discover_with_runtime_identity_header",
+            "endpoint_ref": "http://127.0.0.1:5425/mcp",
+            "http_status": 200,
+            "runtime_identity_attestation": {
+                "state": "passed",
+                "method": "server_emitted_startup_runtime_identity_header",
+                "header": "X-Abyss-MCP-Runtime-Identity",
+                "pid": 1234,
+                "checked_during_discovery": True,
+            },
+        },
+        "sdk_identity_matches_fleet": True,
+        "sdk_identity_stable": True,
+        "checked_before_and_after_tool_call": True,
+    }
+    status = builder.build_status(
+        candidate,
+        pair,
+        stable_rollback_observation=stable_rollback,
+        tasks_matrix=tasks_matrix,
+        live_modern_fleet=deployment,
+        codex_tasks_production_pair=tasks_pair,
+        evaluated_at="2026-09-04T07:32:30.866342Z",
+    )
+
+    assert status["core_read_migration_allowed"] is True
+    assert status["next_action"].startswith("Perform a bounded MCP 2.1.1 core-read")
 
 
 def test_render_binds_status_to_the_recorded_evaluation_time(builder: Any) -> None:
@@ -273,6 +398,12 @@ def test_codex_tasks_receipt_uses_the_serving_server_identity() -> None:
                     "mcp_sdk_source_revision": "0921d94a74db900dccd2d534842aa7b6160542d2",
                     "mcp_sdk_artifact_digest": artifact_digest,
                     "observation_digest": observation_digest,
+                    "mcp_sdk_process_id": 4321,
+                    "mcp_sdk_runtime_attestation": {
+                        "state": "passed",
+                        "method": "process_startup_sdk_identity_snapshot",
+                        "pid": 4321,
+                    },
                 }
             }
         }
@@ -307,6 +438,9 @@ def test_tasks_production_schema_requires_new_runtime_identity_fields(
         builder.validate_payload(candidate, schema_path)
 
     candidate["runtime_observation_digest"] = "sha256:" + ("a" * 64)
+    with pytest.raises(ValueError, match="runtime_process_id"):
+        builder.validate_payload(candidate, schema_path)
+    candidate["runtime_process_id"] = 4321
     builder.validate_payload(candidate, schema_path)
 
 
@@ -416,12 +550,21 @@ def test_live_fleet_accepts_only_reviewed_sdk_identities() -> None:
             result.update(
                 {
                     "main_pid": 1,
+                    "endpoint_ref": "http://127.0.0.1:5431/mcp",
                     "runtime_identity_attestation": {
                         "state": "passed",
                         "method": "server_emitted_startup_runtime_identity_header",
                         "header": "X-Abyss-MCP-Runtime-Identity",
                         "pid": 1,
                         "checked_during_discovery": True,
+                    },
+                    "listener_attestation": {
+                        "state": "passed",
+                        "method": "proc_net_tcp_listener_inode_owned_by_main_pid",
+                        "port": 5431,
+                        "pid": 1,
+                        "socket_inodes": ["12345"],
+                        "checked_before_and_after_probe": True,
                     },
                 }
             )
@@ -519,6 +662,7 @@ def test_candidate_deployment_receipt_requires_per_unit_identity_summary(tmp_pat
         "sdk_identity_count": 11,
         "sdk_identity_unique_count": 1,
         "runtime_identity_attested": True,
+        "listener_attested": True,
     }
     candidate_path = tmp_path / "candidate.json"
     candidate_path.write_text(json.dumps(candidate), encoding="utf-8")
@@ -550,6 +694,7 @@ def test_candidate_stable_canary_requires_raw_aoa_kag_fleet_binding(tmp_path: Pa
         "sdk_identity_count": 11,
         "sdk_identity_unique_count": 1,
         "runtime_identity_attested": True,
+        "listener_attested": True,
     }
     receipt_path = tmp_path / "candidate.json"
     receipt_path.write_text(json.dumps(candidate), encoding="utf-8")
@@ -583,6 +728,14 @@ def test_candidate_stable_canary_requires_raw_aoa_kag_fleet_binding(tmp_path: Pa
                 "header": "X-Abyss-MCP-Runtime-Identity",
                 "pid": 1234,
                 "checked_during_discovery": True,
+            },
+            "listener_attestation": {
+                "state": "passed",
+                "method": "proc_net_tcp_listener_inode_owned_by_main_pid",
+                "port": 5425,
+                "pid": 1234,
+                "socket_inodes": ["12345"],
+                "checked_before_and_after_probe": True,
             },
         }
     ]
@@ -781,11 +934,13 @@ def test_deployment_receipts_must_match_candidate_sdk_for_migration(
             "sdk_identity_count": 11,
             "sdk_identity_unique_count": 1,
             "runtime_identity_attested": True,
+            "listener_attested": True,
         }
     )
     tasks_pair["mcp_sdk"] = "2.1.1"
     tasks_pair["mcp_sdk_artifact_digest"] = builder.EXPECTED_PRODUCTION_MCP_ARTIFACT_DIGEST
     tasks_pair["runtime_observation_digest"] = "sha256:" + ("a" * 64)
+    tasks_pair["runtime_process_id"] = 4321
 
     stale = builder.build_status(
         candidate,
@@ -844,6 +999,27 @@ def test_deployment_receipts_must_match_candidate_sdk_for_migration(
             "header": "X-Abyss-MCP-Runtime-Identity",
             "pid": 1234,
             "checked_during_discovery": True,
+        },
+        "listener_attestation": {
+            "state": "passed",
+            "method": "proc_net_tcp_listener_inode_owned_by_main_pid",
+            "port": 5425,
+            "pid": 1234,
+            "socket_inodes": ["12345"],
+            "checked_before_and_after_probe": True,
+        },
+        "contacted_server_probe": {
+            "state": "passed",
+            "method": "direct_modern_server_discover_with_runtime_identity_header",
+            "endpoint_ref": "http://127.0.0.1:5425/mcp",
+            "http_status": 200,
+            "runtime_identity_attestation": {
+                "state": "passed",
+                "method": "server_emitted_startup_runtime_identity_header",
+                "header": "X-Abyss-MCP-Runtime-Identity",
+                "pid": 1234,
+                "checked_during_discovery": True,
+            },
         },
     }
     for payload in (deployment, tasks_pair, stable_rollback, tasks_matrix):

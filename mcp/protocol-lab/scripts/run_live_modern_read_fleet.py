@@ -11,6 +11,7 @@ import re
 import secrets
 import subprocess
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import UTC, datetime
 from pathlib import Path
@@ -70,6 +71,26 @@ def _meta() -> dict[str, Any]:
             "io.modelcontextprotocol/protocolVersion": PROTOCOL,
         }
     }
+
+
+def _endpoint_port(endpoint_ref: object) -> int | None:
+    """Parse only a loopback HTTP endpoint into its TCP port."""
+    if not isinstance(endpoint_ref, str):
+        return None
+    try:
+        parsed = urllib.parse.urlparse(endpoint_ref)
+        port = parsed.port
+    except ValueError:
+        return None
+    if parsed.scheme not in {"http", "https"} or parsed.hostname not in {
+        "127.0.0.1",
+        "localhost",
+        "::1",
+    }:
+        return None
+    if port is None or not 1 <= port <= 65535:
+        return None
+    return port
 
 
 def _request(
@@ -272,6 +293,64 @@ def _unit_identity(unit: str) -> dict[str, Any]:
     }
 
 
+def _listener_socket_inodes(port: int) -> set[str]:
+    """Return every listening socket inode currently bound to ``port``."""
+    inodes: set[str] = set()
+    for proc_net in (Path("/proc/net/tcp"), Path("/proc/net/tcp6")):
+        try:
+            lines = proc_net.read_text(encoding="ascii").splitlines()[1:]
+        except (OSError, UnicodeError) as exc:
+            raise RuntimeError(f"cannot inspect listening sockets in {proc_net}") from exc
+        for line in lines:
+            fields = line.split()
+            if len(fields) < 10 or fields[3] != "0A":
+                continue
+            try:
+                local_port = int(fields[1].rsplit(":", 1)[1], 16)
+            except (IndexError, ValueError) as exc:
+                raise RuntimeError(f"invalid listening socket entry in {proc_net}") from exc
+            if local_port == port and fields[9] != "0":
+                inodes.add(fields[9])
+    return inodes
+
+
+def _process_socket_inodes(pid: int, unit: str) -> set[str]:
+    inodes: set[str] = set()
+    try:
+        descriptors = Path(f"/proc/{pid}/fd").iterdir()
+        for descriptor in descriptors:
+            try:
+                target = os.readlink(descriptor)
+            except OSError:
+                continue
+            match = re.fullmatch(r"socket:\[(\d+)\]", target)
+            if match is not None:
+                inodes.add(match.group(1))
+    except OSError as exc:
+        raise RuntimeError(f"cannot inspect sockets owned by {unit}") from exc
+    return inodes
+
+
+def _listener_attestation(port: int, pid: int, unit: str) -> dict[str, Any]:
+    """Prove that the loopback port is listened to by the named MainPID."""
+    listening = _listener_socket_inodes(port)
+    owned = listening & _process_socket_inodes(pid, unit)
+    if not listening:
+        raise RuntimeError(f"no listening socket was found for {unit}:{port}")
+    if listening != owned:
+        foreign = sorted(listening - owned)
+        raise RuntimeError(
+            f"{unit}:{port} is served by a socket outside MainPID {pid}: {foreign}"
+        )
+    return {
+        "state": "passed",
+        "method": "proc_net_tcp_listener_inode_owned_by_main_pid",
+        "port": port,
+        "pid": pid,
+        "socket_inodes": sorted(owned),
+    }
+
+
 def _registry_facts() -> dict[str, Any]:
     registry = json.loads(REGISTRY.read_text(encoding="utf-8"))
     rows = [
@@ -297,6 +376,7 @@ def _probe(name: str, port: int, unit: str, credential: str) -> dict[str, Any]:
     token = _load_token(credential)
     url = f"http://127.0.0.1:{port}/mcp"
     before = _unit_identity(unit)
+    listener_before = _listener_attestation(port, before["main_pid"], unit)
     sdk_before = _runtime_sdk_identity(before["python_executable"], unit)
     status, discover, headers = _request(url, token, "server/discover", _meta())
     result = discover.get("result") if isinstance(discover, dict) else None
@@ -337,6 +417,7 @@ def _probe(name: str, port: int, unit: str, credential: str) -> dict[str, Any]:
     if not passed:
         raise RuntimeError(f"{name} modern-only gates failed")
     after = _unit_identity(unit)
+    listener_after = _listener_attestation(port, after["main_pid"], unit)
     sdk_after = _runtime_sdk_identity(after["python_executable"], unit)
     if (
         after["process_identity"] != before["process_identity"]
@@ -344,6 +425,7 @@ def _probe(name: str, port: int, unit: str, credential: str) -> dict[str, Any]:
         or after["python_executable_realpath"]
         != before["python_executable_realpath"]
         or sdk_after != sdk_before
+        or listener_after != listener_before
     ):
         raise RuntimeError(
             f"{name} serving process or SDK identity changed during the probe"
@@ -381,6 +463,10 @@ def _probe(name: str, port: int, unit: str, credential: str) -> dict[str, Any]:
     }
     if runtime_identity_attestation is not None:
         row["runtime_identity_attestation"] = runtime_identity_attestation
+    row["listener_attestation"] = {
+        **listener_before,
+        "checked_before_and_after_probe": True,
+    }
     return row
 
 
@@ -435,6 +521,21 @@ def _fleet_verdict(
         )
         for row in rows
     )
+    listener_attestation = all(
+        row.get("mcp_sdk") != "2.1.1"
+        or (
+            isinstance(row.get("listener_attestation"), dict)
+            and row["listener_attestation"].get("state") == "passed"
+            and row["listener_attestation"].get("method")
+            == "proc_net_tcp_listener_inode_owned_by_main_pid"
+            and row["listener_attestation"].get("port")
+            == _endpoint_port(row.get("endpoint_ref"))
+            and row["listener_attestation"].get("pid") == row.get("main_pid")
+            and row["listener_attestation"].get("checked_before_and_after_probe")
+            is True
+        )
+        for row in rows
+    )
     reviewed_candidate_artifact = all(
         row.get("mcp_sdk") != "2.1.1"
         or row.get("mcp_sdk_artifact_digest")
@@ -457,6 +558,7 @@ def _fleet_verdict(
         and expected_identity in identities
         and per_unit_attestation
         and server_identity_attestation
+        and listener_attestation
         and reviewed_candidate_artifact
         and zero_legacy
         else "failed"
@@ -493,6 +595,13 @@ def main() -> int:
             ),
             "server_identity_attested_unit_count": sum(
                 row.get("runtime_identity_attestation", {}).get("state") == "passed"
+                for row in rows
+            ),
+            "listener_attested_unit_count": sum(
+                row.get("listener_attestation", {}).get(
+                    "checked_before_and_after_probe"
+                )
+                is True
                 for row in rows
             ),
             "unique_identities": len(

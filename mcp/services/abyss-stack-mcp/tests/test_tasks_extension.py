@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -126,6 +127,13 @@ def test_task_completes_and_survives_extension_restart(
             "mcp_sdk_artifact_digest"
         ]
         assert artifact_digest == expected_artifact_digest
+        metadata = result["result"]["structuredContent"]["metadata"]
+        assert metadata["mcp_sdk_process_id"] == os.getpid()
+        assert metadata["mcp_sdk_runtime_attestation"] == {
+            "state": "passed",
+            "method": "process_startup_sdk_identity_snapshot",
+            "pid": os.getpid(),
+        }
 
     asyncio.run(scenario())
 
@@ -141,6 +149,21 @@ def test_tasks_identity_rejects_unattested_sdk(
 
     with pytest.raises(RuntimeError, match="no reviewed source attestation"):
         running_mcp_sdk_identity()
+
+
+def test_tasks_identity_rejects_in_place_sdk_replacement(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import abyss_stack_mcp.tasks_extension as tasks_extension
+
+    monkeypatch.setattr(
+        tasks_extension,
+        "_installed_mcp_sdk_artifact_digest",
+        lambda sdk_version, source_revision: "sha256:" + ("f" * 64),
+    )
+
+    with pytest.raises(RuntimeError, match="changed after process startup"):
+        tasks_extension.running_mcp_sdk_identity()
 
 
 def test_tasks_fail_closed_without_capability_or_matching_headers(
