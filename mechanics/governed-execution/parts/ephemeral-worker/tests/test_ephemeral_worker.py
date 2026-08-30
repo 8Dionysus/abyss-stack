@@ -530,6 +530,23 @@ def test_worker_rejects_encoded_result_above_transport_ceiling(tmp_path: Path) -
         run_ephemeral_read_worker(_request(path, content, max_transport_bytes=128))
 
 
+def test_worker_rejects_projected_base64_before_encoding(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    content = b"x" * 1024
+    path = tmp_path / "large-input.bin"
+    path.write_bytes(content)
+
+    def unexpected_encode(_content: bytes) -> bytes:
+        raise AssertionError("base64 allocation must not occur above transport ceiling")
+
+    worker_base64 = run_ephemeral_read_worker.__globals__["base64"]
+    monkeypatch.setattr(worker_base64, "b64encode", unexpected_encode)
+
+    with pytest.raises(EphemeralWorkerError, match="projected encoded content"):
+        run_ephemeral_read_worker(_request(path, content, max_transport_bytes=128))
+
+
 def test_request_schema_matches_absolute_nul_free_runtime_paths(tmp_path: Path) -> None:
     content = b"path contract\n"
     path = tmp_path / "input.txt"

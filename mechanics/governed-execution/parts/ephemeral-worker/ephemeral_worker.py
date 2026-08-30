@@ -547,6 +547,7 @@ def run_ephemeral_read_worker(request: Mapping[str, object]) -> dict[str, object
     records: list[dict[str, object]] = []
     input_bytes = 0
     output_bytes = 0
+    projected_base64_bytes = 0
     for index, item in enumerate(inputs):
         content = _read_verified(
             str(item["path"]),
@@ -560,6 +561,11 @@ def run_ephemeral_read_worker(request: Mapping[str, object]) -> dict[str, object
         output_bytes += len(content)
         if output_bytes > max_output_bytes:
             raise EphemeralWorkerError("read content exceeds max_output_bytes")
+        projected_base64_bytes += ((len(content) + 2) // 3) * 4
+        if projected_base64_bytes > max_transport_bytes:
+            raise EphemeralWorkerError(
+                "projected encoded content exceeds max_transport_bytes"
+            )
         records.append(
             {
                 "artifact_ref": item["artifact_ref"],
