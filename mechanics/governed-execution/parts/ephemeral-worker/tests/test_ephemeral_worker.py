@@ -117,7 +117,8 @@ def test_explicit_worker_returns_bounded_parent_retained_result(tmp_path: Path) 
     content = b"bounded read\n"
     path = tmp_path / "input.txt"
     path.write_bytes(content)
-    result = run_ephemeral_read_worker(_request(path, content))
+    request = _request(path, content)
+    result = run_ephemeral_read_worker(request)
 
     _validate(RESULT_SCHEMA, result)
     assert result["delegation_class"] == "ephemeral_read_worker_v1"
@@ -149,7 +150,7 @@ def test_explicit_worker_returns_bounded_parent_retained_result(tmp_path: Path) 
         ).encode("utf-8")
     )
     assert digest == expected
-    assert validate_ephemeral_read_result(result) == result
+    assert validate_ephemeral_read_result(result, admitted_request=request) == result
 
 
 @pytest.mark.parametrize("field", ["bytes", "digest", "result_digest"])
@@ -160,7 +161,8 @@ def test_result_intake_rejects_corrupted_content_address(
     content = b"content-addressed result\n"
     path = tmp_path / "input.txt"
     path.write_bytes(content)
-    result = run_ephemeral_read_worker(_request(path, content))
+    request = _request(path, content)
+    result = run_ephemeral_read_worker(request)
     corrupted = json.loads(json.dumps(result))
     if field == "bytes":
         corrupted["records"][0]["bytes"] += 1
@@ -169,8 +171,35 @@ def test_result_intake_rejects_corrupted_content_address(
     else:
         corrupted["result_digest"] = ZERO_DIGEST
 
-    with pytest.raises(EphemeralWorkerError, match="does not match"):
-        validate_ephemeral_read_result(corrupted)
+    with pytest.raises(EphemeralWorkerError, match="does not match|exceeds"):
+        validate_ephemeral_read_result(corrupted, admitted_request=request)
+
+
+def test_result_intake_binds_records_to_exact_admitted_snapshot(tmp_path: Path) -> None:
+    expected_content = b"expected input\n"
+    expected_path = tmp_path / "expected.txt"
+    expected_path.write_bytes(expected_content)
+    admitted_request = _request(expected_path, expected_content)
+    admitted_result = run_ephemeral_read_worker(admitted_request)
+
+    with pytest.raises(EphemeralWorkerError, match="exact admitted request"):
+        validate_ephemeral_read_result(admitted_result)
+
+    substituted_content = b"self-consistent but unrequested input\n"
+    substituted_path = tmp_path / "substituted.txt"
+    substituted_path.write_bytes(substituted_content)
+    substituted_request = _request(substituted_path, substituted_content)
+    substituted_result = run_ephemeral_read_worker(substituted_request)
+    substituted_result["input_snapshot_digest"] = admitted_request[
+        "input_snapshot_digest"
+    ]
+    _resign_result(substituted_result)
+
+    with pytest.raises(EphemeralWorkerError, match="admitted input snapshot"):
+        validate_ephemeral_read_result(
+            substituted_result,
+            admitted_request=admitted_request,
+        )
 
 
 def test_result_intake_bounds_serialized_packet_before_parse() -> None:
@@ -196,10 +225,13 @@ def test_result_intake_bounds_mapped_base64_before_decode(tmp_path: Path) -> Non
     content = b"mapped transport ceiling"
     path = tmp_path / "input.txt"
     path.write_bytes(content)
-    result = run_ephemeral_read_worker(_request(path, content))
+    request = _request(path, content)
+    result = run_ephemeral_read_worker(request)
 
     with pytest.raises(EphemeralWorkerError, match="before validation"):
-        validate_ephemeral_read_result(result, max_transport_bytes=8)
+        validate_ephemeral_read_result(
+            result, admitted_request=request, max_transport_bytes=8
+        )
 
 
 def test_result_intake_counts_mapped_metadata_before_record_validation(
@@ -208,26 +240,30 @@ def test_result_intake_counts_mapped_metadata_before_record_validation(
     content = b"x"
     path = tmp_path / "small.txt"
     path.write_bytes(content)
-    result = run_ephemeral_read_worker(_request(path, content))
+    request = _request(path, content)
+    result = run_ephemeral_read_worker(request)
     result["records"][0]["artifact_ref"] = "a" * 4096  # type: ignore[index]
     _resign_result(result)
 
     with pytest.raises(EphemeralWorkerError, match="before validation"):
-        validate_ephemeral_read_result(result, max_transport_bytes=512)
+        validate_ephemeral_read_result(
+            result, admitted_request=request, max_transport_bytes=512
+        )
 
 
 def test_result_intake_accepts_schema_valid_integral_counters(tmp_path: Path) -> None:
     content = b"integral result counters"
     path = tmp_path / "input.txt"
     path.write_bytes(content)
-    result = run_ephemeral_read_worker(_request(path, content))
+    request = _request(path, content)
+    result = run_ephemeral_read_worker(request)
     result["records"][0]["bytes"] = float(len(content))  # type: ignore[index]
     result["economy_observation"]["input_bytes"] = float(len(content))  # type: ignore[index]
     result["economy_observation"]["output_bytes"] = float(len(content))  # type: ignore[index]
     _resign_result(result)
     _validate(RESULT_SCHEMA, result)
 
-    assert validate_ephemeral_read_result(result) == result
+    assert validate_ephemeral_read_result(result, admitted_request=request) == result
 
 
 def test_result_intake_rejects_boolean_counters_and_unbounded_wall_time(
@@ -236,13 +272,14 @@ def test_result_intake_rejects_boolean_counters_and_unbounded_wall_time(
     content = b"economy counter bounds"
     path = tmp_path / "input.txt"
     path.write_bytes(content)
-    result = run_ephemeral_read_worker(_request(path, content))
+    request = _request(path, content)
+    result = run_ephemeral_read_worker(request)
 
     boolean_counter = json.loads(json.dumps(result))
     boolean_counter["economy_observation"]["turn_count"] = True
     _resign_result(boolean_counter)
     with pytest.raises(EphemeralWorkerError, match="turn_count"):
-        validate_ephemeral_read_result(boolean_counter)
+        validate_ephemeral_read_result(boolean_counter, admitted_request=request)
 
     huge_wall = json.loads(json.dumps(result))
     huge_wall["economy_observation"]["active_wall_seconds"] = (
@@ -255,7 +292,7 @@ def test_result_intake_rejects_boolean_counters_and_unbounded_wall_time(
         ).iter_errors(huge_wall)
     )
     with pytest.raises(EphemeralWorkerError, match="supported range"):
-        validate_ephemeral_read_result(huge_wall)
+        validate_ephemeral_read_result(huge_wall, admitted_request=request)
 
 
 def test_result_intake_normalizes_unencodable_text_to_worker_error() -> None:
@@ -269,40 +306,46 @@ def test_result_intake_normalizes_nested_mapping_implementations(
     content = b"mapping normalization"
     path = tmp_path / "input.txt"
     path.write_bytes(content)
-    result = run_ephemeral_read_worker(_request(path, content))
+    request = _request(path, content)
+    result = run_ephemeral_read_worker(request)
     mapped = UserDict(result)
     mapped["parent_holder_ref"] = UserDict(result["parent_holder_ref"])  # type: ignore[arg-type]
     mapped["records"] = [UserDict(record) for record in result["records"]]  # type: ignore[union-attr]
     mapped["economy_observation"] = UserDict(result["economy_observation"])  # type: ignore[arg-type]
 
-    assert validate_ephemeral_read_result(mapped) == result
+    assert validate_ephemeral_read_result(mapped, admitted_request=request) == result
 
 
 def test_result_intake_bounds_mapping_normalization(tmp_path: Path) -> None:
     content = b"bounded mapping normalization"
     path = tmp_path / "input.txt"
     path.write_bytes(content)
-    result = run_ephemeral_read_worker(_request(path, content))
+    request = _request(path, content)
+    result = run_ephemeral_read_worker(request)
 
     cyclic = UserDict(result)
     cyclic["records"] = [cyclic]
     with pytest.raises(EphemeralWorkerError, match="JSON cycle"):
-        validate_ephemeral_read_result(cyclic)
+        validate_ephemeral_read_result(cyclic, admitted_request=request)
 
     oversized = UserDict(result)
     oversized["records"] = [UserDict(result["records"][0])] * (MAX_INPUT_COUNT + 1)  # type: ignore[index]
     with pytest.raises(EphemeralWorkerError, match="array cardinality"):
-        validate_ephemeral_read_result(oversized)
+        validate_ephemeral_read_result(oversized, admitted_request=request)
 
     oversized_string = UserDict(result)
     oversized_string["request_id"] = "x" * 1024
     with pytest.raises(EphemeralWorkerError, match="before serialization"):
-        validate_ephemeral_read_result(oversized_string, max_transport_bytes=64)
+        validate_ephemeral_read_result(
+            oversized_string, admitted_request=request, max_transport_bytes=64
+        )
 
     repeated_strings = UserDict(result)
     repeated_strings["records"] = [result["records"][0]] * 32  # type: ignore[index]
     with pytest.raises(EphemeralWorkerError, match="before serialization"):
-        validate_ephemeral_read_result(repeated_strings, max_transport_bytes=512)
+        validate_ephemeral_read_result(
+            repeated_strings, admitted_request=request, max_transport_bytes=512
+        )
 
     with pytest.raises(EphemeralWorkerError, match="numeric scalar"):
         _normalize_json_value(
@@ -598,6 +641,7 @@ def test_worker_reserves_wall_time_before_base64_encoding(
     projected_base = _projected_result_base_bytes(
         request["request_id"],  # type: ignore[arg-type]
         request["parent_holder_ref"],  # type: ignore[arg-type]
+        request["input_snapshot_digest"],  # type: ignore[arg-type]
         request["inputs"],  # type: ignore[arg-type]
     )
     assert MAX_ACTIVE_WALL_RENDER_BYTES > len(b"0.0")

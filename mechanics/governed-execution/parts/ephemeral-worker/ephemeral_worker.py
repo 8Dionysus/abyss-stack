@@ -377,6 +377,7 @@ def _validate_request(request: Mapping[str, object]) -> tuple[
     str,
     dict[str, str],
     list[dict[str, object]],
+    str,
     int,
     int,
     int,
@@ -450,6 +451,7 @@ def _validate_request(request: Mapping[str, object]) -> tuple[
         request_id,
         parent_holder,
         inputs,
+        snapshot_digest,
         max_input_bytes,
         max_output_bytes,
         max_transport_bytes,
@@ -536,6 +538,7 @@ def _read_verified(path: str, expected_digest: str, max_bytes: int, label: str) 
 def _projected_result_base_bytes(
     request_id: str,
     parent_holder: Mapping[str, str],
+    input_snapshot_digest: str,
     inputs: Sequence[Mapping[str, object]],
 ) -> int:
     """Return a conservative canonical result size before content encoding."""
@@ -545,6 +548,7 @@ def _projected_result_base_bytes(
         "request_id": request_id,
         "delegation_class": EPHEMERAL_CLASS,
         "parent_holder_ref": parent_holder,
+        "input_snapshot_digest": input_snapshot_digest,
         "records": [],
         "economy_observation": {
             "schema_version": "abyss_delegation_economy_observation_v1",
@@ -585,6 +589,7 @@ def run_ephemeral_read_worker(request: Mapping[str, object]) -> dict[str, object
         request_id,
         parent_holder,
         inputs,
+        input_snapshot_digest,
         max_input_bytes,
         max_output_bytes,
         max_transport_bytes,
@@ -593,7 +598,7 @@ def run_ephemeral_read_worker(request: Mapping[str, object]) -> dict[str, object
     input_bytes = 0
     output_bytes = 0
     projected_result_bytes = _projected_result_base_bytes(
-        request_id, parent_holder, inputs
+        request_id, parent_holder, input_snapshot_digest, inputs
     )
     projected_input_digits = 1
     projected_output_digits = 1
@@ -643,6 +648,7 @@ def run_ephemeral_read_worker(request: Mapping[str, object]) -> dict[str, object
         "request_id": request_id,
         "delegation_class": EPHEMERAL_CLASS,
         "parent_holder_ref": parent_holder,
+        "input_snapshot_digest": input_snapshot_digest,
         "records": records,
         "economy_observation": observation,
         "actual_effects": ["read_only"],
@@ -653,6 +659,7 @@ def run_ephemeral_read_worker(request: Mapping[str, object]) -> dict[str, object
     result["result_digest"] = _digest_bytes(_canonical_bytes(result))
     return validate_ephemeral_read_result(
         result,
+        admitted_request=request,
         max_transport_bytes=max_transport_bytes,
     )
 
@@ -678,13 +685,32 @@ def _require_nonnegative_int(value: object, label: str) -> int:
 def validate_ephemeral_read_result(
     payload: bytes | str | Mapping[str, object],
     *,
-    max_transport_bytes: int = MAX_BYTE_CEILING,
+    admitted_request: Mapping[str, object] | None = None,
+    max_transport_bytes: int | None = None,
 ) -> dict[str, object]:
-    """Admit one bounded, content-addressed worker result from any producer."""
+    """Admit one bounded result against the exact request given to its producer."""
 
-    transport_ceiling = _require_positive_int(
-        max_transport_bytes, "max_transport_bytes"
-    )
+    admitted: tuple[
+        str,
+        dict[str, str],
+        list[dict[str, object]],
+        str,
+        int,
+        int,
+        int,
+    ] | None = None
+    if admitted_request is not None:
+        admitted = _validate_request(admitted_request)
+        admitted_transport_ceiling = admitted[6]
+    else:
+        admitted_transport_ceiling = MAX_BYTE_CEILING
+    if max_transport_bytes is None:
+        transport_ceiling = admitted_transport_ceiling
+    else:
+        transport_ceiling = min(
+            _require_positive_int(max_transport_bytes, "max_transport_bytes"),
+            admitted_transport_ceiling,
+        )
     if isinstance(payload, bytes):
         encoded = payload
         if len(encoded) > transport_ceiling:
@@ -731,6 +757,7 @@ def validate_ephemeral_read_result(
         "request_id",
         "delegation_class",
         "parent_holder_ref",
+        "input_snapshot_digest",
         "records",
         "economy_observation",
         "actual_effects",
@@ -741,18 +768,44 @@ def validate_ephemeral_read_result(
     }
     if set(result) != expected:
         raise EphemeralWorkerError("result has an unexpected shape")
+    if admitted is None:
+        raise EphemeralWorkerError("result intake requires the exact admitted request")
+    (
+        admitted_request_id,
+        admitted_parent_holder,
+        admitted_inputs,
+        admitted_snapshot_digest,
+        admitted_max_input_bytes,
+        admitted_max_output_bytes,
+        _,
+    ) = admitted
     if result["schema_version"] != RESULT_SCHEMA_VERSION:
         raise EphemeralWorkerError("result schema version is unsupported")
-    _require_string(result["request_id"], "request_id")
+    if _require_string(result["request_id"], "request_id") != admitted_request_id:
+        raise EphemeralWorkerError("result request_id does not match admitted request")
     if result["delegation_class"] != EPHEMERAL_CLASS:
         raise EphemeralWorkerError("result has the wrong delegation class")
-    _validate_content_ref(result["parent_holder_ref"], "parent_holder_ref")
+    if (
+        _validate_content_ref(result["parent_holder_ref"], "parent_holder_ref")
+        != admitted_parent_holder
+    ):
+        raise EphemeralWorkerError(
+            "result parent_holder_ref does not match admitted request"
+        )
+    if (
+        _require_digest(result["input_snapshot_digest"], "input_snapshot_digest")
+        != admitted_snapshot_digest
+    ):
+        raise EphemeralWorkerError(
+            "result input_snapshot_digest does not match admitted request"
+        )
     records = result["records"]
     if (
         not isinstance(records, Sequence)
         or isinstance(records, (str, bytes))
         or not records
         or len(records) > MAX_INPUT_COUNT
+        or len(records) != len(admitted_inputs)
     ):
         raise EphemeralWorkerError("result records exceed the supported cardinality")
     decoded_bytes = 0
@@ -772,6 +825,16 @@ def validate_ephemeral_read_result(
         artifact_refs.add(artifact_ref)
         digest = _require_digest(record["digest"], f"{label}.digest")
         byte_count = _require_nonnegative_int(record["bytes"], f"{label}.bytes")
+        admitted_input = admitted_inputs[index]
+        if (
+            artifact_ref != admitted_input["artifact_ref"]
+            or digest != admitted_input["digest"]
+        ):
+            raise EphemeralWorkerError(
+                f"{label} does not match the admitted input snapshot"
+            )
+        if byte_count > int(admitted_input["max_bytes"]):
+            raise EphemeralWorkerError(f"{label}.bytes exceeds its admitted ceiling")
         encoded_content = record["content_base64"]
         if not isinstance(encoded_content, str):
             raise EphemeralWorkerError(f"{label}.content_base64 must be a string")
@@ -822,6 +885,10 @@ def validate_ephemeral_read_result(
         raise EphemeralWorkerError("input_bytes does not match admitted records")
     if _require_nonnegative_int(observation["output_bytes"], "output_bytes") != decoded_bytes:
         raise EphemeralWorkerError("output_bytes does not match admitted records")
+    if decoded_bytes > admitted_max_input_bytes:
+        raise EphemeralWorkerError("input_bytes exceeds the admitted request ceiling")
+    if decoded_bytes > admitted_max_output_bytes:
+        raise EphemeralWorkerError("output_bytes exceeds the admitted request ceiling")
     active_wall = observation["active_wall_seconds"]
     if (
         isinstance(active_wall, bool)
