@@ -164,8 +164,8 @@ and replay only through their matching legacy wake reservation. A retry after a 
   owner/idempotency anchor in persistent owner state retains the first attempt
   path across alternate receipt paths, later reverse transitions, and volatile
   runtime-lock loss. Every typed mutation shares the legacy route's outer lock
-  for the qualified Goal identity, then takes narrower semantic-request and
-  physical-attempt-coordinate locks; two accepted requests cannot observe the
+  for the qualified Goal identity, then takes a narrower semantic-request lock
+  and a globally ordered attempt/receipt coordinate lock set; two accepted requests cannot observe the
   same mutable precondition concurrently, and two callers cannot overwrite one
   selected attempt sidecar. Persistent state parents are created component by
   component with owner-only modes and validated before use. The programmatic
@@ -181,7 +181,9 @@ and replay only through their matching legacy wake reservation. A retry after a 
   to recreate the attempt, and replayed read-only receipts must match the
   recorded observation. The SDK reasserts supplied attempt objects against an
   existing canonical sidecar before opening transport; an in-memory attempt is
-  not durable evidence. The CLI reasserts
+  not durable evidence. CLI receipt and attempt paths share the same physical
+  lock namespace, preventing crossed coordinates across Goals from overwriting
+  either artifact. The CLI reasserts
   request, decision, and owner bytes immediately before mutation and after
   receipt publication;
 - keeps `aoa-external-codex-return pause` as a backwards-compatible legacy

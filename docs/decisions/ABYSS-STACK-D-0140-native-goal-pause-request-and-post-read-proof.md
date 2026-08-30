@@ -70,10 +70,11 @@ Dynamic endpoint rebinding may change the fresh transport coordinate but does
 not rewrite the attempt's historical endpoint evidence.
 All Goal mutations share an outer lock derived only from the qualified Goal
 identity, including the legacy pause route. Typed requests then acquire their
-owner/idempotency lock and a lock derived from the resolved physical attempt
-path in that fixed order. Different accepted requests therefore cannot both
-read one mutable precondition before dispatch, and even requests outside one
-semantic anchor cannot overwrite a colliding caller-selected attempt sidecar.
+owner/idempotency lock and a globally ordered lock set derived from every
+resolved physical attempt and receipt coordinate. Different accepted requests
+therefore cannot both read one mutable precondition before dispatch, and even
+requests outside one semantic anchor cannot overwrite colliding evidence when
+one transition's receipt aliases another transition's attempt.
 Persistent owner-state parents are created directly with owner-only modes and
 validated component by component rather than relying on a recursive mkdir
 whose intermediate modes depend on the process umask.

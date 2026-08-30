@@ -104,7 +104,9 @@ Tracking starts with the community-docs baseline for this repository.
   removed, the surviving owner-state anchor is terminal and refuses to recreate it; replayed
   read-only receipts must also match the exact recorded observation. Supplied
   SDK attempts are accepted only when an existing canonical sidecar matches
-  the in-memory object exactly, before transport is opened. CLI
+  the in-memory object exactly, before transport is opened. Receipt and attempt
+  coordinates now acquire one globally sorted physical-lock set, closing
+  crossed-path races between different Goals. CLI
   request/decision artifacts are reasserted immediately before dispatch and
   again after receipt publication, and the SDK binds attempt/receipt evidence to the initially
   loaded owner bytes while rejecting owner drift before dispatch and after

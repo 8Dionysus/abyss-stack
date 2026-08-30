@@ -1992,7 +1992,7 @@ def _semantic_attempt_lock_path(
 
 
 def _physical_attempt_lock_path(attempt_path: Path) -> Path:
-    """Bind one lock to the caller-selected durable attempt coordinate."""
+    """Bind one lock to a lifecycle artifact coordinate, independent of role."""
 
     runtime = _runtime()
     binding = {
@@ -2001,6 +2001,20 @@ def _physical_attempt_lock_path(attempt_path: Path) -> Path:
     }
     digest = runtime._sha256_bytes(runtime._canonical_bytes(binding))
     return _semantic_attempt_lock_root() / f"physical-{digest}.lock"
+
+
+@contextlib.contextmanager
+def _physical_coordinate_locks(paths: tuple[Path, ...]):
+    """Acquire a globally ordered lock set for all lifecycle artifact paths."""
+
+    lock_paths = sorted(
+        {_physical_attempt_lock_path(path) for path in paths},
+        key=lambda path: str(path),
+    )
+    with contextlib.ExitStack() as stack:
+        for lock_path in lock_paths:
+            stack.enter_context(_attempt_lock(lock_path))
+        yield
 
 
 def _semantic_attempt_digest(request: Any, owner: dict[str, Any]) -> str:
@@ -2309,8 +2323,10 @@ def _goal_transition_attempt_locks(
     request: Any,
     owner: dict[str, Any],
     requested_attempt_path: Path,
+    *,
+    additional_physical_paths: tuple[Path, ...] = (),
 ):
-    """Serialize one transition by Goal, semantic request, and output path."""
+    """Serialize one transition by Goal, semantic request, and artifact paths."""
 
     runtime = _runtime()
     semantic_lock_path = _semantic_attempt_lock_path(request, owner)
@@ -2324,7 +2340,9 @@ def _goal_transition_attempt_locks(
                 owner,
                 requested_attempt_path,
             )
-            with _attempt_lock(_physical_attempt_lock_path(attempt_path)):
+            with _physical_coordinate_locks(
+                (attempt_path, *additional_physical_paths)
+            ):
                 yield attempt_path
 
 
@@ -2376,6 +2394,7 @@ def run_goal_transition(args: Any) -> dict[str, Any]:
         request,
         owner,
         attempt_path,
+        additional_physical_paths=(receipt_path,),
     ) as attempt_path:
         if {receipt_path.resolve(), attempt_path.resolve()} & input_paths:
             raise runtime.ExternalCodexReturnError(

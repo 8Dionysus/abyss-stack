@@ -1223,6 +1223,60 @@ def test_programmatic_adapter_serializes_one_semantic_attempt_across_paths(
     assert sum(path.exists() for path in attempt_paths) == 1
 
 
+def test_crossed_receipt_and_attempt_coordinates_share_physical_lock(
+    tmp_path: Path,
+) -> None:
+    owner_a = _owner()
+    owner_a["goal_id"] = "goal:crossed-a"
+    owner_a["goal_ref"] = _ref("goal:crossed-a").model_dump(mode="json")
+    owner_b = _owner()
+    owner_b["goal_id"] = "goal:crossed-b"
+    owner_b["thread_id"] = "thread:crossed-b"
+    owner_b["goal_ref"] = _ref("goal:crossed-b").model_dump(mode="json")
+    request_a = _request(
+        observed="active",
+        desired="paused",
+        kind="delegation_yield",
+        request_id="request:crossed-coordinate-a",
+    ).model_copy(update={"goal_ref": _ref("goal:crossed-a")})
+    request_b = _request(
+        observed="active",
+        desired="paused",
+        kind="delegation_yield",
+        request_id="request:crossed-coordinate-b",
+    ).model_copy(update={"goal_ref": _ref("goal:crossed-b")})
+    shared_coordinate = tmp_path / "crossed-a.attempt.json"
+    receipt_a = tmp_path / "crossed-a.receipt.json"
+    attempt_b = tmp_path / "crossed-b.attempt.json"
+    contender_started = threading.Event()
+    contender_entered = threading.Event()
+
+    def contend() -> None:
+        contender_started.set()
+        with ADAPTER._goal_transition_attempt_locks(
+            request_b,
+            owner_b,
+            attempt_b,
+            additional_physical_paths=(shared_coordinate,),
+        ):
+            contender_entered.set()
+
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        with ADAPTER._goal_transition_attempt_locks(
+            request_a,
+            owner_a,
+            shared_coordinate,
+            additional_physical_paths=(receipt_a,),
+        ):
+            future = pool.submit(contend)
+            assert contender_started.wait(timeout=2)
+            assert not contender_entered.wait(timeout=0.2)
+            assert not future.done()
+
+        assert contender_entered.wait(timeout=2)
+        future.result(timeout=2)
+
+
 def test_programmatic_adapter_serializes_different_requests_by_goal_identity(
     tmp_path: Path,
 ) -> None:

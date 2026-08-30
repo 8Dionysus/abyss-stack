@@ -138,9 +138,9 @@ Operations are:
   acquire one outer owner-private lock from the qualified Goal identity, shared
   with the legacy pause route, across endpoint discovery, attempt loading,
   mutation, and proof persistence. A nested semantic lock binds the qualified
-  owner identity and idempotency key, while a third lock binds the resolved
-  physical attempt coordinate before any sidecar is loaded or written. This
-  fixed Goal -> semantic request -> physical attempt order prevents competing
+  owner identity and idempotency key, while a globally ordered lock set binds
+  the resolved physical attempt and receipt coordinates before any sidecar is
+  loaded or written. This fixed Goal -> semantic request -> physical artifact order prevents competing
   accepted requests from reading the same mutable precondition and prevents
   unrelated requests from overwriting one caller-selected attempt path. A
   non-replacing semantic anchor in persistent
@@ -170,6 +170,9 @@ Operations are:
   `read_only_recorded` observation.
   A caller-supplied attempt object is never authority by itself: its durable
   sidecar must exist, be canonical, and match exactly before transport use.
+  Receipt and attempt coordinates share the same physical lock namespace, so a
+  path cannot be a receipt for one Goal while concurrently being overwritten
+  as another Goal's attempt.
   Attempt and receipt owner digests come only from the initially
   validated owner bytes. Both entrypoints reassert that snapshot immediately
   before native mutation and after proof persistence, while the CLI also
