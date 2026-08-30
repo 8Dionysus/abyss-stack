@@ -63,6 +63,7 @@ def _normalize_json_value(
     value: object,
     label: str,
     *,
+    _max_string_length: int = MAX_BYTE_CEILING,
     _depth: int = 0,
     _active_containers: set[int] | None = None,
     _remaining_nodes: list[int] | None = None,
@@ -99,9 +100,15 @@ def _normalize_json_value(
                         raise EphemeralWorkerError(
                             f"{label} object keys must be strings"
                         )
+                    if len(key) > _max_string_length:
+                        raise EphemeralWorkerError(
+                            f"{label} object key exceeds max_transport_bytes "
+                            "before validation and before serialization"
+                        )
                     normalized[key] = _normalize_json_value(
                         item,
                         f"{label}.{key}",
+                        _max_string_length=_max_string_length,
                         _depth=_depth + 1,
                         _active_containers=_active_containers,
                         _remaining_nodes=_remaining_nodes,
@@ -116,6 +123,7 @@ def _normalize_json_value(
                 _normalize_json_value(
                     item,
                     f"{label}[{index}]",
+                    _max_string_length=_max_string_length,
                     _depth=_depth + 1,
                     _active_containers=_active_containers,
                     _remaining_nodes=_remaining_nodes,
@@ -124,6 +132,11 @@ def _normalize_json_value(
             ]
         finally:
             _active_containers.remove(container_id)
+    if isinstance(value, str) and len(value) > _max_string_length:
+        raise EphemeralWorkerError(
+            f"{label} string exceeds max_transport_bytes before validation "
+            "and before serialization"
+        )
     if value is None or isinstance(value, (str, int, float, bool)):
         return value
     raise EphemeralWorkerError(f"{label} contains a non-JSON value")
@@ -547,7 +560,11 @@ def validate_ephemeral_read_result(
         except (ValueError, RecursionError) as exc:
             raise EphemeralWorkerError("result is not canonical JSON input") from exc
     elif isinstance(payload, Mapping):
-        candidate = _normalize_json_value(payload, "result")
+        candidate = _normalize_json_value(
+            payload,
+            "result",
+            _max_string_length=transport_ceiling,
+        )
         if len(_canonical_bytes(candidate)) > transport_ceiling:
             raise EphemeralWorkerError(
                 "mapped result exceeds max_transport_bytes before validation"
