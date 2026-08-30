@@ -229,7 +229,9 @@ host-backed Python base cannot pass on the private file digest alone. Generated 
 shebangs are rewritten from the private staging root to the stable published
 venv path before this digest is recorded and before the atomic rename. Bytecode writes are
 disabled while provisioning, verifying, and running the managed units so the
-measured closure remains stable. Replacement is refused while either plane is
+measured closure remains stable; any bytecode that is nevertheless present,
+including importable sourceless `.pyc`, is part of the runtime content digest.
+Replacement is refused while either plane is
 active or its user-systemd state cannot be observed. It never stops or starts
 those units implicitly. Run `--all-user-units` first so the loaded unit
 definitions participate in the runtime lock. Each plane then holds a shared

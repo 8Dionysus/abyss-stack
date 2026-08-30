@@ -5,6 +5,7 @@ import hashlib
 import importlib
 import json
 import os
+import py_compile
 import signal
 import shutil
 import socket
@@ -1963,17 +1964,24 @@ esac
                 first_content_digest,
                 r"\A[0-9a-f]{64}\Z",
             )
-            generated_bytecode = (
+            sourceless_bytecode = (
                 venv
                 / "lib"
                 / "python"
                 / "site-packages"
-                / "test_package"
-                / "__pycache__"
-                / "generated.cpython-test.pyc"
+                / "sitecustomize.pyc"
             )
-            generated_bytecode.parent.mkdir(parents=True)
-            generated_bytecode.write_bytes(b"regenerable bytecode\n")
+            bytecode_source = root / "sitecustomize.py"
+            bytecode_source.write_text(
+                "raise RuntimeError('unmeasured bytecode executed')\n",
+                encoding="utf-8",
+            )
+            py_compile.compile(
+                str(bytecode_source),
+                cfile=str(sourceless_bytecode),
+                doraise=True,
+            )
+            bytecode_source.unlink()
             bytecode_only_verify = subprocess.run(
                 read_verify_command,
                 cwd=REPO_ROOT,
@@ -1982,12 +1990,12 @@ esac
                 capture_output=True,
                 text=True,
             )
-            self.assertEqual(
-                bytecode_only_verify.returncode,
-                0,
+            self.assertNotEqual(bytecode_only_verify.returncode, 0)
+            self.assertIn(
+                "abyss-stack MCP runtime content digest mismatch",
                 bytecode_only_verify.stderr,
             )
-            generated_bytecode.unlink()
+            sourceless_bytecode.unlink()
             self.assertTrue((venv / "bin" / "python").is_file())
             self.assertFalse((venv / "bin" / "python").is_symlink())
             entrypoint = venv / "bin" / "abyss-stack-mcp"

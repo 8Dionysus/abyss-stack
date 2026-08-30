@@ -1808,8 +1808,6 @@ aoa_digest_abyss_stack_mcp_runtime() {
         find . \
           ! -name '.abyss-stack-mcp-runtime-identity' \
           ! -name '.abyss-stack-mcp-runtime-content-digest' \
-          ! -path '*/__pycache__/*' \
-          ! -name '*.pyc' \
           \( -type f -o -type l \) \
           -printf '%y %p\0' |
           LC_ALL=C sort -z
