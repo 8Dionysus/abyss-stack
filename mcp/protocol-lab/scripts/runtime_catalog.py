@@ -523,22 +523,31 @@ def declared_client_read_entries(
 def client_read_entries(
     catalog: Mapping[str, Any], registry: Mapping[str, Any] | None = None
 ) -> list[tuple[str, str, dict[str, Any], dict[str, Any]]]:
-    """Project admitted rows, or declared recovery rows when admission is empty.
+    """Project a complete admitted set, or every declared recovery row.
 
-    An existing but fully withdrawn registry is valid runtime state.  The
-    declared rows let the non-blocking Codex launcher load contour credentials
-    and request owner recovery; they do not change registry admission.
+    Empty, partial, duplicate, malformed, or over-broad admitted projections do
+    not describe the catalog's exact operator-client fleet.  The declared rows
+    let the non-blocking Codex launcher load every expected credential and
+    request owner recovery; they do not change registry admission.
     """
 
+    declared = declared_client_read_entries(catalog)
     if registry is not None:
         admitted = admitted_read_entries(
             catalog,
             registry,
             require_nonempty=False,
         )
-        if admitted:
-            return admitted
-    return declared_client_read_entries(catalog)
+        declared_keys = [(row[0], row[1]) for row in declared]
+        admitted_keys = [(row[0], row[1]) for row in admitted]
+        admitted_by_key = {(row[0], row[1]): row for row in admitted}
+        if (
+            len(admitted) == len(declared)
+            and len(admitted_by_key) == len(admitted)
+            and set(admitted_keys) == set(declared_keys)
+        ):
+            return [admitted_by_key[key] for key in declared_keys]
+    return declared
 
 
 def codex_client_settings(

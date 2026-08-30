@@ -149,6 +149,55 @@ def test_codex_client_uses_declared_recovery_rows_when_admission_is_empty() -> N
         runtime_catalog.admitted_read_entries(catalog, {"records": []})
 
 
+def test_codex_client_uses_complete_recovery_rows_for_partial_admission() -> None:
+    runtime_catalog = _load_runtime_catalog()
+    catalog = runtime_catalog.load_runtime_catalog()
+    declared = runtime_catalog.declared_client_read_entries(catalog)
+    admitted_organ = declared[0][0]
+    partial_registry = {
+        "records": [
+            {
+                "organ_id": admitted_organ,
+                "contours": [
+                    {
+                        "contour_id": "read",
+                        "registry_state": "admitted",
+                    }
+                ],
+            },
+            {"organ_id": declared[1][0], "contours": "malformed"},
+        ]
+    }
+
+    projected = runtime_catalog.client_read_entries(catalog, partial_registry)
+
+    assert projected == declared
+
+
+def test_codex_client_normalizes_complete_admission_to_declared_order() -> None:
+    runtime_catalog = _load_runtime_catalog()
+    catalog = runtime_catalog.load_runtime_catalog()
+    declared = runtime_catalog.declared_client_read_entries(catalog)
+    complete_registry = {
+        "records": [
+            {
+                "organ_id": organ_id,
+                "contours": [
+                    {
+                        "contour_id": "read",
+                        "registry_state": "admitted",
+                    }
+                ],
+            }
+            for organ_id, _service_id, _service, _contour in reversed(declared)
+        ]
+    }
+
+    projected = runtime_catalog.client_read_entries(catalog, complete_registry)
+
+    assert projected == declared
+
+
 @pytest.mark.parametrize(
     "registry_payload",
     (

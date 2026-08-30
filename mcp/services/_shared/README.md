@@ -40,11 +40,13 @@ git under the deployed stack `Secrets/` tree.
 `codex_http_client.sh` is the matching client-side launcher for hosts that use
 authenticated loopback owners. It reads the catalog's client-admitted read
 contours (using the live admission registry when present and the declarative
-client list otherwise). An unreadable or malformed registry is treated as
-unavailable only for this fail-open operator-client projection: the launcher
-uses the declared recovery rows, while strict admission validation and registry
-mutation remain with their owners. It then checks units and loopback listeners
-before an MCP-consuming run. A missing member requests the bounded modern admission
+client list otherwise). The live projection is accepted only when it exactly
+matches the complete declared client set; empty, partial, duplicate, over-broad,
+unreadable, or malformed state uses all declared recovery rows. This fallback
+belongs only to the fail-open operator client, while strict admission validation
+and registry mutation remain with their owners. The launcher then checks units
+and loopback listeners before an MCP-consuming run. A missing member requests
+the bounded modern admission
 recovery oneshot without waiting and then starts Codex immediately. MCP
 degradation is visible but cannot turn the interactive client into a lifecycle
 lock. Metadata-only Codex commands do not request runtime recovery, and
