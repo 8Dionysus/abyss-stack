@@ -4882,6 +4882,11 @@ esac
             "--registry /srv/AbyssOS/.aoa/organ-access/organ-registry.v2.source.json",
             unit,
         )
+        self.assertIn("--runtime-workspace-root /srv/AbyssOS", unit)
+        self.assertIn(
+            "--runtime-stack-root /srv/AbyssOS/abyss-stack",
+            unit,
+        )
         self.assertIn(
             "--output /srv/AbyssOS/abyss-stack/Logs/mcp/observations/current.json",
             unit,

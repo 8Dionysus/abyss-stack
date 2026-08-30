@@ -372,7 +372,12 @@ def _write_atomic(path: Path, payload: dict[str, Any]) -> None:
         temporary.unlink(missing_ok=True)
 
 
-def _load_targets(path: Path) -> tuple[RuntimeTargetCatalog, str]:
+def _load_targets(
+    path: Path,
+    *,
+    workspace_root: str | Path | None = None,
+    stack_root: str | Path | None = None,
+) -> tuple[RuntimeTargetCatalog, str]:
     payload, _ = _read_json(path, "runtime target catalog")
     _reject_secret_material(payload)
     try:
@@ -382,7 +387,14 @@ def _load_targets(path: Path) -> tuple[RuntimeTargetCatalog, str]:
             "runtime target catalog failed contract validation"
         ) from exc
     catalog_digest = _digest(catalog.model_dump(mode="json"))
-    return _resolve_runtime_target_catalog(catalog), catalog_digest
+    return (
+        _resolve_runtime_target_catalog(
+            catalog,
+            workspace_root=workspace_root,
+            stack_root=stack_root,
+        ),
+        catalog_digest,
+    )
 
 
 def _resolve_runtime_target_catalog(
@@ -1205,6 +1217,8 @@ def produce_observation(
     registry_path: Path = DEFAULT_REGISTRY_PATH,
     output_path: Path = DEFAULT_OUTPUT_PATH,
     targets_path: Path = DEFAULT_TARGETS_PATH,
+    runtime_workspace_root: Path | None = None,
+    runtime_stack_root: Path | None = None,
     overlay_path: Path | None = DEFAULT_OVERLAY_PATH,
     allow_missing_overlay: bool = True,
     canary_purpose: ObservationCanaryPurpose = "current",
@@ -1216,7 +1230,11 @@ def produce_observation(
         raise ObservationProducerError("observation TTL must be 30..3600 seconds")
     observed_at = clock().astimezone(timezone.utc)
     expires_at = observed_at + timedelta(seconds=ttl_seconds)
-    catalog, catalog_digest = _load_targets(targets_path)
+    catalog, catalog_digest = _load_targets(
+        targets_path,
+        workspace_root=runtime_workspace_root,
+        stack_root=runtime_stack_root,
+    )
     manifest, manifest_digest = _load_deployment(deployment_manifest_path)
     registry, registry_digest = _load_registry(registry_path)
     overlay, overlay_digest = _load_overlay(
@@ -1289,6 +1307,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--registry", type=Path, default=DEFAULT_REGISTRY_PATH)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT_PATH)
     parser.add_argument("--targets", type=Path, default=DEFAULT_TARGETS_PATH)
+    parser.add_argument("--runtime-workspace-root", type=Path)
+    parser.add_argument("--runtime-stack-root", type=Path)
     parser.add_argument("--overlay", type=Path, default=DEFAULT_OVERLAY_PATH)
     parser.add_argument("--require-overlay", action="store_true")
     parser.add_argument(
@@ -1312,6 +1332,8 @@ def main() -> int:
             registry_path=args.registry,
             output_path=args.output,
             targets_path=args.targets,
+            runtime_workspace_root=args.runtime_workspace_root,
+            runtime_stack_root=args.runtime_stack_root,
             overlay_path=args.overlay,
             allow_missing_overlay=not args.require_overlay,
             canary_purpose=args.canary_purpose,

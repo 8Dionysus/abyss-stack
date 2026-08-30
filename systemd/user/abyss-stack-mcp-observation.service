@@ -14,7 +14,7 @@ WorkingDirectory=/srv/AbyssOS/abyss-stack/Configs/mcp/services/abyss-stack-mcp
 Environment=PYTHONDONTWRITEBYTECODE=1
 Environment=PYTHONHOME=
 Environment=PYTHONPATH=
-ExecStart=/usr/bin/flock --shared --no-fork /srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/.runtime-operation.lock /usr/bin/flock --shared --no-fork /srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/.runtime-provision.lock /srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/venv/bin/python -I -B -m abyss_stack_mcp.observation --deployment-manifest /srv/AbyssOS/abyss-stack/Logs/mcp/deployments/latest.json --registry /srv/AbyssOS/.aoa/organ-access/organ-registry.v2.source.json --output /srv/AbyssOS/abyss-stack/Logs/mcp/observations/current.json --overlay /srv/AbyssOS/abyss-stack/Logs/mcp/observations/evidence-overlay.json --ttl-seconds 300
+ExecStart=/usr/bin/flock --shared --no-fork /srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/.runtime-operation.lock /usr/bin/flock --shared --no-fork /srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/.runtime-provision.lock /srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/venv/bin/python -I -B -m abyss_stack_mcp.observation --deployment-manifest /srv/AbyssOS/abyss-stack/Logs/mcp/deployments/latest.json --registry /srv/AbyssOS/.aoa/organ-access/organ-registry.v2.source.json --runtime-workspace-root /srv/AbyssOS --runtime-stack-root /srv/AbyssOS/abyss-stack --output /srv/AbyssOS/abyss-stack/Logs/mcp/observations/current.json --overlay /srv/AbyssOS/abyss-stack/Logs/mcp/observations/evidence-overlay.json --ttl-seconds 300
 Nice=10
 IOSchedulingClass=idle
 CPUWeight=20
