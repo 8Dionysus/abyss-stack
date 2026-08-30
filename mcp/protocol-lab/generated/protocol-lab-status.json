@@ -16,7 +16,7 @@
   "core_read_migration_allowed": false,
   "deployment_evidence_current": false,
   "deployment_evidence_expires_at": "2026-08-15T08:33:46.547214Z",
-  "evaluated_at": "2026-08-30T01:52:44.198448Z",
+  "evaluated_at": "2026-08-30T03:02:04.002993Z",
   "evidence_expires_at": "2026-08-15T08:33:46.547214Z",
   "external_effect_migration_allowed": false,
   "gate_counts": {
@@ -70,7 +70,7 @@
   "schema_version": "abyss_mcp_protocol_lab_status_v2",
   "stable_registration_retained": true,
   "stable_rollback_observation_digest": "sha256:140a64d223ddec2494b67852a369e09747fe17539a740f66922ba50b2725917d",
-  "status_digest": "sha256:1ef0bb2c2f083d6ec5a7feb8498c737e8c94a75512c703264be524965d8791b5",
+  "status_digest": "sha256:0a996339758bcebf74579651b643bdde99f3d086674a9a517205da33c6be74bd",
   "tasks_blockers": [
     "input_required_update_live_pair_unproved",
     "tasks_notifications_unproved",

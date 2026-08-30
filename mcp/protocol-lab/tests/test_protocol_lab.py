@@ -148,6 +148,19 @@ def test_current_status_is_deterministic_and_keeps_deployment_cutover_blocked(
     assert first["stable_registration_retained"] is True
 
 
+def test_render_binds_status_to_the_recorded_evaluation_time(builder: Any) -> None:
+    evaluated_at = "2026-08-30T06:00:00Z"
+    rendered = json.loads(builder.render(evaluated_at=evaluated_at))
+    expected = builder.build_status(
+        _load(builder.MATRIX_PATH),
+        _load(builder.OBSERVATION_PATH),
+        evaluated_at=evaluated_at,
+    )
+
+    assert rendered == expected
+    assert rendered["evaluated_at"] == evaluated_at
+
+
 def test_final_spec_and_stable_sdks_are_part_of_admitted_migration(
     builder: Any,
     matrix: dict[str, Any],

@@ -352,9 +352,18 @@ def build_status(
     return result
 
 
-def render() -> str:
+def render(*, evaluated_at: str | None = None) -> str:
+    """Render the status with an explicit or current build-time evaluation."""
+
+    evaluated_at = evaluated_at or datetime.now(UTC).isoformat().replace(
+        "+00:00", "Z"
+    )
     return json.dumps(
-        build_status(load_json(MATRIX_PATH), load_json(OBSERVATION_PATH)),
+        build_status(
+            load_json(MATRIX_PATH),
+            load_json(OBSERVATION_PATH),
+            evaluated_at=evaluated_at,
+        ),
         indent=2,
         ensure_ascii=True,
         sort_keys=True,
@@ -365,15 +374,21 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
-    expected = render()
     if args.check:
         if not OUTPUT_PATH.is_file():
             print(f"missing generated protocol lab status: {OUTPUT_PATH}")
+            return 1
+        try:
+            recorded = load_json(OUTPUT_PATH)
+            expected = render(evaluated_at=recorded["evaluated_at"])
+        except (KeyError, OSError, TypeError, ValueError, json.JSONDecodeError):
+            print(f"invalid generated protocol lab status: {OUTPUT_PATH}")
             return 1
         if OUTPUT_PATH.read_text(encoding="utf-8") != expected:
             print(f"stale generated protocol lab status: {OUTPUT_PATH}")
             return 1
         return 0
+    expected = render()
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT_PATH.write_text(expected, encoding="utf-8")
     print(f"[ok] wrote {OUTPUT_PATH.relative_to(LAB_ROOT.parent.parent)}")

@@ -159,6 +159,7 @@ def validate(checked_at: datetime | None = None) -> list[str]:
             fixtures["codex_tasks_production_pair"],
             evaluated_at=evaluated_at,
         )
+        generated_status = builder.load_json(builder.OUTPUT_PATH)
         rendered_status = builder.build_status(
             matrix,
             observation,
@@ -171,6 +172,7 @@ def validate(checked_at: datetime | None = None) -> list[str]:
             fixtures["inspector_tasks_blocker"],
             fixtures["live_modern_fleet"],
             fixtures["codex_tasks_production_pair"],
+            evaluated_at=generated_status["evaluated_at"],
         )
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         return [str(exc)]
@@ -210,6 +212,18 @@ def validate(checked_at: datetime | None = None) -> list[str]:
     ) + "\n"
     if not builder.OUTPUT_PATH.is_file() or builder.OUTPUT_PATH.read_text() != expected_render:
         errors.append("generated protocol-lab status is missing or stale")
+    for field in (
+        "deployment_evidence_current",
+        "core_read_migration_allowed",
+        "tasks_extension_allowed",
+        "tasks_codex_consumer_eligible",
+        "production_cutover_blockers",
+    ):
+        if generated_status.get(field) != status.get(field):
+            errors.append(
+                "generated protocol-lab status is not current for "
+                f"{field}"
+            )
 
     if tuple(gate["gate_id"] for gate in matrix["migration_gates"]) != EXPECTED_GATE_IDS:
         errors.append("P1 gates must remain ordered P1-01 through P1-14")
@@ -277,6 +291,14 @@ def validate(checked_at: datetime | None = None) -> list[str]:
     }:
         errors.append("final 2026-07-28 specification pin drifted")
     sdk_by_id = {sdk["sdk_id"]: sdk for sdk in matrix["sdk_lines"]}
+    candidate_identity = (
+        sdk_by_id["python-next"]["version"],
+        sdk_by_id["python-next"]["commit"],
+    )
+    historical_identity = (
+        EXPECTED_DEPLOYMENT_MCP_VERSION,
+        EXPECTED_DEPLOYMENT_MCP_COMMIT,
+    )
     if (
         sdk_by_id["python-next"]["commit"] != EXPECTED_PYTHON_MCP_COMMIT
         or sdk_by_id["python-next"]["version"] != EXPECTED_PYTHON_MCP_VERSION
@@ -366,8 +388,11 @@ def validate(checked_at: datetime | None = None) -> list[str]:
         errors.append("isolated Codex KAG modern-pair proof drifted")
     if (
         stable_rollback["verdict"] != "stable_production_route_passed_after_lab_rollback"
-        or stable_rollback["mcp_sdk"] != EXPECTED_DEPLOYMENT_MCP_VERSION
-        or stable_rollback["mcp_sdk_source_revision"] != EXPECTED_DEPLOYMENT_MCP_COMMIT
+        or (
+            stable_rollback["mcp_sdk"],
+            stable_rollback["mcp_sdk_source_revision"],
+        )
+        not in {candidate_identity, historical_identity}
         or stable_rollback["canary"]["is_error"]
         or not stable_rollback["stable_registration"]["unchanged"]
         or stable_rollback["secrets_included"]
@@ -468,14 +493,6 @@ def validate(checked_at: datetime | None = None) -> list[str]:
         errors.append("live modern-only production fleet evidence drifted")
     if not _live_fleet_identity_attested(live_modern_fleet):
         errors.append("live modern fleet candidate lacks per-unit SDK artifact attestation")
-    candidate_identity = (
-        sdk_by_id["python-next"]["version"],
-        sdk_by_id["python-next"]["commit"],
-    )
-    historical_identity = (
-        EXPECTED_DEPLOYMENT_MCP_VERSION,
-        EXPECTED_DEPLOYMENT_MCP_COMMIT,
-    )
     deployment_identities = {
         (payload["mcp_sdk"], payload["mcp_sdk_source_revision"])
         for payload in (
@@ -575,12 +592,49 @@ def validate(checked_at: datetime | None = None) -> list[str]:
         or observation["verdict"] != "passed"
     ):
         errors.append("current pair observation lost its bounded pilot/production split")
+    remaining_core_gate_ids = {
+        gate["gate_id"]
+        for gate in matrix["migration_gates"]
+        if gate["gate_id"] != "P1-11" and gate["status"] != "passed"
+    }
+    remaining_tasks_gate_ids = {
+        gate["gate_id"]
+        for gate in matrix["migration_gates"]
+        if gate["gate_id"] == "P1-11" and gate["status"] != "passed"
+    }
+    expected_core_read_migration = all(
+        (
+            production["next_wire_pair_observed"],
+            production["server_discover_observed"],
+            observation["official_conformance"]["status"] == "passed",
+            observation["abyss_pair_conformance"]["status"] == "passed",
+            observation["read_only_canary"]["status"] == "passed",
+            observation["compatibility_aliases"]["status"] == "passed",
+            observation["dual_support"]["status"] == "passed",
+            observation["rollback"]["status"] == "passed",
+            matrix["pilot"]["state"] == "passed",
+            not remaining_core_gate_ids,
+            live_modern_fleet["verdict"] == "production_modern_only_passed",
+            live_modern_fleet["read_fleet"]["production_units"] == 11,
+            live_modern_fleet["read_fleet"]["admitted_units"] == 11,
+            live_modern_fleet["read_fleet"]["bootstrap_identities"] == 0,
+            live_modern_fleet["rollback"]["active_legacy_units"] == 0,
+            _live_fleet_identity_attested(live_modern_fleet),
+            status["deployment_evidence_current"],
+        )
+    )
+    expected_tasks_extension = bool(
+        expected_core_read_migration
+        and codex_tasks_production_pair["verdict"]
+        == "eligible_for_bounded_production"
+        and not remaining_tasks_gate_ids
+    )
     if (
         not status["read_only_pilot_allowed"]
         or not status["read_only_pilot_completed"]
         or status["core_read_migration_allowed"]
-        or status["tasks_extension_allowed"]
-        or status["deployment_evidence_current"]
+        != expected_core_read_migration
+        or status["tasks_extension_allowed"] != expected_tasks_extension
         or not status["candidate_protocol_ready"]
         or status["internal_effect_protocol_ready"]
         or status["candidate_migration_allowed"]
@@ -590,10 +644,19 @@ def validate(checked_at: datetime | None = None) -> list[str]:
         errors.append("split migration verdicts no longer match exact evidence")
     if status["remaining_core_gate_ids"] or status["remaining_tasks_gate_ids"]:
         errors.append("completed core-read and bounded Tasks gates must have no remainder")
-    if status["production_cutover_blockers"] != [
-        "deployment_bound_evidence_not_refreshed_for_mcp_2_1_1"
-    ]:
-        errors.append("production cutover blocker must identify the unrefreshed MCP 2.1.1 deployment evidence")
+    expected_production_cutover_blockers: list[str] = []
+    if not production["next_wire_pair_observed"]:
+        expected_production_cutover_blockers.append("production_modern_pair_not_admitted")
+    if observation["official_conformance"]["status"] != "passed":
+        expected_production_cutover_blockers.append("current_conformance_fixture_mismatch")
+    if observation["abyss_pair_conformance"]["status"] != "passed":
+        expected_production_cutover_blockers.append("modern_cancellation_not_propagated")
+    if not status["deployment_evidence_current"]:
+        expected_production_cutover_blockers.append(
+            "deployment_bound_evidence_not_refreshed_for_mcp_2_1_1"
+        )
+    if status["production_cutover_blockers"] != expected_production_cutover_blockers:
+        errors.append("production cutover blockers no longer match exact evidence")
 
     service_pyprojects = sorted((REPO_ROOT / "mcp" / "services").glob("*/pyproject.toml"))
     constraints: list[str] = []
