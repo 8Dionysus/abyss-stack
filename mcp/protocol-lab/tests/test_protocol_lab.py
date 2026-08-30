@@ -131,6 +131,24 @@ def test_runtime_identity_does_not_accept_an_old_major_two_patch_release(
     assert identity["expected"] == {"mcp": "2.1.1", "mcp-types": "2.1.1"}
 
 
+def test_codex_client_uses_declared_recovery_rows_when_admission_is_empty() -> None:
+    runtime_catalog = _load_runtime_catalog()
+    catalog = runtime_catalog.load_runtime_catalog()
+
+    declared = runtime_catalog.declared_client_read_entries(catalog)
+    projected = runtime_catalog.client_read_entries(catalog, {"records": []})
+
+    assert projected == declared
+    assert len(projected) == len(
+        catalog["deployment"]["client_read_contours"]
+    )
+    with pytest.raises(
+        runtime_catalog.RuntimeCatalogError,
+        match="no admitted read contours",
+    ):
+        runtime_catalog.admitted_read_entries(catalog, {"records": []})
+
+
 @pytest.fixture
 def builder() -> Any:
     return _load_builder()

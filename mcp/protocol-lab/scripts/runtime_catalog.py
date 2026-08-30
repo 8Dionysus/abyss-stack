@@ -477,7 +477,10 @@ def contour_unit_name(
 
 
 def admitted_read_entries(
-    catalog: Mapping[str, Any], registry: Mapping[str, Any]
+    catalog: Mapping[str, Any],
+    registry: Mapping[str, Any],
+    *,
+    require_nonempty: bool = True,
 ) -> list[tuple[str, str, dict[str, Any], dict[str, Any]]]:
     records = registry.get("records")
     if not isinstance(records, list):
@@ -499,7 +502,7 @@ def admitted_read_entries(
                 service = service_for_organ(catalog, organ_id)
                 _, declared = contour_for(catalog, service["service_id"], "read")
                 rows.append((organ_id, service["service_id"], service, declared))
-    if not rows:
+    if not rows and require_nonempty:
         raise RuntimeCatalogError("MCP registry has no admitted read contours")
     return rows
 
@@ -520,10 +523,21 @@ def declared_client_read_entries(
 def client_read_entries(
     catalog: Mapping[str, Any], registry: Mapping[str, Any] | None = None
 ) -> list[tuple[str, str, dict[str, Any], dict[str, Any]]]:
-    """Use admitted registry state when available, with source fallback for tests."""
+    """Project admitted rows, or declared recovery rows when admission is empty.
+
+    An existing but fully withdrawn registry is valid runtime state.  The
+    declared rows let the non-blocking Codex launcher load contour credentials
+    and request owner recovery; they do not change registry admission.
+    """
 
     if registry is not None:
-        return admitted_read_entries(catalog, registry)
+        admitted = admitted_read_entries(
+            catalog,
+            registry,
+            require_nonempty=False,
+        )
+        if admitted:
+            return admitted
     return declared_client_read_entries(catalog)
 
 
@@ -565,10 +579,13 @@ def codex_client_settings(
 
 def _emit_codex_client(catalog: Mapping[str, Any], stack_root: Path) -> int:
     feature, recovery_unit, rows = codex_client_settings(catalog, stack_root)
+    _sdk, _protocol, transport = mcp_settings(catalog)
     print(f"FEATURE\t{feature}")
     print(f"RECOVERY\t{recovery_unit}")
     print(f"STACK_ROOT\t{stack_root}")
     print(f"CREDENTIALS_ROOT\t{credentials_root(catalog, stack_root)}")
+    for host in transport["loopback_hosts"]:
+        print(f"LOOPBACK\t{host}")
     for unit, port, credential, env_name in rows:
         print(f"READ\t{unit}\t{port}\t{credential}\t{env_name}")
     return 0

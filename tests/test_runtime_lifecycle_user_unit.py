@@ -3762,6 +3762,9 @@ esac
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
             stack_root = root / "stack"
+            registry = root / ".aoa" / "organ-access" / "organ-registry.v2.source.json"
+            registry.parent.mkdir(parents=True)
+            registry.write_text('{"records": []}\n', encoding="utf-8")
             secret_root = stack_root / "Secrets" / "Configs"
             secret_root.mkdir(parents=True)
             for index, name in enumerate(CODEX_MCP_READ_CREDENTIAL_NAMES):
@@ -3798,7 +3801,7 @@ esac
                 "set -euo pipefail\n"
                 "[[ -f \"$READINESS_MARKER\" ]]\n"
                 "for port in 5420 5421 5422 5423 5424 5425 5426 5427 5428 5430 5431; do\n"
-                "  printf 'LISTEN 0 128 127.0.0.1:%s 0.0.0.0:*\\n' \"$port\"\n"
+                "  printf 'LISTEN 0 128 %s:%s 0.0.0.0:*\\n' \"$LISTENER_HOST\" \"$port\"\n"
                 "done\n",
                 encoding="utf-8",
             )
@@ -3819,6 +3822,7 @@ esac
                     "AOA_CODEX_EXECUTABLE": str(fake_codex),
                     "CODEX_EXECUTED": str(executed),
                     "PATH": f"{fake_bin}:{env['PATH']}",
+                    "LISTENER_HOST": "127.0.0.1",
                     "READINESS_MARKER": str(ready_marker),
                     "SYSTEMCTL_LOG": str(systemctl_log),
                 }
@@ -3882,6 +3886,39 @@ esac
                     "--user start --no-block abyss-mcp-modern-admission-refresh.service",
                     "--user start --no-block abyss-mcp-modern-admission-refresh.service",
                 ],
+            )
+
+            ready_marker.touch()
+            env["LISTENER_HOST"] = "0.0.0.0"
+            exposed = subprocess.run(
+                [str(MCP_HTTP_CODEX_CLIENT), "exec", "exposed-listener"],
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(exposed.returncode, 0, exposed.stderr)
+            self.assertIn("background recovery requested", exposed.stderr)
+            self.assertEqual(
+                len(systemctl_log.read_text(encoding="utf-8").splitlines()),
+                3,
+            )
+
+            env["LISTENER_HOST"] = "127.0.0.1"
+            loopback = subprocess.run(
+                [str(MCP_HTTP_CODEX_CLIENT), "exec", "loopback-listener"],
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(loopback.returncode, 0, loopback.stderr)
+            self.assertNotIn("background recovery requested", loopback.stderr)
+            self.assertEqual(
+                len(systemctl_log.read_text(encoding="utf-8").splitlines()),
+                3,
             )
 
     @unittest.skipIf(

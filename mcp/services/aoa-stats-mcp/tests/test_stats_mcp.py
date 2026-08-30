@@ -226,7 +226,7 @@ def test_deployed_stack_environment_materializes_stack_owner_port(
             "exports": [],
         },
     )
-    monkeypatch.delenv("AOA_ABYSS_STACK_SOURCE_ROOT", raising=False)
+    monkeypatch.delenv("AOA_SOURCE_ROOT", raising=False)
     monkeypatch.setenv("AOA_ABYSS_STACK_ROOT", str(stack))
 
     state = AoAStatsMCPState.discover(

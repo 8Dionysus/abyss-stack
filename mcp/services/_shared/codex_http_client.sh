@@ -10,6 +10,7 @@ client_mode="${AOA_CODEX_CLIENT_MODE:-codex}"
 codex_mcp_feature=""
 readiness_service=""
 credentials_root=""
+readiness_loopback_hosts=()
 readiness_units=()
 readiness_ports=()
 readiness_credentials=()
@@ -51,6 +52,10 @@ load_runtime_catalog() {
         [[ -z "$credentials_root" ]] || fail "MCP runtime catalog emitted duplicate credentials root"
         credentials_root="$first"
         ;;
+      LOOPBACK)
+        [[ -n "$first" ]] || fail "MCP runtime catalog emitted an empty loopback host"
+        readiness_loopback_hosts+=("$first")
+        ;;
       READ)
         [[ -n "$first" && -n "$second" && -n "$third" && -n "$fourth" ]] || \
           fail "MCP runtime catalog emitted an incomplete read contour"
@@ -69,6 +74,7 @@ load_runtime_catalog() {
 
   [[ -n "$stack_root" && -n "$credentials_root" && -n "$codex_mcp_feature" && -n "$readiness_service" ]] || \
     fail "MCP runtime catalog omitted required Codex client settings"
+  ((${#readiness_loopback_hosts[@]} > 0)) || fail "MCP runtime catalog contains no loopback hosts"
   ((${#readiness_units[@]} > 0)) || fail "MCP runtime catalog contains no client read contours"
 }
 
@@ -158,6 +164,7 @@ metadata_only_invocation() {
 
 modern_fleet_ready() {
   local active_units=0
+  local allowed_hosts=""
   local listening_ports=0
 
   read -r active_units listening_ports < <(modern_fleet_counts)
@@ -182,9 +189,35 @@ modern_fleet_counts() {
     fi
   done
   listeners="$(ss -H -ltn 2>/dev/null || true)"
+  allowed_hosts="$(IFS=,; printf '%s' "${readiness_loopback_hosts[*]}")"
   for port in "${readiness_ports[@]}"; do
-    if awk -v suffix=":${port}" \
-      'index($4, suffix) == length($4) - length(suffix) + 1 { found = 1 }
+    if awk -v expected_port="$port" -v allowed_hosts="$allowed_hosts" \
+      'BEGIN {
+         count = split(allowed_hosts, hosts, ",")
+         for (host_index = 1; host_index <= count; host_index += 1) {
+           allowed[hosts[host_index]] = 1
+         }
+       }
+       {
+         address = $4
+         if (substr(address, 1, 1) == "[") {
+           closing = index(address, "]:")
+           if (closing == 0) {
+             next
+           }
+           host = substr(address, 2, closing - 2)
+           observed_port = substr(address, closing + 2)
+         } else {
+           if (match(address, /:[^:]*$/) == 0) {
+             next
+           }
+           host = substr(address, 1, RSTART - 1)
+           observed_port = substr(address, RSTART + 1)
+         }
+         if (observed_port == expected_port && (host in allowed)) {
+           found = 1
+         }
+       }
        END { exit(found ? 0 : 1) }' <<<"$listeners"; then
       ((listening_ports += 1))
     fi

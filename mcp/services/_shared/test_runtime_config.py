@@ -55,6 +55,7 @@ def test_runtime_catalog_json_matches_its_schema() -> None:
     assert isinstance(payload["mcp"]["protocol"]["modern_only_rejection_code"], int)
     assert payload["mcp"]["protocol"]["modern_only"] is True
     assert payload["deployment"]["approved_artifacts"]["aoa_sdk"]["distribution"] == "aoa-sdk"
+    assert payload["paths"]["stack_source_env_var"] == "AOA_SOURCE_ROOT"
 
 
 def test_each_package_declares_v2_major_line_and_root_runtime_keeps_test_lock() -> None:
@@ -186,6 +187,12 @@ def test_generated_path_projection_resolves_relocatable_roots(monkeypatch, tmp_p
     spec.loader.exec_module(module)
 
     monkeypatch.setenv("AOA_WORKSPACE_ROOT", str(tmp_path / "workspace"))
+    source = tmp_path / "custom" / "abyss-stack-source"
+    monkeypatch.setenv("AOA_SOURCE_ROOT", str(source))
+    monkeypatch.setenv(
+        "AOA_ABYSS_STACK_ROOT",
+        str(tmp_path / "deployed" / "abyss-stack" / "Configs"),
+    )
     connector = tmp_path / "custom" / "fourpda"
     monkeypatch.setenv("AOA_4PDA_CONNECTOR_REPO", str(connector))
     paths = module.PATH_CONFIG
@@ -199,3 +206,4 @@ def test_generated_path_projection_resolves_relocatable_roots(monkeypatch, tmp_p
     assert paths.stack_observation_path(str(tmp_path / "stack" / "Configs")) == (
         tmp_path / "stack" / "Logs" / "mcp" / "observations" / "current.json"
     ).resolve()
+    assert paths.stack_source_root() == source.resolve()
