@@ -116,6 +116,39 @@ class _ExposurePayloadTooLarge(ValueError):
     pass
 
 
+class _FrozenJSONMapping(dict[str, Any]):
+    """Serializable recursive mapping whose content cannot drift after hashing."""
+
+    @staticmethod
+    def _reject_mutation(*_args: Any, **_kwargs: Any) -> None:
+        raise TypeError("exposure mapping is frozen")
+
+    __setitem__ = _reject_mutation
+    __delitem__ = _reject_mutation
+    __ior__ = _reject_mutation
+    clear = _reject_mutation
+    pop = _reject_mutation
+    popitem = _reject_mutation
+    setdefault = _reject_mutation
+    update = _reject_mutation
+
+    def __copy__(self) -> _FrozenJSONMapping:
+        return self
+
+    def __deepcopy__(self, _memo: dict[int, Any]) -> _FrozenJSONMapping:
+        return self
+
+
+def _freeze_json(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return _FrozenJSONMapping(
+            {str(key): _freeze_json(nested) for key, nested in value.items()}
+        )
+    if isinstance(value, (list, tuple)):
+        return tuple(_freeze_json(nested) for nested in value)
+    return value
+
+
 def _bounded_json_preflight(
     value: Any,
     *,
@@ -360,6 +393,9 @@ class StackExposureCapabilityBinding(StrictExposureModel):
             f"{source_owner}:{self.organ_id}:{self.capability_id}"
         ):
             raise ValueError("stack capability binding is not owner-qualified")
+        object.__setattr__(self, "owners", _freeze_json(self.owners))
+        object.__setattr__(self, "source_revision", _freeze_json(self.source_revision))
+        object.__setattr__(self, "approval_ref", _freeze_json(self.approval_ref))
         return self
 
 
@@ -467,6 +503,7 @@ class StackExposurePlan(StrictExposureModel):
             raise ValueError("blocked stack plan cannot carry visible schemas")
         if self.plan_state == "candidate" and not self.expansion_reasons:
             raise ValueError("candidate stack plan requires expansion reasons")
+        object.__setattr__(self, "approval_ref", _freeze_json(self.approval_ref))
         unsigned = {
             key: value
             for key, value in self.model_dump(mode="json").items()
@@ -531,6 +568,28 @@ class ExposureInvocationAuthorization(StrictExposureModel):
 
 
 class ExposureMaterializationReceipt(StrictExposureModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+        json_schema_extra={
+            "allOf": [
+                {
+                    "if": {
+                        "properties": {"decision": {"const": "allowed"}},
+                        "required": ["decision"],
+                    },
+                    "then": {
+                        "properties": {
+                            "baseline_admission_ref": {
+                                "const": BASELINE_ADMISSION_REF
+                            }
+                        },
+                        "required": ["baseline_admission_ref"],
+                    },
+                }
+            ]
+        },
+    )
     schema_version: Literal["abyss_stack_exposure_materialization_receipt_v1"] = (
         "abyss_stack_exposure_materialization_receipt_v1"
     )
@@ -564,8 +623,13 @@ class ExposureMaterializationReceipt(StrictExposureModel):
     def validate_receipt(self) -> ExposureMaterializationReceipt:
         if self.expires_at <= self.observed_at:
             raise ValueError("materialization receipt expiry must follow observation")
-        if self.decision == "allowed" and self.reason_codes:
-            raise ValueError("allowed materialization cannot carry refusal reasons")
+        if self.decision == "allowed":
+            if self.reason_codes:
+                raise ValueError("allowed materialization cannot carry refusal reasons")
+            if self.baseline_admission_ref != BASELINE_ADMISSION_REF:
+                raise ValueError(
+                    "allowed materialization requires the canonical d0 receipt"
+                )
         if self.decision == "denied" and not self.reason_codes:
             raise ValueError("denied materialization requires refusal reasons")
         unsigned = {

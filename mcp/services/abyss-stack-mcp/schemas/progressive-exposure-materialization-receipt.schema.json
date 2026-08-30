@@ -34,6 +34,30 @@
   "$id": "https://8dionysus.github.io/schemas/abyss-stack-mcp/progressive-exposure-materialization-receipt.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "decision": {
+            "const": "allowed"
+          }
+        },
+        "required": [
+          "decision"
+        ]
+      },
+      "then": {
+        "properties": {
+          "baseline_admission_ref": {
+            "const": "receipt://d0/baseline-ready"
+          }
+        },
+        "required": [
+          "baseline_admission_ref"
+        ]
+      }
+    }
+  ],
   "properties": {
     "activation_authorized": {
       "const": false,

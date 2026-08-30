@@ -12,6 +12,7 @@ from abyss_stack_mcp.core import StackMCPError, canonical_json_bytes, sha256_dig
 from abyss_stack_mcp.exposure import (
     ExposureInvocationAuthorization,
     ExposureInvocationReceipt,
+    ExposureMaterializationReceipt,
     ExposureRuntime,
     StackExposurePlan,
     StackExposureTool,
@@ -370,7 +371,8 @@ def test_materialization_retains_a_revalidated_plan_snapshot() -> None:
     plan = StackExposurePlan.from_sdk_payload(_payload())
     materialization = runtime.materialize(plan)
 
-    plan.capability.owners["access_owner"] = "tampered-owner"
+    with pytest.raises(TypeError, match="frozen"):
+        plan.capability.owners["access_owner"] = "tampered-owner"
     authorization_body = {
         "owner": "aoa-kag",
         "plan_id": plan.plan_id,
@@ -395,6 +397,30 @@ def test_materialization_retains_a_revalidated_plan_snapshot() -> None:
 
     assert "invocation_authorization_owner_mismatch" not in receipt.reason_codes
     assert "owner_tool_execution_not_owned_by_stack" in receipt.reason_codes
+
+
+def test_allowed_materialization_receipt_requires_canonical_baseline() -> None:
+    runtime = ExposureRuntime(
+        progressive_exposure_enabled=True,
+        baseline_admitted=True,
+        baseline_admission_ref="receipt://d0/baseline-ready",
+        clock=lambda: NOW,
+    )
+    receipt = runtime.materialize(_payload())
+    payload = receipt.model_dump(mode="json")
+    payload["baseline_admission_ref"] = None
+    unsigned = {key: value for key, value in payload.items() if key != "receipt_id"}
+    payload["receipt_id"] = sha256_digest(unsigned)
+
+    with pytest.raises(Exception, match="canonical d0 receipt"):
+        ExposureMaterializationReceipt.model_validate(payload)
+    schema_path = (
+        Path(__file__).resolve().parents[1]
+        / "schemas"
+        / "progressive-exposure-materialization-receipt.schema.json"
+    )
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    assert list(jsonschema.Draft202012Validator(schema).iter_errors(payload))
 
 
 def test_non_json_invocation_arguments_emit_a_denial_receipt() -> None:
