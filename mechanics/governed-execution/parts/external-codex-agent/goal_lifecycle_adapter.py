@@ -12,6 +12,7 @@ import contextlib
 import fcntl
 import importlib.util
 import os
+import stat
 import sys
 from pathlib import Path
 from typing import Any, Callable
@@ -808,6 +809,7 @@ def _execute_goal_transition_unlocked(
     rpc_factory: Callable[[Path], Any] | None = None,
     attempt_path: Path | None = None,
     attempt: dict[str, Any] | None = None,
+    endpoint_is_owner_resolved: bool = False,
 ) -> dict[str, Any]:
     """Execute one accepted semantic request while the attempt lock is held."""
 
@@ -837,11 +839,14 @@ def _execute_goal_transition_unlocked(
     _load_schema(owner, _goal_owner_schema_path(), "Goal lifecycle owner")
     _validate_request_owner_scope(request, owner)
 
-    endpoint = _resolve_owner_endpoint(
-        owner,
-        Path(endpoint),
-        rpc_factory=rpc_factory,
-    )
+    if endpoint_is_owner_resolved:
+        endpoint = runtime._socket_path(str(endpoint))
+    else:
+        endpoint = _resolve_owner_endpoint(
+            owner,
+            Path(endpoint),
+            rpc_factory=rpc_factory,
+        )
     if attempt_path is not None:
         attempt_path = runtime._validate_output_path(
             attempt_path, "Goal lifecycle attempt reservation"
@@ -1367,26 +1372,26 @@ def execute_goal_transition(
     typed_request = _model(request, request_type, "Goal lifecycle request")
     validated_owner = runtime.validate_goal_lifecycle_owner(owner)
     _validate_request_owner_scope(typed_request, validated_owner)
-    resolved_endpoint = _resolve_owner_endpoint(
-        validated_owner,
-        Path(endpoint),
-        rpc_factory=rpc_factory,
-    )
     lock_path = _semantic_attempt_lock_path(
         typed_request,
         validated_owner,
-        resolved_endpoint,
     )
     with _attempt_lock(lock_path):
+        resolved_endpoint = _resolve_owner_endpoint(
+            validated_owner,
+            Path(endpoint),
+            rpc_factory=rpc_factory,
+        )
         return _execute_goal_transition_unlocked(
             request,
             decision,
             owner,
             owner_path,
-            endpoint,
+            resolved_endpoint,
             rpc_factory=rpc_factory,
             attempt_path=attempt_path,
             attempt=attempt,
+            endpoint_is_owner_resolved=True,
         )
 
 
@@ -1807,7 +1812,6 @@ def _validate_existing_receipt(
 def _semantic_attempt_lock_path(
     request: Any,
     owner: dict[str, Any],
-    endpoint: Path,
 ) -> Path:
     """Derive one lock coordinate from semantic authority, not output names."""
 
@@ -1825,7 +1829,39 @@ def _semantic_attempt_lock_path(
         },
     }
     digest = runtime._sha256_bytes(runtime._canonical_bytes(binding))
-    return endpoint.parent / f".goal-lifecycle-{digest}.lock"
+    return _semantic_attempt_lock_root() / f"{digest}.lock"
+
+
+def _semantic_attempt_lock_root() -> Path:
+    """Return one owner-private host coordinate across endpoint rebinding."""
+
+    runtime = _runtime()
+    uid = os.getuid()
+    runtime_parent = Path(f"/run/user/{uid}")
+    if runtime_parent.is_symlink() or not runtime_parent.is_dir():
+        runtime_parent = Path("/tmp")
+    if runtime_parent.is_symlink() or not runtime_parent.is_dir():
+        raise runtime.ExternalCodexReturnError(
+            "Goal lifecycle semantic lock parent is not a real directory"
+        )
+    root = runtime_parent / f"aoa-external-codex-goal-lifecycle-{uid}"
+    try:
+        root.mkdir(mode=0o700, exist_ok=True)
+        observed = root.stat(follow_symlinks=False)
+    except OSError as exc:
+        raise runtime.ExternalCodexReturnError(
+            f"Goal lifecycle semantic lock root cannot be prepared: {root}"
+        ) from exc
+    if (
+        root.is_symlink()
+        or not stat.S_ISDIR(observed.st_mode)
+        or observed.st_uid != uid
+        or stat.S_IMODE(observed.st_mode) & 0o077
+    ):
+        raise runtime.ExternalCodexReturnError(
+            f"Goal lifecycle semantic lock root is not owner-private: {root}"
+        )
+    return root
 
 
 @contextlib.contextmanager
@@ -1901,9 +1937,9 @@ def run_goal_transition(args: Any) -> dict[str, Any]:
         raise runtime.ExternalCodexReturnError(
             "Goal lifecycle receipt must be distinct from all input artifacts"
         )
-    endpoint, resolution = runtime.discover_app_server_socket(owner)
-    lock_path = _semantic_attempt_lock_path(request, owner, endpoint)
+    lock_path = _semantic_attempt_lock_path(request, owner)
     with _attempt_lock(lock_path):
+        endpoint, resolution = runtime.discover_app_server_socket(owner)
         if receipt_path.exists():
             existing, raw = runtime._load_json_file(
                 receipt_path, "existing Goal lifecycle receipt"
@@ -1970,6 +2006,7 @@ def run_goal_transition(args: Any) -> dict[str, Any]:
             endpoint,
             attempt_path=attempt_path,
             attempt=attempt,
+            endpoint_is_owner_resolved=True,
         )
         receipt["receipt_ref"] = str(receipt_path.resolve())
         receipt["transport"]["resolution"] = resolution

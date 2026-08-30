@@ -1025,6 +1025,78 @@ def test_cli_adapter_serializes_one_semantic_attempt_across_receipts(
     assert sum(path.exists() for path in attempt_paths) == 1
 
 
+def test_programmatic_semantic_lock_survives_endpoint_rebinding(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    old_endpoint = tmp_path / "old" / "app-server.sock"
+    new_endpoint = tmp_path / "new" / "app-server.sock"
+    old_endpoint.parent.mkdir()
+    new_endpoint.parent.mkdir()
+    owner = _owner()
+    owner["transport_posture"] = "resolve-current-local-codex-app-server"
+    owner_path = tmp_path / "owner-endpoint-rebinding.json"
+    owner_path.write_bytes(RUNTIME._canonical_bytes(owner) + b"\n")
+    request = _request(
+        observed="active",
+        desired="paused",
+        kind="delegation_yield",
+        request_id="request:endpoint-rebinding",
+    )
+    decision = _decision(request)
+    rpc = FakeGoalRpc(old_endpoint, status="active")
+    discovery_calls: list[Path] = []
+
+    def discover(
+        _owner: dict[str, Any], **_kwargs: object
+    ) -> tuple[Path, str]:
+        endpoint = old_endpoint if not discovery_calls else new_endpoint
+        discovery_calls.append(endpoint)
+        return endpoint, "test-rebinding"
+
+    monkeypatch.setattr(RUNTIME, "discover_app_server_socket", discover)
+    adapters = [
+        ADAPTER.CodexGoalLifecycleAdapter(
+            owner=owner,
+            owner_path=owner_path,
+            endpoint=old_endpoint,
+            rpc_factory=lambda _endpoint: rpc,
+            attempt_path=tmp_path / f"endpoint-rebinding-{index}.attempt.json",
+        )
+        for index in range(2)
+    ]
+    callers_ready = threading.Barrier(2)
+    mutation_entered = threading.Event()
+    release_mutation = threading.Event()
+    original_call = rpc.call
+
+    def blocking_call(
+        method: str, params: dict[str, object] | None = None
+    ) -> dict[str, object]:
+        if method == "thread/goal/set":
+            mutation_entered.set()
+            assert release_mutation.wait(timeout=5)
+        return original_call(method, params)
+
+    rpc.call = blocking_call  # type: ignore[method-assign]
+
+    def invoke(adapter: Any) -> dict[str, Any]:
+        callers_ready.wait(timeout=5)
+        return adapter.execute_goal_transition(request, decision)
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        futures = [executor.submit(invoke, adapter) for adapter in adapters]
+        assert mutation_entered.wait(timeout=5)
+        assert discovery_calls == [old_endpoint]
+        assert all(not future.done() for future in futures)
+        release_mutation.set()
+        receipts = [future.result(timeout=5) for future in futures]
+
+    assert discovery_calls == [old_endpoint, new_endpoint]
+    assert {receipt["status"] for receipt in receipts} == {"executed", "replayed"}
+    assert [method for method, _params in rpc.calls].count("thread/goal/set") == 1
+
+
 def test_programmatic_adapter_rejects_owner_drift_before_mutation(
     tmp_path: Path,
 ) -> None:

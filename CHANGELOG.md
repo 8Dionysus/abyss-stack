@@ -82,8 +82,9 @@ Tracking starts with the community-docs baseline for this repository.
   response to a fresh post-read, and reconcile a lost response from durable
   dispatch evidence without requiring an unsupported CAS/version field. CLI
   and SDK callers now serialize on a coordinate derived from the qualified
-  owner identity and idempotency key, so different caller-selected receipt or
-  attempt paths cannot issue duplicate lifecycle mutations. The SDK path also
+  owner identity and idempotency key in an owner-private runtime directory, so
+  different caller-selected receipt/attempt paths and app-server endpoint
+  rebinding cannot issue duplicate lifecycle mutations. The SDK path also
   binds attempt/receipt evidence to the initially loaded owner bytes while
   rejecting owner drift before dispatch and after proof persistence.
 - Bind the canonical `aoa-kag` MCP adapter to an authored absolute

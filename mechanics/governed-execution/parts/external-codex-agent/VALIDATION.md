@@ -115,7 +115,9 @@ concurrent SDK regression drives two callers through different durable
 attempt paths, and a CLI regression drives the same accepted request through
 different receipt paths. Both prove that the owner/idempotency-derived lock
 permits exactly one native Goal mutation while the other caller takes the
-read-only already-desired path. Separate
+read-only already-desired path. A dynamic-endpoint regression additionally
+returns different owner-proved app-server paths to the two callers and proves
+that endpoint discovery remains inside the same stable semantic lock. Separate
 programmatic regressions rewrite the owner after the precondition read and
 after the authoritative post-read: the former proves no mutation is sent, and
 the latter proves the persisted attempt remains bound to the original owner

@@ -135,10 +135,11 @@ Operations are:
   a bounded fresh `thread/goal/get` post-read. A response loss after dispatch
   is reconciled only from the durable dispatch marker plus that post-read and
   never by issuing a second lifecycle set. CLI and programmatic SDK entrypoints
-  derive the same lock from the qualified owner identity and idempotency key
-  across attempt loading, mutation, and proof persistence, so caller-selected
-  receipt or attempt paths cannot split one accepted transition into multiple
-  native mutations. Attempt and receipt owner digests come only from the
+  derive the same owner-private runtime lock from the qualified owner identity
+  and idempotency key across endpoint discovery, attempt loading, mutation,
+  and proof persistence. Caller-selected receipt/attempt paths and app-server
+  endpoint rebinding therefore cannot split one accepted transition into
+  multiple native mutations. Attempt and receipt owner digests come only from the
   initially validated owner bytes; both entrypoints reassert that snapshot
   immediately before native mutation and after proof persistence, failing
   closed instead of mixing stale authority with rewritten owner evidence. The
