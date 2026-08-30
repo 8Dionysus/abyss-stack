@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/8Dionysus/abyss-stack/main/mechanics/governed-execution/parts/ephemeral-worker/schemas/ephemeral-read-worker-request.schema.json",
+  "title": "abyss-stack ephemeral read worker request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "request_id",
+    "delegation_class",
+    "activation",
+    "parent_holder_ref",
+    "input_snapshot_digest",
+    "inputs",
+    "max_input_bytes",
+    "max_output_bytes",
+    "max_transport_bytes"
+  ],
+  "properties": {
+    "schema_version": {"const": "abyss_ephemeral_read_worker_request_v1"},
+    "request_id": {"type": "string", "minLength": 1, "maxLength": 4096},
+    "delegation_class": {"const": "ephemeral_read_worker_v1"},
+    "activation": {"enum": ["disabled", "explicit"]},
+    "parent_holder_ref": {"$ref": "#/$defs/contentRef"},
+    "input_snapshot_digest": {"$ref": "#/$defs/digest"},
+    "inputs": {"type": "array", "minItems": 1, "maxItems": 1024, "items": {"$ref": "#/$defs/input"}},
+    "max_input_bytes": {"type": "integer", "exclusiveMinimum": 0, "maximum": 16777216},
+    "max_output_bytes": {"type": "integer", "exclusiveMinimum": 0, "maximum": 16777216},
+    "max_transport_bytes": {"type": "integer", "exclusiveMinimum": 0, "maximum": 16777216}
+  },
+  "$defs": {
+    "digest": {"type": "string", "maxLength": 71, "pattern": "^sha256:[0-9a-f]{64}$"},
+    "contentRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["object_id", "owner_repo", "schema_version", "digest"],
+      "properties": {
+      "object_id": {"type": "string", "minLength": 1, "maxLength": 4096},
+      "owner_repo": {"type": "string", "minLength": 1, "maxLength": 4096},
+      "schema_version": {"type": "string", "minLength": 1, "maxLength": 4096},
+        "digest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifact_ref", "path", "digest", "max_bytes"],
+      "properties": {
+        "artifact_ref": {"type": "string", "minLength": 1, "maxLength": 4096},
+        "path": {"type": "string", "minLength": 1, "maxLength": 4096, "pattern": "^/(?!\\.\\.?(?:/|$))[^/\\u0000]+(?:/(?!\\.\\.?(?:/|$))[^/\\u0000]+)*$"},
+        "digest": {"$ref": "#/$defs/digest"},
+        "max_bytes": {"type": "integer", "exclusiveMinimum": 0, "maximum": 16777216}
+      }
+    }
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "claim_limits": [
+    "This receipt proves requestState handle behavior for one isolated Python MCP 2.1.1 read-only KAG pair, not Codex next-wire support.",
+    "Same-request replay is deliberately allowed only because this lab tool is read-only and idempotent.",
+    "Effectful handle replay policy requires a separate gate and receipt.",
+    "Key retirement proves handle revocation after restart, not OAuth token revocation.",
+    "The adapter was not registered, deployed, admitted, or granted owner authority.",
+    "KAG remains evidence and navigation; owner sources retain authority."
+  ],
+  "finished_at": "2026-08-30T01:51:27.525246Z",
+  "handle_checks": {
+    "cross_request_replay": "denied",
+    "expiry": "denied",
+    "key_retirement_revocation": "denied",
+    "principal_isolation": "denied",
+    "same_request_replay": "allowed_read_only_idempotent",
+    "same_request_result_unchanged": true,
+    "tamper": "denied",
+    "valid_round_trip": "passed"
+  },
+  "handle_contract": {
+    "bearer_verified_each_request": true,
+    "opaque": true,
+    "plaintext_observed_on_wire": false,
+    "principal_binding": [
+      "client_id",
+      "issuer",
+      "subject"
+    ],
+    "raw_tokens_recorded": false,
+    "ttl_seconds": 5.0
+  },
+  "observation_id": "aoa-kag-handle-pair-2.1.1-20260830",
+  "observed_at": "2026-08-30T01:51:03.867979Z",
+  "owner_canary": {
+    "canonical_source_digest": "5aeb7b89dce54b414281f5390c8cc063f59bb75d02b28e1a014da2d96701e164",
+    "freshness_state": "canonical_only",
+    "owner": "abyss-stack",
+    "projection_exact_state": "current",
+    "runtime_source_digest": "",
+    "schema_version": "aoa-kag-mcp-capabilities-v1"
+  },
+  "python_sdk": {
+    "artifact_digest": "sha256:1ef71b1a3cfb3daba29b61d9f280896b35bdc1038474285cc8295071418b01e5",
+    "commit": "0921d94a74db900dccd2d534842aa7b6160542d2",
+    "version": "2.1.1"
+  },
+  "raw_receipt": {
+    "mode": "0600",
+    "ref": "local:///srv/abyss-machine/cache/abyss-stack-mcp-validation-20260829/candidate-receipts-20260830/handle.json",
+    "sha256": "b236b664318d08b92fab13800e595d37f6f3cfc96fe628e48ed82c4ed8d6f4ca"
+  },
+  "rejection_shape": {
+    "code": -32602,
+    "data": {
+      "reason": "invalid_request_state"
+    },
+    "message": "Invalid or expired requestState"
+  },
+  "schema_version": "abyss_mcp_kag_handle_pair_observation_v1",
+  "source_revisions": {
+    "abyss_stack": "cbb387567b193cd75762894fd77e192d2bf5cb80",
+    "aoa_kag": "578e4cea9a04b76a881bde240d5479efceea4926"
+  },
+  "stable_registration_unchanged": true,
+  "verdict": "handle_pair_passed",
+  "wire_version": "2026-07-28"
+}

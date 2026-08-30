@@ -64,6 +64,7 @@ MECHANIC_PACKAGE_PARTS = {
         "local-worker-path",
         "external-codex-agent",
         "programmatic-tool-execution",
+        "ephemeral-worker",
     ),
     "inference-pilots": (
         "llamacpp-pilot",

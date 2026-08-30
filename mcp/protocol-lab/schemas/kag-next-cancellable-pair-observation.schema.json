@@ -14,16 +14,23 @@
       "additionalProperties": false,
       "properties": {
         "commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
-        "version": {"type": "string", "pattern": "^2\\.[0-9]+\\.[0-9]+$"}
+        "version": {"type": "string", "pattern": "^2\\.[0-9]+\\.[0-9]+$"},
+        "artifact_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
       },
-      "required": ["commit", "version"]
+      "required": ["commit", "version"],
+      "allOf": [
+        {
+          "if": {"properties": {"version": {"const": "2.1.1"}}, "required": ["version"]},
+          "then": {"required": ["artifact_digest"]}
+        }
+      ]
     },
     "source_revisions": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
         "abyss_stack": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
-        "aoa_kag": {"const": "ba7805190527a635ff5c515701be29379af8277f"},
+        "aoa_kag": {"enum": ["ba7805190527a635ff5c515701be29379af8277f", "578e4cea9a04b76a881bde240d5479efceea4926"]},
         "stack_runtime_current_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
       },
       "required": ["abyss_stack", "aoa_kag", "stack_runtime_current_digest"]
@@ -61,8 +68,9 @@
       "properties": {
         "owner": {"const": "abyss-stack"},
         "schema_version": {"const": "aoa-kag-mcp-capabilities-v1"},
-        "runtime_source_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
-        "freshness_state": {"const": "current"},
+        "runtime_source_digest": {"type": "string", "oneOf": [{"const": ""}, {"pattern": "^[0-9a-f]{64}$"}]},
+        "canonical_source_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "freshness_state": {"enum": ["current", "canonical_only"]},
         "projection_exact_state": {"const": "current"},
         "degradation": {"const": []}
       },

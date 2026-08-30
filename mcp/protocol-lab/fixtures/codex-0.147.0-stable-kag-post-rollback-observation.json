@@ -18,6 +18,8 @@
   },
   "expires_at": "2026-08-15T08:33:46.547214Z",
   "finished_at": "2026-08-08T08:33:53.059453Z",
+  "mcp_sdk": "2.0.0",
+  "mcp_sdk_source_revision": "6f69a3758ebf2ee55ce050f58b470ce11af71133",
   "observation_id": "codex-0.147.0-stable-kag-post-rollback-20260808",
   "observed_at": "2026-08-08T08:33:46.547214Z",
   "private_receipt": {

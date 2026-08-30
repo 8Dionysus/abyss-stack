@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import importlib.metadata
 import json
 import os
 import secrets
@@ -21,7 +20,9 @@ import socket
 import subprocess
 import sys
 import time
+import tomllib
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import UTC, datetime
 from pathlib import Path
@@ -40,6 +41,13 @@ from run_kag_next_pair import (
     build_next_server,
 )
 from runtime_catalog import deployment_settings, load_runtime_catalog, mcp_settings
+from _mcp_sdk_identity import installed_mcp_identity
+from run_live_modern_read_fleet import (
+    _listener_attestation,
+    _runtime_sdk_identity,
+    _server_runtime_identity_attestation,
+    _unit_identity,
+)
 
 
 _RUNTIME_CATALOG = load_runtime_catalog()
@@ -57,6 +65,21 @@ TRACEPARENT = "00-7d6f4bfe66cc42c7be4dfe186f08bd47-e0ad439d3c018890-01"
 CODEX_VERSION = "codex-cli 0.147.0"
 CODEX_SHA256 = "cb0a15567e9a60a5820d54b0f6ae86d504dc3805c1eab21a47f70e3eb7b73a40"
 PYTHON_MCP_VERSION = str(_SDK_SETTINGS["tested_lock"])
+MCP_SDK_SOURCE_REVISIONS = {
+    "2.0.0": "6f69a3758ebf2ee55ce050f58b470ce11af71133",
+    PYTHON_MCP_VERSION: str(_SDK_SETTINGS["source_revision"]),
+}
+EXPECTED_PYTHON_MCP_ARTIFACT_DIGEST = "sha256:1ef71b1a3cfb3daba29b61d9f280896b35bdc1038474285cc8295071418b01e5"
+EXPECTED_PRODUCTION_PYTHON_MCP_ARTIFACT_DIGEST = "sha256:a638c12e432fc0444d263a55db04668cd789437fde33951cc2be491021219601"
+EXPECTED_PYTHON_MCP_ARTIFACT_DIGESTS = frozenset(
+    {
+        EXPECTED_PYTHON_MCP_ARTIFACT_DIGEST,
+        EXPECTED_PRODUCTION_PYTHON_MCP_ARTIFACT_DIGEST,
+    }
+)
+RUNTIME_IDENTITY_ATTESTATION_METHOD = (
+    "server_emitted_startup_runtime_identity_header"
+)
 
 
 def _utc_now() -> str:
@@ -186,6 +209,7 @@ class PersistentAccessRecorder(AccessRecorder):
 
 
 def _serve(args: argparse.Namespace) -> int:
+    installed_mcp_identity(args.python_sdk_root)
     raw_token = os.environ.get(TOKEN_ENV)
     if raw_token is None or len(raw_token) < 32:
         raise RuntimeError(f"{TOKEN_ENV} is missing or too short")
@@ -369,7 +393,310 @@ def _assert_call_result(result: dict[str, Any]) -> dict[str, Any]:
     return structured
 
 
-def _direct_modern_request(url: str, bearer: str, method: str, params: dict[str, Any]) -> tuple[int, dict[str, Any] | None]:
+def _deployment_payload(path: Path) -> dict[str, Any]:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, TypeError) as exc:
+        raise RuntimeError("the live fleet receipt is not readable JSON") from exc
+    if not isinstance(payload, dict):
+        raise RuntimeError("the live fleet receipt must contain an object")
+    return payload
+
+
+def _endpoint_port(endpoint_ref: str, organ_id: str) -> int:
+    try:
+        parsed = urllib.parse.urlparse(endpoint_ref)
+        port = parsed.port
+    except ValueError as exc:
+        raise RuntimeError(f"candidate {organ_id} fleet endpoint has an invalid port") from exc
+    if parsed.scheme not in {"http", "https"} or parsed.hostname not in {
+        "127.0.0.1",
+        "localhost",
+        "::1",
+    }:
+        raise RuntimeError(f"candidate {organ_id} fleet endpoint is not loopback")
+    if port is None or not 1 <= port <= 65535:
+        raise RuntimeError(f"candidate {organ_id} fleet endpoint has no TCP port")
+    return port
+
+
+def _deployment_sdk_identity(path: Path) -> tuple[str, str]:
+    """Read an SDK identity from a passing live-fleet observation."""
+    try:
+        payload = _deployment_payload(path)
+        sdk = payload["mcp_sdk"]
+        source_revision = payload["mcp_sdk_source_revision"]
+        verdict = payload["verdict"]
+    except (KeyError, TypeError) as exc:
+        raise RuntimeError("the live fleet receipt omitted a usable SDK identity") from exc
+    if verdict not in {"production_modern_only_passed", "passed"}:
+        raise RuntimeError("the live fleet receipt is not a passing deployment observation")
+    if MCP_SDK_SOURCE_REVISIONS.get(sdk) != source_revision:
+        raise RuntimeError("the live fleet receipt returned an unattested SDK identity")
+    if sdk == "2.1.1":
+        if payload.get("mcp_sdk_artifact_digest") not in EXPECTED_PYTHON_MCP_ARTIFACT_DIGESTS:
+            raise RuntimeError(
+                "the MCP 2.1.1 live fleet receipt lacks the reviewed artifact digest"
+            )
+        servers = payload.get("servers")
+        if "servers" in payload:
+            if not isinstance(servers, list) or len(servers) != 11:
+                raise RuntimeError(
+                    "the MCP 2.1.1 live fleet receipt lacks all eleven unit attestations"
+                )
+            for row in servers:
+                attestation = row.get("sdk_attestation") if isinstance(row, dict) else None
+                if not (
+                    isinstance(row, dict)
+                    and isinstance(attestation, dict)
+                    and attestation.get("state") == "passed"
+                    and attestation.get("checked_before_and_after_probe") is True
+                    and row.get("mcp_sdk") == sdk
+                    and row.get("mcp_sdk_source_revision") == source_revision
+                    and row.get("mcp_sdk_artifact_digest")
+                    in EXPECTED_PYTHON_MCP_ARTIFACT_DIGESTS
+                ):
+                    raise RuntimeError(
+                        "the MCP 2.1.1 live fleet receipt has an incomplete unit attestation"
+                    )
+                if row.get("mcp_sdk_artifact_digest") != payload.get(
+                    "mcp_sdk_artifact_digest"
+                ):
+                    raise RuntimeError(
+                        "the MCP 2.1.1 live fleet receipt has nonuniform artifact identities"
+                    )
+                listener_attestation = row.get("listener_attestation")
+                if not (
+                    isinstance(listener_attestation, dict)
+                    and listener_attestation.get("state") == "passed"
+                    and listener_attestation.get("method")
+                    == "proc_net_tcp_listener_inode_owned_by_main_pid"
+                    and listener_attestation.get("port")
+                    == _endpoint_port(row.get("endpoint_ref", ""), "fleet")
+                    and listener_attestation.get("pid") == row.get("main_pid")
+                    and listener_attestation.get("checked_before_and_after_probe") is True
+                    and isinstance(listener_attestation.get("socket_inodes"), list)
+                    and listener_attestation["socket_inodes"]
+                ):
+                    raise RuntimeError(
+                        "the MCP 2.1.1 live fleet receipt lacks listener ownership attestation"
+                    )
+                runtime_attestation = row.get("runtime_identity_attestation")
+                if not (
+                    isinstance(runtime_attestation, dict)
+                    and runtime_attestation.get("state") == "passed"
+                    and runtime_attestation.get("method")
+                    == RUNTIME_IDENTITY_ATTESTATION_METHOD
+                    and runtime_attestation.get("header")
+                    == "X-Abyss-MCP-Runtime-Identity"
+                    and runtime_attestation.get("pid") == row.get("main_pid")
+                    and runtime_attestation.get("checked_during_discovery") is True
+                ):
+                    raise RuntimeError(
+                        "the MCP 2.1.1 live fleet receipt lacks serving-process identity attestation"
+                    )
+            summary = payload.get("sdk_attestation")
+            if not (
+                isinstance(summary, dict)
+                and summary.get("scope") == "every production read unit"
+                and summary.get("unit_count") == 11
+                and summary.get("attested_unit_count") == 11
+                and summary.get("server_identity_attested_unit_count") == 11
+                and summary.get("listener_attested_unit_count") == 11
+                and summary.get("unique_identities") == 1
+            ):
+                raise RuntimeError(
+                    "the MCP 2.1.1 live fleet receipt has an incomplete fleet attestation"
+                )
+        else:
+            read_fleet = payload.get("read_fleet")
+            if not (
+                isinstance(read_fleet, dict)
+                and read_fleet.get("sdk_identity_attested") is True
+                and read_fleet.get("sdk_identity_count") == 11
+                and read_fleet.get("sdk_identity_unique_count") == 1
+                and read_fleet.get("runtime_identity_attested") is True
+                and read_fleet.get("listener_attested") is True
+            ):
+                raise RuntimeError(
+                    "the MCP 2.1.1 normalized fleet receipt lacks per-unit SDK attestation"
+                )
+    return sdk, source_revision
+
+
+def _deployment_fleet_unit(
+    path: Path,
+    sdk: str,
+    organ_id: str,
+) -> dict[str, Any] | None:
+    """Return one raw per-unit candidate row for an identity-bound canary."""
+
+    if sdk != "2.1.1":
+        return None
+    payload = _deployment_payload(path)
+    servers = payload.get("servers")
+    if not isinstance(servers, list):
+        raise RuntimeError(
+            "candidate stable canary requires the raw per-unit live-fleet receipt"
+        )
+    matches = [
+        row
+        for row in servers
+        if isinstance(row, dict) and row.get("organ_id") == organ_id
+    ]
+    if len(matches) != 1:
+        raise RuntimeError(
+            f"candidate live-fleet receipt must contain exactly one {organ_id} unit"
+        )
+    row = matches[0]
+    required_strings = (
+        "unit",
+        "endpoint_ref",
+        "process_identity",
+        "python_executable",
+        "python_executable_realpath",
+        "mcp_sdk",
+        "mcp_sdk_source_revision",
+        "mcp_sdk_artifact_digest",
+    )
+    if any(not isinstance(row.get(key), str) or not row[key] for key in required_strings):
+        raise RuntimeError(
+            f"candidate {organ_id} fleet row lacks its endpoint/process identity"
+        )
+    if (
+        row["mcp_sdk"] != sdk
+        or row["mcp_sdk_source_revision"] != MCP_SDK_SOURCE_REVISIONS[sdk]
+        or row["mcp_sdk_artifact_digest"] not in EXPECTED_PYTHON_MCP_ARTIFACT_DIGESTS
+    ):
+        raise RuntimeError(f"candidate {organ_id} fleet row has an unattested SDK identity")
+    if not isinstance(row.get("main_pid"), int) or row["main_pid"] <= 0:
+        raise RuntimeError(f"candidate {organ_id} fleet row lacks a usable main PID")
+    attestation = row.get("sdk_attestation")
+    if not (
+        isinstance(attestation, dict)
+        and attestation.get("state") == "passed"
+        and attestation.get("checked_before_and_after_probe") is True
+    ):
+        raise RuntimeError(f"candidate {organ_id} fleet row lacks before/after attestation")
+    runtime_attestation = row.get("runtime_identity_attestation")
+    if not (
+        isinstance(runtime_attestation, dict)
+        and runtime_attestation.get("state") == "passed"
+        and runtime_attestation.get("method") == RUNTIME_IDENTITY_ATTESTATION_METHOD
+        and runtime_attestation.get("header") == "X-Abyss-MCP-Runtime-Identity"
+        and runtime_attestation.get("pid") == row.get("main_pid")
+        and runtime_attestation.get("checked_during_discovery") is True
+    ):
+        raise RuntimeError(
+            f"candidate {organ_id} fleet row lacks serving-process identity attestation"
+        )
+    distribution_digests = row.get("mcp_sdk_distribution_digests")
+    if not (
+        isinstance(distribution_digests, dict)
+        and isinstance(distribution_digests.get("mcp"), str)
+        and isinstance(distribution_digests.get("mcp-types"), str)
+    ):
+        raise RuntimeError(f"candidate {organ_id} fleet row lacks component SDK digests")
+    listener_attestation = row.get("listener_attestation")
+    if not (
+        isinstance(listener_attestation, dict)
+        and listener_attestation.get("state") == "passed"
+        and listener_attestation.get("method")
+        == "proc_net_tcp_listener_inode_owned_by_main_pid"
+        and listener_attestation.get("port") == _endpoint_port(row["endpoint_ref"], organ_id)
+        and listener_attestation.get("pid") == row["main_pid"]
+        and listener_attestation.get("checked_before_and_after_probe") is True
+        and isinstance(listener_attestation.get("socket_inodes"), list)
+        and listener_attestation["socket_inodes"]
+    ):
+        raise RuntimeError(
+            f"candidate {organ_id} fleet row lacks listener ownership attestation"
+        )
+    return row
+
+
+def _configured_server_endpoint(config: Path, registration: str) -> str:
+    try:
+        document = tomllib.loads(config.read_text(encoding="utf-8"))
+        endpoint = document["mcp_servers"][registration]["url"]
+    except (OSError, KeyError, TypeError, tomllib.TOMLDecodeError) as exc:
+        raise RuntimeError(
+            f"Codex config omitted a readable URL for {registration}"
+        ) from exc
+    if not isinstance(endpoint, str) or not endpoint.startswith(("http://", "https://")):
+        raise RuntimeError(f"Codex config URL for {registration} is invalid")
+    return endpoint
+
+
+def _status_server_endpoint(row: dict[str, Any]) -> str | None:
+    """Extract an endpoint if app-server status exposes one for the server row."""
+
+    endpoints: set[str] = set()
+
+    def visit(value: Any) -> None:
+        if isinstance(value, dict):
+            for key in ("url", "endpoint", "endpoint_ref"):
+                candidate = value.get(key)
+                if isinstance(candidate, str) and candidate.startswith(
+                    ("http://", "https://")
+                ):
+                    endpoints.add(candidate)
+            for nested in value.values():
+                visit(nested)
+        elif isinstance(value, list):
+            for nested in value:
+                visit(nested)
+
+    visit(row)
+    if len(endpoints) > 1:
+        raise RuntimeError("Codex status exposed multiple aoa_kag endpoints")
+    return next(iter(endpoints), None)
+
+
+def _attest_fleet_unit(row: dict[str, Any]) -> tuple[dict[str, Any], dict[str, str]]:
+    """Re-check the exact serving unit and its SDK through its own interpreter."""
+
+    unit = row["unit"]
+    current = _unit_identity(unit)
+    for key in (
+        "main_pid",
+        "process_identity",
+        "python_executable",
+        "python_executable_realpath",
+    ):
+        if current.get(key) != row.get(key):
+            raise RuntimeError(f"candidate {row['organ_id']} fleet process identity drifted")
+    sdk = _runtime_sdk_identity(current["python_executable"], row["organ_id"])
+    if (
+        sdk["version"] != row["mcp_sdk"]
+        or sdk["commit"] != row["mcp_sdk_source_revision"]
+        or sdk["artifact_digest"] != row["mcp_sdk_artifact_digest"]
+        or sdk["mcp_distribution_digest"]
+        != row["mcp_sdk_distribution_digests"]["mcp"]
+        or sdk["mcp_types_distribution_digest"]
+        != row["mcp_sdk_distribution_digests"]["mcp-types"]
+    ):
+        raise RuntimeError(f"candidate {row['organ_id']} fleet SDK identity drifted")
+    listener = _listener_attestation(
+        _endpoint_port(row["endpoint_ref"], row["organ_id"]),
+        current["main_pid"],
+        unit,
+    )
+    recorded_listener = row["listener_attestation"]
+    if any(
+        listener.get(key) != recorded_listener.get(key)
+        for key in ("state", "method", "port", "pid", "socket_inodes")
+    ):
+        raise RuntimeError(f"candidate {row['organ_id']} fleet listener identity drifted")
+    return current, sdk
+
+
+def _direct_modern_request(
+    url: str,
+    bearer: str,
+    method: str,
+    params: dict[str, Any],
+) -> tuple[int, dict[str, Any] | None, dict[str, str]]:
     payload = json.dumps(
         {"jsonrpc": "2.0", "id": 1, "method": method, "params": params},
         separators=(",", ":"),
@@ -392,17 +719,18 @@ def _direct_modern_request(url: str, bearer: str, method: str, params: dict[str,
     try:
         with urllib.request.urlopen(request, timeout=10) as response:
             body = response.read()
-            return response.status, json.loads(body) if body else None
+            return response.status, json.loads(body) if body else None, dict(response.headers)
     except urllib.error.HTTPError as exc:
         body = exc.read()
         parsed = json.loads(body) if body and body.startswith(b"{") else None
-        return exc.code, parsed
+        return exc.code, parsed, dict(exc.headers)
 
 
 def _run(args: argparse.Namespace) -> int:
     started_at = _utc_now()
     if args.port == 0:
         args.port = _free_port()
+    sdk_identity = installed_mcp_identity(args.python_sdk_root)
     binary = args.codex_binary.resolve()
     if _sha256(binary) != CODEX_SHA256:
         raise RuntimeError("isolated Codex binary digest drifted")
@@ -414,9 +742,6 @@ def _run(args: argparse.Namespace) -> int:
     ).stdout.strip()
     if observed_version != CODEX_VERSION:
         raise RuntimeError(f"isolated Codex version drifted: {observed_version}")
-    observed_python_mcp = importlib.metadata.version("mcp")
-    if observed_python_mcp != PYTHON_MCP_VERSION:
-        raise RuntimeError(f"Python MCP SDK drifted: {observed_python_mcp}")
     if _port_is_open(args.port):
         raise RuntimeError(f"dedicated lab port {args.port} is already in use")
 
@@ -458,6 +783,8 @@ def _run(args: argparse.Namespace) -> int:
         str(args.aoa_kag_root),
         "--stack-runtime-root",
         str(args.stack_runtime_root),
+        "--python-sdk-root",
+        str(args.python_sdk_root),
     ]
     environment = dict(os.environ)
     environment[TOKEN_ENV] = raw_token
@@ -476,7 +803,7 @@ def _run(args: argparse.Namespace) -> int:
     rollback_port_closed = False
     try:
         _wait_port(args.port, True)
-        wrong_bearer_status, _ = _direct_modern_request(
+        wrong_bearer_status, _, _ = _direct_modern_request(
             url,
             secrets.token_urlsafe(48),
             "server/discover",
@@ -543,7 +870,7 @@ def _run(args: argparse.Namespace) -> int:
         )
         call_result = _result(rpc.response(4))
         structured = _assert_call_result(call_result)
-        oversized_status, oversized_result = _direct_modern_request(
+        oversized_status, oversized_result, _ = _direct_modern_request(
             url,
             raw_token,
             "tools/call",
@@ -633,7 +960,9 @@ def _run(args: argparse.Namespace) -> int:
             "registration": REGISTRATION,
             "endpoint": url,
             "process_pid": record["pid"],
-            "python_mcp_version": observed_python_mcp,
+            "python_mcp_version": sdk_identity["version"],
+            "python_mcp_commit": sdk_identity["commit"],
+            "python_mcp_artifact_digest": sdk_identity["artifact_digest"],
             "source_revisions": {
                 "abyss_stack": _git_head(args.stack_source_root),
                 "aoa_kag": _git_head(args.aoa_kag_root),
@@ -721,6 +1050,72 @@ def _stable_canary(args: argparse.Namespace) -> int:
     if raw_token is None or len(raw_token) < 32:
         raise RuntimeError("stable KAG bearer is unavailable in the caller environment")
     config_before = _sha256(args.stable_codex_config)
+    mcp_sdk, mcp_sdk_source_revision = _deployment_sdk_identity(
+        args.live_fleet_receipt
+    )
+    fleet_row = _deployment_fleet_unit(
+        args.live_fleet_receipt,
+        mcp_sdk,
+        "aoa-kag",
+    )
+    configured_endpoint: str | None = None
+    fleet_process_before: dict[str, Any] | None = None
+    fleet_sdk_before: dict[str, str] | None = None
+    status_endpoint: str | None = None
+    server_binding: dict[str, Any] | None = None
+    contacted_server_probe: dict[str, Any] | None = None
+    if fleet_row is not None:
+        configured_endpoint = _configured_server_endpoint(
+            args.stable_codex_config,
+            "aoa_kag",
+        )
+        if configured_endpoint != fleet_row["endpoint_ref"]:
+            raise RuntimeError(
+                "stable aoa_kag config endpoint does not match the candidate fleet row"
+            )
+        fleet_process_before, fleet_sdk_before = _attest_fleet_unit(fleet_row)
+        direct_status, direct_payload, direct_headers = _direct_modern_request(
+            configured_endpoint,
+            raw_token,
+            "server/discover",
+            {
+                "_meta": {
+                    "io.modelcontextprotocol/clientInfo": {
+                        "name": "os-abyss-stable-kag-direct-binding",
+                        "version": "1.0.0",
+                    },
+                    "io.modelcontextprotocol/clientCapabilities": {},
+                    "io.modelcontextprotocol/protocolVersion": WIRE_VERSION,
+                }
+            },
+        )
+        direct_result = (
+            direct_payload.get("result")
+            if isinstance(direct_payload, dict)
+            else None
+        )
+        if (
+            direct_status != 200
+            or not isinstance(direct_result, dict)
+            or direct_result.get("supportedVersions") != [WIRE_VERSION]
+        ):
+            raise RuntimeError(
+                "candidate aoa_kag direct endpoint binding probe failed: "
+                f"status={direct_status}, payload={direct_payload}"
+            )
+        direct_identity_attestation = _server_runtime_identity_attestation(
+            direct_headers,
+            fleet_process_before,
+            fleet_sdk_before,
+            "aoa-kag",
+        )
+        contacted_server_probe = {
+            "state": "passed",
+            "method": "direct_modern_server_discover_with_runtime_identity_header",
+            "endpoint_ref": configured_endpoint,
+            "http_status": direct_status,
+            "runtime_identity_attestation": direct_identity_attestation,
+        }
     binary = args.stable_codex_binary.resolve()
     version = subprocess.run(
         [str(binary), "--version"],
@@ -782,6 +1177,16 @@ def _stable_canary(args: argparse.Namespace) -> int:
         find_stable(status)
         if not stable_row:
             raise RuntimeError("production Codex inventory omitted aoa_kag")
+        if fleet_row is not None:
+            if len(stable_row) != 1:
+                raise RuntimeError(
+                    "candidate stable canary requires exactly one aoa_kag status row"
+                )
+            status_endpoint = _status_server_endpoint(stable_row[0])
+            if status_endpoint is not None and status_endpoint != configured_endpoint:
+                raise RuntimeError(
+                    "Codex status aoa_kag endpoint does not match its configured endpoint"
+                )
         rpc.send(
             4,
             "mcpServer/tool/call",
@@ -794,6 +1199,69 @@ def _stable_canary(args: argparse.Namespace) -> int:
         )
         call_result = _result(rpc.response(4, timeout=45))
         structured = _assert_call_result(call_result)
+        if fleet_row is not None:
+            fleet_process_after, fleet_sdk_after = _attest_fleet_unit(fleet_row)
+            if (
+                fleet_process_after != fleet_process_before
+                or fleet_sdk_after != fleet_sdk_before
+            ):
+                raise RuntimeError(
+                    "candidate aoa_kag serving process or SDK changed during the canary"
+                )
+            server_binding = {
+                "binding_method": (
+                    "configured_codex_endpoint_to_per_unit_fleet_identity"
+                ),
+                "organ_id": fleet_row["organ_id"],
+                "unit": fleet_row["unit"],
+                "fleet_endpoint_ref": fleet_row["endpoint_ref"],
+                "configured_endpoint_ref": configured_endpoint,
+                "status_endpoint_ref": status_endpoint,
+                "status_entry_observed": True,
+                "endpoint_matches": configured_endpoint == fleet_row["endpoint_ref"]
+                and (status_endpoint is None or status_endpoint == configured_endpoint),
+                "fleet_process_identity": fleet_row["process_identity"],
+                "process_identity_before": fleet_process_before["process_identity"],
+                "process_identity_after": fleet_process_after["process_identity"],
+                "process_identity_matches_fleet": (
+                    fleet_process_before["process_identity"]
+                    == fleet_row["process_identity"]
+                    and fleet_process_after["process_identity"]
+                    == fleet_row["process_identity"]
+                ),
+                "process_identity_stable": (
+                    fleet_process_before["process_identity"]
+                    == fleet_process_after["process_identity"]
+                ),
+                "python_executable_realpath": fleet_process_before[
+                    "python_executable_realpath"
+                ],
+                "sdk_identity": {
+                    "version": fleet_sdk_before["version"],
+                    "commit": fleet_sdk_before["commit"],
+                    "artifact_digest": fleet_sdk_before["artifact_digest"],
+                    "mcp_distribution_digest": fleet_sdk_before[
+                        "mcp_distribution_digest"
+                    ],
+                    "mcp_types_distribution_digest": fleet_sdk_before[
+                        "mcp_types_distribution_digest"
+                    ],
+                },
+                "runtime_identity_attestation": fleet_row[
+                    "runtime_identity_attestation"
+                ],
+                "listener_attestation": fleet_row["listener_attestation"],
+                "contacted_server_probe": contacted_server_probe,
+                "sdk_identity_matches_fleet": (
+                    fleet_sdk_before["version"] == fleet_row["mcp_sdk"]
+                    and fleet_sdk_before["commit"]
+                    == fleet_row["mcp_sdk_source_revision"]
+                    and fleet_sdk_before["artifact_digest"]
+                    == fleet_row["mcp_sdk_artifact_digest"]
+                ),
+                "sdk_identity_stable": True,
+                "checked_before_and_after_tool_call": True,
+            }
     finally:
         returncode = _stop(process)
     config_after = _sha256(args.stable_codex_config)
@@ -805,6 +1273,8 @@ def _stable_canary(args: argparse.Namespace) -> int:
         "observed_at": started_at,
         "finished_at": _utc_now(),
         "verdict": "stable_production_route_passed_after_lab_rollback",
+        "mcp_sdk": mcp_sdk,
+        "mcp_sdk_source_revision": mcp_sdk_source_revision,
         "consumer": {
             "version": version,
             "binary_sha256": _sha256(binary),
@@ -832,6 +1302,8 @@ def _stable_canary(args: argparse.Namespace) -> int:
             "KAG output remains derived navigation evidence rather than owner truth.",
         ],
     }
+    if server_binding is not None:
+        receipt["server_binding"] = server_binding
     encoded = (json.dumps(receipt, indent=2, sort_keys=True) + "\n").encode()
     if raw_token.encode() in encoded:
         raise RuntimeError("secret appeared in stable KAG normalized receipt")
@@ -849,6 +1321,7 @@ def main() -> int:
     serve.add_argument("--workspace-root", required=True, type=Path)
     serve.add_argument("--aoa-kag-root", required=True, type=Path)
     serve.add_argument("--stack-runtime-root", required=True, type=Path)
+    serve.add_argument("--python-sdk-root", required=True, type=Path)
 
     run = subparsers.add_parser("run")
     run.add_argument("--output", required=True, type=Path)
@@ -860,11 +1333,13 @@ def main() -> int:
     run.add_argument("--stack-runtime-root", required=True, type=Path)
     run.add_argument("--stack-source-root", required=True, type=Path)
     run.add_argument("--stable-codex-config", required=True, type=Path)
+    run.add_argument("--python-sdk-root", required=True, type=Path)
     stable = subparsers.add_parser("stable-canary")
     stable.add_argument("--output", required=True, type=Path)
     stable.add_argument("--stable-codex-binary", required=True, type=Path)
     stable.add_argument("--stable-codex-config", required=True, type=Path)
     stable.add_argument("--workspace-root", required=True, type=Path)
+    stable.add_argument("--live-fleet-receipt", required=True, type=Path)
     args = parser.parse_args()
     if args.command == "serve":
         return _serve(args)

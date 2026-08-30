@@ -15,14 +15,23 @@
         "sdk": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["distribution", "major", "requirement", "companion_distribution", "tested_lock", "source_revision"],
+          "required": ["distribution", "major", "requirement", "companion_distribution", "tested_lock", "source_revision", "distribution_record_digests"],
           "properties": {
             "distribution": {"const": "mcp"},
             "major": {"const": 2},
             "requirement": {"const": "mcp>=2,<3"},
             "companion_distribution": {"type": "string", "minLength": 1},
             "tested_lock": {"type": "string", "pattern": "^2\\.[0-9]+\\.[0-9]+(?:[+-][0-9A-Za-z.-]+)?$"},
-            "source_revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"}
+            "source_revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+            "distribution_record_digests": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["mcp", "mcp-types"],
+              "properties": {
+                "mcp": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+                "mcp-types": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+              }
+            }
           }
         },
         "protocol": {

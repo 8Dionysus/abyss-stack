@@ -13,7 +13,7 @@
 - Stack lanes: MCP services, runtime lifecycle, protocol compatibility
 - Mechanic parents: runtime-lifecycle
 - Guard families: exact dependency identity, generated projection, fail closed, source/runtime parity
-- Posture: accepted source transition with deployment pending
+- Posture: accepted transition with admitted-read deployment follow-up completed
 
 ## Context
 
@@ -56,11 +56,13 @@ the same catalog, so a future supported SDK update changes one authority and
 then regenerates and verifies its projections rather than requiring scattered
 version literals.
 
-This decision changes the source and test baseline. It does not claim that the
-already-running deployed venvs have been replaced: the deployed runtime and
-its 2.0.0 live receipts remain a separate source/runtime-parity blocker until
-the official deployment path installs the exact 2.1.1 pair and fresh live
-process-bound evidence passes. Candidate and internal-effect contours remain
+This decision first changed the source and test baseline without claiming a
+live deployment. On 2026-08-30 the named owner follow-up installed the exact
+2.1.1 pair for all eleven admitted read contours and passed fresh evidence
+bound to the serving interpreter bytes, process, listener, protocol, schema,
+semantic canary, authentication denial, and legacy denial. That is historical
+follow-up closure, not perpetual live health: the runtime registry and current
+receipts remain authoritative. Candidate and internal-effect contours remain
 manual-only and do not inherit read-contour admission.
 
 ## Rationale
@@ -84,9 +86,9 @@ cannot be mistaken for an activated fleet.
   source revision, transport, and path identity from the catalog.
 - Positive: stale 2.0.0 live or pair evidence is reported explicitly instead
   of being accepted as current after a source-only update.
-- Tradeoff: a deployment refresh is still required before the live fleet can
-  claim 2.1.1; source readiness and installed-runtime readiness remain
-  intentionally separate.
+- Positive: the named eleven-contour read deployment follow-up completed on
+  2.1.1; future live-health claims still require fresh runtime evidence, and
+  source readiness remains separate from installed-runtime readiness.
 - Tradeoff: regenerating the complete hash lock still depends on a valid,
   retrievable pinned `aoa-sdk` artifact; this transition does not weaken that
   supply-chain check.
@@ -97,7 +99,10 @@ cannot be mistaken for an activated fleet.
 - `mcp/services/_shared/runtime-config.schema.json`
 - `mcp/services/_shared/runtime_config.py`
 - `mcp/services/_shared/build_runtime_config_vendors.py`
+- `mcp/services/_shared/build_modern_runtime_vendors.py`
 - `mcp/services/_shared/modern_runtime.py`
+- `mcp/services/_shared/runtime_identity.py`
+- `mcp/services/_shared/codex_http_client.sh`
 - `mcp/services/abyss-stack-mcp/requirements.constraints`
 - `mcp/services/abyss-stack-mcp/requirements.lock`
 - `requirements-dev.txt`
@@ -106,15 +111,18 @@ cannot be mistaken for an activated fleet.
 - `mcp/protocol-lab/scripts/run_kag_next_pair.py`
 - `mcp/protocol-lab/scripts/run_kag_handle_pair.py`
 - `mcp/protocol-lab/scripts/run_kag_cache_pair.py`
+- `mcp/protocol-lab/scripts/run_live_modern_read_fleet.py`
 - `mcp/protocol-lab/CONTRACT.md`
 - `ABYSS-STACK-D-0108` historical modern-only MCP rationale
 
 ## Follow-up route
 
-Use the owner deployment route to install the exact 2.1.1 pair into the
-managed runtime, refresh all eleven admitted read contours and their negative
-wire proofs, then rerun the isolated pair and full fleet evidence. Do not
-refresh or promote candidate/effect authority as a side effect. Revisit this
-decision when the central tested lock or SDK major changes; such a change must
-repeat source, generated, dependency, protocol, deployment, and rollback
-checks.
+Keep the exact pair, serving-process byte identity, listener ownership,
+semantic canaries, negative wire proofs, admission, and receipt freshness in
+the normal owner deployment route. Let the next operator-controlled Desktop
+launch inherit the managed eleven-token environment and verify its
+authenticated discovery without restarting a live GUI as a side effect. Do
+not refresh or promote candidate/effect authority as part of read maintenance.
+Revisit this decision when the central tested lock or SDK major changes; such
+a change must repeat source, generated, dependency, protocol, deployment, and
+rollback checks.

@@ -26,6 +26,7 @@ _CODEX_FEATURE = re.compile(r"mcp_[0-9]{4}_[0-9]{2}_[0-9]{2}")
 _UNIT_NAME = re.compile(r"[A-Za-z0-9_.@%-]+\.service")
 _UNIT_TEMPLATE = re.compile(r"[A-Za-z0-9_.@%{}-]+\.service")
 _VERSION = re.compile(r"2\.[0-9]+\.[0-9]+(?:[+-][0-9A-Za-z.-]+)?")
+_SHA256 = re.compile(r"sha256:[0-9a-f]{64}")
 
 
 @dataclass(frozen=True)
@@ -50,6 +51,7 @@ class TransportConfig:
     sdk_companion_distribution: str
     tested_sdk_lock: str
     sdk_source_revision: str
+    sdk_distribution_record_digests: Mapping[str, str]
 
 
 @dataclass(frozen=True)
@@ -249,6 +251,19 @@ def _validate_raw(payload: dict[str, Any]) -> None:
     )
     if re.fullmatch(r"[0-9a-f]{40}", source_revision) is None:
         raise ValueError("MCP SDK source revision must be a 40-character hex commit")
+    distribution_record_digests = sdk.get("distribution_record_digests")
+    expected_distributions = {sdk["distribution"], companion_distribution}
+    if (
+        not isinstance(distribution_record_digests, dict)
+        or set(distribution_record_digests) != expected_distributions
+        or any(
+            not isinstance(digest, str) or _SHA256.fullmatch(digest) is None
+            for digest in distribution_record_digests.values()
+        )
+    ):
+        raise ValueError(
+            "MCP SDK RECORD digests must exactly bind both managed distributions"
+        )
     if (
         not isinstance(protocol, dict)
         or not _require_string(protocol.get("version"), "mcp.protocol.version")
@@ -612,6 +627,7 @@ def _build_catalog(payload: dict[str, Any], metadata: Mapping[str, tuple[str, st
         sdk_companion_distribution=sdk["companion_distribution"],
         tested_sdk_lock=sdk["tested_lock"],
         sdk_source_revision=sdk["source_revision"],
+        sdk_distribution_record_digests=sdk["distribution_record_digests"],
     )
     raw_paths = payload["paths"]
     path_config = PathConfig(
@@ -711,3 +727,7 @@ MCP_SDK_MAJOR = TRANSPORT_CONFIG.sdk_major
 MCP_SDK_REQUIREMENT = TRANSPORT_CONFIG.sdk_requirement
 MCP_SDK_COMPANION_DISTRIBUTION = TRANSPORT_CONFIG.sdk_companion_distribution
 MCP_TESTED_SDK_LOCK = TRANSPORT_CONFIG.tested_sdk_lock
+MCP_SDK_SOURCE_REVISION = TRANSPORT_CONFIG.sdk_source_revision
+MCP_SDK_DISTRIBUTION_RECORD_DIGESTS = (
+    TRANSPORT_CONFIG.sdk_distribution_record_digests
+)

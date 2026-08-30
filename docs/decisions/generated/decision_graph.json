@@ -1,9 +1,9 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
   "decision_count": 139,
-  "edge_count": 3127,
+  "edge_count": 3131,
   "edge_type_counts": {
-    "CITES_SOURCE_SURFACE": 1135,
+    "CITES_SOURCE_SURFACE": 1139,
     "DATED": 139,
     "GUARDED_BY": 430,
     "HAS_STATUS": 139,
@@ -14838,6 +14838,11 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0139",
+      "target": "source_surface:mcp/protocol-lab/scripts/run_live_modern_read_fleet.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0139",
       "target": "source_surface:mcp/protocol-lab/scripts/runtime_catalog.py",
       "type": "CITES_SOURCE_SURFACE"
     },
@@ -14848,7 +14853,17 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0139",
+      "target": "source_surface:mcp/services/_shared/build_modern_runtime_vendors.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0139",
       "target": "source_surface:mcp/services/_shared/build_runtime_config_vendors.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0139",
+      "target": "source_surface:mcp/services/_shared/codex_http_client.sh",
       "type": "CITES_SOURCE_SURFACE"
     },
     {
@@ -14869,6 +14884,11 @@
     {
       "source": "decision:ABYSS-STACK-D-0139",
       "target": "source_surface:mcp/services/_shared/runtime_config.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0139",
+      "target": "source_surface:mcp/services/_shared/runtime_identity.py",
       "type": "CITES_SOURCE_SURFACE"
     },
     {
@@ -15653,7 +15673,7 @@
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 1365,
+  "node_count": 1367,
   "node_type_counts": {
     "date": 48,
     "decision": 139,
@@ -15661,7 +15681,7 @@
     "mechanic_parent": 13,
     "owner_surface": 70,
     "repo": 1,
-    "source_surface": 643,
+    "source_surface": 645,
     "stack_lane": 58,
     "status": 4,
     "surface_class": 153
@@ -17292,7 +17312,7 @@
       "id": "decision:ABYSS-STACK-D-0139",
       "label": "ABYSS-STACK-D-0139",
       "path": "docs/decisions/ABYSS-STACK-D-0139-mcp-sdk-2-1-1-transition.md",
-      "posture": "accepted source transition with deployment pending",
+      "posture": "accepted transition with admitted-read deployment follow-up completed",
       "status": "accepted",
       "title": "ABYSS-STACK-D-0139 MCP SDK 2.1.1 Transition And Central Runtime Identity",
       "type": "decision"
@@ -19784,6 +19804,11 @@
       "type": "source_surface"
     },
     {
+      "id": "source_surface:mcp/protocol-lab/scripts/run_live_modern_read_fleet.py",
+      "label": "mcp/protocol-lab/scripts/run_live_modern_read_fleet.py",
+      "type": "source_surface"
+    },
+    {
       "id": "source_surface:mcp/protocol-lab/scripts/runtime_catalog.py",
       "label": "mcp/protocol-lab/scripts/runtime_catalog.py",
       "type": "source_surface"
@@ -19851,6 +19876,11 @@
     {
       "id": "source_surface:mcp/services/_shared/runtime_config.py",
       "label": "mcp/services/_shared/runtime_config.py",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mcp/services/_shared/runtime_identity.py",
+      "label": "mcp/services/_shared/runtime_identity.py",
       "type": "source_surface"
     },
     {

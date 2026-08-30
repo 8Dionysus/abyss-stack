@@ -22,8 +22,8 @@ proof verdicts, playbook meaning, and final acceptance.
 ## Current Bridges
 
 - [PARTS.md](PARTS.md) maps governed-runner, agent-os-adapter,
-  autonomy-status, return-policy, runtime-contracts, candidate-exports, and
-  local-worker-path parts.
+  autonomy-status, return-policy, runtime-contracts, candidate-exports,
+  local-worker-path, external-codex-agent, and ephemeral-worker parts.
 - [parts/governed-runner/docs/GOVERNED_EXECUTION.md](parts/governed-runner/docs/GOVERNED_EXECUTION.md)
   owns governed execution posture.
 - [parts/agent-os-adapter/CONTRACT.md](parts/agent-os-adapter/CONTRACT.md)
@@ -41,5 +41,9 @@ proof verdicts, playbook meaning, and final acceptance.
 - [parts/programmatic-tool-execution/CONTRACT.md](parts/programmatic-tool-execution/CONTRACT.md)
   owns the stack-side provider-neutral adapter seam and validated observation
   handoff; `aoa-sdk` remains the request/observation ABI owner.
+- [parts/ephemeral-worker/README.md](parts/ephemeral-worker/README.md) owns the
+  default-off bounded read worker and runtime-owned provider adapter profiles;
+  parent responsibility and all semantic lifecycle claims remain outside the
+  part.
 - [../federation-seams/README.md](../federation-seams/README.md) owns advisory
   owner inputs consumed by local-worker routes.

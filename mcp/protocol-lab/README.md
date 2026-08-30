@@ -12,12 +12,16 @@ Current posture after the 2026-07-28 final release:
   while the deterministic deployment lock currently tests exact `2.1.1`;
 - source transition is now pinned to Python MCP `2.1.1` plus
   `mcp-types==2.1.1` at source revision
-  `0921d94a74db900dccd2d534842aa7b6160542d2`; the existing live-fleet
-  observation remains a separate expired 2.0.0 receipt and does not prove the
-  2.1.1 deployment;
+  `0921d94a74db900dccd2d534842aa7b6160542d2`;
 - eleven production read units are deployment-bound, canary-proven, admitted,
   and observed through `server/discover` and `tools/list` on the exact modern
-  wire; wrong bearers and legacy `initialize` are denied before session issue;
+  wire. A separate bounded 2026-08-30 owner deployment proved the exact 2.1.1
+  serving bytes, listener ownership, schemas, semantic canaries, and negative
+  auth/legacy gates for all eleven;
+- the checked-in live-fleet, rollback, and Tasks fixtures intentionally remain
+  historical expired 2.0.0 evidence. The generated source status therefore
+  stays blocked instead of treating the separate runtime closure as a fixture
+  rewrite or re-admitting Tasks;
 - no active or enabled legacy owner instance remains; the old shared template
   is a non-startable tombstone and the MCP 1 runtime is cold rollback material;
 - OS Abyss Codex `0.147.0-abyss.2` selects modern MCP only for the explicit
@@ -41,9 +45,10 @@ Current posture after the 2026-07-28 final release:
   removable `CODEX_HOME`, passed the separately named and credentialed
   `aoa_kag_next_lab` call on the actual `2026-07-28` wire;
 - official conformance commit `c321dd3` freezes requirements per specification
-  revision. Python `2.0.0` passed all 372 scored client checks and all 119
-  scored server checks for `2026-07-28`; later unscored auth, JSON Schema, and
-  Tasks failures remain visible;
+  revision. Python `2.1.1` passed all 372 scored client checks and all 119
+  scored server checks for `2026-07-28`; later unscored auth and Tasks
+  failures remain visible, while the added-after-release JSON Schema scenario
+  passes;
 - isolated KAG adapter pair: `2026-07-28` `server/discover`, stateless
   requests, private TTL caching, trace propagation, and read-only denials
   pass; exact projection and owner freshness are current;
@@ -59,10 +64,11 @@ Current posture after the 2026-07-28 final release:
 - registered stable modern lab canary: exact one-tool inventory, deterministic schema
   digest, authenticated principal, trace propagation, wrong-bearer `401`,
   16 KiB input and 256 KiB output bounds, and oversized-input denial pass;
-- rollback: the lab process, port, credential, registration, and isolated
-  `CODEX_HOME` were removed; the operator config stayed byte-identical and
-  the existing `aoa_kag` registration passed a post-rollback call;
-- Python MCP `2.0.0` does not itself implement the Tasks client extension;
+- rollback: the MCP `2.1.1` candidate lab process, port, credential,
+  registration, and isolated `CODEX_HOME` were removed; the operator config
+  stayed byte-identical. The existing post-rollback call remains historical
+  MCP `2.0.0` deployment evidence;
+- Python MCP `2.1.1` does not itself implement the Tasks client extension;
 - feature-gated Abyss Tasks adapter: 11/11 synthetic lifecycle cases pass,
   including restart recovery and one real read-only owner diagnostic; Codex was
   not the Tasks client and notifications remain unproved;
@@ -75,11 +81,17 @@ Current posture after the 2026-07-28 final release:
   creation reaches the Abyss adapter, but the strict pair is blocked because
   raw `tasks/get` omits task-bound `Mcp-Name`; the adapter correctly retains
   the boundary with JSON-RPC `-32020` / HTTP `400`;
-- isolated read-only modern pair and rollback: passed;
-- production core-read migration: passed;
-- bounded production Tasks lifecycle: passed;
-- candidate and internal-effect protocol readiness: passed, while their
-  authority migration remains false;
+- isolated read-only MCP `2.1.1` modern pair and rollback: passed;
+- production core-read migration: completed by the bounded live owner route;
+  the checked-in protocol-lab migration gate remains blocked until its
+  deployment-bound fixtures are deliberately refreshed;
+- derived status keeps candidate and deployment evidence deadlines separate;
+  the overall deadline is the earliest of both, and expired deployment-bound
+  receipts remain a hard blocker even if their recorded SDK labels are edited;
+- bounded production Tasks lifecycle: retained as historical MCP `2.0.0`
+  deployment evidence and not re-admitted for the source candidate;
+- candidate protocol readiness: passed; internal-effect readiness and all
+  authority migration remain false;
 - external-effect migration: false;
 - stable registration: `aoa_kag`;
 - isolated lab registration: `aoa_kag_next_lab`, removed after proof;
@@ -87,8 +99,10 @@ Current posture after the 2026-07-28 final release:
 - candidate and effect authority: excluded.
 
 The matrix pins exact specification, SDK, conformance-suite, and consumer
-observations. All fourteen P1 gates pass, including the independently evidenced
-bounded Tasks gate.
+observations. All fourteen P1 compatibility gates pass for their stated
+evidence, including the independently evidenced bounded Tasks gate; production
+fixture cutover remains blocked until deployment-bound receipts match MCP
+`2.1.1`, while the separately evidenced live read cutover is complete.
 The generated v2 status reports separate core-read, Tasks, candidate,
 internal-effect, and external-effect verdicts. Protocol readiness never grants
 candidate or effect authority.
@@ -131,18 +145,23 @@ can execute.
 | `fixtures/current-pair-observation.json` | current evidence-backed pair observation |
 | `fixtures/codex-0.146.0-production-pair-observation.json` | public-safe derivative of the registered production inventory and direct call; not a next-protocol canary |
 | `fixtures/codex-0.146.0-wire-observation.json` | normalized receipt for the isolated Codex-to-Python-SDK stdio exchange |
-| `fixtures/python-mcp-2.0.0-frozen-conformance-observation.json` | normalized official frozen-revision conformance receipt with raw-result digests |
+| `fixtures/python-mcp-2.0.0-frozen-conformance-observation.json` | historical MCP `2.0.0` frozen-revision conformance receipt |
+| `fixtures/python-mcp-2.1.1-frozen-conformance-observation.json` | current isolated MCP `2.1.1` frozen-revision conformance receipt with raw-result refs |
 | `fixtures/codex-0.147.0-stable-kag-next-lab-observation.json` | public-safe stable modern Codex registration, wire, call, limits, and rollback proof |
+| `fixtures/codex-0.147.0-stable-kag-next-lab-2.1.1-observation.json` | current isolated stable Codex pair against the MCP `2.1.1` candidate |
 | `fixtures/codex-0.147.0-stable-kag-post-rollback-observation.json` | actual operator-config stable KAG canary after lab removal |
 | `fixtures/kag-next-cancellable-pair-observation.json` | normalized isolated KAG next-adapter and propagated-cancellation receipt |
-| `fixtures/kag-handle-pair-current-observation.json` | current normalized read-only requestState isolation, expiry, replay, and revocation receipt |
-| `fixtures/kag-cache-pair-current-observation.json` | current normalized private TTL, invalidation, stale-catalog, and revocation receipt |
+| `fixtures/kag-next-cancellable-pair-2.1.1-observation.json` | current isolated MCP `2.1.1` KAG adapter and propagated-cancellation receipt |
+| `fixtures/kag-handle-pair-current-observation.json` | historical normalized MCP `2.0.0` requestState isolation, expiry, replay, and revocation receipt |
+| `fixtures/kag-handle-pair-2.1.1-current-observation.json` | current isolated MCP `2.1.1` requestState receipt |
+| `fixtures/kag-cache-pair-current-observation.json` | historical normalized MCP `2.0.0` private TTL, invalidation, stale-catalog, and revocation receipt |
+| `fixtures/kag-cache-pair-2.1.1-current-observation.json` | current isolated MCP `2.1.1` catalog-cache receipt |
 | `fixtures/tasks-adapter-pilot-20260808.json` | public-safe feature-gated Tasks lifecycle and read-only owner-pilot receipt; not production or Codex proof |
 | `tasks-compatibility-matrix.v1.json` | exact per-consumer Tasks feature and wire verdicts, kept independent from the core migration matrix |
 | `fixtures/rmcp-3.1.2-tasks-adapter-pair-20260808.json` | released Rust reference-client proof against the strict feature-gated Abyss adapter |
 | `fixtures/inspector-2.1.0-tasks-strict-pair-blocked-20260808.json` | exact Inspector strict-pair blocker without weakening task-bound routing |
 | `fixtures/live-modern-fleet-20260809.json` | compact production read-fleet, automation, rollback, and non-read protocol observation |
-| `fixtures/codex-tasks-production-pair-20260809.json` | bounded OS Abyss Codex Tasks production-pair receipt |
+| `fixtures/codex-tasks-production-pair-20260809.json` | bounded OS Abyss Codex Tasks production-pair receipt; historical deployment-bound evidence |
 | `scripts/run_kag_next_pair.py` | private raw-receipt runner for the isolated KAG adapter |
 | `scripts/run_kag_handle_pair.py` | private raw-receipt runner for bearer-bound KAG requestState handles |
 | `scripts/run_kag_cache_pair.py` | private raw-receipt runner for KAG catalog cache behavior |
@@ -161,9 +180,11 @@ can execute.
 | `scripts/validate_protocol_lab.py` | fail-closed source and stack-pin validator |
 | `tests/` | mutation and migration-gate tests |
 
-The modern production receipts admit only the eleven read contours and the
-bounded Tasks lifecycle on `abyss-stack` read. They do not prove subscription
-fan-out across replicas or authorize candidate/effect migration.
+The checked-in modern deployment fixtures remain bound to MCP `2.0.0` and are
+historical inputs to the source gate. The separate 2026-08-30 runtime closure
+admits only the eleven read contours on exact 2.1.1; it does not refresh the
+bounded Tasks fixture, prove subscription fan-out across replicas, or authorize
+candidate/effect migration.
 
 Read [CONTRACT.md](CONTRACT.md) for admission law and
 [docs/COMPATIBILITY_MATRIX.md](docs/COMPATIBILITY_MATRIX.md) for the core

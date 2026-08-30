@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 25485739,
+  "allowed_tracked_bytes": 39014685,
+  "approved_by": "repository-owner",
+  "base_ref": "acee6d7684959ceaace27464c81f1ba23a4f03ea",
+  "changed_generated_bytes": 25485739,
+  "changed_generated_files": 297,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "b1e8914a1c7dc2f0e28f06829851a59db08eb5c9f35075677181aac377e9a346",
+  "reason": "MCP Tasks receipts now attest the measured MCP and mcp-types distribution bytes; the generated owner family is bound to this candidate tree and reviewed receipts.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 39014685,
+  "tracked_bytes_max": 24117248
+}

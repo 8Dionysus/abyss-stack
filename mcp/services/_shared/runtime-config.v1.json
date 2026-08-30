@@ -7,7 +7,11 @@
       "requirement": "mcp>=2,<3",
       "companion_distribution": "mcp-types",
       "tested_lock": "2.1.1",
-      "source_revision": "0921d94a74db900dccd2d534842aa7b6160542d2"
+      "source_revision": "0921d94a74db900dccd2d534842aa7b6160542d2",
+      "distribution_record_digests": {
+        "mcp": "sha256:8023abb83ccd24e167d5ad39a5296ce87040c52972f714b3576fcb8ce1b28a14",
+        "mcp-types": "sha256:d315ab265f62420dc87baadbb9373013330833aeced8950d9951f8b9d71eee0c"
+      }
     },
     "protocol": {
       "version": "2026-07-28",

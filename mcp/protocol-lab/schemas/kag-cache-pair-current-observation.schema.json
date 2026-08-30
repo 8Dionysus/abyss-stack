@@ -6,7 +6,7 @@
   "additionalProperties": false,
   "properties": {
     "schema_version": {"const": "abyss_mcp_kag_cache_pair_observation_v1"},
-    "observation_id": {"const": "aoa-kag-cache-pair-20260808"},
+    "observation_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]+$"},
     "observed_at": {"type": "string", "format": "date-time"},
     "finished_at": {"type": "string", "format": "date-time"},
     "wire_version": {"const": "2026-07-28"},
@@ -15,17 +15,41 @@
       "additionalProperties": false,
       "properties": {
         "commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
-        "version": {"type": "string", "pattern": "^2\\.[0-9]+\\.[0-9]+$"}
+        "version": {"type": "string", "pattern": "^2\\.[0-9]+\\.[0-9]+$"},
+        "artifact_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
       },
-      "required": ["commit", "version"]
+      "required": ["commit", "version"],
+      "allOf": [
+        {
+          "if": {"properties": {"version": {"const": "2.1.1"}}, "required": ["version"]},
+          "then": {"required": ["artifact_digest"]}
+        }
+      ]
     },
-    "source_revisions": {"const": {"abyss_stack": "2bb043e160b6a2c001abad4f4de6969b35782466", "aoa_kag": "ba7805190527a635ff5c515701be29379af8277f"}},
+    "source_revisions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "abyss_stack": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "aoa_kag": {"type": "string", "pattern": "^[0-9a-f]{40}$"}
+      },
+      "required": ["abyss_stack", "aoa_kag"]
+    },
     "cache": {"const": {"scope": "private", "ttl_ms": 30000, "within_ttl_repeat_server_fetches": 1}},
     "subscription": {"const": {"events_consumed": 2, "tools_list_changed_honored": true}},
     "checks": {"const": {"explicit_refresh_replaces_stale_entry": true, "no_subscription_no_replay": true, "stale_catalog_cannot_authorize_removed_tool": true, "subscription_addition_invalidation": true, "subscription_removal_revocation": true, "ttl_expiry_refetch": true}},
     "inventories": {"const": {"after_explicit_refresh": ["kag_discover"], "after_subscription_add": ["kag_discover", "kag_transient_probe"], "after_subscription_remove": ["kag_discover"], "after_ttl_expiry": ["kag_discover", "kag_stale_probe"], "initial": ["kag_discover"], "stale_after_removal": ["kag_discover", "kag_stale_probe"], "stale_before_expiry": ["kag_discover"]}},
     "stable_registration_unchanged": {"const": true},
-    "raw_receipt": {"const": {"mode": "0600", "ref": "local:///srv/abyss-machine/cache/mcp-next-20260808/evidence/kag-cache-pair-20260808-private.json", "sha256": "313f26b3e078b5c2d2858a4c5373b92a07d53c2adfee835cda0057171165f1d4"}},
+    "raw_receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {"const": "0600"},
+        "ref": {"type": "string", "pattern": "^local://"},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      },
+      "required": ["mode", "ref", "sha256"]
+    },
     "verdict": {"const": "cache_pair_passed"},
     "claim_limits": {"type": "array", "minItems": 6, "items": {"type": "string", "minLength": 1}}
   },

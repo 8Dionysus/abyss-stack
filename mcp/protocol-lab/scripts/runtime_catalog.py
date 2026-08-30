@@ -38,6 +38,7 @@ _UNIT_NAME = re.compile(r"[A-Za-z0-9_.@%-]+\.service")
 _UNIT_TEMPLATE = re.compile(r"[A-Za-z0-9_.@%{}-]+\.service")
 _CODEX_FEATURE = re.compile(r"mcp_[0-9]{4}_[0-9]{2}_[0-9]{2}")
 _VERSION = re.compile(r"2\.[0-9]+\.[0-9]+(?:[+-][0-9A-Za-z.-]+)?")
+_SHA256 = re.compile(r"sha256:[0-9a-f]{64}")
 
 
 def _non_empty(value: Any, label: str) -> str:
@@ -93,6 +94,19 @@ def load_runtime_catalog(explicit: Path | None = None) -> dict[str, Any]:
     )
     if re.fullmatch(r"[0-9a-f]{40}", source_revision) is None:
         raise RuntimeCatalogError("MCP SDK source revision is invalid")
+    distribution_record_digests = sdk.get("distribution_record_digests")
+    expected_distributions = {sdk.get("distribution"), companion_distribution}
+    if (
+        not isinstance(distribution_record_digests, dict)
+        or set(distribution_record_digests) != expected_distributions
+        or any(
+            not isinstance(digest, str) or _SHA256.fullmatch(digest) is None
+            for digest in distribution_record_digests.values()
+        )
+    ):
+        raise RuntimeCatalogError(
+            "MCP SDK RECORD digests must exactly bind both managed distributions"
+        )
     if (
         not isinstance(protocol, dict)
         or not _non_empty(protocol.get("version"), "MCP protocol version")

@@ -21,11 +21,31 @@ Tracking starts with the community-docs baseline for this repository.
   with a centrally declared Python `2.1.1`/`mcp-types==2.1.1` pair, generated
   package projections, and explicit stale-evidence detection so a source
   transition cannot be mistaken for a live deployment.
+- Bind MCP 2.1.1 protocol-lab and KAG receipts to the actually imported SDK
+  from a clean attested checkout and source revision; carry the same identity
+  through deployment-bound evidence and use the SDK's typed snake-case
+  annotation fields across all stack-owned MCP service validators.
+- Complete the bounded eleven-contour read deployment follow-up on exact MCP
+  2.1.1 with serving-process byte identity, listener ownership, modern
+  discovery, schema and semantic canaries, and auth/legacy denial; keep four
+  non-read contours unadmitted and the checked-in historical fixtures honest.
+- Keep protocol-lab readiness fail-closed when deployment-bound rollback,
+  Tasks-matrix, live-fleet, or Codex Tasks evidence expires; expose separate
+  candidate/deployment deadlines and derive live Tasks receipts from the
+  serving MCP process identity and runtime-observation digest rather than a
+  fixed cache environment.
 - Add the source-only, default-off provider-neutral programmatic execution
   runtime seam with explicit admission, independent Codex/local adapter
   boundaries, validated observation handoff, and distinct adapter versus
   post-execution sink failures; retain the exact d0 paired-baseline trigger
   before binding real invokers.
+- Record the default-off ephemeral worker landing and harden its
+  provider-neutral adapter boundary: byte ceilings are capped at 16 MiB before
+  reads, path parents are traversed through no-follow descriptors, digest
+  schemas require exact full-string coordinates, Codex explicitly disables
+  `multi_agent`, request cardinality and metadata are bounded, normalized
+  duplicate paths are rejected, and mismatched ABI or ambiguous built-in
+  transport values fail closed.
 - Harden governed landing-effect admission with an independent artifact-byte
   digest, descriptor-bound bounded no-follow reads, duplicate-member rejection,
   complete Git ref validation, effect-specific target constraints, and a
@@ -793,6 +813,17 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Changed
 
+- Refresh easy runtime dependency pins: Neo4j `5.26.30`, Qdrant `1.18.3`,
+  PostgreSQL `16.15`, Redis `7.4.11`, Ollama `0.33.2`, cAdvisor `0.60.5`,
+  Loki `3.7.7`, Playwright `1.62.0`, Gunicorn `26.2.0`, and OVMS/OpenVINO
+  `2026.3`, plus refreshed Python/Node base-image digests. Stateful services
+  remain same-major/minor and require backup, one-at-a-time rollout, health
+  checks, and previous-pin rollback.
+- Refresh the source-side MCP candidate to Python `2.1.1` across all fifteen
+  stack-owned service packages, lockfiles, protocol-lab runners, schemas, and
+  source-bound compatibility receipts. The isolated conformance, KAG, and
+  Codex pair passes do not promote production: deployment-bound MCP `2.0.0`
+  receipts remain historical until a separate deployment proof is completed.
 - The complete `tests` and `release` pytest selection now uses a four-process,
   file-aware work-stealing DAG with exact baseline, disjoint-union, observed
   selection, and final-verdict proofs. Duration hints affect order only; the

@@ -30,6 +30,7 @@ from mcp_types import Implementation, ToolAnnotations
 from aoa_kag_mcp.core import AoAKagMCPState
 from aoa_kag_mcp.runtime import build_application
 from runtime_catalog import load_runtime_catalog, mcp_settings
+from _mcp_sdk_identity import installed_mcp_identity
 
 
 _SDK_SETTINGS, _PROTOCOL_SETTINGS, _TRANSPORT_SETTINGS = mcp_settings(
@@ -383,9 +384,11 @@ def main() -> int:
     parser.add_argument("--stack-runtime-root", required=True, type=Path)
     parser.add_argument("--stack-source-root", required=True, type=Path)
     parser.add_argument("--stable-codex-config", required=True, type=Path)
+    parser.add_argument("--python-sdk-root", required=True, type=Path)
     args = parser.parse_args()
 
     started_at = _utc_now()
+    sdk_identity = installed_mcp_identity(args.python_sdk_root)
     state = AoAKagMCPState.discover(
         workspace_root=args.workspace_root,
         aoa_kag_root=args.aoa_kag_root,
@@ -413,8 +416,9 @@ def main() -> int:
         "finished_at": _utc_now(),
         "exact_inputs": {
             "aoa_kag_source_revision": _git_head(args.aoa_kag_root),
-            "python_mcp_commit": PYTHON_MCP_COMMIT,
-            "python_mcp_version": PYTHON_MCP_VERSION,
+            "python_mcp_commit": sdk_identity["commit"],
+            "python_mcp_artifact_digest": sdk_identity["artifact_digest"],
+            "python_mcp_version": sdk_identity["version"],
             "spec_version": NEXT_WIRE_VERSION,
             "stack_source_revision": _git_head(args.stack_source_root),
         },

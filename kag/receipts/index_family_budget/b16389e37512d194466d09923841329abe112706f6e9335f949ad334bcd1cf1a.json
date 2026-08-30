@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 24828832,
+  "allowed_tracked_bytes": 38989350,
+  "approved_by": "repository-owner",
+  "base_ref": "acee6d7684959ceaace27464c81f1ba23a4f03ea",
+  "changed_generated_bytes": 24828832,
+  "changed_generated_files": 292,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "b16389e37512d194466d09923841329abe112706f6e9335f949ad334bcd1cf1a",
+  "reason": "MCP 2.1.1 protocol and service-validator migration requires a deterministic owner-family regeneration; the generated family is bound to this candidate tree and reviewed receipts.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 38989350,
+  "tracked_bytes_max": 24117248
+}

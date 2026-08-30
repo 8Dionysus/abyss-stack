@@ -433,6 +433,7 @@ def main() -> int:
         "schema_version": "abyss_modern_organ_fleet_matrix_v1",
         "observed_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         "mcp_sdk": sdk_identity["versions"].get(sdk_settings["distribution"]),
+        "mcp_sdk_source_revision": sdk_settings["source_revision"],
         "mcp_companion_sdk": sdk_identity["versions"].get(
             sdk_settings["companion_distribution"]
         ),

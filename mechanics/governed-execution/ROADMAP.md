@@ -15,6 +15,9 @@
 - keep the programmatic execution seam source-only and default-off until d0
   admits a paired baseline; only then bind real Codex and local-model invokers
   and route their observations to the appropriate owner review surfaces
+- keep the source-local ephemeral worker default-off, content-addressed, and
+  parent-retained; require the same provider-neutral delegation ABI for Codex
+  CLI and local/provider adapters
 
 ## Next candidates
 
@@ -43,3 +46,5 @@
   external-process/session contract
 - do not enable commit, push, PR, merge, release, publication, service, or
   global-runtime effects through the initial external Codex lane
+- do not activate ephemeral or external-incarnation delegation before the
+  paired d0 baseline is admitted

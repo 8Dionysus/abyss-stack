@@ -11,6 +11,7 @@
     "finished_at": {"type": "string", "format": "date-time"},
     "expires_at": {"type": "string", "format": "date-time"},
     "verdict": {"const": "isolated_stable_pair_passed"},
+    "secrets_included": {"const": false},
     "consumer": {
       "const": {
         "binary_sha256": "cb0a15567e9a60a5820d54b0f6ae86d504dc3805c1eab21a47f70e3eb7b73a40",
@@ -26,7 +27,9 @@
       "properties": {
         "registration": {"const": "aoa_kag_next_lab"},
         "endpoint": {"type": "string", "pattern": "^http://127\\.0\\.0\\.1:[0-9]+/mcp$"},
-        "python_mcp_version": {"const": "2.0.0"},
+        "python_mcp_version": {"enum": ["2.0.0", "2.1.1"]},
+        "python_mcp_commit": {"enum": ["6f69a3758ebf2ee55ce050f58b470ce11af71133", "0921d94a74db900dccd2d534842aa7b6160542d2"]},
+        "python_mcp_artifact_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
         "credential_regular_non_symlink_0600": {"const": true},
         "source_artifacts": {
           "type": "object",
@@ -43,12 +46,12 @@
           "additionalProperties": false,
           "properties": {
             "abyss_stack": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
-            "aoa_kag": {"const": "ba7805190527a635ff5c515701be29379af8277f"}
+            "aoa_kag": {"enum": ["ba7805190527a635ff5c515701be29379af8277f", "578e4cea9a04b76a881bde240d5479efceea4926"]}
           },
           "required": ["abyss_stack", "aoa_kag"]
         }
       },
-      "required": ["registration", "endpoint", "python_mcp_version", "credential_regular_non_symlink_0600", "source_artifacts", "source_revisions"]
+      "required": ["registration", "endpoint", "python_mcp_version", "python_mcp_commit", "python_mcp_artifact_digest", "credential_regular_non_symlink_0600", "source_artifacts", "source_revisions"]
     },
     "wire": {
       "type": "object",

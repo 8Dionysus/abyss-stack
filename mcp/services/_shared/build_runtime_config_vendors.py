@@ -76,6 +76,7 @@ class TransportConfig:
     sdk_companion_distribution: str
     tested_sdk_lock: str
     sdk_source_revision: str
+    sdk_distribution_record_digests: Mapping[str, str]
 
 
 @dataclass(frozen=True)
@@ -343,6 +344,7 @@ TRANSPORT_CONFIG = TransportConfig(
     sdk_companion_distribution=_sdk["companion_distribution"],
     tested_sdk_lock=_sdk["tested_lock"],
     sdk_source_revision=_sdk["source_revision"],
+    sdk_distribution_record_digests=_sdk["distribution_record_digests"],
 )
 PATH_CONFIG = PathConfig(**_RAW["paths"])
 RUNTIME_LIMITS = RuntimeLimits(**_RAW["limits"])
@@ -375,6 +377,10 @@ MCP_SDK_MAJOR = TRANSPORT_CONFIG.sdk_major
 MCP_SDK_REQUIREMENT = TRANSPORT_CONFIG.sdk_requirement
 MCP_SDK_COMPANION_DISTRIBUTION = TRANSPORT_CONFIG.sdk_companion_distribution
 MCP_TESTED_SDK_LOCK = TRANSPORT_CONFIG.tested_sdk_lock
+MCP_SDK_SOURCE_REVISION = TRANSPORT_CONFIG.sdk_source_revision
+MCP_SDK_DISTRIBUTION_RECORD_DIGESTS = (
+    TRANSPORT_CONFIG.sdk_distribution_record_digests
+)
 '''
 
 

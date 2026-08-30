@@ -130,6 +130,7 @@
         "mechanics/governed-execution/parts/external-codex-agent/tests/test_external_codex_return.py",
         "mechanics/governed-execution/parts/external-codex-agent/tests/test_visible_incarnation_home.py",
         "mechanics/governed-execution/parts/external-codex-agent/tests/test_external_codex_workspace_hygiene.py",
+        "mechanics/governed-execution/parts/ephemeral-worker/tests/test_ephemeral_worker.py",
         "mechanics/governed-execution/parts/governed-runner/tests/governed_runner_test_support.py",
         "mechanics/governed-execution/parts/governed-runner/tests/test_governed_runner_edit_specs.py",
         "mechanics/governed-execution/parts/governed-runner/tests/test_governed_runner_lifecycle.py",

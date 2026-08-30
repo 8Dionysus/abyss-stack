@@ -71,3 +71,9 @@ config templates, and
 package-local parts under `mechanics/governed-execution/parts/`. The
 `programmatic-tool-execution` part owns the provider-neutral runtime adapter
 seam and validated observation handoff.
+
+The default-off `ephemeral-worker` part is the bounded runtime surface for
+`ephemeral_read_worker_v1`; it retains parent responsibility and shares the
+`aoa_delegation_class_v1` adapter ABI with the first Codex CLI and a
+local/provider external-incarnation profile. It does not install a route or
+make a live baseline, eval, closeout, or acceptance claim.

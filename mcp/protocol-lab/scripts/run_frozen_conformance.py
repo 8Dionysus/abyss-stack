@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run exact Python MCP 2.0.0 client/server conformance for 2026-07-28."""
+"""Run exact Python MCP 2.1.1 client/server conformance for 2026-07-28."""
 
 from __future__ import annotations
 
@@ -18,8 +18,8 @@ from typing import Any
 
 CONFORMANCE_COMMIT = "c321dd32035556e6769d3724a8ee97d87c3faaac"
 CONFORMANCE_VERSION = "0.2.0-alpha.11"
-PYTHON_SDK_COMMIT = "6f69a3758ebf2ee55ce050f58b470ce11af71133"
-PYTHON_SDK_VERSION = "2.0.0"
+PYTHON_SDK_COMMIT = "0921d94a74db900dccd2d534842aa7b6160542d2"
+PYTHON_SDK_VERSION = "2.1.1"
 REQUIREMENTS_REVISION = "2026-07-28"
 
 
@@ -92,6 +92,39 @@ def _run(
     )
 
 
+def _sdk_identity(sdk_python: Path, sdk_root: Path) -> dict[str, str]:
+    """Attest the SDK using the interpreter that actually runs conformance."""
+    scripts_root = Path(__file__).resolve().parent
+    probe = (
+        "import json, sys\n"
+        f"sys.path.insert(0, {str(scripts_root)!r})\n"
+        "from pathlib import Path\n"
+        "from _mcp_sdk_identity import installed_mcp_identity\n"
+        f"print(json.dumps(installed_mcp_identity(Path({str(sdk_root)!r})), sort_keys=True))\n"
+    )
+    completed = subprocess.run(
+        [str(sdk_python), "-I", "-B", "-c", probe],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if completed.returncode != 0:
+        raise RuntimeError(
+            "Python MCP SDK identity attestation failed: "
+            + completed.stderr.strip()[-2000:]
+        )
+    try:
+        identity = json.loads(completed.stdout)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError("Python MCP SDK identity attestation returned invalid JSON") from exc
+    if not isinstance(identity, dict) or not all(
+        isinstance(identity.get(key), str)
+        for key in ("version", "commit", "artifact_digest")
+    ):
+        raise RuntimeError("Python MCP SDK identity attestation returned an incomplete identity")
+    return identity
+
+
 def run(args: argparse.Namespace) -> dict[str, Any]:
     started_at = _timestamp()
     conformance_root = args.conformance_root.resolve(strict=True)
@@ -106,7 +139,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     if _git_head(conformance_root) != CONFORMANCE_COMMIT:
         raise RuntimeError("conformance checkout does not match the exact current commit")
     if _git_head(sdk_root) != PYTHON_SDK_COMMIT:
-        raise RuntimeError("Python SDK checkout does not match v2.0.0")
+        raise RuntimeError("Python SDK checkout does not match v2.1.1")
+    sdk_identity = _sdk_identity(sdk_python, sdk_root)
     package = json.loads((conformance_root / "package.json").read_text())
     if package.get("version") != CONFORMANCE_VERSION:
         raise RuntimeError("conformance package version drifted")
@@ -183,7 +217,12 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             "commit": CONFORMANCE_COMMIT,
             "version": CONFORMANCE_VERSION,
         },
-        "python_sdk": {"commit": PYTHON_SDK_COMMIT, "version": PYTHON_SDK_VERSION},
+        "python_sdk": {
+            "artifact_digest": sdk_identity["artifact_digest"],
+            "commit": sdk_identity["commit"],
+            "source_checkout_clean": True,
+            "version": sdk_identity["version"],
+        },
         "client": {
             "returncode": client.returncode,
             "result_tree_sha256": client_digest,

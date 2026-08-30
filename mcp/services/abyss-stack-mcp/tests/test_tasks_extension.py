@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -14,6 +15,7 @@ from abyss_stack_mcp.tasks_extension import (
     TASK_TOOL,
     StackReadTasksExtension,
     _TaskGetParams,
+    running_mcp_sdk_identity,
 )
 
 
@@ -76,8 +78,15 @@ def test_task_completes_and_survives_extension_restart(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(
+        "abyss_stack_mcp.tasks_extension.running_mcp_sdk_version",
+        lambda: "2.1.1",
+    )
+    monkeypatch.setattr(
         "abyss_stack_mcp.tasks_extension.get_access_token",
         lambda: SimpleNamespace(client_id="codex-main"),
+    )
+    expected_sdk, expected_source_revision, expected_artifact_digest = (
+        running_mcp_sdk_identity()
     )
 
     async def scenario() -> None:
@@ -106,8 +115,55 @@ def test_task_completes_and_survives_extension_restart(
         assert result["result"]["structuredContent"]["owner_payload"][
             "organ_id"
         ] == "aoa-kag"
+        assert (
+            result["result"]["structuredContent"]["metadata"]["mcp_sdk"]
+            == expected_sdk
+        )
+        assert (
+            result["result"]["structuredContent"]["metadata"]["mcp_sdk_source_revision"]
+            == expected_source_revision
+        )
+        artifact_digest = result["result"]["structuredContent"]["metadata"][
+            "mcp_sdk_artifact_digest"
+        ]
+        assert artifact_digest == expected_artifact_digest
+        metadata = result["result"]["structuredContent"]["metadata"]
+        assert metadata["mcp_sdk_process_id"] == os.getpid()
+        assert metadata["mcp_sdk_runtime_attestation"] == {
+            "state": "passed",
+            "method": "process_startup_sdk_identity_snapshot",
+            "pid": os.getpid(),
+        }
 
     asyncio.run(scenario())
+
+
+def test_tasks_identity_rejects_unattested_sdk(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "abyss_stack_mcp.tasks_extension.running_mcp_sdk_version",
+        lambda: "local-patched-build",
+    )
+    from abyss_stack_mcp.tasks_extension import running_mcp_sdk_identity
+
+    with pytest.raises(RuntimeError, match="no reviewed source attestation"):
+        running_mcp_sdk_identity()
+
+
+def test_tasks_identity_rejects_in_place_sdk_replacement(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import abyss_stack_mcp.tasks_extension as tasks_extension
+
+    monkeypatch.setattr(
+        tasks_extension,
+        "_installed_mcp_sdk_artifact_digest",
+        lambda sdk_version, source_revision: "sha256:" + ("f" * 64),
+    )
+
+    with pytest.raises(RuntimeError, match="changed after process startup"):
+        tasks_extension.running_mcp_sdk_identity()
 
 
 def test_tasks_fail_closed_without_capability_or_matching_headers(

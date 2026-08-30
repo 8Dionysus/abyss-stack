@@ -33,6 +33,7 @@
   "server": {
     "credential_regular_non_symlink_0600": true,
     "endpoint": "http://127.0.0.1:5445/mcp",
+    "python_mcp_commit": "6f69a3758ebf2ee55ce050f58b470ce11af71133",
     "python_mcp_version": "2.0.0",
     "registration": "aoa_kag_next_lab",
     "source_artifacts": {

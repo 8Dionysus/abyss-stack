@@ -1,5 +1,7 @@
 {
   "authority_move_combined": false,
+  "candidate_evidence_current": true,
+  "candidate_evidence_expires_at": "2026-09-06T01:51:50.099097Z",
   "candidate_migration_allowed": false,
   "candidate_protocol_ready": true,
   "claim_limits": [
@@ -10,10 +12,12 @@
     "A registered alias does not prove schema observation or a grounded call.",
     "Final publication and stable SDKs never authorize production migration without exact pair receipts."
   ],
-  "codex_lab_observation_digest": "sha256:edcfc2a5765f0b14d18bc72e8cb5ae03f9f7b60e9187beec242a7b0e93be1998",
-  "codex_tasks_production_pair_digest": "sha256:5a7c3f00872f5afff9a4c3291975cd4c05cf78e1c0411c05b8203e7920880610",
+  "codex_lab_observation_digest": "sha256:94da4db329420e3158a5f153ecd51658209a70e01b4ff89250e0fbe2dc4d9995",
+  "codex_tasks_production_pair_digest": "sha256:5bf3a280c869fadcda6c170907f5116995a8d8601d4e44e02e962abc6c734704",
   "core_read_migration_allowed": false,
-  "evaluated_at": "2026-08-09T13:53:36.813735Z",
+  "deployment_evidence_current": false,
+  "deployment_evidence_expires_at": "2026-08-15T08:33:46.547214Z",
+  "evaluated_at": "2026-08-30T09:48:29.560132Z",
   "evidence_expires_at": "2026-08-15T08:33:46.547214Z",
   "external_effect_migration_allowed": false,
   "gate_counts": {
@@ -23,13 +27,13 @@
   },
   "inspector_tasks_blocker_digest": "sha256:c169b672bb7be2ab0e24da24cb22c14e6c2ff9bb450b746974644612e1217d07",
   "internal_effect_migration_allowed": false,
-  "internal_effect_protocol_ready": true,
-  "live_modern_fleet_digest": "sha256:c61a1f0756d267bf55a790f662eb948d46580523a003a27ddefdb9fc2366cc75",
-  "matrix_digest": "sha256:be0014b8daa8c2231fd6733cf829cb4edf41f3a29bfe9554e3b35d7ebf67b6ef",
-  "next_action": "Install and prove MCP SDK 2.1.1 in the deployed runtime, refresh process-bound fleet evidence, then maintain the admitted modern-only read fleet; keep candidate/effect authority disabled until those contours receive separate owner admission.",
+  "internal_effect_protocol_ready": false,
+  "live_modern_fleet_digest": "sha256:1353e1e5a0a5c349785ddcd5a0c401e098ce6ba14decbb86008e2ad2475107d7",
+  "matrix_digest": "sha256:09730f1837b107d1afa83fca62f5617d7f8b8d3ce435401fa761b0d8e66185fd",
+  "next_action": "Refresh the deployment-bound MCP 2.1.1 process, artifact, rollback, and Tasks receipts before any production cutover or non-read admission.",
   "next_protocol": "2026-07-28",
   "next_release_status": "final",
-  "observation_digest": "sha256:60bbf8972f9439dd0ba7f79e498ef358d58d1cba94a68a426e9b22d60dbad9d1",
+  "observation_digest": "sha256:55c8a6b5e2e3f687bdd5bea8284301febb26c53ba8d9c553851d50518d153378",
   "passed_gate_ids": [
     "P1-01",
     "P1-02",
@@ -47,17 +51,17 @@
     "P1-14"
   ],
   "production_cutover_blockers": [
-    "deployed_mcp_sdk_evidence_stale"
+    "deployment_bound_evidence_not_refreshed_for_mcp_2_1_1"
   ],
   "production_protocol": "2026-07-28",
   "read_only_pilot_allowed": true,
   "read_only_pilot_completed": true,
   "reason_codes": [
-    "production_modern_only_fleet_admitted",
-    "zero_active_legacy_units",
+    "isolated_mcp_2_1_1_candidate_pair_passed",
     "frozen_core_conformance_passed",
     "modern_cancellation_propagated",
-    "bounded_production_tasks_pair_passed",
+    "request_state_and_cache_pairs_passed",
+    "production_2_0_0_evidence_retained",
     "candidate_and_effect_authority_independent"
   ],
   "remaining_core_gate_ids": [],
@@ -66,8 +70,8 @@
   "rmcp_tasks_pair_digest": "sha256:ada33eff1464ec37517a16634cf6edc6d364d096aeb1da709c11c2231267b2d7",
   "schema_version": "abyss_mcp_protocol_lab_status_v2",
   "stable_registration_retained": true,
-  "stable_rollback_observation_digest": "sha256:eeba4f8f37eacf249d3ead0e9552eaa68a05848a86f51f1fc50304210295ed1f",
-  "status_digest": "sha256:91d22e331dc33c8c9deaf15e87440b7d99f7230e2d4a9a85d34ee3ee9d23808d",
+  "stable_rollback_observation_digest": "sha256:140a64d223ddec2494b67852a369e09747fe17539a740f66922ba50b2725917d",
+  "status_digest": "sha256:5131cd4127076aa219f6da68c5ceb1755774722c810f5d63533295752f32deb7",
   "tasks_blockers": [
     "input_required_update_live_pair_unproved",
     "tasks_notifications_unproved",
@@ -78,7 +82,7 @@
   "tasks_extension_allowed": false,
   "tasks_extension_maturity": "experimental",
   "tasks_inspector_strict_pair_blocked": true,
-  "tasks_matrix_digest": "sha256:1cebd0b2e16623607207fe524b230541a4c5a006ba9b44c763e1e03f7041ac70",
+  "tasks_matrix_digest": "sha256:276bbdb7a313f2d9811f15049a6300b273db9dd9bd0e228b2e50109f7875775d",
   "tasks_notifications_proven": false,
   "tasks_pilot_digest": "sha256:dfa97a26a89b3278e465f718a6f524095f8c14d6952c8f4b7f746fb907b4f876",
   "tasks_production_enabled": true,

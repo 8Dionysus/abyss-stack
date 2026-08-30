@@ -12,19 +12,21 @@ owner-approved deployment receipt exists. They must not be read as proof that
 the deployed fleet has already moved to 2.1.1.
 
 Production uses MCP `2026-07-28` for the eleven admitted OS Abyss organ read
-registrations. Each listener runs exact Python MCP `2.0.0`, advertises only the
-modern wire, rejects wrong bearer and legacy initialization before session
-creation, and is bound to a production process identity rather than a bootstrap
-unit. OS Abyss Codex `0.147.0-abyss.2` selects this wire only for the explicit
+registrations. Each deployment-bound listener is still evidenced on exact
+Python MCP `2.0.0`, advertises only the modern wire, rejects wrong bearer and
+legacy initialization before session creation, and is bound to a production
+process identity rather than a bootstrap unit. The source candidate now pins
+Python MCP `2.1.1`, but no production cutover is claimed from source-only proof.
+OS Abyss Codex `0.147.0-abyss.2` selects this wire only for the explicit
 organ allow-list; upstream Codex and unrelated external MCP owners are separate
 compatibility rows.
 
-The earlier isolated `aoa_kag_next_lab` contour remains the precursor evidence
-that proved stable-client modern compatibility and rollback before the live
-cutover. It no longer describes production state.
+The isolated `aoa_kag_next_lab` contour is now refreshed as a removable MCP
+`2.1.1` candidate proof. The older `2.0.0` lab and post-rollback receipts remain
+historical evidence and no longer stand in for the candidate deployment proof.
 
 The removable contour used an independent process, loopback endpoint,
-generated mode `0600` credential, registration, Codex home, Python MCP `2.0.0`
+generated mode `0600` credential, registration, Codex home, Python MCP `2.1.1`
 runtime, and exact source-artifact digests. The wire showed
 `server/discover`, self-describing requests, no legacy `initialize`, no
 `Mcp-Session-Id`, the expected authenticated principal, trace propagation, one
@@ -33,20 +35,21 @@ bounds, and oversized-input denial.
 
 The modern server uses the SSE response path. A client disconnect cancelled
 the client request and the actual server dispatch, and the worker did not
-complete afterward. This receipt does not generalize to the Python `2.0.0`
+complete afterward. This receipt does not generalize to the Python `2.1.1`
 JSON-response shortcut, whose handler path does not watch disconnects.
 
-Rollback removed the lab app-server, MCP process, port, credential,
+Rollback removed the candidate lab app-server, MCP process, port, credential,
 registration, and isolated Codex home. The operator config remained
-byte-identical, after which stable Codex `0.147.0` called the unchanged
-production `aoa_kag` registration successfully.
+byte-identical. The separate stable post-rollback call is retained as
+historical deployment-bound MCP `2.0.0` evidence and does not authorize a
+candidate cutover.
 
 ## Frozen conformance
 
 Official conformance commit
 `c321dd32035556e6769d3724a8ee97d87c3faaac` adds requirements frozen per
 specification revision. Against `--requirements 2026-07-28`, Python MCP
-`2.0.0` passed all 372 scored client checks across 32 scenarios and all 119
+`2.1.1` passed all 372 scored client checks across 32 scenarios and all 119
 scored server checks across 37 scenarios. There is no expected-failure
 baseline.
 
@@ -65,10 +68,14 @@ advertisement, create, completed get, cancel, cancelled get, auth and owner
 binding, observe-only output, and missing-extension denial. Update/input-required,
 notifications, and distributed poll enforcement remain outside that subset.
 
-Production core-read migration is allowed for exactly eleven admitted read
-contours. Three candidate contours and one internal-effect contour are
-protocol-ready on the same modern-only runtime, but remain inactive and
-unadmitted. External effects remain outside this decision.
+The isolated MCP `2.1.1` core-read candidate is protocol-ready, but production
+core-read migration remains blocked until the deployment-bound fleet, rollback,
+and Tasks receipts are refreshed against the candidate SDK and rechecked for
+currentness. Candidate and deployment deadlines remain separate; the overall
+deadline is the earliest of both, and changing a stale receipt's SDK label
+cannot revive it. Three candidate contours and one internal-effect contour
+remain inactive and unadmitted.
+External effects remain outside this decision.
 
 ## Supporting behavior receipts
 
