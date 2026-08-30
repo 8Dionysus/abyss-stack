@@ -168,6 +168,8 @@ Operations are:
   explicitly unstarted v2 anchor may rebind to a newly validated retry path.
   Replayed read-only receipts are bound byte-for-byte to the stored
   `read_only_recorded` observation.
+  A caller-supplied attempt object is never authority by itself: its durable
+  sidecar must exist, be canonical, and match exactly before transport use.
   Attempt and receipt owner digests come only from the initially
   validated owner bytes. Both entrypoints reassert that snapshot immediately
   before native mutation and after proof persistence, while the CLI also

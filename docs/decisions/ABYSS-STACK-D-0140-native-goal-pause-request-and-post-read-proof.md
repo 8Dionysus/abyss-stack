@@ -63,7 +63,9 @@ reuse. If cleanup removes the original attempt parent before any attempt was
 persisted, that unstarted anchor may rebind to the retry's newly validated
 durable path; a started anchor never receives this permission. A replayed read-only
 receipt is accepted only when its historical response bytes, summaries, and
-digests match the anchored `read_only_recorded` observation.
+digests match the anchored `read_only_recorded` observation. SDK-supplied
+attempt objects are recovery hints only: the named durable sidecar must exist,
+be canonically encoded, and match the supplied object exactly before transport.
 Dynamic endpoint rebinding may change the fresh transport coordinate but does
 not rewrite the attempt's historical endpoint evidence.
 All Goal mutations share an outer lock derived only from the qualified Goal

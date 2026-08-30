@@ -946,6 +946,66 @@ def test_generic_adapter_rejects_recovery_under_a_different_decision(
     assert [method for method, _params in rpc.calls].count("thread/goal/set") == 1
 
 
+@pytest.mark.parametrize("durable_state", ("missing", "mismatched"))
+def test_generic_adapter_requires_supplied_attempt_to_match_durable_artifact(
+    tmp_path: Path,
+    durable_state: str,
+) -> None:
+    endpoint = tmp_path / f"supplied-attempt-{durable_state}.sock"
+    owner = _owner(endpoint)
+    owner_path = tmp_path / f"owner-supplied-attempt-{durable_state}.json"
+    owner_path.write_bytes(RUNTIME._canonical_bytes(owner) + b"\n")
+    request = _request(
+        observed="active",
+        desired="paused",
+        kind="delegation_yield",
+        request_id=f"request:supplied-attempt-{durable_state}",
+    )
+    decision = _decision(request)
+    attempt_path = tmp_path / f"supplied-attempt-{durable_state}.attempt.json"
+    content_ref_type, _decision_type, _execution_type, _request_type, _scope, _assert_receipt_scope, canonical_digest = ADAPTER._contract_types()
+    attempt = ADAPTER._attempt_binding(
+        request=request,
+        decision=decision,
+        owner=owner,
+        owner_path=owner_path,
+        owner_bytes=owner_path.read_bytes(),
+        endpoint=endpoint,
+        attempt_path=attempt_path,
+        precondition=ADAPTER._precondition(
+            {"goal": {"threadId": owner["thread_id"], "status": "active"}},
+            "active",
+        ),
+        content_ref_type=content_ref_type,
+        canonical_digest=canonical_digest,
+    )
+    if durable_state == "mismatched":
+        mismatched = {**attempt, "correlation_id": "different-correlation"}
+        attempt_path.write_bytes(RUNTIME._canonical_bytes(mismatched) + b"\n")
+    rpc = FakeGoalRpc(endpoint, status="active")
+
+    with pytest.raises(
+        RUNTIME.ExternalCodexReturnError,
+        match=(
+            "requires its durable artifact"
+            if durable_state == "missing"
+            else "does not match its durable artifact"
+        ),
+    ):
+        ADAPTER.execute_goal_transition(
+            request,
+            decision,
+            owner,
+            owner_path,
+            endpoint,
+            rpc_factory=lambda _endpoint: rpc,
+            attempt_path=attempt_path,
+            attempt=attempt,
+        )
+
+    assert rpc.calls == []
+
+
 def test_generic_adapter_rechecks_all_inputs_before_publishing_receipt(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -862,6 +862,31 @@ def _execution_projection(
     return receipt
 
 
+def _require_supplied_attempt_artifact(
+    path: Path,
+    supplied_attempt: dict[str, Any],
+) -> dict[str, Any]:
+    """Require an SDK recovery hint to match its durable canonical sidecar."""
+
+    runtime = _runtime()
+    if not path.exists():
+        raise runtime.ExternalCodexReturnError(
+            "supplied Goal lifecycle attempt requires its durable artifact"
+        )
+    stored_attempt, stored_raw = runtime._load_json_file(
+        path, "existing Goal lifecycle attempt reservation"
+    )
+    if stored_raw != runtime._canonical_bytes(stored_attempt) + b"\n":
+        raise runtime.ExternalCodexReturnError(
+            "existing Goal lifecycle attempt reservation is not canonically encoded"
+        )
+    if supplied_attempt != stored_attempt:
+        raise runtime.ExternalCodexReturnError(
+            "supplied Goal lifecycle attempt does not match its durable artifact"
+        )
+    return stored_attempt
+
+
 def _execute_goal_transition_unlocked(
     request: Any,
     decision: Any,
@@ -915,7 +940,9 @@ def _execute_goal_transition_unlocked(
         attempt_path = runtime._validate_output_path(
             attempt_path, "Goal lifecycle attempt reservation"
         )
-        if attempt_path.exists():
+        if attempt is not None:
+            attempt = _require_supplied_attempt_artifact(attempt_path, attempt)
+        elif attempt_path.exists():
             stored_attempt, stored_raw = runtime._load_json_file(
                 attempt_path, "existing Goal lifecycle attempt reservation"
             )
@@ -923,12 +950,7 @@ def _execute_goal_transition_unlocked(
                 raise runtime.ExternalCodexReturnError(
                     "existing Goal lifecycle attempt reservation is not canonically encoded"
                 )
-            if attempt is None:
-                attempt = stored_attempt
-            elif attempt != stored_attempt:
-                raise runtime.ExternalCodexReturnError(
-                    "supplied Goal lifecycle attempt does not match its durable artifact"
-                )
+            attempt = stored_attempt
     if attempt is not None:
         if attempt_path is None:
             raise runtime.ExternalCodexReturnError(
@@ -1495,6 +1517,8 @@ def execute_goal_transition(
         validated_owner,
         attempt_path,
     ) as attempt_path:
+        if attempt is not None:
+            _require_supplied_attempt_artifact(attempt_path, attempt)
         resolved_endpoint = _resolve_owner_endpoint(
             validated_owner,
             Path(endpoint),

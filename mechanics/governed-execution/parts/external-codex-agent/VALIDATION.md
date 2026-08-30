@@ -137,7 +137,9 @@ fail the first invocation during endpoint discovery and RPC setup, verify the
 v2 anchor remains unstarted, then prove a retry persists one attempt and issues
 exactly one native set. A cleanup regression removes the original unstarted
 attempt parent and proves a retry can rebind to a new validated path without
-issuing more than one native set. A separate programmatic regression places the Goal in
+issuing more than one native set. Programmatic regressions also supply an
+attempt with a missing or mismatched sidecar and prove rejection before RPC.
+A separate programmatic regression places the Goal in
 the desired state, omits the attempt path, and proves the adapter refuses the
 call before any RPC rather than publishing an unanchored read-only result. A
 dynamic-endpoint regression additionally

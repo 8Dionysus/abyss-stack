@@ -177,8 +177,11 @@ and replay only through their matching legacy wake reservation. A retry after a 
   is persisted, so a transient transport failure before that point may retry;
   if cleanup removes the old attempt parent, the unstarted anchor may rebind to
   the retry's newly validated durable path.
-  A started anchor with a missing attempt is terminal rather than permission to recreate the attempt, and replayed
-  read-only receipts must match the recorded observation. The CLI reasserts
+  A started anchor with a missing attempt is terminal rather than permission
+  to recreate the attempt, and replayed read-only receipts must match the
+  recorded observation. The SDK reasserts supplied attempt objects against an
+  existing canonical sidecar before opening transport; an in-memory attempt is
+  not durable evidence. The CLI reasserts
   request, decision, and owner bytes immediately before mutation and after
   receipt publication;
 - keeps `aoa-external-codex-return pause` as a backwards-compatible legacy
