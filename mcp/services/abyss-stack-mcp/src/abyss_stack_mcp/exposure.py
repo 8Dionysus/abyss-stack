@@ -75,6 +75,8 @@ MAX_RETAINED_MATERIALIZATIONS = 256
 MAX_EXPOSURE_PLAN_BYTES = 1_048_576
 MAX_EXPOSURE_COLLECTION_ITEMS = 256
 MAX_EXPOSURE_MAPPING_ITEMS = 64
+MAX_INVOCATION_ARGUMENT_BYTES = 1_048_576
+MAX_INVOCATION_ARGUMENT_ITEMS = 256
 ZERO_DIGEST = "sha256:" + "0" * 64
 BASELINE_ADMISSION_REF = "receipt://d0/baseline-ready"
 CLAIM_LIMIT = (
@@ -380,8 +382,10 @@ class StackExposurePlan(StrictExposureModel):
 
         try:
             return cls.model_validate(payload)
-        except Exception as exc:
-            raise StackMCPError("exposure plan failed stack normalization") from exc
+        except Exception:
+            # Pydantic ValidationError values can retain the rejected input.
+            # Never chain that private payload into the public runtime error.
+            raise StackMCPError("exposure plan failed stack normalization") from None
 
 
 class ExposureInvocationAuthorization(StrictExposureModel):
@@ -578,8 +582,8 @@ class ExposureRuntime:
         )
         try:
             raw_plan_bytes = canonical_json_bytes(raw_plan)
-        except (TypeError, ValueError) as exc:
-            raise StackMCPError("exposure plan failed stack normalization") from exc
+        except (TypeError, ValueError):
+            raise StackMCPError("exposure plan failed stack normalization") from None
         if len(raw_plan_bytes) > MAX_EXPOSURE_PLAN_BYTES:
             raise StackMCPError("exposure plan exceeds canonical byte limit")
         normalized = StackExposurePlan.from_sdk_payload(
@@ -765,17 +769,25 @@ class ExposureRuntime:
                     reasons.append("invocation_authorization_expired")
                 if plan is not None and authorization.expires_at > plan.expires_at:
                     reasons.append("invocation_authorization_outlives_plan")
+        normalized_arguments: dict[str, Any] = {}
+        input_digest = sha256_digest(normalized_arguments)
         try:
-            normalized_arguments = dict(arguments)
-            _reject_secret_material(normalized_arguments)
-            input_digest = sha256_digest(normalized_arguments)
+            if len(arguments) > MAX_INVOCATION_ARGUMENT_ITEMS:
+                reasons.append("invocation_arguments_too_large")
+            else:
+                candidate_arguments = (
+                    arguments if isinstance(arguments, dict) else dict(arguments)
+                )
+                argument_bytes = canonical_json_bytes(candidate_arguments)
+                if len(argument_bytes) > MAX_INVOCATION_ARGUMENT_BYTES:
+                    reasons.append("invocation_arguments_too_large")
+                else:
+                    _reject_secret_material(candidate_arguments)
+                    normalized_arguments = dict(candidate_arguments)
+                    input_digest = sha256_digest(normalized_arguments)
         except StackMCPError:
-            normalized_arguments = {}
-            input_digest = sha256_digest(normalized_arguments)
             reasons.append("secret_material_rejected")
         except Exception:
-            normalized_arguments = {}
-            input_digest = sha256_digest(normalized_arguments)
             reasons.append("malformed_invocation_arguments")
         effect_class: EffectClass = tool.effect_class if tool is not None else "observe"
         policy_family: PolicyFamily = tool.policy_family if tool is not None else "read"

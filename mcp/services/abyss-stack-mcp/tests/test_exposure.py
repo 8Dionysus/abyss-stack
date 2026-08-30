@@ -601,6 +601,47 @@ def test_non_json_plan_is_rejected_before_normalization() -> None:
         runtime.materialize(payload)
 
 
+def test_malformed_secret_plan_does_not_chain_private_validation_input() -> None:
+    secret_value = "Bearer sk-" + "e" * 48
+    payload = _payload()
+    payload["password"] = secret_value
+
+    with pytest.raises(StackMCPError) as exc_info:
+        StackExposurePlan.from_sdk_payload(payload)
+
+    assert exc_info.value.__cause__ is None
+    assert secret_value not in str(exc_info.value)
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        {"item": "x" * 1_048_576},
+        {f"item-{index}": index for index in range(257)},
+    ],
+)
+def test_invocation_arguments_are_bounded_before_hashing(arguments: dict) -> None:
+    runtime = ExposureRuntime(
+        progressive_exposure_enabled=True,
+        baseline_admitted=True,
+        baseline_admission_ref="receipt://d0/baseline-ready",
+        clock=lambda: NOW,
+    )
+    materialization = runtime.materialize(_payload())
+
+    receipt = runtime.invoke(
+        materialization.receipt_id,
+        request_id="bounded-invocation",
+        caller_id="test-caller",
+        tool_id="knowledge-inspect.inspect-knowledge",
+        arguments=arguments,
+        authorization_ref=None,
+    )
+
+    assert "invocation_arguments_too_large" in receipt.reason_codes
+    assert receipt.input_digest == sha256_digest({})
+
+
 def test_stack_normalization_rejects_visible_tool_schema_drift() -> None:
     payload = _payload()
     payload["rendered_snapshot"]["visible_tool_ids"] = ["unexpected"]
