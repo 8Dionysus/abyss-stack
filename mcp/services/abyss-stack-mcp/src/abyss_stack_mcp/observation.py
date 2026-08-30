@@ -74,6 +74,15 @@ ObservationCanaryPurpose = Literal["current", "last-known-good"]
 _ENV_REF = re.compile(r"\$\{([A-Z][A-Z0-9_]*)\}")
 
 
+def _resolve_runtime_env_ref(match: re.Match[str]) -> str:
+    value = os.environ.get(match.group(1))
+    if value is None:
+        return match.group(0)
+    if match.group(1) == PATH_CONFIG.stack_root_env_var:
+        return str(PATH_CONFIG.stack_runtime_root(value))
+    return value
+
+
 class ObservationProducerError(ValueError):
     """Fail-closed production error without secret-bearing detail."""
 
@@ -372,7 +381,7 @@ def _load_targets(path: Path) -> tuple[RuntimeTargetCatalog, str]:
     resolved_payload = catalog.model_dump(mode="json")
     for target in resolved_payload["targets"]:
         target["executable_ref"] = _ENV_REF.sub(
-            lambda match: os.environ.get(match.group(1), match.group(0)),
+            _resolve_runtime_env_ref,
             target["executable_ref"],
         )
     try:

@@ -13,7 +13,7 @@ Type=simple
 WorkingDirectory=/srv/AbyssOS
 Environment=AOA_WORKSPACE_ROOT=/srv/AbyssOS
 Environment=AOA_EVALS_ROOT=/srv/AbyssOS/aoa-evals
-Environment=AOA_ABYSS_STACK_ROOT=/srv/AbyssOS/abyss-stack
+Environment=AOA_ABYSS_STACK_ROOT=/srv/AbyssOS/abyss-stack/Configs
 Environment=AOA_MCP_TRANSPORT=streamable-http
 Environment=AOA_MCP_HOST=127.0.0.1
 Environment=AOA_MCP_PORT=5435
