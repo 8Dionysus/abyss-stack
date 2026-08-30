@@ -62,6 +62,9 @@ EVALS_MCP_CANDIDATE_UNIT = (
     REPO_ROOT / "systemd" / "user" / "aoa-evals-mcp-candidate.service"
 )
 MCP_HTTP_BUNDLE = REPO_ROOT / "systemd" / "user" / "aoa-mcp-http.service"
+MCP_RUNTIME_CONFIG = (
+    REPO_ROOT / "mcp" / "services" / "_shared" / "runtime-config.v1.json"
+)
 STACK_MCP_READ_UNIT = REPO_ROOT / "systemd" / "user" / "abyss-stack-mcp-read.service"
 STACK_MCP_READ_BOOTSTRAP_UNIT = (
     REPO_ROOT / "systemd" / "user" / "abyss-stack-mcp-read-bootstrap.service"
@@ -308,23 +311,16 @@ MCP_SERVER_PACKAGES = {
     ),
     "aoa_xda_connector_mcp": ("aoa-xda-connector-mcp", 5438),
 }
-EXPECTED_MCP_HTTP_INSTANCES = {
-    "aoa-organ-mcp-read@aoa-decisions.service",
-    "aoa-organ-mcp-read@aoa-memo.service",
-    "aoa-memo-mcp-candidate.service",
-    "aoa-organ-mcp-read@aoa-session-memory.service",
-    "aoa-organ-mcp-read@abyss-machine.service",
-    "aoa-organ-mcp-read@aoa-evals.service",
-    "aoa-evals-mcp-candidate.service",
-    "aoa-organ-mcp-read@aoa-kag.service",
-    "aoa-organ-mcp-read@aoa-stats.service",
-    "aoa-organ-mcp-read@aoa-4pda-connector.service",
-    "aoa-organ-mcp-read@aoa-course-connector.service",
-    "aoa-organ-mcp-read@aoa-discord-connector.service",
-    "aoa-organ-mcp-read@aoa-stackoverflow-connector.service",
-    "aoa-organ-mcp-read@aoa-telegram-connector.service",
-    "aoa-organ-mcp-read@aoa-xda-connector.service",
-}
+def expected_mcp_http_instances() -> set[str]:
+    shared_root = REPO_ROOT / "mcp" / "services" / "_shared"
+    if str(shared_root) not in sys.path:
+        sys.path.insert(0, str(shared_root))
+    from build_mcp_bundle_unit import bundle_read_units
+
+    payload = json.loads(
+        (shared_root / "runtime-config.v1.json").read_text(encoding="utf-8")
+    )
+    return set(bundle_read_units(payload))
 
 
 class DummySettings:
@@ -336,13 +332,13 @@ class DummyServer:
     def __init__(self) -> None:
         self.settings = DummySettings()
         self.transports: list[str] = []
+        self.run_kwargs: list[dict[str, object]] = []
 
-    def run(self, *, transport: str) -> None:
+    def run(self, transport: str, **kwargs: object) -> None:
         self.transports.append(transport)
-
-    def configure_http(self, host: str, port: int) -> None:
-        self.settings.host = host
-        self.settings.port = port
+        self.run_kwargs.append(kwargs)
+        self.settings.host = kwargs.get("host", self.settings.host)
+        self.settings.port = kwargs.get("port", self.settings.port)
 
 
 def mcp_environment(**overrides: str) -> dict[str, str]:
@@ -378,10 +374,12 @@ def mcp_environment(**overrides: str) -> dict[str, str]:
 
 def mcp_server_auth_kwargs(module, package: str):
     if package == "aoa_decisions_mcp":
-        return module._contour_http_auth_kwargs("read")
-    if package in ORGAN_MCP_READ_AUTH:
-        return module._read_http_auth_kwargs()
-    return module._http_auth_kwargs(module.DEFAULT_HTTP_PORT)
+        config = module._contour_http_auth_config("read")
+    elif package in {"aoa_memo_mcp", "aoa_evals_mcp"}:
+        config = module._contour_http_auth_config("read")
+    else:
+        config = module._read_http_auth_config()
+    return {**config.server_kwargs, "transport_security": config.transport_security}
 
 
 def mcp_server_token_environment(package: str) -> str:
@@ -1413,7 +1411,9 @@ esac
     def test_stack_mcp_runtime_requires_the_released_aoa_sdk(self) -> None:
         installer = INSTALL_SYSTEMD.read_text(encoding="utf-8")
         self.assertIn("import abyss_stack_mcp, aoa_sdk, mcp, pydantic", installer)
-        self.assertIn('version("aoa-sdk") == "0.10.2"', installer)
+        self.assertIn("aoa_mcp_approved_aoa_sdk_version", installer)
+        self.assertIn('version("aoa-sdk") == sys.argv[1]', installer)
+        self.assertNotIn('version("aoa-sdk") == "0.10.2"', installer)
 
     def test_stack_mcp_runtime_fallback_activation_is_transactional(self) -> None:
         installer = INSTALL_SYSTEMD.read_text(encoding="utf-8")
@@ -1469,6 +1469,23 @@ esac
                 stack_root / "Configs" / "mcp" / "services" / "abyss-stack-mcp"
             )
             service_root.mkdir(parents=True)
+            runtime_config = json.loads(
+                MCP_RUNTIME_CONFIG.read_text(encoding="utf-8")
+            )
+            shared_config_root = service_root.parent / "_shared"
+            shared_config_root.mkdir(parents=True)
+            (shared_config_root / "runtime-config.v1.json").write_text(
+                json.dumps(
+                    {
+                        "deployment": {
+                            "approved_artifacts": runtime_config["deployment"][
+                                "approved_artifacts"
+                            ]
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
             (service_root / "pyproject.toml").write_text(
                 '[project]\nname = "abyss-stack-mcp"\nversion = "0.1.0"\n',
                 encoding="utf-8",
@@ -2988,6 +3005,24 @@ esac
                 first_identity,
             )
 
+            runtime_config_path = shared_config_root / "runtime-config.v1.json"
+            runtime_config_bytes = runtime_config_path.read_bytes()
+            runtime_config_path.unlink()
+            missing_catalog = subprocess.run(
+                verify_command,
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(missing_catalog.returncode, 0)
+            self.assertIn(
+                "runtime catalog is unavailable or lacks the approved aoa-sdk version",
+                missing_catalog.stderr,
+            )
+            runtime_config_path.write_bytes(runtime_config_bytes)
+
             source_file.write_text("VALUE = 2\n", encoding="utf-8")
             source_drift = subprocess.run(
                 verify_command,
@@ -3808,6 +3843,28 @@ esac
             deployed_launcher.parent.mkdir(parents=True)
             deployed_launcher.write_bytes(MCP_HTTP_CODEX_CLIENT.read_bytes())
             deployed_launcher.chmod(0o755)
+            deployed_catalog = (
+                configs_root / "mcp" / "protocol-lab" / "scripts" / "runtime_catalog.py"
+            )
+            deployed_catalog.parent.mkdir(parents=True)
+            deployed_catalog.write_bytes(
+                (
+                    REPO_ROOT
+                    / "mcp"
+                    / "protocol-lab"
+                    / "scripts"
+                    / "runtime_catalog.py"
+                ).read_bytes()
+            )
+            (configs_root / "mcp" / "services" / "_shared" / "runtime-config.v1.json").write_bytes(
+                (
+                    REPO_ROOT
+                    / "mcp"
+                    / "services"
+                    / "_shared"
+                    / "runtime-config.v1.json"
+                ).read_bytes()
+            )
             credential = stack_root / MCP_HTTP_SECRET_RELATIVE
             credential.parent.mkdir(parents=True)
             credential.write_text(f"{MCP_HTTP_AUTH_TOKEN}\n", encoding="utf-8")
@@ -3987,7 +4044,9 @@ esac
             for line in bundle.splitlines()
             if line.startswith("Wants=")
         }
-        self.assertEqual(wants, EXPECTED_MCP_HTTP_INSTANCES)
+        self.assertEqual(wants, expected_mcp_http_instances())
+        self.assertNotIn("aoa-memo-mcp-candidate.service", wants)
+        self.assertNotIn("aoa-evals-mcp-candidate.service", wants)
         self.assertIn("Type=oneshot", bundle)
         self.assertIn("RemainAfterExit=yes", bundle)
 
@@ -4787,7 +4846,10 @@ esac
 class McpLoopbackLifecycleTests(unittest.TestCase):
     def test_release_dependencies_retain_the_tested_mcp_auth_api(self) -> None:
         requirements = (REPO_ROOT / "requirements-dev.txt").read_text(encoding="utf-8")
-        self.assertIn("mcp==2.0.0", requirements.splitlines())
+        tested_lock = json.loads(
+            MCP_RUNTIME_CONFIG.read_text(encoding="utf-8")
+        )["mcp"]["sdk"]["tested_lock"]
+        self.assertIn(f"mcp=={tested_lock}", requirements.splitlines())
 
     def test_all_standalone_packages_require_the_tested_mcp_auth_api(self) -> None:
         for directory, _ in MCP_SERVER_PACKAGES.values():
@@ -4795,7 +4857,29 @@ class McpLoopbackLifecycleTests(unittest.TestCase):
                 pyproject = (
                     REPO_ROOT / "mcp" / "services" / directory / "pyproject.toml"
                 ).read_text(encoding="utf-8")
-                self.assertIn('"mcp==2.0.0",', pyproject)
+                self.assertIn('"mcp>=2,<3",', pyproject)
+        lock = (
+            REPO_ROOT
+            / "mcp"
+            / "services"
+            / "abyss-stack-mcp"
+            / "requirements.lock"
+        ).read_text(encoding="utf-8")
+        tested_lock = json.loads(
+            MCP_RUNTIME_CONFIG.read_text(encoding="utf-8")
+        )["mcp"]["sdk"]["tested_lock"]
+        self.assertTrue(
+            any(
+                line.strip().startswith(f"mcp=={tested_lock}")
+                for line in lock.splitlines()
+            )
+        )
+        self.assertTrue(
+            any(
+                line.strip().startswith(f"mcp-types=={tested_lock}")
+                for line in lock.splitlines()
+            )
+        )
 
     def test_generated_http_auth_helpers_are_current(self) -> None:
         result = subprocess.run(
@@ -4822,8 +4906,8 @@ class McpLoopbackLifecycleTests(unittest.TestCase):
         for package, (directory, expected_port) in MCP_SERVER_PACKAGES.items():
             with self.subTest(package=package):
                 module = import_mcp_server(package, directory)
-                self.assertEqual(module.DEFAULT_HTTP_PORT, expected_port)
-                ports.add(module.DEFAULT_HTTP_PORT)
+                self.assertEqual(module.SERVICE_CONFIG.contour("read").port, expected_port)
+                ports.add(module.SERVICE_CONFIG.contour("read").port)
 
                 server = DummyServer()
                 with mock.patch.dict(os.environ, mcp_environment(), clear=True):
@@ -4997,7 +5081,7 @@ class McpLoopbackLifecycleTests(unittest.TestCase):
             clear=True,
         ):
             with self.assertRaisesRegex(SystemExit, "bearer authentication"):
-                decisions._contour_http_auth_kwargs("internal_effect")
+                decisions._contour_http_auth_config("internal_effect")
 
         with mock.patch.dict(
             os.environ,
@@ -5007,7 +5091,7 @@ class McpLoopbackLifecycleTests(unittest.TestCase):
             ),
             clear=True,
         ):
-            kwargs = decisions._contour_http_auth_kwargs("internal_effect")
+            kwargs = decisions._contour_http_auth_config("internal_effect").server_kwargs
         self.assertEqual(
             kwargs["auth"].required_scopes,
             ["mcp:aoa-decisions:internal-effect"],
@@ -5063,7 +5147,7 @@ class McpLoopbackLifecycleTests(unittest.TestCase):
                         SystemExit,
                         "bearer authentication",
                     ):
-                        module._contour_http_auth_kwargs("candidate")
+                        module._contour_http_auth_config("candidate")
             with mock.patch.dict(
                 os.environ,
                 mcp_environment(
@@ -5072,7 +5156,7 @@ class McpLoopbackLifecycleTests(unittest.TestCase):
                 ),
                 clear=True,
             ):
-                kwargs = module._contour_http_auth_kwargs("candidate")
+                kwargs = module._contour_http_auth_config("candidate").server_kwargs
             self.assertEqual(kwargs["auth"].required_scopes, [scope])
             access = asyncio.run(
                 kwargs["token_verifier"].verify_token(MCP_HTTP_AUTH_TOKEN)
@@ -5083,9 +5167,10 @@ class McpLoopbackLifecycleTests(unittest.TestCase):
 
     def test_http_auth_accepts_systemd_credential_and_rejects_conflict(self) -> None:
         module = import_mcp_server("aoa_decisions_mcp", "aoa-decisions-mcp")
+        read_auth = module.SERVICE_CONFIG.contour("read").auth
         with tempfile.TemporaryDirectory() as tmpdir:
             credential_dir = Path(tmpdir)
-            credential_dir.joinpath(MCP_HTTP_CREDENTIAL_NAME).write_text(
+            credential_dir.joinpath(read_auth.credential_name).write_text(
                 MCP_HTTP_AUTH_TOKEN + "\n",
                 encoding="utf-8",
             )
@@ -5097,7 +5182,7 @@ class McpLoopbackLifecycleTests(unittest.TestCase):
                 ),
                 clear=True,
             ):
-                kwargs = module._http_auth_kwargs(module.DEFAULT_HTTP_PORT)
+                kwargs = module._contour_http_auth_config("read").server_kwargs
             access = asyncio.run(
                 kwargs["token_verifier"].verify_token(MCP_HTTP_AUTH_TOKEN)
             )
@@ -5107,7 +5192,7 @@ class McpLoopbackLifecycleTests(unittest.TestCase):
                 os.environ,
                 mcp_environment(
                     AOA_MCP_TRANSPORT="streamable-http",
-                    AOA_MCP_HTTP_BEARER_TOKEN="different-" + ("b" * 54),
+                    **{read_auth.token_env_var: "different-" + ("b" * 54)},
                     CREDENTIALS_DIRECTORY=str(credential_dir),
                 ),
                 clear=True,
@@ -5115,27 +5200,28 @@ class McpLoopbackLifecycleTests(unittest.TestCase):
                 with self.assertRaisesRegex(
                     SystemExit, "conflicting bearer credentials"
                 ):
-                    module._http_auth_kwargs(module.DEFAULT_HTTP_PORT)
+                    module._contour_http_auth_config("read")
 
             with mock.patch.dict(
                 os.environ,
                 mcp_environment(
                     AOA_MCP_TRANSPORT="streamable-http",
-                    AOA_MCP_HTTP_BEARER_TOKEN="too-short",
+                    **{read_auth.token_env_var: "too-short"},
                     CREDENTIALS_DIRECTORY=str(credential_dir),
                 ),
                 clear=True,
             ):
                 with self.assertRaisesRegex(SystemExit, "invalid bearer credential"):
-                    module._http_auth_kwargs(module.DEFAULT_HTTP_PORT)
+                    module._contour_http_auth_config("read")
 
     def test_http_auth_rejects_symlinked_systemd_credential(self) -> None:
         module = import_mcp_server("aoa_decisions_mcp", "aoa-decisions-mcp")
+        read_auth = module.SERVICE_CONFIG.contour("read").auth
         with tempfile.TemporaryDirectory() as tmpdir:
             credential_dir = Path(tmpdir)
             target = credential_dir / "outside-token"
             target.write_text(MCP_HTTP_AUTH_TOKEN, encoding="utf-8")
-            credential_dir.joinpath(MCP_HTTP_CREDENTIAL_NAME).symlink_to(target)
+            credential_dir.joinpath(read_auth.credential_name).symlink_to(target)
 
             with mock.patch.dict(
                 os.environ,
@@ -5146,7 +5232,7 @@ class McpLoopbackLifecycleTests(unittest.TestCase):
                 clear=True,
             ):
                 with self.assertRaisesRegex(SystemExit, "regular non-symlink"):
-                    module._http_auth_kwargs(module.DEFAULT_HTTP_PORT)
+                    module._contour_http_auth_config("read")
 
     def test_http_transport_rejects_invalid_port(self) -> None:
         module = import_mcp_server("aoa_decisions_mcp", "aoa-decisions-mcp")

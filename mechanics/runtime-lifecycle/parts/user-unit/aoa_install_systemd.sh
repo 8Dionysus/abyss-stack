@@ -408,6 +408,15 @@ aoa_run_isolated_python() {
     "$python_executable" -I "$@"
 }
 
+aoa_mcp_approved_aoa_sdk_version() {
+  local catalog_path="${AOA_CONFIGS_ROOT}/mcp/services/_shared/runtime-config.v1.json"
+
+  [[ -f "$catalog_path" && ! -L "$catalog_path" ]] || return 1
+  aoa_run_isolated_python python3 -c \
+    'import json, sys; value = json.load(open(sys.argv[1], encoding="utf-8"))["deployment"]["approved_artifacts"]["aoa_sdk"]["version"]; assert isinstance(value, str) and value; print(value)' \
+    "$catalog_path"
+}
+
 aoa_set_abyss_stack_mcp_auto_repair_policy() {
   local requested_state="$1"
   local marker="$abyss_stack_mcp_auto_repair_marker"
@@ -1804,9 +1813,14 @@ aoa_digest_abyss_stack_mcp_runtime() {
 }
 
 aoa_verify_abyss_stack_mcp_runtime_imports() {
+  local approved_aoa_sdk_version="${1:-}"
+  if [[ -z "$approved_aoa_sdk_version" ]]; then
+    approved_aoa_sdk_version="$(aoa_mcp_approved_aoa_sdk_version)" || return 1
+  fi
   PYTHONDONTWRITEBYTECODE=1 \
     aoa_run_isolated_python "${abyss_stack_mcp_venv}/bin/python" -c \
-      'import encodings, importlib.metadata, ssl; import abyss_stack_mcp, aoa_sdk, mcp, pydantic; assert importlib.metadata.version("aoa-sdk") == "0.10.2"'
+      'import encodings, importlib.metadata, ssl, sys; import abyss_stack_mcp, aoa_sdk, mcp, pydantic; assert importlib.metadata.version("aoa-sdk") == sys.argv[1]' \
+      "$approved_aoa_sdk_version"
 }
 
 aoa_verify_abyss_stack_mcp_read_rollback_grant() {
@@ -1856,6 +1870,7 @@ aoa_verify_abyss_stack_mcp_runtime() {
   local marker=".abyss-stack-mcp-runtime-identity"
   local content_marker=".abyss-stack-mcp-runtime-content-digest"
   local lock_path="${abyss_stack_mcp_service_root}/requirements.lock"
+  local approved_aoa_sdk_version=""
   local source_digest=""
   local lock_digest=""
   local expected_identity=""
@@ -1909,6 +1924,8 @@ aoa_verify_abyss_stack_mcp_runtime() {
   [[ -f "${abyss_stack_mcp_venv}/${content_marker}" && \
      ! -L "${abyss_stack_mcp_venv}/${content_marker}" ]] || \
     aoa_die "abyss-stack MCP runtime content marker is unavailable"
+  approved_aoa_sdk_version="$(aoa_mcp_approved_aoa_sdk_version)" || \
+    aoa_die "deployed abyss-stack MCP runtime catalog is unavailable or lacks the approved aoa-sdk version"
 
   source_digest="$(
     aoa_digest_abyss_stack_mcp_package "$abyss_stack_mcp_service_root"
@@ -1939,7 +1956,7 @@ aoa_verify_abyss_stack_mcp_runtime() {
       aoa_die "abyss-stack MCP runtime content digest mismatch"
     fi
   fi
-  aoa_verify_abyss_stack_mcp_runtime_imports >/dev/null || \
+  aoa_verify_abyss_stack_mcp_runtime_imports "$approved_aoa_sdk_version" >/dev/null || \
     aoa_die "abyss-stack MCP runtime Python dependency/import check failed"
   exec {runtime_lock_fd}>&-
   exec {source_lock_fd}>&-
@@ -2071,6 +2088,9 @@ aoa_provision_abyss_stack_mcp_runtime() {
       aoa_die "unsupported abyss-stack MCP runtime provision mode: ${provision_mode}"
       ;;
   esac
+
+  approved_aoa_sdk_version="$(aoa_mcp_approved_aoa_sdk_version)" || \
+    aoa_die "runtime catalog lacks the approved aoa-sdk version"
 
   aoa_restore_abyss_stack_mcp_runtime_consumers() {
     local consumer_unit=""
@@ -2532,7 +2552,8 @@ aoa_provision_abyss_stack_mcp_runtime() {
          "${temp_venv}/bin/python" -m pip check >/dev/null || \
      ! PYTHONDONTWRITEBYTECODE=1 \
        aoa_run_isolated_python "${temp_venv}/bin/python" -c \
-         'import abyss_stack_mcp, aoa_sdk, mcp, pydantic; from importlib.metadata import version; assert version("aoa-sdk") == "0.10.2"' >/dev/null; then
+         'import abyss_stack_mcp, aoa_sdk, mcp, pydantic, sys; from importlib.metadata import version; assert version("aoa-sdk") == sys.argv[1]' \
+         "$approved_aoa_sdk_version" >/dev/null; then
     rm -rf -- "$temp_venv"
     aoa_die "provisioned abyss-stack MCP runtime failed dependency verification"
   fi

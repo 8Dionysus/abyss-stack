@@ -368,10 +368,10 @@ def main() -> None:
             tool.name
             for tool in tools
             if tool.annotations is None
-            or tool.annotations.readOnlyHint is not True
-            or tool.annotations.destructiveHint is not False
-            or tool.annotations.idempotentHint is not True
-            or tool.annotations.openWorldHint is not False
+            or tool.annotations.read_only_hint is not True
+            or tool.annotations.destructive_hint is not False
+            or tool.annotations.idempotent_hint is not True
+            or tool.annotations.open_world_hint is not False
         ]
         if unsafe_tools:
             raise SystemExit(

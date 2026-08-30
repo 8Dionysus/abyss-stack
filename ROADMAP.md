@@ -140,13 +140,19 @@ The current direction is:
   source to an exact artifact-hashed lock and cannot be replaced while any
   plane is active. No contour is admitted or live merely because its
   package and unit files exist.
+- Source baseline:
+  all fifteen stack-owned MCP packages now use the native SDK-v2 `MCPServer`
+  route and consume the central runtime catalog. The catalog-tested dependency
+  pair is `mcp==2.1.1` with `mcp-types==2.1.1`; isolated fleet evidence is
+  `15/15 passed`. This is source and isolated-runtime readiness, not yet a
+  deployed-fleet claim.
 - Next honest move:
-  land and deploy the typed source-to-runtime provenance spine, generate one
-  secret-free runtime observation from exact source and deployed identities,
-  then advance read and candidate processes independently through registry
-  shadow, consumer schema observation, grounded canary, central proof, owner
-  acceptance, and rollback evidence; only then execute and restore the exact
-  effect pilot from a fresh approved plan.
+  land and deploy the typed source-to-runtime provenance spine with the exact
+  2.1.1 pair, generate one secret-free runtime observation from exact source
+  and deployed identities, then advance read and candidate processes
+  independently through registry shadow, consumer schema observation, grounded
+  canary, central proof, owner acceptance, and rollback evidence; only then
+  execute and restore the exact effect pilot from a fresh approved plan.
 - Guardrail:
   `abyss-stack-mcp` is runtime evidence, bounded plan preparation, and one
   literal approved pilot—not a gateway, domain authority, proof owner, generic

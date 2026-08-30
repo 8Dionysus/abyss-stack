@@ -82,10 +82,10 @@ def main() -> None:
     for tool in tools:
         annotations = tool.annotations
         if annotations is None or not (
-            annotations.readOnlyHint is True
-            and annotations.destructiveHint is False
-            and annotations.idempotentHint is True
-            and annotations.openWorldHint is False
+            annotations.read_only_hint is True
+            and annotations.destructive_hint is False
+            and annotations.idempotent_hint is True
+            and annotations.open_world_hint is False
         ):
             raise SystemExit(f"tool is not closed-world read-only: {tool.name}")
     if asyncio.run(server.list_resources()):

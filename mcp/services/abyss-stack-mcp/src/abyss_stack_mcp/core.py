@@ -18,6 +18,7 @@ from urllib.parse import parse_qsl, unquote_plus, urlsplit
 
 from pydantic import ValidationError
 
+from ._runtime_config import PATH_CONFIG
 from .contracts import (
     ConsumerObservation,
     EvidenceRef,
@@ -33,9 +34,7 @@ from .contracts import (
 from .orchestration import CrossOrganRunStore
 
 
-DEFAULT_OBSERVATION_PATH = Path(
-    "/srv/AbyssOS/abyss-stack/Logs/mcp/observations/current.json"
-)
+DEFAULT_OBSERVATION_PATH = PATH_CONFIG.stack_observation_path()
 MAX_OBSERVATION_BYTES = 2 * 1024 * 1024
 MAX_PLAN_FUTURE_SKEW = timedelta(seconds=30)
 MAX_REFERENCE_DECODE_DEPTH = 4
@@ -452,7 +451,11 @@ def _reject_secret_material(
 class ObservationStore:
     def __init__(self, path: str | Path | None = None) -> None:
         configured = path or os.environ.get("ABYSS_STACK_MCP_OBSERVATION_PATH")
-        self.path = Path(configured or DEFAULT_OBSERVATION_PATH).expanduser()
+        self.path = (
+            Path(configured).expanduser()
+            if configured
+            else PATH_CONFIG.stack_observation_path()
+        )
 
     def load(self) -> tuple[RuntimeObservation, str]:
         path = self.path

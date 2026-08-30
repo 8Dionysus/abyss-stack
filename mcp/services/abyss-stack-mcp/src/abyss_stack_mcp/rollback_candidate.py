@@ -14,6 +14,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
+from ._runtime_config import PATH_CONFIG
 from .contracts import RuntimeObservation
 from .core import _reject_secret_material, canonical_json_bytes
 from .observation import (
@@ -27,12 +28,10 @@ from .observation import (
 )
 
 
-DEFAULT_DEPLOYMENT_RECORD = Path(
-    "/srv/AbyssOS/abyss-stack/Logs/mcp/deployments/latest.json"
-)
-DEFAULT_STACK_SOURCE_ROOT = Path("/srv/AbyssOS/abyss-stack-source")
-DEFAULT_STACK_RUNTIME_ROOT = Path("/srv/AbyssOS/abyss-stack")
-DEFAULT_SECRET_DIR = DEFAULT_STACK_RUNTIME_ROOT / "Secrets" / "Configs"
+DEFAULT_DEPLOYMENT_RECORD = PATH_CONFIG.stack_deployment_manifest_path()
+DEFAULT_STACK_SOURCE_ROOT = PATH_CONFIG.stack_source_root()
+DEFAULT_STACK_RUNTIME_ROOT = PATH_CONFIG.stack_runtime_root()
+DEFAULT_SECRET_DIR = PATH_CONFIG.stack_secrets_root()
 MAX_TTL_SECONDS = 300
 MAX_FUTURE_SKEW = timedelta(seconds=30)
 
@@ -202,11 +201,10 @@ def _validate_manifest(payload: dict[str, Any], path: Path) -> dict[str, Any]:
         if key not in {"manifest_id", "record_ref", "latest_ref"}
     }
     manifest_id = _digest(body)
+    manifest_relative = Path(PATH_CONFIG.stack_deployment_manifest_relative_to_runtime)
     expected_ref = (
-        "Logs/mcp/deployments/records/"
-        + manifest_id.removeprefix("sha256:")
-        + ".json"
-    )
+        manifest_relative.parent / "records" / f"{manifest_id.removeprefix('sha256:')}.json"
+    ).as_posix()
     if payload.get("manifest_id") != manifest_id or payload.get("record_ref") != expected_ref:
         raise RollbackCandidateError("deployment record content address is invalid")
     if path.name != expected_ref.rsplit("/", 1)[1]:

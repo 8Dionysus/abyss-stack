@@ -15,14 +15,13 @@ from uuid import uuid4
 import yaml
 from jsonschema import Draft202012Validator, FormatChecker
 
+from ._runtime_config import PATH_CONFIG
+
 REQUIRED_PORT_DIRS = ("candidates", "receipts", "exports", "local")
 TEXT_SUFFIXES = {".md", ".json", ".txt", ".toml", ".yaml", ".yml"}
 LOCAL_MEMO_PORT_LEVELS = {"stub_port", "full_port", "mature_port"}
 LEGACY_MEMO_PORT_REPOS = ("Agents-of-Abyss", "abyss-stack", "abyss-machine")
-DEFAULT_WORKSPACE_ROOT = Path("/srv/AbyssOS")
-DEFAULT_ABYSS_STACK_SOURCE = Path.home() / "src" / "abyss-stack"
-DEFAULT_ABYSS_MACHINE_PORT = Path("/var/lib/abyss-machine/memo")
-DEFAULT_ABYSS_MACHINE_POLICY = Path("/etc/abyss-machine")
+
 OWNER_ORIENTATION_PIN = (
     "mechanics/federation-seams/parts/memo-seam/examples/"
     "codex_owner_orientation_runtime_compatibility_pin_v0.json"
@@ -229,7 +228,7 @@ def _iso_timestamp(value: datetime) -> str:
 
 
 def _stack_source_root() -> Path:
-    configured = os.environ.get("AOA_ABYSS_STACK_ROOT")
+    configured = os.environ.get(PATH_CONFIG.stack_root_env_var)
     candidates = []
     if configured:
         candidates.append(Path(configured).expanduser().resolve())
@@ -994,7 +993,7 @@ class AoAMemoMCPState:
         root = Path(
             workspace_root
             or os.environ.get("AOA_WORKSPACE_ROOT")
-            or DEFAULT_WORKSPACE_ROOT
+            or PATH_CONFIG.workspace_root()
         ).expanduser().resolve()
         return cls(workspace_root=root)
 
@@ -1018,7 +1017,7 @@ class AoAMemoMCPState:
                 owner_note="session evidence kernel; use rehydrate/retrieve routes before reviewed memory intake",
             )
         if normalized == "abyss-stack":
-            source = Path(os.environ.get("AOA_ABYSS_STACK_ROOT", DEFAULT_ABYSS_STACK_SOURCE)).expanduser()
+            source = PATH_CONFIG.stack_source_root()
             source = source if source.exists() else None
             return RepoRoute(
                 name="abyss-stack",
@@ -1028,19 +1027,23 @@ class AoAMemoMCPState:
                 owner_note="runtime substrate source checkout; runtime mirror is not the source repo",
             )
         if normalized == "abyss-machine":
-            policy_path = Path(
-                os.environ.get("AOA_ABYSS_MACHINE_POLICY_ROOT", str(DEFAULT_ABYSS_MACHINE_POLICY))
-            ).expanduser()
-            memo_port = Path(
-                os.environ.get("AOA_ABYSS_MACHINE_MEMO_ROOT", str(DEFAULT_ABYSS_MACHINE_PORT))
-            ).expanduser()
-            policy = policy_path if policy_path.exists() else None
+            policy_path = PATH_CONFIG.abyss_machine_policy_root(
+                os.environ.get("AOA_ABYSS_MACHINE_POLICY_ROOT")
+            )
+            memo_root = os.environ.get("AOA_ABYSS_MACHINE_MEMO_ROOT")
+            machine_state_root = PATH_CONFIG.abyss_machine_state_root()
+            memo_port = (
+                Path(memo_root).expanduser().resolve()
+                if memo_root
+                else (machine_state_root / "memo" if machine_state_root else None)
+            )
+            policy = policy_path if policy_path and policy_path.exists() else None
             return RepoRoute(
                 name="abyss-machine",
                 source_root=policy,
                 memo_port=memo_port,
                 default_mode="write_candidate_only",
-                owner_note="host-local memory port; policy remains under /etc/abyss-machine",
+                owner_note="host-local memory port; policy remains under the configured abyss-machine policy root",
             )
         source = self.workspace_root / normalized
         place = self._workspace_memory_place(normalized)
@@ -1096,7 +1099,13 @@ class AoAMemoMCPState:
             "validation": [
                 "python mcp/services/aoa-memo-mcp/scripts/validate_memo_mcp.py",
                 "python -m pytest mcp/services/aoa-memo-mcp/tests -q",
-                "python /srv/AbyssOS/aoa-memo/scripts/memory/validate_memory_operations.py",
+                str(
+                    PATH_CONFIG.workspace_root()
+                    / "aoa-memo"
+                    / "scripts"
+                    / "memory"
+                    / "validate_memory_operations.py"
+                ),
             ],
         }
 

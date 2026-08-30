@@ -844,4 +844,4 @@ def test_server_builds_with_fake_runner() -> None:
     server = build_server(workspace_root="/tmp/abyss", command_runner=FakeRunner())
 
     assert server is not None
-    assert server._mcp_server.version == "0.2.0"
+    assert server.application_version == "0.2.0"

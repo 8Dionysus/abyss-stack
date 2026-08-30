@@ -15,19 +15,19 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from runtime_catalog import (
+    contour_for,
+    credentials_root,
+    load_runtime_catalog,
+    mcp_settings,
+    runtime_python_path,
+    stack_relative_path,
+    stack_root_from_catalog,
+    workspace_root_from_catalog,
+)
+
 
 TASKS = "io.modelcontextprotocol/tasks"
-PROTOCOL = "2026-07-28"
-DEFAULT_RUNTIME = Path(
-    "/srv/abyss-machine/runtimes/codex-os-abyss-mcp/"
-    "0.147.0-abyss.2/bin/codex-os-abyss-mcp"
-)
-LIVE_ENDPOINT = "http://127.0.0.1:5431/mcp"
-LIVE_BEARER_FILE = Path(
-    "/srv/AbyssOS/abyss-stack/Secrets/Configs/abyss-stack-mcp-read-bearer-token"
-)
-PYTHON = Path("/srv/abyss-machine/cache/mcp-modern-fleet-20260809/venv/bin/python")
-OBSERVATION = Path("/srv/AbyssOS/abyss-stack/Logs/mcp/observations/current.json")
 
 
 class AppClient:
@@ -165,6 +165,7 @@ async def exercise_pair(
     runtime: Path,
     endpoint: str,
     bearer: str,
+    task_cwd: Path,
 ) -> dict[str, Any]:
     apps: list[asyncio.subprocess.Process] = []
     with tempfile.TemporaryDirectory(dir=root) as temporary:
@@ -175,7 +176,7 @@ async def exercise_pair(
         try:
             thread = (
                 await client.request(
-                    2, "thread/start", {"cwd": "/home/dionysus", "model": "mock-model"}
+                    2, "thread/start", {"cwd": str(task_cwd), "model": "mock-model"}
                 )
             )["result"]["thread"]["id"]
             started_task = await client.request(
@@ -253,7 +254,7 @@ async def exercise_pair(
         try:
             no_ext_thread = (
                 await no_ext.request(
-                    50, "thread/start", {"cwd": "/home/dionysus", "model": "mock-model"}
+                    50, "thread/start", {"cwd": str(task_cwd), "model": "mock-model"}
                 )
             )["result"]["thread"]["id"]
             rejected = await no_ext.request(
@@ -282,22 +283,61 @@ async def exercise_pair(
 
 async def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--runtime", type=Path, default=DEFAULT_RUNTIME)
+    parser.add_argument(
+        "--runtime",
+        type=Path,
+        default=(os.environ.get("ABYSS_MCP_TASKS_RUNTIME") or None),
+    )
     parser.add_argument("--live-production", action="store_true")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
+    catalog = load_runtime_catalog()
+    sdk_settings, protocol_settings, transport_settings = mcp_settings(catalog)
+    service, read_contour = contour_for(catalog, "abyss-stack-mcp", "read")
+    stack_root = stack_root_from_catalog(
+        Path(__file__).resolve().parents[2]
+        / "services"
+        / "_shared"
+        / "runtime-config.v1.json"
+    )
+    workspace_root = workspace_root_from_catalog(catalog, stack_root)
+    if args.runtime is None:
+        raise RuntimeError(
+            "--runtime or ABYSS_MCP_TASKS_RUNTIME is required; "
+            "the lab runner does not select a host runtime implicitly"
+        )
+    args.runtime = args.runtime.expanduser().resolve()
     if not args.runtime.is_file():
         raise RuntimeError(f"missing Codex Tasks runtime: {args.runtime}")
     started = datetime.now(UTC)
-    root = Path("/srv/abyss-machine/cache/mcp-modern-fleet-20260809/evidence") / started.strftime(
-        "codex-real-stack-tasks-%Y%m%dT%H%M%SZ"
-    )
+    evidence_root = Path(
+        os.environ.get(
+            "ABYSS_MCP_TASKS_EVIDENCE_ROOT",
+            str(stack_relative_path(catalog, stack_root, "stack_logs_relative_to_runtime") / "tasks-pilots"),
+        )
+    ).expanduser().resolve()
+    root = evidence_root / started.strftime("codex-real-stack-tasks-%Y%m%dT%H%M%SZ")
     root.mkdir(mode=0o700, parents=True)
     server: asyncio.subprocess.Process | None = None
+    protocol = str(protocol_settings["version"])
+    path = str(protocol_settings["streamable_http_path"])
+    host = str(transport_settings["default_host"])
+    server_python = Path(
+        os.environ.get(
+            "ABYSS_MCP_TASKS_SERVER_PYTHON",
+            str(runtime_python_path(catalog, stack_root, service["service_id"])),
+        )
+    ).expanduser().resolve()
+    observation = stack_relative_path(
+        catalog, stack_root, "stack_observation_relative_to_runtime"
+    )
+    bearer_file = credentials_root(catalog, stack_root) / str(
+        read_contour["auth"]["credential_name"]
+    )
     try:
         if args.live_production:
-            bearer = load_bearer(LIVE_BEARER_FILE)
-            endpoint = LIVE_ENDPOINT
+            bearer = load_bearer(bearer_file)
+            endpoint = f"http://{host}:{read_contour['port']}{path}"
         else:
             task_root = root / "tasks"
             task_root.mkdir(mode=0o700)
@@ -305,16 +345,16 @@ async def main() -> None:
             audit.touch(mode=0o600)
             bearer = secrets.token_urlsafe(48)
             port = free_port()
-            endpoint = f"http://127.0.0.1:{port}/mcp"
+            endpoint = f"http://{host}:{port}{path}"
             env = os.environ.copy()
             env.update(
                 {
                     "AOA_MCP_TRANSPORT": "streamable-http",
-                    "AOA_MCP_HOST": "127.0.0.1",
+                    "AOA_MCP_HOST": host,
                     "AOA_MCP_PORT": str(port),
                     "ABYSS_STACK_MCP_POLICY_FAMILY": "read",
-                    "ABYSS_STACK_MCP_READ_BEARER_TOKEN": bearer,
-                    "ABYSS_STACK_MCP_OBSERVATION_PATH": str(OBSERVATION),
+                    str(read_contour["auth"]["token_env_var"]): bearer,
+                    "ABYSS_STACK_MCP_OBSERVATION_PATH": str(observation),
                     "ABYSS_STACK_MCP_AUDIT_JOURNAL_PATH": str(audit),
                     "ABYSS_STACK_MCP_REQUIRE_AUDIT_JOURNAL": "1",
                     "ABYSS_STACK_MCP_TASKS_ENABLED": "1",
@@ -323,17 +363,17 @@ async def main() -> None:
                 }
             )
             server = await asyncio.create_subprocess_exec(
-                str(PYTHON),
+                str(server_python),
                 "-I",
                 "-B",
                 "-m",
-                "abyss_stack_mcp.server",
+                f"{service['module']}.server",
                 env=env,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
             await wait_port(port, server)
-        pair = await exercise_pair(root, args.runtime, endpoint, bearer)
+        pair = await exercise_pair(root, args.runtime, endpoint, bearer, workspace_root)
         terminal = pair["completed"]
         task_id = pair["completed_task_id"]
         rejected = pair["missing_extension"]
@@ -341,9 +381,9 @@ async def main() -> None:
         receipt = {
             "schema_version": "codex_real_abyss_stack_tasks_pair_v1",
             "observed_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
-            "protocol_version": PROTOCOL,
-            "server": "abyss-stack-mcp/0.5.2",
-            "mcp_sdk": "2.0.0",
+            "protocol_version": protocol,
+            "server": service["service_id"],
+            "mcp_sdk": str(sdk_settings["tested_lock"]),
             "codex_runtime": args.runtime.parents[1].name,
             "codex_runtime_sha256": hashlib.sha256(
                 args.runtime.parent.joinpath("codex").read_bytes()

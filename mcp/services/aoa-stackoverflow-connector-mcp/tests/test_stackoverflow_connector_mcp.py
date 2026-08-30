@@ -52,7 +52,7 @@ def test_server_is_small_and_annotated(tmp_path: Path) -> None:
     )
     server = build_server(state)
     tools = asyncio.run(server.list_tools())
-    assert server._mcp_server.version == "0.1.0"
+    assert server.application_version == "0.1.0"
     assert len(tools) == 4
     assert all(tool.annotations.read_only_hint is True for tool in tools)
     assert all(tool.annotations.open_world_hint is False for tool in tools)

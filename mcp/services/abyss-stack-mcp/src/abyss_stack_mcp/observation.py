@@ -23,6 +23,7 @@ from typing import Any, Literal
 
 from pydantic import Field, ValidationError, field_validator
 
+from ._runtime_config import PATH_CONFIG
 from .contracts import (
     CanaryObservation,
     CentralProofObservation,
@@ -48,18 +49,10 @@ from .contracts import (
 from .core import MAX_OBSERVATION_BYTES, _reject_secret_material, canonical_json_bytes
 
 
-DEFAULT_DEPLOYMENT_MANIFEST_PATH = Path(
-    "/srv/AbyssOS/abyss-stack/Logs/mcp/deployments/latest.json"
-)
-DEFAULT_REGISTRY_PATH = Path(
-    "/srv/AbyssOS/.aoa/organ-access/organ-registry.source.json"
-)
-DEFAULT_OUTPUT_PATH = Path(
-    "/srv/AbyssOS/abyss-stack/Logs/mcp/observations/current.json"
-)
-DEFAULT_OVERLAY_PATH = Path(
-    "/srv/AbyssOS/abyss-stack/Logs/mcp/observations/evidence-overlay.json"
-)
+DEFAULT_DEPLOYMENT_MANIFEST_PATH = PATH_CONFIG.stack_deployment_manifest_path()
+DEFAULT_REGISTRY_PATH = PATH_CONFIG.stack_registry_path()
+DEFAULT_OUTPUT_PATH = PATH_CONFIG.stack_observation_path()
+DEFAULT_OVERLAY_PATH = PATH_CONFIG.stack_overlay_path()
 def _packaged_targets_path(module_path: Path) -> Path:
     """Bind the packaged catalog to the physical installed package directory.
 
@@ -102,6 +95,9 @@ class RuntimeCanaryContract(StrictModel):
     schema_value: NonEmpty
     required_pointers: tuple[NonEmpty, ...] = ()
     exact_values: dict[NonEmpty, Any] = Field(default_factory=dict)
+    transport_exact_values: dict[NonEmpty, dict[NonEmpty, Any]] = Field(
+        default_factory=dict
+    )
     array_contains: tuple[CanaryArrayContains, ...] = ()
 
     @field_validator("schema_pointer")
@@ -135,6 +131,21 @@ class RuntimeCanaryContract(StrictModel):
             )
         return value
 
+    @field_validator("transport_exact_values")
+    @classmethod
+    def require_absolute_transport_exact_pointers(
+        cls,
+        value: dict[str, dict[str, Any]],
+    ) -> dict[str, dict[str, Any]]:
+        for transport, assertions in value.items():
+            if not transport.strip():
+                raise ValueError("canary transport names must be non-empty")
+            if any(not pointer.startswith("/") for pointer in assertions):
+                raise ValueError(
+                    "canary transport exact-value pointers must be absolute JSON pointers"
+                )
+        return value
+
 
 class RuntimeTarget(StrictModel):
     organ_id: Identifier
@@ -152,6 +163,7 @@ class RuntimeTarget(StrictModel):
     canary_route: NonEmpty
     canary_contract: RuntimeCanaryContract | None = None
     rollback_route: NonEmpty
+    rollout_cohort: Literal["admitted-read", "package-only-shadow"] = "admitted-read"
 
 
 class RuntimeTargetCatalog(StrictModel):
@@ -375,13 +387,14 @@ def _load_deployment(path: Path) -> tuple[dict[str, Any], str]:
         if key not in {"manifest_id", "record_ref", "latest_ref"}
     }
     expected = _digest(unsigned)
+    manifest_relative = Path(PATH_CONFIG.stack_deployment_manifest_relative_to_runtime)
     expected_ref = (
-        "Logs/mcp/deployments/records/" + expected.removeprefix("sha256:") + ".json"
-    )
+        manifest_relative.parent / "records" / f"{expected.removeprefix('sha256:')}.json"
+    ).as_posix()
     if (
         payload.get("manifest_id") != expected
         or payload.get("record_ref") != expected_ref
-        or payload.get("latest_ref") != "Logs/mcp/deployments/latest.json"
+        or payload.get("latest_ref") != manifest_relative.as_posix()
     ):
         raise ObservationProducerError("deployment manifest content address is invalid")
     if path.name == "latest.json":

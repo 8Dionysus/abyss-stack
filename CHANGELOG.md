@@ -9,6 +9,10 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Move the stack-owned MCP source/test baseline to the native SDK v2 runtime
+  with a centrally declared Python `2.1.1`/`mcp-types==2.1.1` pair, generated
+  package projections, and explicit stale-evidence detection so a source
+  transition cannot be mistaken for a live deployment.
 - Add the source-only, default-off provider-neutral programmatic execution
   runtime seam with explicit admission, independent Codex/local adapter
   boundaries, validated observation handoff, and distinct adapter versus

@@ -347,7 +347,7 @@
       "version": "1.29.0"
     },
     {
-      "commit": "6f69a3758ebf2ee55ce050f58b470ce11af71133",
+      "commit": "0921d94a74db900dccd2d534842aa7b6160542d2",
       "ecosystem": "python",
       "production_allowed": true,
       "protocol_versions": [
@@ -359,9 +359,9 @@
       ],
       "release_status": "stable",
       "sdk_id": "python-next",
-      "stack_pin": "2.0.0",
+      "stack_pin": "2.1.1",
       "stack_pin_status": "exact",
-      "version": "2.0.0"
+      "version": "2.1.1"
     },
     {
       "commit": "cc4b41617ce3601b1290d67216ea0b194a3cd9ac",
@@ -382,7 +382,7 @@
     "https://github.com/modelcontextprotocol/modelcontextprotocol/releases/tag/2025-11-25",
     "https://github.com/modelcontextprotocol/modelcontextprotocol/releases/tag/2026-07-28",
     "https://github.com/modelcontextprotocol/python-sdk/releases/tag/v1.29.0",
-    "https://github.com/modelcontextprotocol/python-sdk/releases/tag/v2.0.0",
+    "https://github.com/modelcontextprotocol/python-sdk/releases/tag/v2.1.1",
     "https://github.com/modelcontextprotocol/typescript-sdk/releases",
     "https://github.com/modelcontextprotocol/typescript-sdk/blob/main/docs/migration/support-2026-07-28.md",
     "https://github.com/modelcontextprotocol/conformance",

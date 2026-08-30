@@ -8,7 +8,6 @@ import os
 import sys
 import tomllib
 from contextlib import AsyncExitStack
-from datetime import timedelta
 from pathlib import Path
 
 
@@ -58,13 +57,6 @@ REQUIRED_STDIO_SMOKE_TOOLS = {
     "aoa_session_graph_neighborhood",
     "aoa_session_graph_bridge",
     "aoa_session_graph_cooccurrence",
-}
-
-ACCEPTABLE_FRESHNESS_SMOKE_STATUSES = {
-    "current",
-    "current_with_deferred_live_updates",
-    "current_with_global_deferred_live_updates",
-    "current_with_global_stale",
 }
 
 ACCEPTABLE_FRESHNESS_SMOKE_STATUSES = {
@@ -182,10 +174,10 @@ def _read_only_tool_annotation_summary(tools: list[object], context: str) -> dic
         name = str(getattr(tool, "name", "<unnamed>"))
         annotations = getattr(tool, "annotations", None)
         observed = {
-            "readOnlyHint": getattr(annotations, "readOnlyHint", None),
-            "destructiveHint": getattr(annotations, "destructiveHint", None),
-            "idempotentHint": getattr(annotations, "idempotentHint", None),
-            "openWorldHint": getattr(annotations, "openWorldHint", None),
+            "readOnlyHint": getattr(annotations, "read_only_hint", None),
+            "destructiveHint": getattr(annotations, "destructive_hint", None),
+            "idempotentHint": getattr(annotations, "idempotent_hint", None),
+            "openWorldHint": getattr(annotations, "open_world_hint", None),
         }
         expected = {
             "readOnlyHint": True,
@@ -207,6 +199,39 @@ def _read_only_tool_annotation_summary(tools: list[object], context: str) -> dic
         "open_world": False,
         "contract_limit": "metadata contract only; tool behavior remains covered by package tests and smoke calls",
     }
+
+
+async def _stdio_contract_smoke(state: AoASessionMemoryMCPState) -> dict[str, object]:
+    """Prove the native MCP transport without making owner-data assumptions."""
+    params = StdioServerParameters(
+        command=sys.executable,
+        args=[(REPO_ROOT / "scripts" / "aoa_session_memory_mcp_server.py").as_posix()],
+        cwd=REPO_ROOT.as_posix(),
+        env=_stdio_env(state),
+    )
+    async with stdio_client(params) as (read_stream, write_stream):
+        async with ClientSession(read_stream, write_stream) as mcp_session:
+            initialized = await mcp_session.initialize()
+            listed_tools = (await mcp_session.list_tools()).tools
+            annotation_contract = _read_only_tool_annotation_summary(listed_tools, "mcp-only stdio")
+            tools = {str(tool.name) for tool in listed_tools}
+            missing_tools = sorted(REQUIRED_STDIO_SMOKE_TOOLS - tools)
+            if missing_tools:
+                raise SystemExit(f"stdio MCP tool list is missing required tools: {missing_tools}")
+            server_info = getattr(initialized, "server_info", None)
+            return {
+                "schema": "aoa_session_memory_mcp_stdio_contract_v1",
+                "ok": True,
+                "transport": "stdio",
+                "protocol_version": getattr(initialized, "protocol_version", None),
+                "server_name": getattr(server_info, "name", None),
+                "server_version": getattr(server_info, "version", None),
+                "tool_count": len(listed_tools),
+                "required_tool_count": len(REQUIRED_STDIO_SMOKE_TOOLS),
+                "tool_annotation_contract": annotation_contract,
+                "data_routes_called": False,
+                "owner_data_freshness_assumed": False,
+            }
 
 
 def _codex_config_path() -> Path:
@@ -671,11 +696,10 @@ def _select_usage_neighborhood_probe(
 ) -> tuple[str, str, dict]:
     anchors = ("view_image", "update_goal", "get_goal", "apply_patch", "exec_command")
     sessions = _candidate_sessions(route_only, goal_usage_probe)
-    attempts: list[str] = []
+    attempts: list[dict[str, object]] = []
 
     for session in sessions:
         for anchor in anchors:
-            attempts.append(f"{anchor}@{session}")
             neighborhood = state.session_entity_usage_neighborhood(
                 anchor,
                 kind="tool",
@@ -689,8 +713,25 @@ def _select_usage_neighborhood_probe(
             )
             if neighborhood.get("ok") and neighborhood.get("neighborhoods"):
                 return anchor, session, neighborhood
+            diagnostics = neighborhood.get("diagnostics")
+            attempts.append(
+                {
+                    "anchor": anchor,
+                    "session": session,
+                    "ok": neighborhood.get("ok"),
+                    "neighborhood_count": len(neighborhood.get("neighborhoods", []))
+                    if isinstance(neighborhood.get("neighborhoods"), list)
+                    else 0,
+                    "diagnostics": diagnostics[:8]
+                    if isinstance(diagnostics, list)
+                    else diagnostics,
+                }
+            )
 
-    raise SystemExit(f"usage neighborhood returned no evidence windows for indexed smoke candidates: {attempts}")
+    raise SystemExit(
+        "usage neighborhood returned no evidence windows for indexed smoke candidates: "
+        + json.dumps(attempts, ensure_ascii=False, sort_keys=True)
+    )
 
 
 def _select_mcp_usage_smoke_session(state: AoASessionMemoryMCPState) -> str:
@@ -705,11 +746,22 @@ def _select_mcp_usage_smoke_session(state: AoASessionMemoryMCPState) -> str:
         )
         for query in ("aoa_session_entity_usage_chain", "")
     ]
-    attempts: list[str] = []
+    candidate_summaries = [
+        {
+            "ok": payload.get("ok"),
+            "result_count": len(payload.get("results", []))
+            if isinstance(payload.get("results"), list)
+            else 0,
+            "diagnostics": payload.get("diagnostics")[:8]
+            if isinstance(payload.get("diagnostics"), list)
+            else payload.get("diagnostics"),
+        }
+        for payload in candidate_payloads
+    ]
+    attempts: list[dict[str, object]] = []
     for session in _candidate_sessions(*candidate_payloads):
         if session == "entity-registry":
             continue
-        attempts.append(session)
         usage_chain = state.session_entity_usage_chain(
             anchor="aoa-session-memory-mcp",
             kind="mcp_service",
@@ -727,9 +779,30 @@ def _select_mcp_usage_smoke_session(state: AoASessionMemoryMCPState) -> str:
             and _has_first_raw_or_segment_ref(first_ref)
         ):
             return session
+        diagnostics = usage_chain.get("diagnostics")
+        attempts.append(
+            {
+                "session": session,
+                "ok": usage_chain.get("ok"),
+                "usage_event_count": counts.get("usage_event_count", 0),
+                "direct_usage_present": usage_chain.get("direct_usage_present"),
+                "raw_or_segment_ref_present": quality.get("raw_or_segment_ref_present"),
+                "first_ref_has_raw_or_segment_ref": _has_first_raw_or_segment_ref(first_ref),
+                "diagnostics": diagnostics[:8]
+                if isinstance(diagnostics, list)
+                else diagnostics,
+            }
+        )
     raise SystemExit(
         "no indexed session with direct aoa-session-memory MCP usage evidence: "
-        f"{attempts}"
+        + json.dumps(
+            {
+                "candidate_searches": candidate_summaries,
+                "usage_chain_attempts": attempts,
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+        )
     )
 
 
@@ -924,9 +997,9 @@ async def _stdio_tool_smoke(
                 result = await mcp_session.call_tool(
                     name,
                     arguments,
-                    read_timeout_seconds=timedelta(seconds=timeout_seconds),
+                    read_timeout_seconds=float(timeout_seconds),
                 )
-                if result.isError:
+                if result.is_error:
                     raise SystemExit(f"stdio MCP {name} call failed: {result.content}")
                 if not result.content:
                     raise SystemExit(f"stdio MCP {name} returned no content")
@@ -1354,9 +1427,9 @@ async def _configured_transport_smoke(
             result = await mcp_session.call_tool(
                 "aoa_session_memory_status",
                 {"include_live": False},
-                read_timeout_seconds=timedelta(seconds=60),
+                read_timeout_seconds=60.0,
             )
-            if result.isError:
+            if result.is_error:
                 raise SystemExit(f"configured Codex MCP status call failed: {result.content}")
             if not result.content:
                 raise SystemExit("configured Codex MCP status call returned no content")
@@ -1367,9 +1440,9 @@ async def _configured_transport_smoke(
             search_result = await mcp_session.call_tool(
                 "aoa_session_search",
                 _search_alias_smoke_arguments(limit=2),
-                read_timeout_seconds=timedelta(seconds=60),
+                read_timeout_seconds=60.0,
             )
-            if search_result.isError or not search_result.content:
+            if search_result.is_error or not search_result.content:
                 raise SystemExit(f"configured Codex MCP search alias call failed: {search_result.content}")
             search_payload = json.loads(search_result.content[0].text)
             search_diagnostics = search_payload.get("diagnostics", []) if isinstance(search_payload, dict) else []
@@ -1388,9 +1461,9 @@ async def _configured_transport_smoke(
                     "kind": "mcp_service",
                     "filters": {"doc_type": "event", "route_layer": "mcp", "max_shards": 3},
                 },
-                read_timeout_seconds=timedelta(seconds=60),
+                read_timeout_seconds=60.0,
             )
-            if literal_plan_result.isError or not literal_plan_result.content:
+            if literal_plan_result.is_error or not literal_plan_result.content:
                 raise SystemExit(f"configured Codex MCP literal query plan call failed: {literal_plan_result.content}")
             literal_plan_payload = json.loads(literal_plan_result.content[0].text)
             if (
@@ -1410,9 +1483,9 @@ async def _configured_transport_smoke(
                     "per_route_limit": 3,
                     "session": usage_session,
                 },
-                read_timeout_seconds=timedelta(seconds=90),
+                read_timeout_seconds=90.0,
             )
-            if usage_chain_result.isError or not usage_chain_result.content:
+            if usage_chain_result.is_error or not usage_chain_result.content:
                 raise SystemExit(f"configured Codex MCP usage-chain call failed: {usage_chain_result.content}")
             usage_chain_payload = json.loads(usage_chain_result.content[0].text)
             usage_chain_counts = usage_chain_payload.get("counts") if isinstance(usage_chain_payload, dict) and isinstance(usage_chain_payload.get("counts"), dict) else {}
@@ -1430,9 +1503,9 @@ async def _configured_transport_smoke(
             inventory_result = await mcp_session.call_tool(
                 "aoa_session_entity_inventory",
                 {"layer": "mcp_service", "query": "aoa-session-memory", "limit": 3, "sample_limit": 3},
-                read_timeout_seconds=timedelta(seconds=20),
+                read_timeout_seconds=20.0,
             )
-            if inventory_result.isError or not inventory_result.content:
+            if inventory_result.is_error or not inventory_result.content:
                 raise SystemExit(f"configured Codex MCP mcp_service inventory call failed: {inventory_result.content}")
             inventory_payload = json.loads(inventory_result.content[0].text)
             if (
@@ -1459,9 +1532,9 @@ async def _configured_transport_smoke(
                     "document_limit": 12,
                     "session": usage_session,
                 },
-                read_timeout_seconds=timedelta(seconds=90),
+                read_timeout_seconds=90.0,
             )
-            if usage_result.isError or not usage_result.content:
+            if usage_result.is_error or not usage_result.content:
                 raise SystemExit(f"configured Codex MCP usage alias call failed: {usage_result.content}")
             usage_payload = json.loads(usage_result.content[0].text)
             if (
@@ -1482,9 +1555,9 @@ async def _configured_transport_smoke(
                     "graph_edge_limit": 6,
                     "session": usage_session,
                 },
-                read_timeout_seconds=timedelta(seconds=90),
+                read_timeout_seconds=90.0,
             )
-            if dossier_result.isError or not dossier_result.content:
+            if dossier_result.is_error or not dossier_result.content:
                 raise SystemExit(f"configured Codex MCP entity dossier call failed: {dossier_result.content}")
             dossier_payload = json.loads(dossier_result.content[0].text)
             dossier_quality = dossier_payload.get("quality") if isinstance(dossier_payload, dict) else {}
@@ -1501,9 +1574,9 @@ async def _configured_transport_smoke(
             agent_event_usage_result = await mcp_session.call_tool(
                 "aoa_session_entity_usage_audit",
                 {"anchor": "assistant_answer", "kind": "agent_event", "limit": 3, "per_route_limit": 5},
-                read_timeout_seconds=timedelta(seconds=90),
+                read_timeout_seconds=90.0,
             )
-            if agent_event_usage_result.isError or not agent_event_usage_result.content:
+            if agent_event_usage_result.is_error or not agent_event_usage_result.content:
                 raise SystemExit(f"configured Codex MCP agent_event usage call failed: {agent_event_usage_result.content}")
             agent_event_usage_payload = json.loads(agent_event_usage_result.content[0].text)
             if (
@@ -1522,9 +1595,9 @@ async def _configured_transport_smoke(
                     "limit": 2,
                     "event_limit": 2,
                 },
-                read_timeout_seconds=timedelta(seconds=90),
+                read_timeout_seconds=90.0,
             )
-            if retrieve_result.isError or not retrieve_result.content:
+            if retrieve_result.is_error or not retrieve_result.content:
                 raise SystemExit(f"configured Codex MCP retrieve entity_usage call failed: {retrieve_result.content}")
             retrieve_payload = json.loads(retrieve_result.content[0].text)
             if (
@@ -1536,9 +1609,9 @@ async def _configured_transport_smoke(
             projection_result = await mcp_session.call_tool(
                 "aoa_session_projection_status",
                 {},
-                read_timeout_seconds=timedelta(seconds=60),
+                read_timeout_seconds=60.0,
             )
-            if projection_result.isError or not projection_result.content:
+            if projection_result.is_error or not projection_result.content:
                 raise SystemExit(f"configured Codex MCP projection status call failed: {projection_result.content}")
             projection_payload = json.loads(projection_result.content[0].text)
             if (
@@ -1593,15 +1666,23 @@ async def _configured_transport_smoke(
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Validate the aoa-session-memory MCP service with live archive, "
-            "portable stdio, and configured Codex MCP transport smoke checks."
+            "Validate the aoa-session-memory MCP service. The default is an MCP-only "
+            "contract check; --owner-smoke additionally asserts current .aoa data."
         )
+    )
+    parser.add_argument(
+        "--owner-smoke",
+        action="store_true",
+        help=(
+            "run the strict owner-data smoke, including provider hits and freshness; "
+            "this is separate from MCP readiness and never repairs or reindexes"
+        ),
     )
     return parser.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> None:
-    parse_args(argv)
+    args = parse_args(argv)
 
     required = [
         "AGENTS.md",
@@ -1618,6 +1699,78 @@ def main(argv: list[str] | None = None) -> None:
         raise SystemExit(f"missing required files: {missing}")
 
     state = AoASessionMemoryMCPState.discover()
+    server = build_server()
+    if server is None:
+        raise SystemExit("MCP server did not build")
+    validate_runtime_bindings(
+        load_organ_access_manifest(),
+        tool_names=set(server._tool_manager._tools),
+        resource_templates={
+            str(item.uri_template)
+            for item in server._resource_manager._templates.values()
+        },
+    )
+
+    if not args.owner_smoke:
+        status = state.session_memory_status()
+        trace = state.session_trace(
+            "aoa-session-memory-mcp",
+            kind="mcp",
+            doc_type="session",
+            limit=1,
+            per_route_limit=1,
+        )
+        search = state.session_search("aoa-session-memory-mcp", limit=1)
+        stdio_contract = asyncio.run(_stdio_contract_smoke(state))
+        transport_preflight = state.session_mcp_transport_preflight()
+        backend = {
+            "mcp_contract_ok": True,
+            "data_ok": status.get("ok"),
+            "posture": status.get("backend_posture"),
+            "reason_codes": status.get("backend_reason_codes", []),
+            "freshness_checked": False,
+            "owner_smoke_required_for_data_acceptance": True,
+            "authority": "stale or unavailable .aoa data is surfaced, never promoted to fresh MCP truth",
+        }
+        print(
+            json.dumps(
+                {
+                    "ok": True,
+                    "validation_scope": "mcp_only",
+                    "aoa_root": status["aoa_root"],
+                    "mcp_contract": status.get("mcp_contract"),
+                    "backend_data": backend,
+                    "status_route": {
+                        "schema": status.get("schema"),
+                        "degraded": status.get("degraded"),
+                        "provider_status": _portable_provider(status).get("status"),
+                        "atlas_root_index_exists": status.get("atlas", {}).get("root_index_exists"),
+                    },
+                    "trace_route": {
+                        "route_status": trace.get("route_status"),
+                        "route_candidate_count": trace.get("route_candidate_count"),
+                        "degraded": trace.get("degraded"),
+                        "reason_codes": trace.get("reason_codes", []),
+                        "structured": isinstance(trace.get("mcp_access"), dict),
+                    },
+                    "search_route": {
+                        "schema": search.get("schema_version"),
+                        "search_status": search.get("search_status"),
+                        "result_count": search.get("result_count", 0),
+                        "degraded": search.get("degraded"),
+                        "reason_codes": search.get("reason_codes", []),
+                        "structured": isinstance(search.get("mcp_access"), dict),
+                    },
+                    "stdio_contract": stdio_contract,
+                    "transport_preflight": transport_preflight,
+                    "mutation_posture": "read-only MCP checks; no owner repair, reindex, or projection catchup",
+                },
+                ensure_ascii=False,
+                sort_keys=True,
+            )
+        )
+        return
+
     status = state.session_memory_status()
     if not _provider_usable_for_smoke(status):
         raise SystemExit(f"search provider is not ready: {status['provider'].get('diagnostics')}")
@@ -1691,17 +1844,6 @@ def main(argv: list[str] | None = None) -> None:
     freshness_status = freshness.get("projection_freshness", {}).get("status")
     if not freshness.get("ok") or freshness_status not in ACCEPTABLE_FRESHNESS_SMOKE_STATUSES:
         raise SystemExit(f"freshness smoke is not current: {freshness_status}")
-    server = build_server()
-    if server is None:
-        raise SystemExit("MCP server did not build")
-    validate_runtime_bindings(
-        load_organ_access_manifest(),
-        tool_names=set(server._tool_manager._tools),
-        resource_templates={
-            str(item.uri_template)
-            for item in server._resource_manager._templates.values()
-        },
-    )
     mcp_usage_session = _select_mcp_usage_smoke_session(state)
     stdio_smoke = asyncio.run(
         _stdio_tool_smoke(state, latest_session, mcp_usage_session)

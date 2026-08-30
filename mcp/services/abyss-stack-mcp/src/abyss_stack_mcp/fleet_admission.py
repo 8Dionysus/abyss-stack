@@ -50,6 +50,7 @@ from .managed_catalog import publish_private_json
 from .observation import RuntimeTargetCatalog
 from .preflight import PreflightError, _safe_json
 from .runtime_overlay import build_runtime_overlay
+from ._runtime_config import MCP_PROTOCOL_VERSION
 
 
 DECISION_REF = "owner://abyss-stack/decision/ABYSS-STACK-D-0108"
@@ -57,27 +58,25 @@ PROOF_CONTRACT = "eval://aoa-organ-access-admission-integrity"
 PROOF_SOURCE_SHA256 = (
     "sha256:4926e14110b759e95153d96fcad413ab51676fabeb353914e3bf5ca3fea75c2d"
 )
-SUPPORTED_PROTOCOL = "2026-07-28"
+SUPPORTED_PROTOCOL = MCP_PROTOCOL_VERSION
 ADMISSION_POLICY = "modern-wire-exact-live-admission-v1"
-READ_FLEET = frozenset(
-    {
-        "abyss-stack",
-        "abyss-machine",
-        "aoa-decisions",
-        "aoa-memo",
-        "aoa-session-memory",
-        "aoa-evals",
-        "aoa-kag",
-        "aoa-stats",
-        "aoa-4pda-connector",
-        "aoa-telegram-connector",
-        "aoa-discord-connector",
-    }
-)
 
 
 class FleetAdmissionError(ValueError):
     """The supplied evidence cannot support the modern read-fleet candidate."""
+
+
+def _admitted_read_fleet(targets: RuntimeTargetCatalog) -> frozenset[str]:
+    fleet = frozenset(
+        target.registry_organ_id
+        for target in targets.targets
+        if target.rollout_cohort == "admitted-read"
+    )
+    if not fleet:
+        raise FleetAdmissionError(
+            "runtime target catalog has no admitted-read rollout cohort"
+        )
+    return fleet
 
 
 def _now() -> datetime:
@@ -199,7 +198,7 @@ def _ensure_read_contours(
 ) -> OrganRegistrySourceV2:
     by_organ = {record.organ_id: record for record in source.records}
     target_by_organ = {target.registry_organ_id: target for target in targets.targets}
-    for organ_id in ("aoa-memo", "aoa-evals"):
+    for organ_id in _admitted_read_fleet(targets):
         record = by_organ[organ_id]
         if any(contour.contour_id == "read" for contour in record.contours):
             continue
@@ -259,7 +258,7 @@ def _bind_read_canary_names(
 
     for target in targets.targets:
         organ_id = target.registry_organ_id
-        if organ_id not in READ_FLEET:
+        if target.rollout_cohort != "admitted-read":
             continue
         record, contour = _contour(source, organ_id)
         tool_name = target.canary_contract.tool_name
@@ -342,14 +341,17 @@ def build_fleet_admission_candidate(
         raise FleetAdmissionError("registry source is expired")
     source = _ensure_read_contours(source, targets, observed_at=now)
     source = _bind_read_canary_names(source, targets, observed_at=now)
+    read_fleet = _admitted_read_fleet(targets)
     public_key = _read_public_key(canary_public_key_path)
 
     current_receipts: dict[str, CanaryReceipt] = {}
     lkg_receipts: dict[str, CanaryReceipt] = {}
     selected_targets = tuple(
-        target for target in targets.targets if target.registry_organ_id in READ_FLEET
+        target
+        for target in targets.targets
+        if target.registry_organ_id in read_fleet
     )
-    if {item.registry_organ_id for item in selected_targets} != READ_FLEET:
+    if {item.registry_organ_id for item in selected_targets} != read_fleet:
         raise FleetAdmissionError("runtime target catalog does not cover the read fleet")
     selected_catalog = targets.model_copy(update={"targets": selected_targets})
     for target in selected_targets:
@@ -688,7 +690,9 @@ def build_fleet_admission_candidate(
 
     report["registry_source_digest"] = sha256_digest(source.model_dump(mode="json"))
     report["organ_count"] = len(report["organs"])
-    report["verdict"] = "passed" if report["organ_count"] == 11 else "failed"
+    report["verdict"] = (
+        "passed" if report["organ_count"] == len(read_fleet) else "failed"
+    )
     return source, report
 
 

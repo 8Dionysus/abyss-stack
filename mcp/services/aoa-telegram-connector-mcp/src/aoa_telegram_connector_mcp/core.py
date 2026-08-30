@@ -12,13 +12,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from ._runtime_config import PATH_CONFIG
+
 SERVICE_NAME = "aoa-telegram-connector-mcp"
 SOURCE_NAME = "telegram"
 SOURCE_LABEL = "Telegram"
 CONNECTOR_REPO_NAME = "aoa-telegram-connector"
 CONNECTOR_PACKAGE = "aoa_telegram_connector"
 CONNECTOR_BIN = "aoa-telegram"
-DEFAULT_CONNECTOR_REPO = Path("/srv/AbyssOS/connectors/aoa-telegram-connector")
 DEFAULT_RUN = "starter-fixture"
 DEFAULT_TIMEOUT_SECONDS = 30.0
 
@@ -175,7 +176,7 @@ class AoATelegramConnectorMCPState:
 
     @classmethod
     def discover(cls) -> "AoATelegramConnectorMCPState":
-        connector_repo = _env_path("AOA_TELEGRAM_CONNECTOR_REPO") or DEFAULT_CONNECTOR_REPO
+        connector_repo = PATH_CONFIG.connector_repo(SERVICE_NAME)
         connector_bin = os.environ.get("AOA_TELEGRAM_CONNECTOR_BIN") or os.environ.get("AOA_TELEGRAM_BIN")
         return cls(
             connector_repo=connector_repo,

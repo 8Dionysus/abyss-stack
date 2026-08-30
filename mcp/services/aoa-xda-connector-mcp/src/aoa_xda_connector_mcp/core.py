@@ -13,11 +13,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from ._runtime_config import PATH_CONFIG
+
 SERVICE_NAME = "aoa-xda-connector-mcp"
 CONNECTOR_REPO_NAME = "aoa-xda-connector"
 CONNECTOR_PACKAGE = "aoa_xda_connector"
 CONNECTOR_BIN = "aoa-xda"
-DEFAULT_CONNECTOR_REPO = Path("/srv/AbyssOS/connectors/aoa-xda-connector")
 DEFAULT_RUN = "starter-fixture"
 DEFAULT_TIMEOUT_SECONDS = 30.0
 MAX_QUERY_LENGTH = 500
@@ -115,9 +116,8 @@ class AoAXDAConnectorMCPState:
 
     @classmethod
     def discover(cls) -> "AoAXDAConnectorMCPState":
-        repo = os.environ.get("AOA_XDA_CONNECTOR_REPO")
         return cls(
-            connector_repo=Path(repo).expanduser() if repo else DEFAULT_CONNECTOR_REPO,
+            connector_repo=PATH_CONFIG.connector_repo(SERVICE_NAME),
             connector_bin=os.environ.get("AOA_XDA_CONNECTOR_BIN"),
             data_root=_env_path("CONNECTOR_DATA_ROOT"),
             cache_root=_env_path("CONNECTOR_CACHE_ROOT"),

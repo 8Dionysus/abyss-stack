@@ -10,7 +10,15 @@
     "observed_at": {"type": "string", "format": "date-time"},
     "finished_at": {"type": "string", "format": "date-time"},
     "wire_version": {"const": "2026-07-28"},
-    "python_sdk": {"const": {"commit": "6f69a3758ebf2ee55ce050f58b470ce11af71133", "version": "2.0.0"}},
+    "python_sdk": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "version": {"type": "string", "pattern": "^2\\.[0-9]+\\.[0-9]+$"}
+      },
+      "required": ["commit", "version"]
+    },
     "source_revisions": {"const": {"abyss_stack": "2bb043e160b6a2c001abad4f4de6969b35782466", "aoa_kag": "ba7805190527a635ff5c515701be29379af8277f"}},
     "handle_contract": {"const": {"bearer_verified_each_request": true, "opaque": true, "plaintext_observed_on_wire": false, "principal_binding": ["client_id", "issuer", "subject"], "raw_tokens_recorded": false, "ttl_seconds": 5.0}},
     "handle_checks": {"const": {"cross_request_replay": "denied", "expiry": "denied", "key_retirement_revocation": "denied", "principal_isolation": "denied", "same_request_replay": "allowed_read_only_idempotent", "same_request_result_unchanged": true, "tamper": "denied", "valid_round_trip": "passed"}},

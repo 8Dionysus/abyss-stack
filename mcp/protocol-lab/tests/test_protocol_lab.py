@@ -39,8 +39,43 @@ def _load_validator() -> Any:
     return module
 
 
+def _load_runtime_catalog() -> Any:
+    path = LAB_ROOT / "scripts" / "runtime_catalog.py"
+    spec = importlib.util.spec_from_file_location(
+        "runtime_catalog_under_test",
+        path,
+    )
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def _load(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def test_runtime_identity_does_not_accept_an_old_major_two_patch_release(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    runtime_catalog = _load_runtime_catalog()
+
+    class Completed:
+        stdout = '{"mcp": "2.0.0", "mcp-types": "2.1.1"}\n'
+
+    monkeypatch.setattr(runtime_catalog.subprocess, "run", lambda *args, **kwargs: Completed())
+    identity = runtime_catalog.runtime_identity(
+        Path("/opt/mcp/bin/python"),
+        {
+            "distribution": "mcp",
+            "companion_distribution": "mcp-types",
+            "tested_lock": "2.1.1",
+        },
+    )
+
+    assert identity["exact_pair"] is False
+    assert identity["expected"] == {"mcp": "2.1.1", "mcp-types": "2.1.1"}
 
 
 @pytest.fixture
@@ -70,15 +105,15 @@ def test_current_status_is_deterministic_and_admits_bounded_production(
     assert first["evidence_expires_at"] <= first["tasks_evidence_expires_at"]
     assert first["gate_counts"] == {"passed": 14, "blocked": 0, "pending": 0}
     assert first["passed_gate_ids"] == [f"P1-{index:02d}" for index in range(1, 15)]
-    assert first["core_read_migration_allowed"] is True
+    assert first["core_read_migration_allowed"] is False
     assert first["read_only_pilot_allowed"] is True
     assert first["read_only_pilot_completed"] is True
-    assert first["tasks_extension_allowed"] is True
+    assert first["tasks_extension_allowed"] is False
     assert first["tasks_evidence_expires_at"] == "2026-08-16T13:53:36.813735Z"
     assert first["tasks_reference_consumer"] == "rust-rmcp-3.1.2"
     assert first["tasks_reference_pair_passed"] is True
     assert first["tasks_inspector_strict_pair_blocked"] is True
-    assert first["tasks_codex_consumer_eligible"] is True
+    assert first["tasks_codex_consumer_eligible"] is False
     assert first["tasks_production_enabled"] is True
     assert first["tasks_blockers"] == [
         "input_required_update_live_pair_unproved",
@@ -92,7 +127,9 @@ def test_current_status_is_deterministic_and_admits_bounded_production(
     assert first["external_effect_migration_allowed"] is False
     assert first["remaining_core_gate_ids"] == []
     assert first["remaining_tasks_gate_ids"] == []
-    assert first["production_cutover_blockers"] == []
+    assert first["production_cutover_blockers"] == [
+        "deployed_mcp_sdk_evidence_stale"
+    ]
     assert first["stable_registration_retained"] is True
 
 
@@ -103,7 +140,7 @@ def test_final_spec_and_stable_sdks_are_part_of_admitted_migration(
 ) -> None:
     status = builder.build_status(copy.deepcopy(matrix), observation)
 
-    assert status["core_read_migration_allowed"] is True
+    assert status["core_read_migration_allowed"] is False
     assert status["read_only_pilot_allowed"] is True
 
 
@@ -122,7 +159,7 @@ def test_production_consumer_is_bound_to_wire_pair_evidence(
 
     assert consumer["capability_posture"] == "supported"
     assert "production_modern_pair_not_admitted" not in status["reason_codes"]
-    assert status["core_read_migration_allowed"] is True
+    assert status["core_read_migration_allowed"] is False
 
 
 def test_codex_wire_receipt_proves_legacy_pair_only(builder: Any) -> None:
@@ -435,7 +472,17 @@ def test_all_core_and_runtime_receipts_are_required_for_migration(
         pair[check_name]["status"] = "passed"
         pair[check_name]["receipt_refs"] = [f"receipts/{check_name}.json"]
 
-    admitted = builder.build_status(candidate, pair)
+    runtime_sdk = _load(builder.RUNTIME_CONFIG_PATH)["mcp"]["sdk"]
+    live_fleet = _load(builder.LIVE_MODERN_FLEET_PATH)
+    live_fleet["mcp_sdk"] = runtime_sdk["tested_lock"]
+    tasks_production_pair = _load(builder.CODEX_TASKS_PRODUCTION_PAIR_PATH)
+    tasks_production_pair["mcp_sdk"] = runtime_sdk["tested_lock"]
+    admitted = builder.build_status(
+        candidate,
+        pair,
+        live_modern_fleet=live_fleet,
+        codex_tasks_production_pair=tasks_production_pair,
+    )
     assert admitted["core_read_migration_allowed"] is True
     assert admitted["read_only_pilot_allowed"] is True
     assert admitted["internal_effect_migration_allowed"] is False

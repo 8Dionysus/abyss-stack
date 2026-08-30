@@ -3,11 +3,13 @@ from __future__ import annotations
 
 import importlib.util
 import json
-import re
 import sys
+import tomllib
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
+from packaging.requirements import Requirement
 
 
 LAB_ROOT = Path(__file__).resolve().parents[1]
@@ -17,6 +19,9 @@ WATCH_PLAN_PATH = LAB_ROOT / "protocol-watch-plan.v1.json"
 WATCH_PLAN_SCHEMA_PATH = LAB_ROOT / "schemas" / "protocol-watch-plan.schema.json"
 TASKS_MATRIX_PATH = LAB_ROOT / "tasks-compatibility-matrix.v1.json"
 TASKS_MATRIX_SCHEMA_PATH = LAB_ROOT / "schemas" / "tasks-compatibility-matrix.schema.json"
+RUNTIME_CONFIG_PATH = (
+    REPO_ROOT / "mcp" / "services" / "_shared" / "runtime-config.v1.json"
+)
 EXPECTED_GATE_IDS = tuple(f"P1-{index:02d}" for index in range(1, 15))
 FIXTURES = {
     "wire": (
@@ -111,6 +116,9 @@ def validate(checked_at: datetime | None = None) -> list[str]:
     builder = _load_builder()
     matrix = _load(builder.MATRIX_PATH)
     tasks_matrix = _load(TASKS_MATRIX_PATH)
+    runtime_config = _load(RUNTIME_CONFIG_PATH)
+    current_protocol = runtime_config["mcp"]["protocol"]["version"]
+    admitted_read_count = len(runtime_config["deployment"]["client_read_contours"])
     observation = _load(builder.OBSERVATION_PATH)
     watch_plan = _load(WATCH_PLAN_PATH)
     fixtures: dict[str, dict[str, Any]] = {}
@@ -224,12 +232,17 @@ def validate(checked_at: datetime | None = None) -> list[str]:
         "release_status": "final",
         "source": "https://github.com/modelcontextprotocol/modelcontextprotocol/releases/tag/2026-07-28",
         "tag": "2026-07-28",
-        "wire_version": "2026-07-28",
+        "wire_version": current_protocol,
     }:
-        errors.append("final 2026-07-28 specification pin drifted")
+        errors.append(f"final {current_protocol} specification pin drifted")
     sdk_by_id = {sdk["sdk_id"]: sdk for sdk in matrix["sdk_lines"]}
-    if sdk_by_id["python-next"]["commit"] != "6f69a3758ebf2ee55ce050f58b470ce11af71133":
-        errors.append("Python MCP 2.0.0 pin drifted")
+    configured_sdk = runtime_config["mcp"]["sdk"]
+    if (
+        sdk_by_id["python-next"]["version"] != configured_sdk["tested_lock"]
+        or sdk_by_id["python-next"]["commit"] != configured_sdk["source_revision"]
+        or sdk_by_id["python-next"]["stack_pin"] != configured_sdk["tested_lock"]
+    ):
+        errors.append("Python MCP SDK pin drifted from the shared runtime catalog")
     if sdk_by_id["typescript-next"]["commit"] != "cc4b41617ce3601b1290d67216ea0b194a3cd9ac":
         errors.append("TypeScript MCP 2.0.0 pin drifted")
 
@@ -256,7 +269,7 @@ def validate(checked_at: datetime | None = None) -> list[str]:
         or not production["next_wire_pair_observed"]
         or not production["server_discover_observed"]
         or not production["tasks_wire_pair_observed"]
-        or production["production_protocol_versions_observed"] != ["2026-07-28"]
+        or production["production_protocol_versions_observed"] != [current_protocol]
     ):
         errors.append("OS Abyss Codex production modern pair facts drifted")
     if stable["version"] != "0.147.0" or stable["next_wire_pair_observed"] or stable["server_discover_observed"]:
@@ -278,7 +291,7 @@ def validate(checked_at: datetime | None = None) -> list[str]:
     live_modern_fleet = fixtures["live_modern_fleet"]
     codex_tasks_production_pair = fixtures["codex_tasks_production_pair"]
     if (
-        codex_lab["wire"]["version"] != "2026-07-28"
+        codex_lab["wire"]["version"] != current_protocol
         or not codex_lab["wire"]["server_discover_observed"]
         or codex_lab["wire"]["initialize_observed"]
         or codex_lab["wire"]["mcp_session_id_observed"]
@@ -375,6 +388,13 @@ def validate(checked_at: datetime | None = None) -> list[str]:
     ):
         errors.append("Tasks compatibility verdicts drifted from exact pair evidence")
     if (
+        tasks_by_id.get("python-sdk", {}).get("version")
+        != configured_sdk["tested_lock"]
+        or tasks_by_id.get("python-sdk", {}).get("source_revision")
+        != configured_sdk["source_revision"]
+    ):
+        errors.append("Tasks matrix Python SDK row drifted from the shared runtime catalog")
+    if (
         rmcp_tasks_pair["verdict"]
         != "released_rmcp_passed_feature_gated_abyss_adapter"
         or not all(rmcp_tasks_pair["wire"].values())
@@ -393,8 +413,8 @@ def validate(checked_at: datetime | None = None) -> list[str]:
         errors.append("reference-client Tasks pair or Inspector blocker drifted")
     if (
         live_modern_fleet["verdict"] != "production_modern_only_passed"
-        or live_modern_fleet["read_fleet"]["production_units"] != 11
-        or live_modern_fleet["read_fleet"]["admitted_units"] != 11
+        or live_modern_fleet["read_fleet"]["production_units"] != admitted_read_count
+        or live_modern_fleet["read_fleet"]["admitted_units"] != admitted_read_count
         or live_modern_fleet["read_fleet"]["bootstrap_identities"] != 0
         or not live_modern_fleet["read_fleet"]["legacy_initialize_denied"]
         or live_modern_fleet["rollback"]["active_legacy_units"] != 0
@@ -445,11 +465,15 @@ def validate(checked_at: datetime | None = None) -> list[str]:
         or observation["verdict"] != "passed"
     ):
         errors.append("current pair observation lost its bounded pilot/production split")
+    live_sdk_aligned = (
+        live_modern_fleet["mcp_sdk"] == configured_sdk["tested_lock"]
+        and codex_tasks_production_pair["mcp_sdk"] == configured_sdk["tested_lock"]
+    )
     if (
         not status["read_only_pilot_allowed"]
         or not status["read_only_pilot_completed"]
-        or not status["core_read_migration_allowed"]
-        or not status["tasks_extension_allowed"]
+        or status["core_read_migration_allowed"] != live_sdk_aligned
+        or (live_sdk_aligned and not status["tasks_extension_allowed"])
         or not status["candidate_protocol_ready"]
         or not status["internal_effect_protocol_ready"]
         or status["candidate_migration_allowed"]
@@ -459,17 +483,79 @@ def validate(checked_at: datetime | None = None) -> list[str]:
         errors.append("split migration verdicts no longer match exact evidence")
     if status["remaining_core_gate_ids"] or status["remaining_tasks_gate_ids"]:
         errors.append("completed core-read and bounded Tasks gates must have no remainder")
-    if status["production_cutover_blockers"]:
+    expected_production_blockers = (
+        [] if live_sdk_aligned else ["deployed_mcp_sdk_evidence_stale"]
+    )
+    if status["production_cutover_blockers"] != expected_production_blockers:
         errors.append("production cutover blockers drifted")
 
-    service_pyprojects = sorted((REPO_ROOT / "mcp" / "services").glob("*/pyproject.toml"))
-    constraints: list[str] = []
-    for path in service_pyprojects:
-        match = re.search(r'"mcp==([^"]+)"', path.read_text())
-        if match is not None:
-            constraints.append(match.group(1))
-    if not constraints or any(value != "2.0.0" for value in constraints):
-        errors.append("all stack MCP service packages must pin exact mcp==2.0.0")
+    try:
+        sdk = runtime_config["mcp"]["sdk"]
+        expected_requirement = str(sdk["requirement"])
+        expected_major = int(sdk["major"])
+        sdk_distribution = str(sdk["distribution"])
+        companion_distribution = str(sdk["companion_distribution"])
+        tested_lock = str(sdk["tested_lock"])
+        expected_specifier = Requirement(expected_requirement).specifier
+        if expected_major != 2 or expected_requirement != "mcp>=2,<3":
+            errors.append("shared MCP runtime catalog must admit SDK major 2 only")
+        service_pyprojects = sorted(
+            (REPO_ROOT / "mcp" / "services").glob("*/pyproject.toml")
+        )
+        if not service_pyprojects:
+            errors.append("shared MCP runtime catalog has no standalone packages")
+        for path in service_pyprojects:
+            project = tomllib.loads(path.read_text(encoding="utf-8"))["project"]
+            requirements = [
+                Requirement(item)
+                for item in project.get("dependencies", [])
+                if Requirement(item).name.casefold() == "mcp"
+            ]
+            if len(requirements) != 1 or requirements[0].specifier != expected_specifier:
+                errors.append(f"MCP SDK requirement drifted in {path.parent.name}")
+        lock_path = (
+            REPO_ROOT
+            / "mcp"
+            / "services"
+            / "abyss-stack-mcp"
+            / "requirements.lock"
+        )
+        locked = {
+            name: line.strip()
+            for line in lock_path.read_text(encoding="utf-8").splitlines()
+            for name in (sdk_distribution, companion_distribution)
+            if line.strip().lower().startswith(f"{name}==")
+        }
+        if (
+            set(locked) != {sdk_distribution, companion_distribution}
+            or not locked[sdk_distribution].startswith(
+                f"{sdk_distribution}=={tested_lock}"
+            )
+            or not locked[companion_distribution].startswith(
+                f"{companion_distribution}=={tested_lock}"
+            )
+        ):
+            errors.append("managed MCP runtime lock pair drifted from the shared catalog")
+        if (
+            live_modern_fleet["mcp_sdk"] != tested_lock
+            or live_modern_fleet.get("mcp_companion_sdk") != tested_lock
+            or live_modern_fleet.get("runtime_identity", {}).get("exact_pair") is not True
+        ):
+            errors.append(
+                "live modern fleet evidence is stale relative to the shared tested SDK; "
+                "refresh deployment evidence before claiming the 2.1.1 cutover"
+            )
+        for fixture_name in ("adapter", "handle", "cache"):
+            python_sdk = fixtures[fixture_name].get("python_sdk")
+            if python_sdk != {
+                "version": tested_lock,
+                "commit": sdk["source_revision"],
+            }:
+                errors.append(
+                    f"{fixture_name} protocol evidence is stale relative to the shared tested SDK"
+                )
+    except (KeyError, OSError, TypeError, ValueError, tomllib.TOMLDecodeError) as exc:
+        errors.append(f"shared MCP runtime catalog could not be checked: {exc}")
     return errors
 
 

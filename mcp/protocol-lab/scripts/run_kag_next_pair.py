@@ -25,9 +25,17 @@ from mcp_types import Implementation, ToolAnnotations
 
 from aoa_kag_mcp.core import AoAKagMCPState
 from aoa_kag_mcp.runtime import build_application
+from runtime_catalog import load_runtime_catalog, mcp_settings
 
 
-NEXT_WIRE_VERSION = "2026-07-28"
+_SDK_SETTINGS, _PROTOCOL_SETTINGS, _TRANSPORT_SETTINGS = mcp_settings(
+    load_runtime_catalog()
+)
+NEXT_WIRE_VERSION = str(_PROTOCOL_SETTINGS["version"])
+MCP_PATH = str(_PROTOCOL_SETTINGS["streamable_http_path"])
+MCP_HOST = str(_TRANSPORT_SETTINGS["default_host"])
+PYTHON_MCP_VERSION = str(_SDK_SETTINGS["tested_lock"])
+PYTHON_MCP_COMMIT = str(_SDK_SETTINGS["source_revision"])
 MAX_INPUT_BYTES = 16_384
 MAX_OUTPUT_BYTES = 262_144
 CANCELLATION_META_KEY = "io.os-abyss.protocol-lab/cancel-delay-ms"
@@ -168,7 +176,7 @@ class AccessRecorder:
             record["outcome"] = "denied_legacy"
             raise MCPError(
                 code=mcp_types.UNSUPPORTED_PROTOCOL_VERSION,
-                message="The isolated next adapter requires MCP 2026-07-28.",
+                message=f"The isolated next adapter requires MCP {NEXT_WIRE_VERSION}.",
                 data={"supported": [NEXT_WIRE_VERSION]},
             )
         if ctx.method not in READ_METHODS:
@@ -237,7 +245,7 @@ def build_next_server(
         name="aoa-kag-next-lab",
         title="AoA KAG isolated next-protocol lab",
         description=(
-            "Compact read-only KAG adapter for MCP 2026-07-28 pair proof. "
+            f"Compact read-only KAG adapter for MCP {NEXT_WIRE_VERSION} pair proof. "
             "It has no owner, candidate, or effect authority."
         ),
         instructions=(
@@ -321,23 +329,23 @@ async def _exercise_pair(
     recorder: AccessRecorder,
 ) -> dict[str, Any]:
     app = server.streamable_http_app(
-        streamable_http_path="/mcp",
+        streamable_http_path=MCP_PATH,
         # The 2026-07-28 transport expresses cancellation by closing the
-        # request's SSE response stream. Python MCP 2.0.0 can return JSON, but
-        # that shortcut has no disconnect watcher and therefore lets the
+        # request's SSE response stream. The tested Python MCP SDK can return
+        # JSON, but that shortcut has no disconnect watcher and therefore lets the
         # dispatch continue after a client gives up. Keep the modern contour
         # on SSE so disconnect reaches the handler/worker cancel scope.
         json_response=False,
         stateless_http=True,
-        host="127.0.0.1",
+        host=MCP_HOST,
     )
     listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    listener.bind(("127.0.0.1", 0))
+    listener.bind((MCP_HOST, 0))
     listener.listen(128)
     listener.setblocking(False)
     port = int(listener.getsockname()[1])
-    url = f"http://127.0.0.1:{port}/mcp"
+    url = f"http://{MCP_HOST}:{port}{MCP_PATH}"
     uvicorn_server = uvicorn.Server(
         uvicorn.Config(
             app,
@@ -637,10 +645,8 @@ def main() -> int:
         "finished_at": _utc_now(),
         "exact_inputs": {
             "spec_version": NEXT_WIRE_VERSION,
-            "python_mcp_version": "2.0.0",
-            "python_mcp_commit": (
-                "6f69a3758ebf2ee55ce050f58b470ce11af71133"
-            ),
+            "python_mcp_version": PYTHON_MCP_VERSION,
+            "python_mcp_commit": PYTHON_MCP_COMMIT,
             "stack_source_revision": _git_head(args.stack_source_root),
             "aoa_kag_source_revision": _git_head(args.aoa_kag_root),
             "stack_runtime_current_digest": _digest(
@@ -660,7 +666,7 @@ def main() -> int:
         "pair": observation,
         "verdict": "passed",
         "claim_limits": [
-            "This receipt proves one isolated Python MCP 2.0.0 KAG read pair, not Codex next-wire support.",
+            f"This receipt proves one isolated Python MCP {PYTHON_MCP_VERSION} KAG read pair, not Codex next-wire support.",
             "The adapter was not registered, deployed, credentialed, or admitted.",
             "KAG output remains navigation/evidence; owner sources retain authority.",
             "The owner canary proves a current exact projection for abyss-stack only.",

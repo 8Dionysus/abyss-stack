@@ -11,9 +11,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from ._runtime_config import PATH_CONFIG
 
 SERVICE_NAME = "aoa-4pda-connector-mcp"
-DEFAULT_CONNECTOR_REPO = Path("/srv/AbyssOS/connectors/aoa-4pda-connector")
 DEFAULT_TIMEOUT_SECONDS = 20.0
 MAX_QUERY_LENGTH = 500
 MAX_LIMIT = 20
@@ -218,7 +218,7 @@ class AoA4PDAConnectorMCPState:
         timeout_seconds: float | None = None,
     ) -> "AoA4PDAConnectorMCPState":
         env = os.environ
-        repo_value = connector_repo or env.get("AOA_4PDA_CONNECTOR_REPO") or DEFAULT_CONNECTOR_REPO
+        repo_value = PATH_CONFIG.connector_repo(SERVICE_NAME, connector_repo)
         return cls(
             connector_repo=_as_path(repo_value),
             connector_bin=connector_bin or env.get("AOA_4PDA_CONNECTOR_BIN") or env.get("AOA_4PDA_BIN"),

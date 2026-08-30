@@ -8,6 +8,7 @@ from typing import Any
 
 from .canonical import CanonicalRepoKag
 from .core import AoAKagMCPState
+from ._runtime_config import PATH_CONFIG
 
 
 RUNTIME_RELATIVE_PATH = Path("mechanics/federation-seams/parts/kag-seam")
@@ -18,7 +19,7 @@ def _runtime_package_root() -> Path:
     candidates: list[Path] = []
     if configured:
         candidates.append(Path(configured).expanduser())
-    stack_root = os.environ.get("AOA_ABYSS_STACK_ROOT") or os.environ.get(
+    stack_root = os.environ.get(PATH_CONFIG.stack_root_env_var) or os.environ.get(
         "AOA_STACK_ROOT"
     )
     if stack_root:
@@ -27,7 +28,7 @@ def _runtime_package_root() -> Path:
     candidates.extend(
         (
             source_root / RUNTIME_RELATIVE_PATH,
-            Path("/srv/AbyssOS/abyss-stack/Configs") / RUNTIME_RELATIVE_PATH,
+            PATH_CONFIG.stack_root() / RUNTIME_RELATIVE_PATH,
         )
     )
     for candidate in candidates:

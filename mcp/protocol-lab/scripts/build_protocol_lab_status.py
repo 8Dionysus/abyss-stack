@@ -24,6 +24,7 @@ RMCP_TASKS_PAIR_PATH = LAB_ROOT / "fixtures" / "rmcp-3.1.2-tasks-adapter-pair-20
 INSPECTOR_TASKS_BLOCKER_PATH = LAB_ROOT / "fixtures" / "inspector-2.1.0-tasks-strict-pair-blocked-20260808.json"
 LIVE_MODERN_FLEET_PATH = LAB_ROOT / "fixtures" / "live-modern-fleet-20260809.json"
 CODEX_TASKS_PRODUCTION_PAIR_PATH = LAB_ROOT / "fixtures" / "codex-tasks-production-pair-20260809.json"
+RUNTIME_CONFIG_PATH = LAB_ROOT.parent / "services" / "_shared" / "runtime-config.v1.json"
 MATRIX_SCHEMA_PATH = LAB_ROOT / "schemas" / "protocol-compatibility-matrix.schema.json"
 OBSERVATION_SCHEMA_PATH = LAB_ROOT / "schemas" / "protocol-pair-observation.schema.json"
 STATUS_SCHEMA_PATH = LAB_ROOT / "schemas" / "protocol-lab-status.schema.json"
@@ -105,6 +106,10 @@ def build_status(
     codex_tasks_production_pair = codex_tasks_production_pair or load_json(
         CODEX_TASKS_PRODUCTION_PAIR_PATH
     )
+    runtime_config = load_json(RUNTIME_CONFIG_PATH)
+    runtime_sdk = runtime_config["mcp"]["sdk"]
+    admitted_read_count = len(runtime_config["deployment"]["client_read_contours"])
+    tested_sdk_lock = str(runtime_sdk["tested_lock"])
     for payload, schema in (
         (matrix, MATRIX_SCHEMA_PATH),
         (observation, OBSERVATION_SCHEMA_PATH),
@@ -173,10 +178,12 @@ def build_status(
             matrix["pilot"]["state"] == "passed",
             not remaining_core_gate_ids,
             live_modern_fleet["verdict"] == "production_modern_only_passed",
-            live_modern_fleet["read_fleet"]["production_units"] == 11,
-            live_modern_fleet["read_fleet"]["admitted_units"] == 11,
+            live_modern_fleet["read_fleet"]["production_units"] == admitted_read_count,
+            live_modern_fleet["read_fleet"]["admitted_units"] == admitted_read_count,
             live_modern_fleet["read_fleet"]["bootstrap_identities"] == 0,
             live_modern_fleet["rollback"]["active_legacy_units"] == 0,
+            live_modern_fleet["mcp_sdk"] == tested_sdk_lock,
+            codex_tasks_production_pair["mcp_sdk"] == tested_sdk_lock,
         )
     )
     tasks_extension_allowed = bool(
@@ -192,6 +199,11 @@ def build_status(
         production_cutover_blockers.append("current_conformance_fixture_mismatch")
     if observation["abyss_pair_conformance"]["status"] != "passed":
         production_cutover_blockers.append("modern_cancellation_not_propagated")
+    if (
+        live_modern_fleet["mcp_sdk"] != tested_sdk_lock
+        or codex_tasks_production_pair["mcp_sdk"] != tested_sdk_lock
+    ):
+        production_cutover_blockers.append("deployed_mcp_sdk_evidence_stale")
 
     unsigned = {
         "schema_version": "abyss_mcp_protocol_lab_status_v2",
@@ -266,9 +278,20 @@ def build_status(
         "production_cutover_blockers": production_cutover_blockers,
         "reason_codes": observation["reason_codes"],
         "next_action": (
-            "Maintain the admitted modern-only read fleet, refresh expiring registry "
-            "evidence automatically, and keep candidate/effect authority disabled "
+            f"Install and prove MCP SDK {tested_sdk_lock} in the deployed runtime, "
+            "refresh process-bound fleet evidence, then maintain the admitted "
+            "modern-only read fleet; keep candidate/effect authority disabled "
             "until those contours receive separate owner admission."
+            if (
+                live_modern_fleet["mcp_sdk"] != tested_sdk_lock
+                or codex_tasks_production_pair["mcp_sdk"] != tested_sdk_lock
+            )
+            else (
+                "Maintain the admitted modern-only read fleet, refresh expiring "
+                "registry evidence automatically, and keep candidate/effect "
+                "authority disabled until those contours receive separate owner "
+                "admission."
+            )
         ),
         "claim_limits": matrix["claim_limits"],
     }

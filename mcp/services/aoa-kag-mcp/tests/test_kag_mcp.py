@@ -427,7 +427,7 @@ def test_server_exposes_compact_read_only_kag_surface(tmp_path: Path) -> None:
         for resource in asyncio.run(server.list_resource_templates())
     }
 
-    assert server._mcp_server.version == "0.1.0"
+    assert server.application_version == "0.1.0"
     assert set(tools) == {
         "kag_discover",
         "kag_search",

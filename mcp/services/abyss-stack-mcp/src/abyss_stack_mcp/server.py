@@ -14,7 +14,9 @@ from typing import Annotated, Any, Literal
 
 from pydantic import Field
 
-from ._http_auth import http_auth_kwargs, transport_settings
+from ._http_auth import http_auth_config, transport_settings
+from ._modern_runtime import run_server
+from ._runtime_config import SERVICE_CONFIG
 from .audit import (
     DEFAULT_MAX_BYTES,
     PolicyAuditError,
@@ -26,32 +28,13 @@ from .policy import PolicyIdentity, StackPolicySeam, ToolPolicy
 
 
 LOGGER = logging.getLogger(__name__)
-READ_PORT = 5431
-CANDIDATE_PORT = 5433
-INTERNAL_EFFECT_PORT = 5439
-AUTH_MANIFEST_CREDENTIAL = "abyss-stack-mcp-auth-manifest.json"
-AUTH_MANIFEST_SCHEMA = "abyss_stack_mcp_auth_manifest_v2"
-PACKAGE_NAME = "abyss-stack-mcp"
-APPLICATION_VERSION = "0.5.2"
+AUTH_MANIFEST_CREDENTIAL = SERVICE_CONFIG.auth_manifest_credential
+AUTH_MANIFEST_SCHEMA = SERVICE_CONFIG.auth_manifest_schema
 _SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
 PolicyMode = Literal["read", "candidate"]
 CredentialContour = Literal["read", "candidate", "internal_effect"]
 CatalogLimit = Annotated[int, Field(ge=1, le=64)]
 CatalogBudget = Annotated[int, Field(ge=512, le=131_072)]
-
-
-def _application_version() -> str:
-    return APPLICATION_VERSION
-
-
-def _bind_server_info_version(mcp: Any) -> None:
-    """Keep serverInfo.version application-owned under the pinned AbyssMCPServer seam."""
-    low_level_server = getattr(mcp, "_mcp_server", None)
-    if low_level_server is None or not hasattr(low_level_server, "version"):
-        raise RuntimeError(
-            "the pinned MCP SDK no longer exposes the server identity seam"
-        )
-    low_level_server.version = _application_version()
 
 
 def configured_policy_family() -> PolicyMode:
@@ -61,28 +44,8 @@ def configured_policy_family() -> PolicyMode:
     return value  # type: ignore[return-value]
 
 
-def _contour(policy_family: CredentialContour) -> tuple[int, str, str, str]:
-    contours = {
-        "read": (
-            READ_PORT,
-            "ABYSS_STACK_MCP_READ_BEARER_TOKEN",
-            "abyss-stack-mcp-read-bearer-token",
-            "abyss-stack-mcp:read",
-        ),
-        "candidate": (
-            CANDIDATE_PORT,
-            "ABYSS_STACK_MCP_CANDIDATE_BEARER_TOKEN",
-            "abyss-stack-mcp-candidate-bearer-token",
-            "abyss-stack-mcp:candidate",
-        ),
-        "internal_effect": (
-            INTERNAL_EFFECT_PORT,
-            "ABYSS_STACK_MCP_INTERNAL_EFFECT_BEARER_TOKEN",
-            "abyss-stack-mcp-internal-effect-bearer-token",
-            "abyss-stack-mcp:internal_effect",
-        ),
-    }
-    return contours[policy_family]
+def _contour(policy_family: CredentialContour) -> Any:
+    return SERVICE_CONFIG.contour(policy_family)
 
 
 def _credential_text(credential_name: str, label: str) -> str:
@@ -111,7 +74,7 @@ def _require_managed_credential_separation(
         raise SystemExit(
             "ABYSS_STACK_MCP_REQUIRE_AUTH_MANIFEST must be 1 when configured"
         )
-    _, _, credential_name, _ = _contour(policy_family)
+    credential_name = _contour(policy_family).auth.credential_name
     token = _credential_text(
         credential_name,
         f"{policy_family} bearer credential",
@@ -164,21 +127,16 @@ def _require_managed_credential_separation(
         )
 
 
-def _auth_kwargs(policy_family: CredentialContour) -> dict[str, Any]:
-    port, env_name, credential_name, scope = _contour(policy_family)
+def _auth_config(policy_family: CredentialContour) -> Any:
+    contour = _contour(policy_family)
     _require_managed_credential_separation(policy_family)
-    return http_auth_kwargs(
-        port,
-        token_env_var=env_name,
-        credential_name=credential_name,
-        auth_scope=scope,
-        client_id=f"abyss-stack-mcp-{policy_family}-consumer",
-    )
+    return http_auth_config(contour.port, **contour.auth.as_kwargs())
 
 
 def _policy_identity(policy_family: CredentialContour) -> PolicyIdentity:
-    port, _, _, expected_scope = _contour(policy_family)
-    settings = transport_settings(port)
+    contour = _contour(policy_family)
+    expected_scope = contour.auth.auth_scope
+    settings = transport_settings(contour.port)
     if settings.transport == "stdio":
         return PolicyIdentity(
             identity_id="local-os-stdio",
@@ -190,17 +148,17 @@ def _policy_identity(policy_family: CredentialContour) -> PolicyIdentity:
     )
 
     token = get_access_token()
-    expected_client = f"abyss-stack-mcp-{policy_family}-consumer"
+    expected_client = contour.auth.client_id
     assert settings.host is not None and settings.port is not None
     rendered_host = (
-        f"[{settings.host}]" if settings.host == "::1" else settings.host
+        f"[{settings.host}]" if ":" in settings.host else settings.host
     )
     expected_authority = f"http://{rendered_host}:{settings.port}"
     if (
         token is None
         or token.client_id != expected_client
         or expected_scope not in token.scopes
-        or token.resource != f"{expected_authority}/mcp"
+        or token.resource != f"{expected_authority}{settings.streamable_http_path}"
         or token.subject != "local-operator"
         or not isinstance(token.claims, dict)
         or token.claims.get("iss") != f"{expected_authority}/"
@@ -265,7 +223,7 @@ def _configured_audit_journal(
 
 
 def _build_policy_seam(policy_family: PolicyMode) -> StackPolicySeam:
-    _, _, _, scope = _contour(policy_family)
+    scope = _contour(policy_family).auth.auth_scope
     if policy_family == "read":
         tools = (
             ToolPolicy(
@@ -335,16 +293,7 @@ def _build_policy_seam(policy_family: PolicyMode) -> StackPolicySeam:
 
 
 def _run_server(server: Any, policy_family: PolicyMode) -> None:
-    port, _, _, _ = _contour(policy_family)
-    settings = transport_settings(port)
-    _auth_kwargs(policy_family)
-    if settings.transport == "stdio":
-        server.run(transport="stdio")
-        return
-    assert settings.host is not None
-    assert settings.port is not None
-    server.configure_http(settings.host, settings.port)
-    server.run(transport="streamable-http")
+    run_server(server, _auth_config(policy_family))
 
 
 def build_server(
@@ -354,7 +303,7 @@ def build_server(
     orchestration_root: str | Path | None = None,
 ) -> Any:
     try:
-        from ._modern_runtime import AbyssMCPServer  # type: ignore[import-not-found]
+        from ._modern_runtime import ModernMCPServer  # type: ignore[import-not-found]
         from mcp.types import ToolAnnotations  # type: ignore[import-not-found]
     except ImportError as exc:
         raise SystemExit(
@@ -362,7 +311,7 @@ def build_server(
         ) from exc
 
     mode = policy_family or configured_policy_family()
-    auth_kwargs = _auth_kwargs(mode)
+    auth_config = _auth_config(mode)
     application = StackMCPApplication(
         ObservationStore(observation_path),
         policy_family=mode,
@@ -382,29 +331,28 @@ def build_server(
             )
     policy = _build_policy_seam(mode)
     read_annotations = ToolAnnotations(
-        readOnlyHint=True,
-        destructiveHint=False,
-        idempotentHint=True,
-        openWorldHint=False,
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=False,
     )
     candidate_annotations = ToolAnnotations(
-        readOnlyHint=False,
-        destructiveHint=False,
-        idempotentHint=True,
-        openWorldHint=False,
+        read_only_hint=False,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=False,
     )
-    mcp = AbyssMCPServer(
-        f"abyss-stack-mcp-{mode}",
+    mcp = ModernMCPServer(
+        SERVICE_CONFIG.server_name(mode),
+        version=SERVICE_CONFIG.package_version,
         instructions=(
             "Inspect stack-owned source/package/deploy/process/endpoint/consumer "
             "evidence or prepare non-executing bounded runtime plans. This server "
             "does not proxy owner tools and never executes a plan."
         ),
-        json_response=True,
         extensions=extensions,
-        **auth_kwargs,
+        **auth_config.server_kwargs,
     )
-    _bind_server_info_version(mcp)
 
     if mode == "read":
 

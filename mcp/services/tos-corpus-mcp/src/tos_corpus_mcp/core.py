@@ -6,8 +6,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from ._runtime_config import PATH_CONFIG
 
-DEFAULT_TOS_ROOT = Path("/srv/AbyssOS/Tree-of-Sophia")
 INDEX_RELATIVE_PATH = Path("ToS/derived-exports/tos_corpus_index.min.json")
 PHILOSOPHY_PROJECTION_RELATIVE_PATH = Path("ToS/derived-exports/philosophy_graph_projection.min.json")
 PHILOSOPHY_AUDIT_RELATIVE_PATH = Path("ToS/philosophy/graph-workbench/review-packets/table-i-post-planting-audit.json")
@@ -85,7 +85,7 @@ class ToSCorpusMCPState:
             tos_root
             or os.environ.get("AOA_TOS_ROOT")
             or os.environ.get("TOS_ROOT")
-            or DEFAULT_TOS_ROOT
+            or PATH_CONFIG.tos_root()
         ).expanduser().resolve()
         index = Path(
             index_path

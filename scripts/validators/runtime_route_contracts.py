@@ -4,7 +4,6 @@ from collections.abc import Callable, Sequence
 import json
 from pathlib import Path
 import re
-from typing import Any
 
 TextFileIterator = Callable[[], list[Path]]
 TextReader = Callable[[Path], str | None]

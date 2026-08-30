@@ -12,7 +12,7 @@ dependencies = [
   "aoa-sdk @ https://github.com/8Dionysus/aoa-sdk/releases/download/v0.10.2/aoa_sdk-0.10.2-py3-none-any.whl",
   "cryptography==48.0.0",
   "httpx==0.28.1",
-  "mcp==2.0.0",
+  "mcp>=2,<3",
   "pydantic==2.13.4",
 ]
 

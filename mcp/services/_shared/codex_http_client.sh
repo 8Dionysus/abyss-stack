@@ -1,28 +1,74 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-stack_root="${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}"
+stack_root="${AOA_STACK_ROOT:-}"
 managed_codex_default="${HOME}/.codex/packages/standalone/current/bin/codex"
-readiness_service="abyss-mcp-modern-admission-refresh.service"
-
-readiness_units=(
-  abyss-stack-mcp-read.service
-  aoa-organ-mcp-read@abyss-machine.service
-  aoa-organ-mcp-read@aoa-decisions.service
-  aoa-organ-mcp-read@aoa-memo.service
-  aoa-organ-mcp-read@aoa-session-memory.service
-  aoa-organ-mcp-read@aoa-evals.service
-  aoa-organ-mcp-read@aoa-kag.service
-  aoa-organ-mcp-read@aoa-stats.service
-  aoa-organ-mcp-read@aoa-4pda-connector.service
-  aoa-organ-mcp-read@aoa-telegram-connector.service
-  aoa-organ-mcp-read@aoa-discord-connector.service
-)
-readiness_ports=(5420 5421 5422 5423 5424 5425 5426 5427 5428 5430 5431)
+launcher_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+runtime_catalog_script="${ABYSS_MCP_RUNTIME_CATALOG:-${launcher_dir}/../../protocol-lab/scripts/runtime_catalog.py}"
+runtime_config="${ABYSS_MCP_RUNTIME_CONFIG:-${launcher_dir}/runtime-config.v1.json}"
+codex_mcp_feature=""
+readiness_service=""
+credentials_root=""
+readiness_units=()
+readiness_ports=()
+readiness_credentials=()
+readiness_environment_names=()
 
 fail() {
   printf 'abyss-stack Codex MCP HTTP client: %s\n' "$1" >&2
   exit 78
+}
+
+load_runtime_catalog() {
+  local -a catalog_args=(
+    "$runtime_catalog_script"
+    --runtime-config "$runtime_config"
+    --emit codex-client
+  )
+  [[ -n "$stack_root" ]] && catalog_args+=(--stack-root "$stack_root")
+  command -v python3 >/dev/null 2>&1 || fail "python3 is required to read the MCP runtime catalog"
+  local projection=""
+  projection="$(python3 "${catalog_args[@]}")" || \
+    fail "MCP runtime catalog could not produce the Codex client projection"
+
+  local kind first second third fourth
+  while IFS=$'\t' read -r kind first second third fourth; do
+    case "$kind" in
+      FEATURE)
+        [[ -z "$codex_mcp_feature" ]] || fail "MCP runtime catalog emitted duplicate Codex feature"
+        codex_mcp_feature="$first"
+        ;;
+      RECOVERY)
+        [[ -z "$readiness_service" ]] || fail "MCP runtime catalog emitted duplicate recovery unit"
+        readiness_service="$first"
+        ;;
+      STACK_ROOT)
+        [[ -z "$stack_root" ]] || continue
+        stack_root="$first"
+        ;;
+      CREDENTIALS_ROOT)
+        [[ -z "$credentials_root" ]] || fail "MCP runtime catalog emitted duplicate credentials root"
+        credentials_root="$first"
+        ;;
+      READ)
+        [[ -n "$first" && -n "$second" && -n "$third" && -n "$fourth" ]] || \
+          fail "MCP runtime catalog emitted an incomplete read contour"
+        readiness_units+=("$first")
+        readiness_ports+=("$second")
+        readiness_credentials+=("$third")
+        readiness_environment_names+=("$fourth")
+        ;;
+      "")
+        ;;
+      *)
+        fail "MCP runtime catalog emitted an unknown record: $kind"
+        ;;
+    esac
+  done <<< "$projection"
+
+  [[ -n "$stack_root" && -n "$credentials_root" && -n "$codex_mcp_feature" && -n "$readiness_service" ]] || \
+    fail "MCP runtime catalog omitted required Codex client settings"
+  ((${#readiness_units[@]} > 0)) || fail "MCP runtime catalog contains no client read contours"
 }
 
 load_credential() {
@@ -136,7 +182,9 @@ modern_fleet_counts() {
   done
   listeners="$(ss -H -ltn 2>/dev/null || true)"
   for port in "${readiness_ports[@]}"; do
-    if grep -Eq "(^|[[:space:]])127\\.0\\.0\\.1:${port}([[:space:]]|$)" <<<"$listeners"; then
+    if awk -v suffix=":${port}" \
+      'index($4, suffix) == length($4) - length(suffix) + 1 { found = 1 }
+       END { exit(found ? 0 : 1) }' <<<"$listeners"; then
       ((listening_ports += 1))
     fi
   done
@@ -166,50 +214,14 @@ request_modern_fleet_recovery() {
   fi
 }
 
-load_credential \
-  "${stack_root}/Secrets/Configs/aoa-decisions-mcp-read-bearer-token" \
-  "AOA_DECISIONS_MCP_READ_BEARER_TOKEN" \
-  "aoa-decisions MCP read bearer credential"
-load_credential \
-  "${stack_root}/Secrets/Configs/aoa-memo-mcp-read-bearer-token" \
-  "AOA_MEMO_MCP_READ_BEARER_TOKEN" \
-  "aoa-memo MCP read bearer credential"
-load_credential \
-  "${stack_root}/Secrets/Configs/aoa-evals-mcp-read-bearer-token" \
-  "AOA_EVALS_MCP_READ_BEARER_TOKEN" \
-  "aoa-evals MCP read bearer credential"
-load_credential \
-  "${stack_root}/Secrets/Configs/aoa-kag-mcp-read-bearer-token" \
-  "AOA_KAG_MCP_READ_BEARER_TOKEN" \
-  "aoa-kag MCP read bearer credential"
-load_credential \
-  "${stack_root}/Secrets/Configs/aoa-4pda-connector-mcp-read-bearer-token" \
-  "AOA_4PDA_CONNECTOR_MCP_READ_BEARER_TOKEN" \
-  "aoa-4pda-connector MCP read bearer credential"
-load_credential \
-  "${stack_root}/Secrets/Configs/aoa-discord-connector-mcp-read-bearer-token" \
-  "AOA_DISCORD_CONNECTOR_MCP_READ_BEARER_TOKEN" \
-  "aoa-discord-connector MCP read bearer credential"
-load_credential \
-  "${stack_root}/Secrets/Configs/aoa-session-memory-mcp-read-bearer-token" \
-  "AOA_SESSION_MEMORY_MCP_READ_BEARER_TOKEN" \
-  "aoa-session-memory MCP read bearer credential"
-load_credential \
-  "${stack_root}/Secrets/Configs/aoa-stats-mcp-read-bearer-token" \
-  "AOA_STATS_MCP_READ_BEARER_TOKEN" \
-  "aoa-stats MCP read bearer credential"
-load_credential \
-  "${stack_root}/Secrets/Configs/aoa-telegram-connector-mcp-read-bearer-token" \
-  "AOA_TELEGRAM_CONNECTOR_MCP_READ_BEARER_TOKEN" \
-  "aoa-telegram-connector MCP read bearer credential"
-load_credential \
-  "${stack_root}/Secrets/Configs/abyss-machine-mcp-read-bearer-token" \
-  "ABYSS_MACHINE_MCP_READ_BEARER_TOKEN" \
-  "abyss-machine MCP read bearer credential"
-load_credential \
-  "${stack_root}/Secrets/Configs/abyss-stack-mcp-read-bearer-token" \
-  "ABYSS_STACK_MCP_READ_BEARER_TOKEN" \
-  "abyss-stack MCP read bearer credential"
+load_runtime_catalog
+
+for index in "${!readiness_credentials[@]}"; do
+  load_credential \
+    "${credentials_root}/${readiness_credentials[$index]}" \
+    "${readiness_environment_names[$index]}" \
+    "MCP read bearer credential ${readiness_credentials[$index]}"
+done
 
 codex_executable="${AOA_CODEX_EXECUTABLE:-}"
 if [[ -z "$codex_executable" ]]; then
@@ -230,4 +242,4 @@ request_modern_fleet_recovery "$@"
 
 unset AOA_CODEX_EXECUTABLE
 unset AOA_MCP_READINESS_SKIP
-exec "$codex_executable" --enable mcp_2026_07_28 "$@"
+exec "$codex_executable" --enable "$codex_mcp_feature" "$@"

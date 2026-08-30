@@ -7,6 +7,8 @@ import os
 from pathlib import Path
 from typing import Any
 
+from ._runtime_config import PATH_CONFIG
+
 
 READ_CAPABILITY_ID = "durable-memory-read"
 CANDIDATE_CAPABILITY_ID = "memory-candidate-prepare"
@@ -39,11 +41,7 @@ def owner_manifest_path(workspace_root: str | Path | None = None) -> Path:
     explicit = os.environ.get(ORGAN_ACCESS_MANIFEST_ENV_VAR, "").strip()
     if explicit:
         return Path(explicit).expanduser().resolve()
-    root = Path(
-        workspace_root
-        or os.environ.get("AOA_WORKSPACE_ROOT")
-        or "/srv/AbyssOS"
-    ).expanduser().resolve()
+    root = PATH_CONFIG.workspace_root(workspace_root)
     return root / "aoa-memo" / OWNER_MANIFEST_RELATIVE_PATH
 
 

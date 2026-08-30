@@ -128,9 +128,9 @@ def main() -> None:
             raise SystemExit("MCP server did not build")
         tools = asyncio.run(server.list_tools())
         if len(tools) != 5 or any(
-            tool.annotations.readOnlyHint is not True
-            or tool.annotations.destructiveHint is not False
-            or tool.annotations.openWorldHint is not False
+            tool.annotations.read_only_hint is not True
+            or tool.annotations.destructive_hint is not False
+            or tool.annotations.open_world_hint is not False
             for tool in tools
         ):
             raise SystemExit("4PDA read tool catalog or annotations drifted")

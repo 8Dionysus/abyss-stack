@@ -7,8 +7,14 @@ because a specification, SDK, or client advertises support.
 Current posture after the 2026-07-28 final release:
 
 - admitted OS Abyss production wire: final `2026-07-28`;
-- stable next SDKs: Python `2.0.0`, TypeScript client/server `2.0.0`;
-- all fifteen standalone stack-owned organ packages pin exact `mcp==2.0.0`;
+- stable next SDKs: Python `2.1.1`, TypeScript client/server `2.0.0`;
+- all fifteen standalone stack-owned organ packages admit only `mcp>=2,<3`,
+  while the deterministic deployment lock currently tests exact `2.1.1`;
+- source transition is now pinned to Python MCP `2.1.1` plus
+  `mcp-types==2.1.1` at source revision
+  `0921d94a74db900dccd2d534842aa7b6160542d2`; the existing live-fleet
+  observation remains a separate expired 2.0.0 receipt and does not prove the
+  2.1.1 deployment;
 - eleven production read units are deployment-bound, canary-proven, admitted,
   and observed through `server/discover` and `tools/list` on the exact modern
   wire; wrong bearers and legacy `initialize` are denied before session issue;

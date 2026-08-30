@@ -9,7 +9,15 @@
     "observation_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]+$"},
     "observed_at": {"type": "string", "format": "date-time"},
     "finished_at": {"type": "string", "format": "date-time"},
-    "python_sdk": {"const": {"commit": "6f69a3758ebf2ee55ce050f58b470ce11af71133", "version": "2.0.0"}},
+    "python_sdk": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "version": {"type": "string", "pattern": "^2\\.[0-9]+\\.[0-9]+$"}
+      },
+      "required": ["commit", "version"]
+    },
     "source_revisions": {
       "type": "object",
       "additionalProperties": false,

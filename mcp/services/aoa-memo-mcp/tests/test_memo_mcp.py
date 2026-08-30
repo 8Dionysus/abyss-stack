@@ -1093,7 +1093,7 @@ def test_server_builds(tmp_path: Path) -> None:
     seed_workspace(tmp_path)
     server = build_server(tmp_path)
     assert server is not None
-    assert server._mcp_server.version == "0.2.0"
+    assert server.application_version == "0.2.0"
 
 
 def test_pilot_port_topology(tmp_path: Path, monkeypatch) -> None:

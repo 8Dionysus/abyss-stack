@@ -5,6 +5,7 @@ import hmac
 import json
 import os
 import re
+import signal as process_signal
 import shlex
 import sqlite3
 import subprocess
@@ -16,6 +17,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import unquote, urlparse
+
+from ._runtime_config import (
+    MCP_PROTOCOL_PATH,
+    PATH_CONFIG,
+    RUNTIME_LIMITS,
+    SERVICE_CONFIG,
+    TRANSPORT_CONFIG,
+)
 
 
 def _file_sha256(path: Path) -> str:
@@ -120,10 +129,10 @@ MCP_CORE_LOADED_SHA256 = _file_sha256(MCP_CORE_SOURCE_PATH)
 # registered by the already-running server process and need a process restart.
 MCP_SERVER_LOADED_SHA256 = globals().get("MCP_SERVER_LOADED_SHA256") or _file_sha256(MCP_SERVER_SOURCE_PATH)
 
-DEFAULT_WORKSPACE_ROOT = Path("/srv/AbyssOS")
+DEFAULT_WORKSPACE_ROOT = PATH_CONFIG.workspace_root()
 DEFAULT_TIMEOUT_SECONDS = 20.0
-HTTP_BEARER_TOKEN_ENV_VAR = "AOA_SESSION_MEMORY_MCP_READ_BEARER_TOKEN"
-HTTP_BEARER_CREDENTIAL_NAME = "aoa-session-memory-mcp-read-bearer-token"
+HTTP_BEARER_TOKEN_ENV_VAR = SERVICE_CONFIG.contour("read").auth.token_env_var
+HTTP_BEARER_CREDENTIAL_NAME = SERVICE_CONFIG.contour("read").auth.credential_name
 HTTP_BEARER_TOKEN_PATTERN = re.compile(r"[A-Za-z0-9._~-]{43,512}")
 MCP_ARCHIVE_READ_COMMANDS = frozenset(
     {
@@ -158,14 +167,14 @@ MCP_ARCHIVE_FORBIDDEN_FLAG_PREFIXES = (
     "--refresh-state",
     "--write",
 )
-STATUS_TIMEOUT_SECONDS = 60.0
-SEARCH_TIMEOUT_SECONDS = 60.0
-GOAL_LIFECYCLE_TIMEOUT_SECONDS = 60.0
-EVIDENCE_PACKET_TIMEOUT_SECONDS = 90.0
+STATUS_TIMEOUT_SECONDS = RUNTIME_LIMITS.status_timeout_seconds
+SEARCH_TIMEOUT_SECONDS = RUNTIME_LIMITS.search_timeout_seconds
+GOAL_LIFECYCLE_TIMEOUT_SECONDS = RUNTIME_LIMITS.goal_lifecycle_timeout_seconds
+EVIDENCE_PACKET_TIMEOUT_SECONDS = RUNTIME_LIMITS.evidence_packet_timeout_seconds
 DEFAULT_SEARCH_MAX_SHARDS = 24
-USAGE_NEIGHBORHOOD_TIMEOUT_SECONDS = 20.0
-ROUTE_ROLLUP_QUERY_TIMEOUT_SECONDS = 30.0
-DIRECT_EVENT_ROLLUP_QUERY_TIMEOUT_SECONDS = 30.0
+USAGE_NEIGHBORHOOD_TIMEOUT_SECONDS = RUNTIME_LIMITS.usage_neighborhood_timeout_seconds
+ROUTE_ROLLUP_QUERY_TIMEOUT_SECONDS = RUNTIME_LIMITS.route_rollup_query_timeout_seconds
+DIRECT_EVENT_ROLLUP_QUERY_TIMEOUT_SECONDS = RUNTIME_LIMITS.direct_event_rollup_query_timeout_seconds
 LIVE_READINESS_LIMIT: int | None = None
 LIVE_READINESS_SAMPLE_LIMIT = 0
 PROVIDER_DIRTY_SESSION_SAMPLE_LIMIT = 5
@@ -579,27 +588,52 @@ CommandRunner = Callable[[list[str], float], CommandOutput]
 
 def _default_runner(argv: list[str], timeout_seconds: float) -> CommandOutput:
     started = time.perf_counter()
+    process: subprocess.Popen[str] | None = None
     try:
-        proc = subprocess.run(
+        popen_kwargs: dict[str, Any] = {
+            "stdout": subprocess.PIPE,
+            "stderr": subprocess.PIPE,
+            "text": True,
+        }
+        if os.name == "posix":
+            popen_kwargs["start_new_session"] = True
+        process = subprocess.Popen(
             argv,
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=timeout_seconds,
+            **popen_kwargs,
         )
+        stdout, stderr = process.communicate(timeout=timeout_seconds)
         return CommandOutput(
             argv=argv,
-            returncode=proc.returncode,
-            stdout=proc.stdout,
-            stderr=proc.stderr,
+            returncode=process.returncode,
+            stdout=stdout or "",
+            stderr=stderr or "",
             elapsed_ms=(time.perf_counter() - started) * 1000,
         )
     except subprocess.TimeoutExpired as exc:
+        if process is not None:
+            try:
+                if os.name == "posix":
+                    os.killpg(process.pid, process_signal.SIGKILL)
+                else:
+                    process.kill()
+            except OSError:
+                process.kill()
+            stdout, stderr = process.communicate()
+        else:
+            stdout, stderr = "", ""
         return CommandOutput(
             argv=argv,
             returncode=124,
-            stdout=exc.stdout or "",
-            stderr=exc.stderr or f"command timed out after {timeout_seconds}s",
+            stdout=stdout or exc.stdout or "",
+            stderr=stderr or exc.stderr or f"command timed out after {timeout_seconds}s",
+            elapsed_ms=(time.perf_counter() - started) * 1000,
+        )
+    except OSError as exc:
+        return CommandOutput(
+            argv=argv,
+            returncode=127,
+            stdout="",
+            stderr=f"command unavailable: {exc}",
             elapsed_ms=(time.perf_counter() - started) * 1000,
         )
 
@@ -705,6 +739,58 @@ def _annotate_trace_kind_payload(payload: dict[str, Any], *, requested_kind: str
     payload.setdefault("kind", normalized_kind)
     if requested != normalized_kind:
         payload.setdefault("requested_kind", requested)
+    return payload
+
+
+def _append_diagnostic(payload: dict[str, Any], diagnostic: str) -> list[str]:
+    existing = payload.get("diagnostics")
+    diagnostics = list(existing) if isinstance(existing, list) else []
+    if diagnostic not in diagnostics:
+        diagnostics.append(diagnostic)
+    payload["diagnostics"] = diagnostics
+    return diagnostics
+
+
+def _normalize_trace_route_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    """Make route absence and backend failure explicit without inventing evidence."""
+    candidates = payload.get("route_candidates")
+    if not isinstance(candidates, list):
+        candidates = []
+        payload["route_candidates"] = candidates
+    payload["route_candidate_count"] = len(candidates)
+
+    mcp_access = payload.get("mcp_access") if isinstance(payload.get("mcp_access"), dict) else {}
+    returncode = mcp_access.get("returncode")
+    outcome = mcp_access.get("outcome")
+    backend_failed = returncode not in (None, 0) or outcome in {"timeout", "backend_error", "backend_not_ready"}
+    if backend_failed or payload.get("ok") is False:
+        payload["route_status"] = "degraded"
+        payload["degraded"] = True
+        reason_codes = list(payload.get("reason_codes", [])) if isinstance(payload.get("reason_codes"), list) else []
+        if returncode == 124 or outcome == "timeout":
+            reason_codes.append("backend_timeout")
+        elif returncode not in (None, 0) or outcome == "backend_error":
+            reason_codes.append("backend_command_failed")
+        else:
+            reason_codes.append("backend_reported_not_ready")
+        if not candidates:
+            reason_codes.append("route_candidates_unavailable")
+        payload["reason_codes"] = list(dict.fromkeys(reason_codes))
+        payload.setdefault("truth_status", "route candidates unavailable; backend result is degraded")
+        mcp_access["response_kind"] = "degraded"
+        mcp_access["degraded"] = True
+    elif candidates:
+        payload["route_status"] = "matched"
+        payload["degraded"] = False
+        mcp_access["response_kind"] = "normal"
+        mcp_access["degraded"] = False
+    else:
+        payload["route_status"] = "empty"
+        payload["degraded"] = False
+        payload.setdefault("truth_status", "route query completed with no matching candidates")
+        mcp_access["response_kind"] = "empty"
+        mcp_access["degraded"] = False
+    payload["mcp_access"] = mcp_access
     return payload
 
 
@@ -1010,6 +1096,10 @@ def _compact_search_payload(payload: dict[str, Any], *, full_route: str, filters
         "result_count",
         "diagnostics",
         "cost_profile",
+        "truth_status",
+        "search_status",
+        "degraded",
+        "reason_codes",
     )
     for key in passthrough_keys:
         if payload.get(key) not in (None, "", [], {}):
@@ -1024,6 +1114,9 @@ def _compact_search_payload(payload: dict[str, Any], *, full_route: str, filters
     if isinstance(results, list):
         compact["results"] = [_compact_hit(hit) for hit in results if isinstance(hit, dict)]
         compact["result_count"] = payload.get("result_count", len(results))
+    else:
+        compact["results"] = []
+        compact["result_count"] = 0
     route_plan = _search_mcp_route_plan(payload, filters=search_filters, full_route=full_route)
     if route_plan:
         compact["mcp_route_plan"] = route_plan
@@ -1038,6 +1131,27 @@ def _compact_search_payload(payload: dict[str, Any], *, full_route: str, filters
             "authority_boundary": "MCP returns compact search hits and provider summary; raw/segment evidence remains authoritative.",
         }
     )
+    if mcp_access.get("degraded") is True or payload.get("ok") is False:
+        compact["degraded"] = True
+        compact.setdefault("search_status", "backend_unavailable")
+        compact.setdefault("truth_status", "search projection is unavailable or not ready")
+        reason_codes = compact.get("reason_codes")
+        if not isinstance(reason_codes, list):
+            reason_codes = []
+        if mcp_access.get("returncode") == 124 or mcp_access.get("outcome") == "timeout":
+            reason_codes.append("backend_timeout")
+        elif mcp_access.get("returncode") not in (None, 0) or mcp_access.get("outcome") in {"backend_error", "backend_not_ready"}:
+            reason_codes.append("backend_command_failed")
+        else:
+            reason_codes.append("backend_reported_not_ready")
+        compact["reason_codes"] = list(dict.fromkeys(reason_codes))
+        mcp_access["response_kind"] = "degraded"
+        mcp_access["degraded"] = True
+    elif results is not None:
+        compact.setdefault("search_status", "matched" if compact.get("result_count", 0) else "empty")
+        compact.setdefault("degraded", False)
+        mcp_access.setdefault("response_kind", "normal" if compact.get("result_count", 0) else "empty")
+        mcp_access.setdefault("degraded", False)
     compact["mcp_access"] = mcp_access
     compact["mcp_payload_policy"] = {
         "response_compacted": True,
@@ -3010,7 +3124,7 @@ class AoASessionMemoryMCPState:
         root = Path(
             workspace_root
             or os.environ.get("AOA_WORKSPACE_ROOT")
-            or DEFAULT_WORKSPACE_ROOT
+            or PATH_CONFIG.workspace_root()
         ).expanduser().resolve()
         archive = Path(
             aoa_root
@@ -3030,6 +3144,14 @@ class AoASessionMemoryMCPState:
             command_runner=command_runner or _default_runner,
             timeout_seconds=float(timeout_seconds or os.environ.get("AOA_SESSION_MEMORY_MCP_TIMEOUT", DEFAULT_TIMEOUT_SECONDS)),
         )
+
+    def _route_timeout(self, maximum_seconds: float) -> float:
+        """Use the configured MCP budget while respecting each route's ceiling."""
+        try:
+            configured = float(self.timeout_seconds)
+        except (TypeError, ValueError):
+            configured = DEFAULT_TIMEOUT_SECONDS
+        return min(max(configured, 1.0), float(maximum_seconds))
 
     def authority_boundary(self) -> dict[str, Any]:
         return {
@@ -3206,8 +3328,8 @@ class AoASessionMemoryMCPState:
                 http_boundary_valid = bool(
                     parsed_url is not None
                     and parsed_url.scheme in {"http", "https"}
-                    and url_host in {"127.0.0.1", "localhost", "::1"}
-                    and url_path.rstrip("/") == "/mcp"
+                    and url_host in TRANSPORT_CONFIG.loopback_hosts
+                    and url_path.rstrip("/") == MCP_PROTOCOL_PATH
                     and parsed_url.username is None
                     and parsed_url.password is None
                     and not parsed_url.query
@@ -3421,7 +3543,10 @@ class AoASessionMemoryMCPState:
             direct_status = "invalid_http_config"
             live_transport_restart_advisory = False
             direct_ok = False
-            next_action = "Keep aoa_session_memory on an authenticated local process route or a loopback-only /mcp URL."
+            next_action = (
+                "Keep aoa_session_memory on an authenticated local process route or a "
+                f"loopback-only {MCP_PROTOCOL_PATH} URL."
+            )
         elif shared_http and not http_auth_ready:
             direct_status = "http_auth_unavailable"
             live_transport_restart_advisory = False
@@ -3549,19 +3674,32 @@ class AoASessionMemoryMCPState:
         argv = self._archive_argv(command, args)
         effective_timeout = float(timeout_seconds if timeout_seconds is not None else self.timeout_seconds)
         output = self.command_runner(argv, effective_timeout)
+        timed_out = output.returncode == 124
         try:
             payload: Any = json.loads(output.stdout)
         except json.JSONDecodeError:
             payload = {
                 "ok": False,
                 "artifact_type": "aoa_session_memory_command_error",
-                "diagnostics": ["command did not return JSON"],
+                "diagnostics": ["command timed out" if timed_out else "command did not return JSON"],
                 "stdout_preview": output.stdout[:1000],
             }
+            if timed_out:
+                payload["timeout_seconds"] = effective_timeout
         if not isinstance(payload, dict):
             payload = {"ok": False, "payload": payload, "diagnostics": ["command returned non-object JSON"]}
-        if output.returncode != 0 and not allow_nonzero_json:
-            payload.setdefault("ok", False)
+        if output.returncode != 0:
+            payload["ok"] = False
+            _append_diagnostic(payload, "command timed out" if timed_out else "archive command failed")
+        backend_not_ready = payload.get("ok") is False and output.returncode == 0
+        if timed_out:
+            outcome = "timeout"
+        elif output.returncode != 0:
+            outcome = "backend_error"
+        elif backend_not_ready:
+            outcome = "backend_not_ready"
+        else:
+            outcome = "ok"
         payload["mcp_access"] = {
             "mutates": False,
             "archive_command": command,
@@ -3569,6 +3707,10 @@ class AoASessionMemoryMCPState:
             "elapsed_ms": round(output.elapsed_ms, 2),
             "timeout_seconds": effective_timeout,
             "stderr": output.stderr.strip()[:1000],
+            "outcome": outcome,
+            "response_kind": "degraded" if outcome != "ok" else "normal",
+            "degraded": outcome != "ok",
+            "allow_nonzero_json": allow_nonzero_json,
             "authority_boundary": "MCP output routes to .aoa refs; it is not reviewed truth.",
         }
         return payload
@@ -3587,6 +3729,435 @@ class AoASessionMemoryMCPState:
 
     def _archive_command_line(self, command: str, args: list[str] | None = None) -> str:
         return shlex.join(self._archive_argv(command, args))
+
+    @staticmethod
+    def _mcp_tool_call_description(tool_name: str, **arguments: Any) -> str:
+        """Render a bounded MCP expansion route without embedding owner paths."""
+
+        rendered = ", ".join(
+            f"{name}={value!r}" for name, value in arguments.items()
+        )
+        return f"{tool_name}({rendered})"
+
+    def _mcp_literal_query_plan_fast_path(
+        self,
+        *,
+        text: str,
+        route_kind: str,
+        requested_kind: str,
+        filters: dict[str, Any],
+        diagnostics: list[str],
+    ) -> dict[str, Any] | None:
+        """Plan known MCP routes from the generated registry, without booting .aoa.
+
+        ``literal-query-plan`` is route advice, not archive evidence.  For an
+        unfiltered MCP query, the generated entity registry already contains
+        the identity needed to choose the MCP-local registry/inventory or
+        entity-usage route.  Starting the owner CLI here needlessly imports a
+        very large program and made a health probe exceed the HTTP budget.
+        Requests with search/freshness filters still use the owner route so
+        that this shortcut cannot silently change their semantics.
+        """
+
+        if route_kind != "mcp" or diagnostics:
+            return None
+
+        owner_filter_keys = {
+            key
+            for key, value in filters.items()
+            if key not in {"max_shards", "query_timeout_ms"}
+            and _filter_is_active(value)
+        }
+        if owner_filter_keys:
+            return None
+
+        query_key = _route_key(text)
+        class_query_keys = {
+            route_kind,
+            f"{route_kind}s",
+            f"{route_kind}_service",
+            f"{route_kind}_services",
+            f"{route_kind}_server",
+            f"{route_kind}_servers",
+        }
+        broad_class_query = not text or query_key in class_query_keys
+        lookup_text = "" if broad_class_query else text
+        registry = self._entity_registry_snapshot(
+            kind_key="mcp",
+            query_text="",
+            lookup_text=lookup_text,
+            limit=12,
+        )
+        registry_entries = registry.get("entries")
+        if not isinstance(registry_entries, list):
+            return None
+        registry_entries = [
+            entry for entry in registry_entries if isinstance(entry, dict)
+        ]
+        if not registry.get("ok") or not registry_entries:
+            return None
+        if not broad_class_query and not registry_entries:
+            return None
+
+        selected_entry = registry_entries[0] if not broad_class_query else {}
+        anchor = (
+            str(
+                selected_entry.get("canonical_key")
+                or selected_entry.get("entity_id")
+                or text
+            ).strip()
+            if selected_entry
+            else route_kind
+        )
+        if not anchor:
+            return None
+
+        route_candidates: list[dict[str, Any]] = []
+        for entry in registry_entries:
+            key = str(entry.get("canonical_key") or entry.get("entity_id") or "").strip()
+            signal = str(entry.get("route_signal") or "").strip()
+            layer = str(entry.get("route_layer") or route_kind).strip() or route_kind
+            if not key and not signal:
+                continue
+            candidate = {
+                "layer": layer,
+                "key": key,
+                "route_signal": signal or f"{layer}:{key}",
+                "source": "generated_entity_registry_snapshot",
+            }
+            route_candidates.append(candidate)
+
+        compact_registry_entries = [
+            compact
+            for compact in (_compact_entity_registry_entry(entry) for entry in registry_entries)
+            if compact
+        ]
+        registry_diagnostics = registry.get("diagnostics")
+        if isinstance(registry_diagnostics, list):
+            diagnostics = list(dict.fromkeys([*diagnostics, *(str(item) for item in registry_diagnostics)]))
+
+        def route(
+            route_id: str,
+            reason: str,
+            command: str,
+            *,
+            cost: str = "low",
+            authority: str = "generated_entity_registry",
+        ) -> dict[str, Any]:
+            return {
+                "route_id": route_id,
+                "reason": reason,
+                "estimated_cost": cost,
+                "authority": authority,
+                "command": command,
+            }
+
+        fallback = route(
+            "monolith_raw_text_fallback",
+            "exact literal recall remains an explicit search expansion after typed MCP routes",
+            self._mcp_tool_call_description(
+                "aoa_session_search",
+                query=text,
+                filters={"route_layer": "mcp"},
+                limit=20,
+            ),
+            cost="high",
+            authority="generated_search_refs",
+        )
+        if broad_class_query:
+            routes = [
+                route(
+                    "entity_registry_class",
+                    "broad MCP query asks what exists; read the generated typed registry before literal recall",
+                    self._mcp_tool_call_description(
+                        "aoa_session_entity_registry",
+                        kind="mcp_service",
+                        query="",
+                        limit=50,
+                    ),
+                ),
+                route(
+                    "entity_inventory",
+                    "inventory shows session MCP route-signal counts and bounded evidence samples",
+                    self._mcp_tool_call_description(
+                        "aoa_session_entity_inventory",
+                        layer="mcp",
+                        query="",
+                        limit=50,
+                        sample_limit=2,
+                    ),
+                    authority="generated_inventory_refs",
+                ),
+                route(
+                    "entity_usage_scenario_audit",
+                    "sample MCP usage/consequence packets before falling back to literal text",
+                    self._mcp_tool_call_description(
+                        "aoa_session_entity_usage_scenario_audit",
+                        sample_size=3,
+                        seed="literal-planner-mcp",
+                        layers=["mcp"],
+                        limit=4,
+                        per_route_limit=8,
+                    ),
+                    cost="medium",
+                    authority="route_refs",
+                ),
+            ]
+            primary_shape = "entity_class"
+            signals = ["entity_class", "entity_anchor"]
+            broad_entity_class: dict[str, Any] = {
+                "layer": "mcp",
+                "registry_kind": "mcp_service",
+                "route_kind": "mcp",
+                "matched_terms": [route_kind],
+                "usage_intent": False,
+                "classification": "broad_entity_class_query",
+            }
+            route_anchor_source = "broad_entity_class_query"
+        else:
+            routes = [
+                route(
+                    "entity_usage_chain",
+                    "known MCP anchor resolves to a compact usage-to-consequence route before literal recall",
+                    self._mcp_tool_call_description(
+                        "aoa_session_entity_usage_chain",
+                        anchor=anchor,
+                        kind="mcp",
+                        limit=8,
+                        per_route_limit=12,
+                    ),
+                ),
+                route(
+                    "entity_usage_audit",
+                    "expand structured MCP usage buckets after the compact chain",
+                    self._mcp_tool_call_description(
+                        "aoa_session_entity_usage_audit",
+                        anchor=anchor,
+                        kind="mcp",
+                        limit=8,
+                        per_route_limit=12,
+                    ),
+                ),
+                route(
+                    "trace_route",
+                    "trace exact MCP route refs without opening raw transcript text",
+                    self._mcp_tool_call_description(
+                        "aoa_session_trace",
+                        anchor=anchor,
+                        kind="mcp",
+                        limit=20,
+                        per_route_limit=8,
+                        doc_type="event",
+                    ),
+                ),
+                route(
+                    "graph_neighborhood",
+                    "inspect adjacent MCP/tool/skill topology only when route context requires it",
+                    self._mcp_tool_call_description(
+                        "aoa_session_graph_neighborhood",
+                        anchor=anchor,
+                        kind="mcp",
+                        depth=1,
+                        limit=20,
+                    ),
+                    cost="medium",
+                ),
+            ]
+            primary_shape = "entity_anchor"
+            signals = ["entity_anchor"]
+            broad_entity_class = {}
+            route_anchor_source = "generated_entity_registry_lookup"
+        routes.append(fallback)
+
+        query_timeout_ms = (
+            _coerce_bounded_int(filters.get("query_timeout_ms"), 250, 0, 300_000)
+            if text
+            else 0
+        )
+        route_sequence = [
+            {
+                "ordinal": ordinal,
+                "route_id": item["route_id"],
+                "estimated_cost": item["estimated_cost"],
+                "uses_fts": item["route_id"] == "monolith_raw_text_fallback",
+                "uses_monolith": item["route_id"] == "monolith_raw_text_fallback",
+                "authority": item["authority"],
+                "purpose": item["reason"],
+            }
+            for ordinal, item in enumerate(routes, start=1)
+        ]
+        fallback_position = len(routes)
+        exact_fallback_available = bool(text)
+        route_strategy = {
+            "query_class": primary_shape,
+            "class_contract": {
+                "meaning": (
+                    "broad MCP class inventory or class usage query"
+                    if broad_class_query
+                    else "specific MCP operational entity"
+                ),
+                "cheapest_first_routes": [item["route_id"] for item in routes[:-1]],
+                "exact_recall_fallback_routes": ["monolith_raw_text_fallback"],
+            },
+            "primary_route_id": routes[0]["route_id"],
+            "primary_route_cost": routes[0]["estimated_cost"],
+            "uses_structured_first": True,
+            "uses_fts_first": False,
+            "monolith_fallback_first": False,
+            "fallback_route_id": fallback["route_id"],
+            "raw_text_fallback_status": "deferred_to_mcp_search_expansion",
+            "raw_text_fallback_position": fallback_position,
+            "monolith_fallback_position": fallback_position,
+            "monolith_is_fallback_only": True,
+            "exact_recall_preserved_by_fallback": False,
+            "fallback_preserves_exact_recall": False,
+            "exact_recall_fallback_available": exact_fallback_available,
+            "exact_recall_proof_status": (
+                "requires_complete_verified_fallback_execution"
+                if exact_fallback_available
+                else "not_applicable"
+            ),
+            "needs_scoped_full_text_for_repeated_literal": False,
+            "scoped_full_text_strategy": {
+                "needs_scoped_full_text_for_repeated_literal": False,
+                "status": "not_assessed_by_mcp_local_planner",
+            },
+            "query_timeout_ms": query_timeout_ms,
+            "route_sequence": route_sequence,
+        }
+        structured_filters = {
+            key: filters.get(key) or ""
+            for key in (
+                "session",
+                "doc_type",
+                "route_layer",
+                "route_signal",
+                "agent_event",
+                "usage_role",
+                "task_episode_id",
+                "date_from",
+                "date_to",
+                "time_from",
+                "time_to",
+            )
+        }
+        payload = {
+            "schema_version": 1,
+            "artifact_type": "session_memory_literal_query_plan",
+            "generated_at": dt.datetime.now(dt.timezone.utc).isoformat().replace("+00:00", "Z"),
+            "ok": True,
+            "mutates": False,
+            "degraded": bool(diagnostics),
+            "truth_status": "literal_query_plan_is_route_advice_not_evidence_truth",
+            "query": text,
+            "normalized_query": query_key,
+            "exact_recall_query": text,
+            "route_anchor": anchor,
+            "route_anchor_source": route_anchor_source,
+            "route_anchor_kind": route_kind,
+            "broad_entity_class": broad_entity_class,
+            "embedded_entity_anchor": {},
+            "query_shape": {
+                "primary": primary_shape,
+                "signals": signals,
+                "query_chars": len(text),
+                "term_count": len(text.split()) if text else 0,
+            },
+            "classifications": {
+                "primary": primary_shape,
+                "signals": signals,
+                "route_anchor_source": route_anchor_source,
+                "route_anchor_kind": route_kind,
+                "broad_entity_class": broad_class_query,
+                "embedded_entity_anchor": False,
+                "semantic_episode_query": False,
+                "compositional_episode_query": False,
+                "structured_filter_keys": [],
+                "mcp_local_fast_path": True,
+            },
+            "structured_filters": structured_filters,
+            "inferred_kinds": [route_kind],
+            "entity_registry": {
+                "match_count": len(registry_entries),
+                "selected_entry_count": len(registry_entries),
+                "entries": compact_registry_entries[:5],
+                "omitted_entry_count": max(0, len(compact_registry_entries) - 5),
+                "read_model": (self.aoa_root / "maps" / "entity-registry.json").as_posix(),
+                "read_model_truth_status": registry.get("truth_status"),
+                "bounded_sample": True,
+            },
+            "route_candidates": route_candidates[:12],
+            "omitted_route_candidate_count": max(0, len(route_candidates) - 12),
+            "structured_route_signal_candidates": route_candidates[:5],
+            "omitted_structured_route_signal_candidate_count": max(0, len(route_candidates) - 5),
+            "primary_route": routes[0],
+            "ordered_routes": routes,
+            "literal_route_strategy": route_strategy,
+            "search_projection": {
+                "catalog_status": "not_consulted",
+                "active_projection": "generated_entity_registry_snapshot",
+                "shard_strategy": "deferred_to_owner_search_route",
+                "candidate_shard_count": 0,
+                "max_shards": _coerce_bounded_int(
+                    filters.get("max_shards"), DEFAULT_SEARCH_MAX_SHARDS, 1, DEFAULT_SEARCH_MAX_SHARDS
+                ),
+                "raw_text_fallback": {
+                    "status": "deferred",
+                    "route_id": fallback["route_id"],
+                    "authority": "generated_search_refs",
+                },
+                "exact_literal_postings": {
+                    "status": "not_consulted",
+                    "route_available": False,
+                },
+                "live_tail_fallback": {
+                    "eligible": False,
+                    "blockers": ["mcp_local_planner_does_not_inspect_owner_freshness"],
+                    "mutates": False,
+                    "authority": "live_raw_transcript_snapshot",
+                },
+                "archived_raw_exact_fallback": {
+                    "eligible": False,
+                    "blockers": ["mcp_local_planner_does_not_inspect_owner_freshness"],
+                    "mutates": False,
+                    "authority": "archived_raw_snapshot",
+                    "absence_claim_requires": "complete_digest_verified_scan",
+                },
+            },
+            "cost_profile": {
+                "structured_first": True,
+                "uses_fts_first": False,
+                "monolith_fallback_first": False,
+                "query_timeout_ms": query_timeout_ms,
+                "exact_recall_preserved_by_fallback": False,
+                "exact_recall_fallback_available": exact_fallback_available,
+                "exact_recall_proof_status": route_strategy["exact_recall_proof_status"],
+            },
+            "fallback_plan": fallback,
+            "next_command": routes[0]["command"],
+            "next_expansion": routes[1] if len(routes) > 1 else fallback,
+            "next_expansion_command": (routes[1] if len(routes) > 1 else fallback)["command"],
+            "authority_boundary": "This planner chooses a bounded MCP-local route; generated registry and raw transcript refs remain stronger evidence sources.",
+            "diagnostics": diagnostics,
+            "mcp_access": {
+                "mutates": False,
+                "archive_command": None,
+                "read_model": (self.aoa_root / "maps" / "entity-registry.json").as_posix(),
+                "read_only_registry_route": True,
+                "mcp_local_fast_path": True,
+                "response_kind": "degraded" if diagnostics else "normal",
+                "degraded": bool(diagnostics),
+                "owner_freshness_consulted": False,
+                "owner_expansion_deferred": True,
+                "authority_boundary": "MCP route advice only; owner archive/raw/segment evidence remains authoritative.",
+            },
+        }
+        _annotate_trace_kind_payload(
+            payload,
+            requested_kind=requested_kind,
+            normalized_kind=route_kind,
+        )
+        return payload
 
     def _resource_admitted_archive_route(
         self,
@@ -3645,7 +4216,7 @@ class AoASessionMemoryMCPState:
             "search-provider-status",
             args,
             allow_nonzero_json=True,
-            timeout_seconds=max(self.timeout_seconds, STATUS_TIMEOUT_SECONDS),
+            timeout_seconds=self._route_timeout(STATUS_TIMEOUT_SECONDS),
         )
         return _compact_provider_status_for_mcp(
             payload,
@@ -3797,7 +4368,7 @@ class AoASessionMemoryMCPState:
                 "limit": LIVE_READINESS_LIMIT,
                 "sample_limit": LIVE_READINESS_SAMPLE_LIMIT,
                 "sample_policy": "no evidence sample extraction in MCP status",
-                "timeout_seconds": self.timeout_seconds,
+                "timeout_seconds": self._route_timeout(STATUS_TIMEOUT_SECONDS),
                 "status_field": "live_route_readiness",
             },
             "audit_route": {
@@ -3807,12 +4378,16 @@ class AoASessionMemoryMCPState:
             "authority_boundary": "MCP status is a read-only route companion; .aoa diagnostics and raw refs remain stronger evidence.",
         }
 
-    def session_memory_status(self, include_live: bool = False) -> dict[str, Any]:
-        status_timeout = max(self.timeout_seconds, STATUS_TIMEOUT_SECONDS)
+    def session_memory_status(
+        self,
+        include_live: bool = False,
+        refresh_maintenance: bool = False,
+    ) -> dict[str, Any]:
+        status_timeout = self._route_timeout(STATUS_TIMEOUT_SECONDS)
         provider = self._search_provider_status_fast()
         atlas = self._atlas_summary()
         diagnostics = self.latest_diagnostics(kind="route-layer-readiness", limit=1)
-        maintenance = self._maintenance_summary_for_status()
+        maintenance = self._maintenance_summary_for_status(refresh=refresh_maintenance)
         live_readiness = None
         if include_live:
             live_args = ["all", "--sample-limit", str(LIVE_READINESS_SAMPLE_LIMIT)]
@@ -3824,9 +4399,25 @@ class AoASessionMemoryMCPState:
                 allow_nonzero_json=True,
                 timeout_seconds=status_timeout,
             )
+        backend_ok = bool(provider.get("ok")) and atlas.get("root_index_exists", False)
+        backend_reason_codes: list[str] = []
+        if not provider.get("ok"):
+            backend_reason_codes.append("search_provider_not_ready")
+        if not atlas.get("root_index_exists", False):
+            backend_reason_codes.append("atlas_root_index_unavailable")
         return {
             "schema": "aoa_session_memory_status_v1",
-            "ok": bool(provider.get("ok")) and atlas.get("root_index_exists", False),
+            "ok": backend_ok,
+            "mcp_contract": {
+                "ok": True,
+                "read_only": True,
+                "backend_data_ok": backend_ok,
+                "backend_posture": "ready" if backend_ok else "stale_or_unavailable",
+                "freshness_checked": False,
+            },
+            "backend_posture": "ready" if backend_ok else "stale_or_unavailable",
+            "backend_reason_codes": backend_reason_codes,
+            "degraded": not backend_ok,
             "mutates": False,
             "workspace_root": self.workspace_root.as_posix(),
             "aoa_root": self.aoa_root.as_posix(),
@@ -3896,7 +4487,7 @@ class AoASessionMemoryMCPState:
         payload = self._archive_command(
             "search",
             args,
-            timeout_seconds=max(self.timeout_seconds, SEARCH_TIMEOUT_SECONDS),
+            timeout_seconds=self._route_timeout(SEARCH_TIMEOUT_SECONDS),
         )
         if diagnostics:
             payload.setdefault("diagnostics", []).extend(diagnostics)
@@ -3931,6 +4522,15 @@ class AoASessionMemoryMCPState:
         }
         for key in sorted(set(filters) - supported_filters):
             diagnostics.append(f"ignored unsupported filter {key!r}")
+        fast_path = self._mcp_literal_query_plan_fast_path(
+            text=text,
+            route_kind=route_kind,
+            requested_kind=kind,
+            filters=filters,
+            diagnostics=diagnostics,
+        )
+        if fast_path is not None:
+            return fast_path
         args = ["--query", text, "--kind", route_kind]
         for key, flag in (
             ("session", "--session"),
@@ -3961,7 +4561,7 @@ class AoASessionMemoryMCPState:
         payload = self._archive_command(
             "literal-query-plan",
             args,
-            timeout_seconds=max(self.timeout_seconds, SEARCH_TIMEOUT_SECONDS),
+            timeout_seconds=self._route_timeout(SEARCH_TIMEOUT_SECONDS),
         )
         if diagnostics:
             payload.setdefault("diagnostics", []).extend(diagnostics)
@@ -4785,7 +5385,7 @@ class AoASessionMemoryMCPState:
             "goal-lifecycles",
             args,
             allow_nonzero_json=True,
-            timeout_seconds=max(self.timeout_seconds, GOAL_LIFECYCLE_TIMEOUT_SECONDS),
+            timeout_seconds=self._route_timeout(GOAL_LIFECYCLE_TIMEOUT_SECONDS),
         )
         if isinstance(payload.get("provider"), dict):
             payload["provider"] = _compact_provider_status_for_mcp(payload["provider"])
@@ -4950,6 +5550,7 @@ class AoASessionMemoryMCPState:
             args.append("--explain")
         payload = self._archive_command("trace-route", args)
         _annotate_trace_kind_payload(payload, requested_kind=kind, normalized_kind=route_kind)
+        _normalize_trace_route_payload(payload)
         payload.setdefault("authority_boundary", self.authority_boundary())
         return payload
 
@@ -5062,7 +5663,7 @@ class AoASessionMemoryMCPState:
             "entity-usage-audit",
             args,
             allow_nonzero_json=True,
-            timeout_seconds=max(self.timeout_seconds, EVIDENCE_PACKET_TIMEOUT_SECONDS),
+            timeout_seconds=self._route_timeout(EVIDENCE_PACKET_TIMEOUT_SECONDS),
         )
         _annotate_trace_kind_payload(payload, requested_kind=kind, normalized_kind=route_kind)
         payload.setdefault("authority_boundary", self.authority_boundary())
@@ -5109,7 +5710,7 @@ class AoASessionMemoryMCPState:
             "usage-chain",
             run_args,
             allow_nonzero_json=True,
-            timeout_seconds=max(self.timeout_seconds, EVIDENCE_PACKET_TIMEOUT_SECONDS),
+            timeout_seconds=self._route_timeout(EVIDENCE_PACKET_TIMEOUT_SECONDS),
         )
         _annotate_trace_kind_payload(payload, requested_kind=kind, normalized_kind=route_kind)
         payload.setdefault("authority_boundary", self.authority_boundary())
@@ -5635,7 +6236,7 @@ class AoASessionMemoryMCPState:
             "entity-usage-scenario-audit",
             args,
             allow_nonzero_json=True,
-            timeout_seconds=max(self.timeout_seconds, EVIDENCE_PACKET_TIMEOUT_SECONDS),
+            timeout_seconds=self._route_timeout(EVIDENCE_PACKET_TIMEOUT_SECONDS),
         )
         payload.setdefault("authority_boundary", self.authority_boundary())
         return payload
@@ -5664,7 +6265,7 @@ class AoASessionMemoryMCPState:
             "live-scenario-audit",
             args,
             allow_nonzero_json=True,
-            timeout_seconds=max(self.timeout_seconds, EVIDENCE_PACKET_TIMEOUT_SECONDS),
+            timeout_seconds=self._route_timeout(EVIDENCE_PACKET_TIMEOUT_SECONDS),
         )
         payload.setdefault("authority_boundary", self.authority_boundary())
         payload.setdefault(
@@ -5698,7 +6299,7 @@ class AoASessionMemoryMCPState:
             "live-scenario-corpus",
             args,
             allow_nonzero_json=True,
-            timeout_seconds=max(self.timeout_seconds, EVIDENCE_PACKET_TIMEOUT_SECONDS),
+            timeout_seconds=self._route_timeout(EVIDENCE_PACKET_TIMEOUT_SECONDS),
         )
         payload.setdefault("authority_boundary", self.authority_boundary())
         payload.setdefault(
@@ -5722,7 +6323,7 @@ class AoASessionMemoryMCPState:
             "live-scenario-corpus",
             args,
             allow_nonzero_json=True,
-            timeout_seconds=max(self.timeout_seconds, EVIDENCE_PACKET_TIMEOUT_SECONDS),
+            timeout_seconds=self._route_timeout(EVIDENCE_PACKET_TIMEOUT_SECONDS),
         )
         payload.setdefault("authority_boundary", self.authority_boundary())
         payload.setdefault(
@@ -6078,7 +6679,7 @@ class AoASessionMemoryMCPState:
         provider_full = self._archive_command(
             "search-provider-status",
             provider_args,
-            timeout_seconds=max(self.timeout_seconds, STATUS_TIMEOUT_SECONDS),
+            timeout_seconds=self._route_timeout(STATUS_TIMEOUT_SECONDS),
         )
         diagnostics = []
         session_provider_fallback: dict[str, Any] | None = None
@@ -6091,7 +6692,7 @@ class AoASessionMemoryMCPState:
             global_provider = self._archive_command(
                 "search-provider-status",
                 global_provider_args,
-                timeout_seconds=max(self.timeout_seconds, STATUS_TIMEOUT_SECONDS),
+                timeout_seconds=self._route_timeout(STATUS_TIMEOUT_SECONDS),
             )
             if global_provider.get("ok"):
                 session_provider_fallback = _compact_provider_status_for_mcp(
@@ -6998,7 +7599,7 @@ class AoASessionMemoryMCPState:
             "maintenance-status",
             args,
             allow_nonzero_json=True,
-            timeout_seconds=max(self.timeout_seconds, STATUS_TIMEOUT_SECONDS),
+            timeout_seconds=self._route_timeout(STATUS_TIMEOUT_SECONDS),
         )
         payload.setdefault("mutates", False)
         payload.setdefault("runtime", self.runtime_identity())
@@ -7044,7 +7645,7 @@ class AoASessionMemoryMCPState:
             "search-operational-route-rollup-query",
             args,
             allow_nonzero_json=True,
-            timeout_seconds=max(self.timeout_seconds, ROUTE_ROLLUP_QUERY_TIMEOUT_SECONDS),
+            timeout_seconds=self._route_timeout(ROUTE_ROLLUP_QUERY_TIMEOUT_SECONDS),
         )
         payload.setdefault("mutates", False)
         payload.setdefault("authority_boundary", self.authority_boundary())
@@ -7095,7 +7696,7 @@ class AoASessionMemoryMCPState:
             "search-operational-direct-event-rollup-query",
             args,
             allow_nonzero_json=True,
-            timeout_seconds=max(self.timeout_seconds, DIRECT_EVENT_ROLLUP_QUERY_TIMEOUT_SECONDS),
+            timeout_seconds=self._route_timeout(DIRECT_EVENT_ROLLUP_QUERY_TIMEOUT_SECONDS),
         )
         payload.setdefault("mutates", False)
         payload.setdefault("authority_boundary", self.authority_boundary())
@@ -7111,7 +7712,47 @@ class AoASessionMemoryMCPState:
             mcp_access["full_route"] = self._archive_command_line("search-operational-direct-event-rollup-query", args)
         return payload
 
-    def _maintenance_summary_for_status(self) -> dict[str, Any]:
+    def _cached_maintenance_summary(self) -> dict[str, Any]:
+        """Return bounded cached freshness without invoking the heavy owner CLI."""
+        freshness = self._latest_graph_freshness_summary()
+        cached = bool(freshness.get("checked"))
+        return {
+            "ok": freshness.get("ok") if cached else None,
+            "source": "cached_graph_freshness_diagnostic" if cached else "not_refreshed",
+            "generated_at": freshness.get("generated_at"),
+            "graph": {
+                "status": freshness.get("graph_status"),
+                "needs_maintenance": freshness.get("needs_graph_maintenance"),
+                "needs_graph_maintenance": freshness.get("needs_graph_maintenance"),
+            },
+            "route": {
+                "status": (
+                    "stale"
+                    if freshness.get("needs_index_maintenance") is True
+                    else ("current" if freshness.get("needs_index_maintenance") is False else "unknown")
+                ),
+                "needs_index_maintenance": freshness.get("needs_index_maintenance"),
+                "needs_graph_maintenance": freshness.get("needs_graph_maintenance"),
+            },
+            "cached_graph_freshness": freshness,
+            "diagnostics": [
+                "maintenance_status_not_refreshed_by_status_route",
+                *([] if cached else ["cached_graph_freshness_diagnostic_missing"]),
+            ],
+            "mcp_access": {
+                "mutates": False,
+                "archive_command": None,
+                "read_only": True,
+                "does_not_invoke_maintenance_status": True,
+                "refresh_route": self._archive_command_line("maintenance-status", ["--no-timers"]),
+                "authority_boundary": "MCP status uses cached diagnostics; canonical maintenance refresh remains an explicit read-only route.",
+            },
+            "truth_status": "cached_graph_freshness_for_fast_status_not_current_maintenance_verdict",
+        }
+
+    def _maintenance_summary_for_status(self, *, refresh: bool = True) -> dict[str, Any]:
+        if not refresh:
+            return self._cached_maintenance_summary()
         payload = self.session_maintenance_status(include_timers=False, full=False)
         mcp_access = payload.get("mcp_access") if isinstance(payload.get("mcp_access"), dict) else {}
         if payload.get("artifact_type") != "session_memory_maintenance_status":
@@ -7275,7 +7916,11 @@ class AoASessionMemoryMCPState:
         payload["preferred_tool"] = "aoa_session_maintenance_status"
         return payload
 
-    def session_projection_status(self, include_payload: bool = False) -> dict[str, Any]:
+    def session_projection_status(
+        self,
+        include_payload: bool = False,
+        refresh_maintenance: bool = False,
+    ) -> dict[str, Any]:
         diagnostics = self.latest_diagnostics(kind="projection-catchup", limit=1, include_payload=True)
         reports = diagnostics.get("reports") if isinstance(diagnostics.get("reports"), list) else []
         latest = reports[0] if reports and isinstance(reports[0], dict) else {}
@@ -7301,7 +7946,7 @@ class AoASessionMemoryMCPState:
             )
         )
         next_route = latest_payload.get("next_route") if isinstance(latest_payload.get("next_route"), dict) else {}
-        maintenance = self._maintenance_summary_for_status()
+        maintenance = self._maintenance_summary_for_status(refresh=refresh_maintenance)
         refresh_route = {
             "id": "run_projection_catchup_outside_mcp",
             "status": "needed",
@@ -7340,6 +7985,8 @@ class AoASessionMemoryMCPState:
                 "archive_command": None,
                 "read_only": True,
                 "does_not_run_projection_catchup": True,
+                "does_not_invoke_maintenance_status": not refresh_maintenance,
+                "maintenance_refresh_requested": refresh_maintenance,
                 "writer_route_stays_outside_mcp": True,
                 "elapsed_ms": (maintenance.get("mcp_access") or {}).get("elapsed_ms") if isinstance(maintenance.get("mcp_access"), dict) else None,
             },
@@ -8758,7 +9405,10 @@ class AoASessionMemoryMCPState:
         maintenance = maintenance if isinstance(maintenance, dict) else {}
         maintenance_graph = maintenance.get("graph") if isinstance(maintenance.get("graph"), dict) else {}
         maintenance_route = maintenance.get("route") if isinstance(maintenance.get("route"), dict) else {}
-        has_maintenance_verdict = bool(maintenance_graph or maintenance_route)
+        has_maintenance_verdict = bool(maintenance_graph or maintenance_route) and (
+            maintenance.get("source") == "maintenance-status"
+            or maintenance.get("artifact_type") == "session_memory_maintenance_status"
+        )
         decision_source = "maintenance_status" if has_maintenance_verdict else "cached_graph_freshness_diagnostic"
         needs_graph_maintenance = (
             maintenance_route.get("needs_graph_maintenance")

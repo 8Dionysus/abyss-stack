@@ -10,7 +10,15 @@
     "observed_at": {"type": "string", "format": "date-time"},
     "finished_at": {"type": "string", "format": "date-time"},
     "wire_version": {"const": "2026-07-28"},
-    "python_sdk": {"const": {"commit": "6f69a3758ebf2ee55ce050f58b470ce11af71133", "version": "2.0.0"}},
+    "python_sdk": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "version": {"type": "string", "pattern": "^2\\.[0-9]+\\.[0-9]+$"}
+      },
+      "required": ["commit", "version"]
+    },
     "source_revisions": {"const": {"abyss_stack": "2bb043e160b6a2c001abad4f4de6969b35782466", "aoa_kag": "ba7805190527a635ff5c515701be29379af8277f"}},
     "cache": {"const": {"scope": "private", "ttl_ms": 30000, "within_ttl_repeat_server_fetches": 1}},
     "subscription": {"const": {"events_consumed": 2, "tools_list_changed_honored": true}},

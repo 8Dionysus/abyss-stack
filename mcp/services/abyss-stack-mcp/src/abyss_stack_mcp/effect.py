@@ -19,6 +19,7 @@ from typing import Annotated, Any, Literal
 
 from pydantic import Field, ValidationError, field_validator, model_validator
 
+from ._runtime_config import PATH_CONFIG
 from .canary import CanaryReceipt, run_canary
 from .contracts import Digest, Identifier, RuntimePlanCandidate, StrictModel
 from .core import ObservationStore, StackMCPError, _reject_secret_material, canonical_json_bytes
@@ -28,8 +29,8 @@ EXACT_ORGAN_ID = "abyss-stack"
 EXACT_POLICY_FAMILY = "read"
 EXACT_UNIT_NAME = "abyss-stack-mcp-read.service"
 EXACT_TOOL_ID = "stack_execute_approved_read_restart_pilot"
-DEFAULT_EFFECT_ROOT = Path("/srv/AbyssOS/abyss-stack/Logs/mcp/internal-effects/read-restart-pilot")
-DEFAULT_OBSERVATION_PATH = Path("/srv/AbyssOS/abyss-stack/Logs/mcp/observations/current.json")
+DEFAULT_EFFECT_ROOT = PATH_CONFIG.stack_effects_root()
+DEFAULT_OBSERVATION_PATH = PATH_CONFIG.stack_observation_path()
 EXECUTION_LOCK_NAME = ".execute.lock"
 REQUEST_DRAIN_LOCK_NAME = ".request-drain.lock"
 MAX_ARTIFACT_BYTES = 2 * 1024 * 1024

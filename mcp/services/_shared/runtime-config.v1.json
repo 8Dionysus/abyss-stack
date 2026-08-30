@@ -1,0 +1,510 @@
+{
+  "schema_version": "abyss_mcp_runtime_config_v1",
+  "mcp": {
+    "sdk": {
+      "distribution": "mcp",
+      "major": 2,
+      "requirement": "mcp>=2,<3",
+      "companion_distribution": "mcp-types",
+      "tested_lock": "2.1.1",
+      "source_revision": "0921d94a74db900dccd2d534842aa7b6160542d2"
+    },
+    "protocol": {
+      "version": "2026-07-28",
+      "legacy_version": "2025-11-25",
+      "modern_only_rejection_code": -32022,
+      "streamable_http_path": "/mcp",
+      "modern_only": true
+    },
+    "transport": {
+      "transport_env_var": "AOA_MCP_TRANSPORT",
+      "host_env_var": "AOA_MCP_HOST",
+      "port_env_var": "AOA_MCP_PORT",
+      "default_transport": "stdio",
+      "streamable_http_transport": "streamable-http",
+      "default_host": "127.0.0.1",
+      "loopback_hosts": [
+        "127.0.0.1",
+        "localhost",
+        "::1"
+      ],
+      "port_min": 1,
+      "port_max": 65535
+    }
+  },
+  "paths": {
+    "workspace_env_var": "AOA_WORKSPACE_ROOT",
+    "stack_root_env_var": "AOA_ABYSS_STACK_ROOT",
+    "stack_source_env_var": "AOA_ABYSS_STACK_SOURCE_ROOT",
+    "tos_root_env_var": "AOA_TOS_ROOT",
+    "tos_root_fallback_env_var": "TOS_ROOT",
+    "connector_repo_bindings": {
+      "aoa-4pda-connector-mcp": {
+        "connector_id": "aoa-4pda-connector",
+        "env_var": "AOA_4PDA_CONNECTOR_REPO"
+      },
+      "aoa-course-connector-mcp": {
+        "connector_id": "aoa-course-connector",
+        "env_var": "AOA_COURSE_CONNECTOR_REPO"
+      },
+      "aoa-discord-connector-mcp": {
+        "connector_id": "aoa-discord-connector",
+        "env_var": "AOA_DISCORD_CONNECTOR_REPO"
+      },
+      "aoa-stackoverflow-connector-mcp": {
+        "connector_id": "aoa-stackoverflow-connector",
+        "env_var": "AOA_STACKOVERFLOW_CONNECTOR_REPO"
+      },
+      "aoa-telegram-connector-mcp": {
+        "connector_id": "aoa-telegram-connector",
+        "env_var": "AOA_TELEGRAM_CONNECTOR_REPO"
+      },
+      "aoa-xda-connector-mcp": {
+        "connector_id": "aoa-xda-connector",
+        "env_var": "AOA_XDA_CONNECTOR_REPO"
+      }
+    },
+    "connector_relative_template": "connectors/{connector_id}",
+    "tos_relative_to_workspace": "Tree-of-Sophia",
+    "stack_runtime_relative_to_workspace": "abyss-stack",
+    "stack_source_relative_to_workspace": "abyss-stack-source",
+    "stack_logs_relative_to_runtime": "Logs/mcp",
+    "stack_secrets_relative_to_runtime": "Secrets/Configs",
+    "stack_services_relative_to_runtime": "Services",
+    "stack_configs_relative_to_runtime": "Configs",
+    "stack_deployment_manifest_relative_to_runtime": "Logs/mcp/deployments/latest.json",
+    "stack_observation_relative_to_runtime": "Logs/mcp/observations/current.json",
+    "stack_overlay_relative_to_runtime": "Logs/mcp/observations/evidence-overlay.json",
+    "stack_registry_relative_to_workspace": ".aoa/organ-access/organ-registry.source.json",
+    "stack_codex_executable_relative_to_workspace_template": ".codex/bin/{instance}-mcp-server.py",
+    "stack_orchestration_relative_to_runtime": "Logs/mcp/cross-organ-orchestrations",
+    "stack_canaries_relative_to_runtime": "Logs/mcp/canaries",
+    "stack_effects_relative_to_runtime": "Logs/mcp/internal-effects/read-restart-pilot",
+    "abyss_machine_policy_env_var": "AOA_ABYSS_MACHINE_POLICY_ROOT",
+    "abyss_machine_state_env_var": "AOA_ABYSS_MACHINE_STATE_ROOT",
+    "abyss_machine_policy_fallback_env_var": "ABYSS_MACHINE_STORAGE_POLICY",
+    "abyss_machine_state_fallback_env_var": "ABYSS_MACHINE_PROCESS_ROOT"
+  },
+  "limits": {
+    "status_timeout_seconds": 90,
+    "search_timeout_seconds": 60,
+    "goal_lifecycle_timeout_seconds": 180,
+    "evidence_packet_timeout_seconds": 90,
+    "usage_neighborhood_timeout_seconds": 20,
+    "route_rollup_query_timeout_seconds": 30,
+    "direct_event_rollup_query_timeout_seconds": 30,
+    "protocol_probe_server_start_timeout_seconds": 20,
+    "protocol_probe_request_timeout_seconds": 15,
+    "protocol_probe_stdio_call_timeout_seconds": 45,
+    "protocol_probe_stdio_timeout_seconds": 60,
+    "protocol_probe_connect_timeout_seconds": 0.2,
+    "protocol_probe_process_shutdown_timeout_seconds": 10,
+    "protocol_probe_process_kill_timeout_seconds": 5
+  },
+  "deployment": {
+    "credentials_relative": "Secrets/Configs",
+    "runtime_python_relative_template": "Services/{service_id}/venv/bin/python",
+    "registry_relative_to_workspace": ".aoa/organ-access/organ-registry.v2.source.json",
+    "contour_unit_template": "{service_id}-{contour}.service",
+    "codex_mcp_feature": "mcp_2026_07_28",
+    "recovery_unit": "abyss-mcp-modern-admission-refresh.service",
+    "approved_artifacts": {
+      "aoa_sdk": {
+        "distribution": "aoa-sdk",
+        "version": "0.10.2",
+        "wheel_url": "https://github.com/8Dionysus/aoa-sdk/releases/download/v0.10.2/aoa_sdk-0.10.2-py3-none-any.whl",
+        "sha256": "cf512a7b0a00f8707e21b3950b147d01b7fd2317d64ce7fbcba004a2d1846e2f"
+      }
+    },
+    "client_read_contours": [
+      {"service_id": "aoa-decisions-mcp", "contour_id": "read", "organ_id": "aoa-decisions"},
+      {"service_id": "aoa-memo-mcp", "contour_id": "read", "organ_id": "aoa-memo"},
+      {"service_id": "aoa-evals-mcp", "contour_id": "read", "organ_id": "aoa-evals"},
+      {"service_id": "aoa-kag-mcp", "contour_id": "read", "organ_id": "aoa-kag"},
+      {"service_id": "aoa-4pda-connector-mcp", "contour_id": "read", "organ_id": "aoa-4pda-connector"},
+      {"service_id": "aoa-discord-connector-mcp", "contour_id": "read", "organ_id": "aoa-discord-connector"},
+      {"service_id": "aoa-session-memory-mcp", "contour_id": "read", "organ_id": "aoa-session-memory"},
+      {"service_id": "aoa-stats-mcp", "contour_id": "read", "organ_id": "aoa-stats"},
+      {"service_id": "aoa-telegram-connector-mcp", "contour_id": "read", "organ_id": "aoa-telegram-connector"},
+      {"service_id": "abyss-machine-mcp", "contour_id": "read", "organ_id": "abyss-machine"},
+      {"service_id": "abyss-stack-mcp", "contour_id": "read", "organ_id": "abyss-stack"}
+    ],
+    "nonread_probe_contours": [
+      {"service_id": "abyss-stack-mcp", "contour_id": "candidate"},
+      {"service_id": "aoa-memo-mcp", "contour_id": "candidate"},
+      {"service_id": "aoa-evals-mcp", "contour_id": "candidate"},
+      {"service_id": "abyss-stack-mcp", "contour_id": "internal_effect"}
+    ]
+  },
+  "reserved_ports": [
+    {
+      "port": 5432,
+      "owner": "postgresql",
+      "reason": "non-MCP storage module"
+    }
+  ],
+  "services": [
+    {
+      "service_id": "abyss-machine-mcp",
+      "organ_id": "abyss-machine",
+      "registry_organ_id": "abyss-machine",
+      "runtime_executable_mode": "workspace_codex",
+      "module": "abyss_machine_mcp",
+      "server_name_template": "abyss-machine-mcp-read",
+      "read_unit_template": "aoa-organ-mcp-read@{instance}.service",
+      "read_unit_instance": "abyss-machine",
+      "contours": {
+        "read": {
+          "port": 5423,
+          "auth": {
+            "token_env_var": "ABYSS_MACHINE_MCP_READ_BEARER_TOKEN",
+            "credential_name": "abyss-machine-mcp-read-bearer-token",
+            "auth_scope": "mcp:abyss-machine:read",
+            "client_id": "aoa-loopback-codex:abyss-machine:read"
+          }
+        }
+      }
+    },
+    {
+      "service_id": "abyss-stack-mcp",
+      "organ_id": "abyss-stack",
+      "registry_organ_id": "abyss-stack",
+      "runtime_executable_mode": "stack_venv",
+      "module": "abyss_stack_mcp",
+      "server_name_template": "abyss-stack-mcp-{contour}",
+      "read_unit_template": "abyss-stack-mcp-read.service",
+      "read_unit_instance": "abyss-stack",
+      "auth_manifest_credential": "abyss-stack-mcp-auth-manifest.json",
+      "auth_manifest_schema": "abyss_stack_mcp_auth_manifest_v2",
+      "contours": {
+        "read": {
+          "port": 5431,
+          "auth": {
+            "token_env_var": "ABYSS_STACK_MCP_READ_BEARER_TOKEN",
+            "credential_name": "abyss-stack-mcp-read-bearer-token",
+            "auth_scope": "abyss-stack-mcp:read",
+            "client_id": "abyss-stack-mcp-read-consumer"
+          }
+        },
+        "candidate": {
+          "port": 5433,
+          "auth": {
+            "token_env_var": "ABYSS_STACK_MCP_CANDIDATE_BEARER_TOKEN",
+            "credential_name": "abyss-stack-mcp-candidate-bearer-token",
+            "auth_scope": "abyss-stack-mcp:candidate",
+            "client_id": "abyss-stack-mcp-candidate-consumer"
+          }
+        },
+        "internal_effect": {
+          "port": 5439,
+          "auth": {
+            "token_env_var": "ABYSS_STACK_MCP_INTERNAL_EFFECT_BEARER_TOKEN",
+            "credential_name": "abyss-stack-mcp-internal-effect-bearer-token",
+            "auth_scope": "abyss-stack-mcp:internal_effect",
+            "client_id": "abyss-stack-mcp-internal-effect-consumer"
+          }
+        }
+      }
+    },
+    {
+      "service_id": "aoa-4pda-connector-mcp",
+      "organ_id": "aoa-4pda-connector",
+      "registry_organ_id": "aoa-4pda-connector",
+      "runtime_executable_mode": "workspace_codex",
+      "module": "aoa_4pda_connector_mcp",
+      "server_name_template": "aoa-4pda-connector-mcp",
+      "read_unit_template": "aoa-organ-mcp-read@{instance}.service",
+      "read_unit_instance": "aoa-4pda-connector",
+      "contours": {
+        "read": {
+          "port": 5426,
+          "auth": {
+            "token_env_var": "AOA_4PDA_CONNECTOR_MCP_READ_BEARER_TOKEN",
+            "credential_name": "aoa-4pda-connector-mcp-read-bearer-token",
+            "auth_scope": "mcp:aoa-4pda-connector:read",
+            "client_id": "aoa-loopback-codex:aoa-4pda-connector:read"
+          }
+        }
+      }
+    },
+    {
+      "service_id": "aoa-course-connector-mcp",
+      "organ_id": "aoa-course-connector",
+      "registry_organ_id": "aoa-course-connector",
+      "runtime_executable_mode": "workspace_codex",
+      "module": "aoa_course_connector_mcp",
+      "server_name_template": "aoa-course-connector-mcp",
+      "read_unit_template": "aoa-organ-mcp-read@{instance}.service",
+      "read_unit_instance": "aoa-course-connector",
+      "contours": {
+        "read": {
+          "port": 5436,
+          "auth": {
+            "token_env_var": "AOA_COURSE_CONNECTOR_MCP_READ_BEARER_TOKEN",
+            "credential_name": "aoa-course-connector-mcp-read-bearer-token",
+            "auth_scope": "mcp:aoa-course-connector:read",
+            "client_id": "aoa-loopback-codex:aoa-course-connector:read"
+          }
+        }
+      }
+    },
+    {
+      "service_id": "aoa-decisions-mcp",
+      "organ_id": "aoa-decisions",
+      "registry_organ_id": "aoa-decisions",
+      "runtime_executable_mode": "workspace_codex",
+      "module": "aoa_decisions_mcp",
+      "server_name_template": "aoa-decisions-mcp-{contour}-{profile}",
+      "read_unit_template": "aoa-organ-mcp-read@{instance}.service",
+      "read_unit_instance": "aoa-decisions",
+      "contours": {
+        "read": {
+          "port": 5420,
+          "auth": {
+            "token_env_var": "AOA_DECISIONS_MCP_READ_BEARER_TOKEN",
+            "credential_name": "aoa-decisions-mcp-read-bearer-token",
+            "auth_scope": "mcp:aoa-decisions:read",
+            "client_id": "aoa-loopback-codex:aoa-decisions:read"
+          }
+        },
+        "internal_effect": {
+          "port": 5440,
+          "auth": {
+            "token_env_var": "AOA_DECISIONS_MCP_INTERNAL_EFFECT_BEARER_TOKEN",
+            "credential_name": "aoa-decisions-mcp-internal-effect-bearer-token",
+            "auth_scope": "mcp:aoa-decisions:internal-effect",
+            "client_id": "aoa-loopback-codex:aoa-decisions:internal-effect"
+          }
+        }
+      }
+    },
+    {
+      "service_id": "aoa-discord-connector-mcp",
+      "organ_id": "aoa-discord-connector",
+      "registry_organ_id": "aoa-discord-connector",
+      "runtime_executable_mode": "workspace_codex",
+      "module": "aoa_discord_connector_mcp",
+      "server_name_template": "aoa-discord-connector-mcp",
+      "read_unit_template": "aoa-organ-mcp-read@{instance}.service",
+      "read_unit_instance": "aoa-discord-connector",
+      "contours": {
+        "read": {
+          "port": 5428,
+          "auth": {
+            "token_env_var": "AOA_DISCORD_CONNECTOR_MCP_READ_BEARER_TOKEN",
+            "credential_name": "aoa-discord-connector-mcp-read-bearer-token",
+            "auth_scope": "mcp:aoa-discord-connector:read",
+            "client_id": "aoa-loopback-codex:aoa-discord-connector:read"
+          }
+        }
+      }
+    },
+    {
+      "service_id": "aoa-evals-mcp",
+      "organ_id": "aoa-evals",
+      "registry_organ_id": "aoa-evals",
+      "runtime_executable_mode": "workspace_codex",
+      "module": "aoa_evals_mcp",
+      "server_name_template": "aoa-evals-mcp-{contour}-{profile}",
+      "read_unit_template": "aoa-organ-mcp-read@{instance}.service",
+      "read_unit_instance": "aoa-evals",
+      "contours": {
+        "read": {
+          "port": 5424,
+          "auth": {
+            "token_env_var": "AOA_EVALS_MCP_READ_BEARER_TOKEN",
+            "credential_name": "aoa-evals-mcp-read-bearer-token",
+            "auth_scope": "mcp:aoa-evals:read",
+            "client_id": "aoa-loopback-codex:aoa-evals:read"
+          }
+        },
+        "candidate": {
+          "port": 5435,
+          "auth": {
+            "token_env_var": "AOA_EVALS_MCP_CANDIDATE_BEARER_TOKEN",
+            "credential_name": "aoa-evals-mcp-candidate-bearer-token",
+            "auth_scope": "mcp:aoa-evals:candidate",
+            "client_id": "aoa-loopback-codex:aoa-evals:candidate"
+          }
+        }
+      }
+    },
+    {
+      "service_id": "aoa-kag-mcp",
+      "organ_id": "aoa-kag",
+      "registry_organ_id": "aoa-kag",
+      "runtime_executable_mode": "workspace_codex",
+      "module": "aoa_kag_mcp",
+      "server_name_template": "aoa-kag-mcp",
+      "read_unit_template": "aoa-organ-mcp-read@{instance}.service",
+      "read_unit_instance": "aoa-kag",
+      "contours": {
+        "read": {
+          "port": 5425,
+          "auth": {
+            "token_env_var": "AOA_KAG_MCP_READ_BEARER_TOKEN",
+            "credential_name": "aoa-kag-mcp-read-bearer-token",
+            "auth_scope": "mcp:aoa-kag:read",
+            "client_id": "aoa-loopback-codex:aoa-kag:read"
+          }
+        }
+      }
+    },
+    {
+      "service_id": "aoa-memo-mcp",
+      "organ_id": "aoa-memo",
+      "registry_organ_id": "aoa-memo",
+      "runtime_executable_mode": "workspace_codex",
+      "module": "aoa_memo_mcp",
+      "server_name_template": "aoa-memo-mcp-{contour}",
+      "read_unit_template": "aoa-organ-mcp-read@{instance}.service",
+      "read_unit_instance": "aoa-memo",
+      "contours": {
+        "read": {
+          "port": 5421,
+          "auth": {
+            "token_env_var": "AOA_MEMO_MCP_READ_BEARER_TOKEN",
+            "credential_name": "aoa-memo-mcp-read-bearer-token",
+            "auth_scope": "mcp:aoa-memo:read",
+            "client_id": "aoa-loopback-codex:aoa-memo:read"
+          }
+        },
+        "candidate": {
+          "port": 5434,
+          "auth": {
+            "token_env_var": "AOA_MEMO_MCP_CANDIDATE_BEARER_TOKEN",
+            "credential_name": "aoa-memo-mcp-candidate-bearer-token",
+            "auth_scope": "mcp:aoa-memo:candidate",
+            "client_id": "aoa-loopback-codex:aoa-memo:candidate"
+          }
+        }
+      }
+    },
+    {
+      "service_id": "aoa-session-memory-mcp",
+      "organ_id": "aoa-session-memory",
+      "registry_organ_id": "aoa-session-memory",
+      "runtime_executable_mode": "workspace_codex",
+      "module": "aoa_session_memory_mcp",
+      "server_name_template": "aoa-session-memory-mcp",
+      "read_unit_template": "aoa-organ-mcp-read@{instance}.service",
+      "read_unit_instance": "aoa-session-memory",
+      "contours": {
+        "read": {
+          "port": 5422,
+          "auth": {
+            "token_env_var": "AOA_SESSION_MEMORY_MCP_READ_BEARER_TOKEN",
+            "credential_name": "aoa-session-memory-mcp-read-bearer-token",
+            "auth_scope": "mcp:aoa-session-memory:read",
+            "client_id": "aoa-loopback-codex:aoa-session-memory:read"
+          }
+        }
+      }
+    },
+    {
+      "service_id": "aoa-stackoverflow-connector-mcp",
+      "organ_id": "aoa-stackoverflow-connector",
+      "registry_organ_id": "aoa-stackoverflow-connector",
+      "runtime_executable_mode": "workspace_codex",
+      "module": "aoa_stackoverflow_connector_mcp",
+      "server_name_template": "aoa-stackoverflow-connector-mcp",
+      "read_unit_template": "aoa-organ-mcp-read@{instance}.service",
+      "read_unit_instance": "aoa-stackoverflow-connector",
+      "contours": {
+        "read": {
+          "port": 5437,
+          "auth": {
+            "token_env_var": "AOA_STACKOVERFLOW_CONNECTOR_MCP_READ_BEARER_TOKEN",
+            "credential_name": "aoa-stackoverflow-connector-mcp-read-bearer-token",
+            "auth_scope": "mcp:aoa-stackoverflow-connector:read",
+            "client_id": "aoa-loopback-codex:aoa-stackoverflow-connector:read"
+          }
+        }
+      }
+    },
+    {
+      "service_id": "aoa-stats-mcp",
+      "organ_id": "aoa-stats",
+      "registry_organ_id": "aoa-stats",
+      "runtime_executable_mode": "workspace_codex",
+      "module": "aoa_stats_mcp",
+      "server_name_template": "aoa-stats-mcp",
+      "read_unit_template": "aoa-organ-mcp-read@{instance}.service",
+      "read_unit_instance": "aoa-stats",
+      "contours": {
+        "read": {
+          "port": 5430,
+          "auth": {
+            "token_env_var": "AOA_STATS_MCP_READ_BEARER_TOKEN",
+            "credential_name": "aoa-stats-mcp-read-bearer-token",
+            "auth_scope": "mcp:aoa-stats:read",
+            "client_id": "aoa-loopback-codex:aoa-stats:read"
+          }
+        }
+      }
+    },
+    {
+      "service_id": "aoa-telegram-connector-mcp",
+      "organ_id": "aoa-telegram-connector",
+      "registry_organ_id": "aoa-telegram-connector",
+      "runtime_executable_mode": "workspace_codex",
+      "module": "aoa_telegram_connector_mcp",
+      "server_name_template": "aoa-telegram-connector-mcp",
+      "read_unit_template": "aoa-organ-mcp-read@{instance}.service",
+      "read_unit_instance": "aoa-telegram-connector",
+      "contours": {
+        "read": {
+          "port": 5427,
+          "auth": {
+            "token_env_var": "AOA_TELEGRAM_CONNECTOR_MCP_READ_BEARER_TOKEN",
+            "credential_name": "aoa-telegram-connector-mcp-read-bearer-token",
+            "auth_scope": "mcp:aoa-telegram-connector:read",
+            "client_id": "aoa-loopback-codex:aoa-telegram-connector:read"
+          }
+        }
+      }
+    },
+    {
+      "service_id": "aoa-xda-connector-mcp",
+      "organ_id": "aoa-xda-connector",
+      "registry_organ_id": "aoa-xda-connector",
+      "runtime_executable_mode": "workspace_codex",
+      "module": "aoa_xda_connector_mcp",
+      "server_name_template": "aoa-xda-connector-mcp",
+      "read_unit_template": "aoa-organ-mcp-read@{instance}.service",
+      "read_unit_instance": "aoa-xda-connector",
+      "contours": {
+        "read": {
+          "port": 5438,
+          "auth": {
+            "token_env_var": "AOA_XDA_CONNECTOR_MCP_READ_BEARER_TOKEN",
+            "credential_name": "aoa-xda-connector-mcp-read-bearer-token",
+            "auth_scope": "mcp:aoa-xda-connector:read",
+            "client_id": "aoa-loopback-codex:aoa-xda-connector:read"
+          }
+        }
+      }
+    },
+    {
+      "service_id": "tos-corpus-mcp",
+      "organ_id": "tree-of-sophia",
+      "registry_organ_id": "tree-of-sophia",
+      "runtime_executable_mode": "workspace_codex",
+      "module": "tos_corpus_mcp",
+      "server_name_template": "tos-corpus-mcp",
+      "read_unit_template": "aoa-organ-mcp-read@{instance}.service",
+      "read_unit_instance": "tos-corpus",
+      "contours": {
+        "read": {
+          "port": 5429,
+          "auth": {
+            "token_env_var": "TOS_CORPUS_MCP_READ_BEARER_TOKEN",
+            "credential_name": "tos-corpus-mcp-read-bearer-token",
+            "auth_scope": "mcp:tos-corpus:read",
+            "client_id": "aoa-loopback-codex:tos-corpus:read"
+          }
+        }
+      }
+    }
+  ]
+}

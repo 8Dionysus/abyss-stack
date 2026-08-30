@@ -113,10 +113,12 @@ own capability and payload meaning. `aoa-sdk` owns registry discovery and
 activation-plan compilation. `aoa-evals` owns central proof interpretation.
 The named acceptance owner accepts durable source or memory changes.
 
-The MCP production line is `2026-07-28` on the exact Python SDK `2.0.0`.
-Authenticated HTTP endpoints reject handshake-era traffic before the SDK's
-dual-era compatibility path can create a session. These contracts remain
-protocol-independent: protocol migration does not change runtime authority.
+The MCP production line is the catalog-declared modern protocol
+(`2026-07-28` in this revision) on the MCP SDK 2.x line (`mcp>=2,<3`), with
+`2.1.1` as the tested lock. Authenticated HTTP endpoints reject handshake-era
+traffic before the SDK's dual-era compatibility path can create a session.
+These contracts remain protocol-independent: protocol migration does not
+change runtime authority.
 
 ## Bounded system status
 

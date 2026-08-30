@@ -66,7 +66,7 @@ consumer recovery path. A tool removed at the server must remain uncallable
 even while an old catalog entry is still warm. Cross-replica invalidation
 requires its own production subscription-bus receipt.
 
-Tasks remains a separately versioned extension gate. Python MCP `2.0.0` does
+Tasks remains a separately versioned extension gate. Python MCP `2.1.1` does
 not implement the Tasks client extension, and upstream Codex `0.147.0` does
 not advertise it. The bounded OS Abyss derivative does advertise
 `io.modelcontextprotocol/tasks` on the real production pair and passes

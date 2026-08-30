@@ -25,7 +25,14 @@ from starlette.routing import Route
 LAB_ROOT = Path(__file__).resolve().parents[1]
 CLIENT_SCRIPT = Path(__file__).with_name("inspector_tasks_adapter_client.ts")
 TASKS_EXTENSION_ID = "io.modelcontextprotocol/tasks"
-PROTOCOL_VERSION = "2026-07-28"
+
+from runtime_catalog import load_runtime_catalog, mcp_settings  # noqa: E402
+
+
+_, _protocol_settings, _transport_settings = mcp_settings(load_runtime_catalog())
+PROTOCOL_VERSION = str(_protocol_settings["version"])
+MCP_PATH = str(_protocol_settings["streamable_http_path"])
+MCP_HOST = str(_transport_settings["default_host"])
 
 
 def _canonical_bytes(value: Any) -> bytes:
@@ -119,7 +126,7 @@ class _PairServer:
         self.task_id: str | None = None
         self.request_facts: list[dict[str, Any]] = []
         self.owner_rerun_count = 0
-        self.app = Starlette(routes=[Route("/mcp", self.handle, methods=["POST"])])
+        self.app = Starlette(routes=[Route(MCP_PATH, self.handle, methods=["POST"])])
 
     async def handle(self, request: Request) -> JSONResponse:
         if request.headers.get("authorization") != f"Bearer {self.bearer}":
@@ -327,9 +334,9 @@ async def _run(args: argparse.Namespace) -> Path:
         bearer=bearer,
     )
     listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    listener.bind(("127.0.0.1", 0))
+    listener.bind((MCP_HOST, 0))
     listener.listen()
-    endpoint = f"http://127.0.0.1:{listener.getsockname()[1]}/mcp"
+    endpoint = f"http://{MCP_HOST}:{listener.getsockname()[1]}{MCP_PATH}"
     server = uvicorn.Server(
         uvicorn.Config(pair.app, log_level="error", lifespan="off")
     )

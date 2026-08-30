@@ -191,7 +191,7 @@
           "reason_codes": [],
           "state": "exact"
         },
-        "executable_ref": "/srv/AbyssOS/.codex/bin/aoa-kag-mcp-server.py",
+        "executable_ref": "${AOA_WORKSPACE_ROOT}/.codex/bin/aoa-kag-mcp-mcp-server.py",
         "process_identity": "aoa-kag-mcp/0.0.0-example",
         "unit_name": "aoa-organ-mcp-read@aoa-kag.service"
       },
@@ -270,7 +270,7 @@
         "last_known_good_deploy_manifest_ref": "Logs/mcp/deployments/records/2222222222222222222222222222222222222222222222222222222222222222.json",
         "last_known_good_deploy_revision": "deploy-example-revision",
         "last_known_good_deploy_tree_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-        "last_known_good_executable_ref": "/srv/AbyssOS/.codex/bin/aoa-kag-mcp-server.py",
+        "last_known_good_executable_ref": "${AOA_WORKSPACE_ROOT}/.codex/bin/aoa-kag-mcp-mcp-server.py",
         "last_known_good_package_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         "last_known_good_process_identity": "aoa-kag-mcp/0.0.0-example",
         "last_known_good_unit_name": "aoa-organ-mcp-read@aoa-kag.service",
@@ -284,7 +284,7 @@
           "deploy_manifest_ref": "Logs/mcp/deployments/records/2222222222222222222222222222222222222222222222222222222222222222.json",
           "deploy_revision": "deploy-example-revision",
           "deploy_tree_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-          "executable_ref": "/srv/AbyssOS/.codex/bin/aoa-kag-mcp-server.py",
+          "executable_ref": "${AOA_WORKSPACE_ROOT}/.codex/bin/aoa-kag-mcp-mcp-server.py",
           "package_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
           "process_identity": "aoa-kag-mcp/0.0.0-example",
           "unit_name": "aoa-organ-mcp-read@aoa-kag.service"

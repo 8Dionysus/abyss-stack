@@ -939,27 +939,27 @@ def test_live_probe_uses_authenticated_http_and_observes_application_version(
         f"""
 from mcp.types import ToolAnnotations
 from typing import Any
-from abyss_stack_mcp._http_auth import http_auth_kwargs
-from abyss_stack_mcp._modern_runtime import AbyssMCPServer
+from abyss_stack_mcp._http_auth import http_auth_config
+from abyss_stack_mcp._modern_runtime import ModernMCPServer, run_server
 
-server = AbyssMCPServer(
-    "aoa-kag-mcp",
-    json_response=True,
-    **http_auth_kwargs(
-        {port},
-        token_env_var="CANARY_TEST_READ_VALUE",
-        credential_name="unused-canary-value",
-        auth_scope="mcp:test:read",
-        client_id="abyss-stack-mcp-canary:test",
-    ),
+auth_config = http_auth_config(
+    {port},
+    token_env_var="CANARY_TEST_READ_VALUE",
+    credential_name="unused-canary-value",
+    auth_scope="mcp:test:read",
+    client_id="abyss-stack-mcp-canary:test",
 )
-server._mcp_server.version = "9.8.7"
+server = ModernMCPServer(
+    "aoa-kag-mcp",
+    version="9.8.7",
+    **auth_config.server_kwargs,
+)
 read_only = server.tool(
     annotations=ToolAnnotations(
-        readOnlyHint=True,
-        destructiveHint=False,
-        idempotentHint=True,
-        openWorldHint=False,
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=False,
     ),
     structured_output=True,
 )
@@ -979,8 +979,7 @@ def kag_discover(owner: str, detail: str = "compact") -> dict[str, Any]:
         }},
     }}
 
-server.configure_http("127.0.0.1", {port})
-server.run(transport="streamable-http")
+run_server(server, auth_config)
 """,
         encoding="utf-8",
     )
@@ -1111,7 +1110,9 @@ def test_session_memory_canary_tracks_the_bounded_admission_profile() -> None:
     }
     assert contract.schema_pointer == "/artifact_type"
     assert contract.schema_value == "session_memory_literal_query_plan"
-    assert contract.exact_values["/mcp_access/capability_profile"] == (
+    assert contract.transport_exact_values["streamable-http"][
+        "/mcp_access/capability_profile"
+    ] == (
         "session-evidence-read"
     )
     assert contract.exact_values["/mutates"] is False
