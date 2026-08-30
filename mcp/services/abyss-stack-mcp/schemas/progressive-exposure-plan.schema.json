@@ -1,0 +1,613 @@
+{
+  "$defs": {
+    "ExposureRollbackBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "primitive_id": {
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Primitive Id",
+          "type": "string"
+        },
+        "rollback_route": {
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Rollback Route",
+          "type": "string"
+        },
+        "tool_id": {
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Tool Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tool_id",
+        "primitive_id",
+        "rollback_route"
+      ],
+      "title": "ExposureRollbackBinding",
+      "type": "object"
+    },
+    "StackExposureCapabilityBinding": {
+      "additionalProperties": false,
+      "description": "Nested capability identity carried by the SDK plan ingress.",
+      "properties": {
+        "approval_ref": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "maxProperties": 64,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Approval Ref"
+        },
+        "capability_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Capability Digest",
+          "type": "string"
+        },
+        "capability_id": {
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Capability Id",
+          "type": "string"
+        },
+        "effect_ceiling": {
+          "enum": [
+            "read",
+            "candidate",
+            "internal_effect",
+            "external_effect"
+          ],
+          "title": "Effect Ceiling",
+          "type": "string"
+        },
+        "freshness": {
+          "$ref": "#/$defs/StackExposureFreshness"
+        },
+        "organ_id": {
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Organ Id",
+          "type": "string"
+        },
+        "owners": {
+          "additionalProperties": true,
+          "maxProperties": 64,
+          "title": "Owners",
+          "type": "object"
+        },
+        "qualified_capability_id": {
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Qualified Capability Id",
+          "type": "string"
+        },
+        "rollback_route": {
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Rollback Route",
+          "type": "string"
+        },
+        "schema_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Schema Digest",
+          "type": "string"
+        },
+        "source_revision": {
+          "additionalProperties": true,
+          "maxProperties": 64,
+          "title": "Source Revision",
+          "type": "object"
+        }
+      },
+      "required": [
+        "organ_id",
+        "capability_id",
+        "qualified_capability_id",
+        "owners",
+        "capability_digest",
+        "schema_digest",
+        "source_revision",
+        "freshness",
+        "effect_ceiling",
+        "rollback_route"
+      ],
+      "title": "StackExposureCapabilityBinding",
+      "type": "object"
+    },
+    "StackExposureFreshness": {
+      "additionalProperties": false,
+      "properties": {
+        "expires_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expires At"
+        },
+        "observed_at": {
+          "format": "date-time",
+          "title": "Observed At",
+          "type": "string"
+        },
+        "provider_watermark": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Provider Watermark"
+        },
+        "reason_codes": {
+          "default": [],
+          "items": {
+            "maxLength": 512,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 256,
+          "title": "Reason Codes",
+          "type": "array"
+        },
+        "source_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Source Digest",
+          "type": "string"
+        },
+        "source_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Source Ref",
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "fresh",
+            "stale",
+            "expired",
+            "unknown",
+            "missing",
+            "partial",
+            "estimated",
+            "provider_reported"
+          ],
+          "title": "State",
+          "type": "string"
+        },
+        "ttl_seconds": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ttl Seconds"
+        }
+      },
+      "required": [
+        "state",
+        "source_ref",
+        "source_digest",
+        "observed_at"
+      ],
+      "title": "StackExposureFreshness",
+      "type": "object"
+    },
+    "StackExposureSnapshot": {
+      "additionalProperties": false,
+      "properties": {
+        "expires_at": {
+          "format": "date-time",
+          "title": "Expires At",
+          "type": "string"
+        },
+        "observed_at": {
+          "format": "date-time",
+          "title": "Observed At",
+          "type": "string"
+        },
+        "refusal_reasons": {
+          "default": [],
+          "items": {
+            "maxLength": 512,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 256,
+          "title": "Refusal Reasons",
+          "type": "array"
+        },
+        "rendered_bytes": {
+          "minimum": 0,
+          "title": "Rendered Bytes",
+          "type": "integer"
+        },
+        "rendered_schema_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Rendered Schema Digest",
+          "type": "string"
+        },
+        "rendered_tokens": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rendered Tokens"
+        },
+        "schema_version": {
+          "const": "aoa_organ_exposure_snapshot_v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "snapshot_id": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Snapshot Id",
+          "type": "string"
+        },
+        "source_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Source Digest",
+          "type": "string"
+        },
+        "token_count_method": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Token Count Method"
+        },
+        "token_count_posture": {
+          "enum": [
+            "measured",
+            "provider_reported",
+            "estimated",
+            "partial",
+            "unknown",
+            "missing"
+          ],
+          "title": "Token Count Posture",
+          "type": "string"
+        },
+        "tools": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/StackExposureTool"
+          },
+          "maxItems": 256,
+          "title": "Tools",
+          "type": "array"
+        },
+        "visible_tool_ids": {
+          "default": [],
+          "items": {
+            "maxLength": 512,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 256,
+          "title": "Visible Tool Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "schema_version",
+        "snapshot_id",
+        "source_digest",
+        "rendered_schema_digest",
+        "rendered_bytes",
+        "token_count_posture",
+        "observed_at",
+        "expires_at"
+      ],
+      "title": "StackExposureSnapshot",
+      "type": "object"
+    },
+    "StackExposureTool": {
+      "additionalProperties": false,
+      "properties": {
+        "capability_id": {
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Capability Id",
+          "type": "string"
+        },
+        "effect_ceiling": {
+          "enum": [
+            "read",
+            "candidate",
+            "internal_effect",
+            "external_effect"
+          ],
+          "title": "Effect Ceiling",
+          "type": "string"
+        },
+        "effect_class": {
+          "enum": [
+            "observe",
+            "derive",
+            "validate",
+            "prepare_candidate",
+            "apply_runtime",
+            "accept_source",
+            "external_emit",
+            "external_change"
+          ],
+          "title": "Effect Class",
+          "type": "string"
+        },
+        "input_schema_ref": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Input Schema Ref"
+        },
+        "mcp_name": {
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Mcp Name",
+          "type": "string"
+        },
+        "output_schema_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Output Schema Ref",
+          "type": "string"
+        },
+        "policy_family": {
+          "enum": [
+            "read",
+            "candidate",
+            "internal_effect",
+            "external_effect"
+          ],
+          "title": "Policy Family",
+          "type": "string"
+        },
+        "primitive_id": {
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Primitive Id",
+          "type": "string"
+        },
+        "schema_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Schema Digest",
+          "type": "string"
+        },
+        "tool_id": {
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Tool Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tool_id",
+        "capability_id",
+        "primitive_id",
+        "mcp_name",
+        "effect_class",
+        "policy_family",
+        "output_schema_ref",
+        "schema_digest",
+        "effect_ceiling"
+      ],
+      "title": "StackExposureTool",
+      "type": "object"
+    }
+  },
+  "$id": "https://8dionysus.github.io/schemas/abyss-stack-mcp/progressive-exposure-plan.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "The nested SDK candidate shape consumed by stack.",
+  "properties": {
+    "activation_authorized": {
+      "const": false,
+      "default": false,
+      "title": "Activation Authorized",
+      "type": "boolean"
+    },
+    "approval_ref": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "maxProperties": 64,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Approval Ref"
+    },
+    "baseline_ready": {
+      "title": "Baseline Ready",
+      "type": "boolean"
+    },
+    "capability": {
+      "$ref": "#/$defs/StackExposureCapabilityBinding"
+    },
+    "claim_limit": {
+      "const": "This candidate records deterministic disclosure identity and visibility accounting only. It does not authorize activation, execute a tool, prove runtime reachability, establish owner acceptance, or issue central proof.",
+      "default": "This candidate records deterministic disclosure identity and visibility accounting only. It does not authorize activation, execute a tool, prove runtime reachability, establish owner acceptance, or issue central proof.",
+      "title": "Claim Limit",
+      "type": "string"
+    },
+    "execution_authorized": {
+      "const": false,
+      "default": false,
+      "title": "Execution Authorized",
+      "type": "boolean"
+    },
+    "expansion_reasons": {
+      "default": [],
+      "items": {
+        "maxLength": 512,
+        "minLength": 1,
+        "type": "string"
+      },
+      "maxItems": 256,
+      "title": "Expansion Reasons",
+      "type": "array"
+    },
+    "expires_at": {
+      "format": "date-time",
+      "title": "Expires At",
+      "type": "string"
+    },
+    "feature_enabled": {
+      "title": "Feature Enabled",
+      "type": "boolean"
+    },
+    "plan_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Plan Id",
+      "type": "string"
+    },
+    "plan_state": {
+      "enum": [
+        "blocked",
+        "candidate"
+      ],
+      "title": "Plan State",
+      "type": "string"
+    },
+    "refusal_reasons": {
+      "default": [],
+      "items": {
+        "maxLength": 512,
+        "minLength": 1,
+        "type": "string"
+      },
+      "maxItems": 256,
+      "title": "Refusal Reasons",
+      "type": "array"
+    },
+    "rendered_snapshot": {
+      "$ref": "#/$defs/StackExposureSnapshot"
+    },
+    "request_id": {
+      "maxLength": 512,
+      "minLength": 1,
+      "title": "Request Id",
+      "type": "string"
+    },
+    "requested_at": {
+      "format": "date-time",
+      "title": "Requested At",
+      "type": "string"
+    },
+    "requested_policy_family": {
+      "enum": [
+        "read",
+        "candidate",
+        "internal_effect",
+        "external_effect"
+      ],
+      "title": "Requested Policy Family",
+      "type": "string"
+    },
+    "requested_primitive_ids": {
+      "default": [],
+      "items": {
+        "maxLength": 512,
+        "minLength": 1,
+        "type": "string"
+      },
+      "maxItems": 256,
+      "title": "Requested Primitive Ids",
+      "type": "array"
+    },
+    "rollback_bindings": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/ExposureRollbackBinding"
+      },
+      "maxItems": 256,
+      "title": "Rollback Bindings",
+      "type": "array"
+    },
+    "rollback_route": {
+      "maxLength": 512,
+      "minLength": 1,
+      "title": "Rollback Route",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "aoa_organ_exposure_plan_v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "visible_tools": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/StackExposureTool"
+      },
+      "maxItems": 256,
+      "title": "Visible Tools",
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema_version",
+    "plan_id",
+    "plan_state",
+    "feature_enabled",
+    "baseline_ready",
+    "request_id",
+    "capability",
+    "requested_policy_family",
+    "rendered_snapshot",
+    "rollback_route",
+    "requested_at",
+    "expires_at"
+  ],
+  "title": "StackExposurePlan",
+  "type": "object"
+}

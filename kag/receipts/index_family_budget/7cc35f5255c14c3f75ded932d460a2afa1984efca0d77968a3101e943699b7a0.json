@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 36272631,
+  "allowed_tracked_bytes": 41038015,
+  "approved_by": "repository-owner",
+  "base_ref": "64bdae20b3a5c885ca75755188b04803b587ab50",
+  "changed_generated_bytes": 36272631,
+  "changed_generated_files": 523,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "7cc35f5255c14c3f75ded932d460a2afa1984efca0d77968a3101e943699b7a0",
+  "reason": "Reconcile the exact MCP 2.1.1 runtime-catalog and serving-process attestation merge with current main after the landed progressive-exposure adapter, preserving both authored source lines and the ShellCheck-safe Desktop launch route. Authorize only this measured portable-family and tracked-size exceedance needed to index the combined source, decision, documentation, and progressive-exposure surfaces; do not raise standing budgets or admit candidate, effect, materialization, or invocation authority.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 41038015,
+  "tracked_bytes_max": 24117248
+}

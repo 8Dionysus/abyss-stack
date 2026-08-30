@@ -7,6 +7,13 @@ Tracking starts with the community-docs baseline for this repository.
 
 ## [Unreleased]
 
+### Added
+
+- Add the default-off progressive tool-exposure adapter with five published
+  contracts for exact plan/snapshot materialization, invocation authorization,
+  and content-addressed receipts. The stack surface admits and observes
+  bounded disclosure but never executes or proxies an owner tool.
+
 ### Fixed
 
 - Pass the eleven admitted read-contour bearer variables to future
