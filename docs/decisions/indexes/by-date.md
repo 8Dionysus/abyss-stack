@@ -284,3 +284,7 @@
 ## 2026-08-29
 
 - [ABYSS-STACK-D-0139 MCP SDK 2.1.1 Transition And Central Runtime Identity](../ABYSS-STACK-D-0139-mcp-sdk-2-1-1-transition.md) (`docs/decisions/ABYSS-STACK-D-0139-mcp-sdk-2-1-1-transition.md`)
+
+## 2026-08-30
+
+- [ABYSS-STACK-D-0140 Budget Inherited Agent Context](../ABYSS-STACK-D-0140-budget-inherited-agent-context.md) (`docs/decisions/ABYSS-STACK-D-0140-budget-inherited-agent-context.md`)

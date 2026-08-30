@@ -184,5 +184,7 @@ unit, `.zshrc`, nor `config.toml` contains the secret. This bearer prevents
 unauthenticated local callers; it does not sandbox a compromised same-UID
 process that already has access to the operator's Secrets tree.
 
-For district law, read [AGENTS](AGENTS.md). For the parent access-plane route,
-read [mcp/AGENTS](../AGENTS.md).
+For district law, read [AGENTS](AGENTS.md). For package work, continue to the
+service-local `AGENTS.md`, which owns exact commands and stop-lines. Parent
+cards route district-wide validation without copying every package matrix. For
+the parent access-plane route, read [mcp/AGENTS](../AGENTS.md).

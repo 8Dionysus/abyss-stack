@@ -113,6 +113,9 @@ Agent guidance may tell agents where to look and what to verify. It must not:
   mesh, but source cards own the contracts.
 - **Proximity narrows.** The deeper the path, the more concrete the guidance
   should become.
+- **Inherited context is budgeted.** Keep every applicable AGENTS chain within
+  32 KiB. Parent cards route shared lanes; the nearest package card owns exact
+  commands and local stop-lines.
 - **Portability through repeated shape.** A recurring card shape makes future
   passes faster without flattening local differences.
 
@@ -131,6 +134,8 @@ Agent guidance may tell agents where to look and what to verify. It must not:
 - local cards repeat doctrine without naming local files, risks, or checks
 - a package has parts but no route for part-owned docs, schemas, examples, or
   tests
+- parent cards copy every child command and make unrelated procedure part of
+  every descendant prompt
 - legacy folders are silent dumping grounds instead of provenance-preserving
   bridges
 - closeout says "validated" without naming the actual check

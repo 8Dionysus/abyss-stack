@@ -128,6 +128,7 @@
 - [ABYSS-STACK-D-0125 Decouple Codex Availability From MCP Recovery](../ABYSS-STACK-D-0125-decouple-codex-availability-from-mcp-recovery.md) (`docs/decisions/ABYSS-STACK-D-0125-decouple-codex-availability-from-mcp-recovery.md`)
 - [ABYSS-STACK-D-0136 Canonical KAG Cold-CAS Binding](../ABYSS-STACK-D-0136-canonical-kag-cold-cas-binding.md) (`docs/decisions/ABYSS-STACK-D-0136-canonical-kag-cold-cas-binding.md`)
 - [ABYSS-STACK-D-0139 MCP SDK 2.1.1 Transition And Central Runtime Identity](../ABYSS-STACK-D-0139-mcp-sdk-2-1-1-transition.md) (`docs/decisions/ABYSS-STACK-D-0139-mcp-sdk-2-1-1-transition.md`)
+- [ABYSS-STACK-D-0140 Budget Inherited Agent Context](../ABYSS-STACK-D-0140-budget-inherited-agent-context.md) (`docs/decisions/ABYSS-STACK-D-0140-budget-inherited-agent-context.md`)
 
 ## federation/read-model
 
@@ -299,6 +300,7 @@
 ## agent guidance
 
 - [ABYSS-STACK-D-0055 Root Routes Validator Module](../ABYSS-STACK-D-0055-root-routes-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0055-root-routes-validator-module.md`)
+- [ABYSS-STACK-D-0140 Budget Inherited Agent Context](../ABYSS-STACK-D-0140-budget-inherited-agent-context.md) (`docs/decisions/ABYSS-STACK-D-0140-budget-inherited-agent-context.md`)
 
 ## agent skill projection
 
@@ -816,6 +818,10 @@
 
 - [ABYSS-STACK-D-0067 Decision Surface Coverage Registry](../ABYSS-STACK-D-0067-decision-surface-coverage-registry.md) (`docs/decisions/ABYSS-STACK-D-0067-decision-surface-coverage-registry.md`)
 - [ABYSS-STACK-D-0122 Attempt-Local Python Cache Routing](../ABYSS-STACK-D-0122-attempt-local-python-cache-routing.md) (`docs/decisions/ABYSS-STACK-D-0122-attempt-local-python-cache-routing.md`)
+
+## validation contract
+
+- [ABYSS-STACK-D-0140 Budget Inherited Agent Context](../ABYSS-STACK-D-0140-budget-inherited-agent-context.md) (`docs/decisions/ABYSS-STACK-D-0140-budget-inherited-agent-context.md`)
 
 ## validation evidence
 

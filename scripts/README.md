@@ -76,6 +76,9 @@ still synced into deployed `Configs/` with the wrappers.
   diagnostics; tests are not retried.
 - Keep `validate_local_stats_port.py` as a thin delegation to the `aoa-stats`
   contract owner; do not copy the central schemas or validator into this repo.
+- Keep `validate_nested_agents.py` responsible for every discovered inherited
+  AGENTS chain, including unmodeled and legacy cards, and preserve its 32-KiB
+  fail-closed budget when route-card topology changes.
 - Put mechanic-specific implementation logic under the owning
   `mechanics/<package>/parts/<part>/` route when it can move without breaking
   operator command stability.

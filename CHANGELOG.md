@@ -16,6 +16,10 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Keep inherited `AGENTS.md` chains within a 32-KiB budget and remove the
+  duplicated all-service MCP command matrices from parent route cards. Exact
+  checks remain in each service-local card, while district-wide work uses the
+  existing `mcp-services` validation lane.
 - Pass the eleven admitted read-contour bearer variables to future
   ChatGPT/Codex Desktop launches through a managed user wrapper and desktop
   entry, while leaving the running GUI, packaged files, and credential values

@@ -444,7 +444,7 @@
       "paths": [
         "scripts/validate_nested_agents.py"
       ],
-      "protects": "nested AGENTS route coverage, required route snippets, and explicit legacy-archive card classification",
+      "protects": "nested AGENTS route coverage, required route snippets, explicit legacy-archive card classification, and the 32-KiB inherited-chain budget across every discovered card",
       "owner_surface": "AGENTS.md",
       "layer": "agent-route/topology",
       "lane": "source-fast/release",
@@ -453,7 +453,7 @@
         "scripts/ci_gate.py --mode source-fast",
         "root AGENTS validation route"
       ],
-      "failure_route": "Fix the nearest active AGENTS card, required owner route, or explicit legacy-archive classification.",
+      "failure_route": "Fix the nearest active AGENTS card, repeated parent guidance, required owner route, inherited-chain budget, or explicit legacy-archive classification.",
       "status": "active"
     },
     {

@@ -190,6 +190,9 @@ memo state, or route runtime evidence toward reviewed memory.
   the shortest honest verification path.
 - Nested guidance owns local contracts, local risk, exact files, and local
   checks.
+- Keep every applicable inherited AGENTS chain within the 32-KiB budget enforced
+  by `scripts/validate_nested_agents.py`. Parent cards route broad lanes;
+  package-local cards own exact commands and stop-lines.
 - Authored source surfaces own meaning. Generated, exported, compact, derived,
   runtime, and adapter surfaces summarize, transport, or support meaning.
 - Self-agency, recurrence, quest, progression, checkpoint, or growth language

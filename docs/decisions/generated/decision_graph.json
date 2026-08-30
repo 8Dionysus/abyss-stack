@@ -1,17 +1,17 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
-  "decision_count": 139,
-  "edge_count": 3131,
+  "decision_count": 140,
+  "edge_count": 3154,
   "edge_type_counts": {
-    "CITES_SOURCE_SURFACE": 1139,
-    "DATED": 139,
-    "GUARDED_BY": 430,
-    "HAS_STATUS": 139,
-    "HAS_SURFACE_CLASS": 380,
-    "IN_STACK_LANE": 333,
-    "NEXT_DECISION": 138,
-    "OWNED_BY_SURFACE": 145,
-    "OWNS_DECISION": 139,
+    "CITES_SOURCE_SURFACE": 1146,
+    "DATED": 140,
+    "GUARDED_BY": 433,
+    "HAS_STATUS": 140,
+    "HAS_SURFACE_CLASS": 383,
+    "IN_STACK_LANE": 336,
+    "NEXT_DECISION": 139,
+    "OWNED_BY_SURFACE": 148,
+    "OWNS_DECISION": 140,
     "SUPERSEDED_BY": 4,
     "UNDER_MECHANIC_PARENT": 145
   },
@@ -14968,6 +14968,11 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0139",
+      "target": "decision:ABYSS-STACK-D-0140",
+      "type": "NEXT_DECISION"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0139",
       "target": "owner_surface:mcp/services/_shared/",
       "type": "OWNED_BY_SURFACE"
     },
@@ -14975,6 +14980,111 @@
       "source": "decision:ABYSS-STACK-D-0139",
       "target": "mechanic_parent:runtime-lifecycle",
       "type": "UNDER_MECHANIC_PARENT"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0140",
+      "target": "source_surface:AGENTS.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0140",
+      "target": "source_surface:DESIGN.AGENTS.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0140",
+      "target": "source_surface:docs/validation/VALIDATOR_TOPOLOGY.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0140",
+      "target": "source_surface:mcp/AGENTS.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0140",
+      "target": "source_surface:mcp/services/AGENTS.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0140",
+      "target": "source_surface:mcp/services/README.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0140",
+      "target": "source_surface:scripts/validate_nested_agents.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0140",
+      "target": "date:2026-08-30",
+      "type": "DATED"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0140",
+      "target": "guard_family:inherited%20context",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0140",
+      "target": "guard_family:nested%20AGENTS",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0140",
+      "target": "guard_family:route%20locality",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0140",
+      "target": "status:accepted",
+      "type": "HAS_STATUS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0140",
+      "target": "surface_class:MCP%20access%20plane",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0140",
+      "target": "surface_class:agent%20guidance",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0140",
+      "target": "surface_class:validation%20contract",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0140",
+      "target": "stack_lane:MCP%20services",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0140",
+      "target": "stack_lane:source",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0140",
+      "target": "stack_lane:validation",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0140",
+      "target": "owner_surface:AGENTS.md",
+      "type": "OWNED_BY_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0140",
+      "target": "owner_surface:DESIGN.AGENTS.md",
+      "type": "OWNED_BY_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0140",
+      "target": "owner_surface:scripts/validate_nested_agents.py",
+      "type": "OWNED_BY_SURFACE"
     },
     {
       "source": "repo:abyss-stack",
@@ -15670,21 +15780,26 @@
       "source": "repo:abyss-stack",
       "target": "decision:ABYSS-STACK-D-0139",
       "type": "OWNS_DECISION"
+    },
+    {
+      "source": "repo:abyss-stack",
+      "target": "decision:ABYSS-STACK-D-0140",
+      "type": "OWNS_DECISION"
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 1367,
+  "node_count": 1376,
   "node_type_counts": {
-    "date": 48,
-    "decision": 139,
-    "guard_family": 236,
+    "date": 49,
+    "decision": 140,
+    "guard_family": 239,
     "mechanic_parent": 13,
-    "owner_surface": 70,
+    "owner_surface": 73,
     "repo": 1,
     "source_surface": 645,
     "stack_lane": 58,
     "status": 4,
-    "surface_class": 153
+    "surface_class": 154
   },
   "nodes": [
     {
@@ -15925,6 +16040,11 @@
     {
       "id": "date:2026-08-29",
       "label": "2026-08-29",
+      "type": "date"
+    },
+    {
+      "id": "date:2026-08-30",
+      "label": "2026-08-30",
       "type": "date"
     },
     {
@@ -17318,6 +17438,16 @@
       "type": "decision"
     },
     {
+      "date": "2026-08-30",
+      "id": "decision:ABYSS-STACK-D-0140",
+      "label": "ABYSS-STACK-D-0140",
+      "path": "docs/decisions/ABYSS-STACK-D-0140-budget-inherited-agent-context.md",
+      "posture": "accepted source-route rationale; no runtime admission or exposure change",
+      "status": "accepted",
+      "title": "ABYSS-STACK-D-0140 Budget Inherited Agent Context",
+      "type": "decision"
+    },
+    {
       "id": "guard_family:A/B/C%20freeze",
       "label": "A/B/C freeze",
       "type": "guard_family"
@@ -17893,6 +18023,11 @@
       "type": "guard_family"
     },
     {
+      "id": "guard_family:inherited%20context",
+      "label": "inherited context",
+      "type": "guard_family"
+    },
+    {
       "id": "guard_family:language%20competence",
       "label": "language competence",
       "type": "guard_family"
@@ -17975,6 +18110,11 @@
     {
       "id": "guard_family:narrowest%20access%20form",
       "label": "narrowest access form",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:nested%20AGENTS",
+      "label": "nested AGENTS",
       "type": "guard_family"
     },
     {
@@ -18265,6 +18405,11 @@
     {
       "id": "guard_family:route%20docs",
       "label": "route docs",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:route%20locality",
+      "label": "route locality",
       "type": "guard_family"
     },
     {
@@ -18563,6 +18708,16 @@
       "type": "mechanic_parent"
     },
     {
+      "id": "owner_surface:AGENTS.md",
+      "label": "AGENTS.md",
+      "type": "owner_surface"
+    },
+    {
+      "id": "owner_surface:DESIGN.AGENTS.md",
+      "label": "DESIGN.AGENTS.md",
+      "type": "owner_surface"
+    },
+    {
       "id": "owner_surface:abyss-stack",
       "label": "abyss-stack",
       "type": "owner_surface"
@@ -18785,6 +18940,11 @@
     {
       "id": "owner_surface:scripts/build_workspace_decision_graph.py",
       "label": "scripts/build_workspace_decision_graph.py",
+      "type": "owner_surface"
+    },
+    {
+      "id": "owner_surface:scripts/validate_nested_agents.py",
+      "label": "scripts/validate_nested_agents.py",
       "type": "owner_surface"
     },
     {
@@ -23186,6 +23346,11 @@
     {
       "id": "surface_class:validation",
       "label": "validation",
+      "type": "surface_class"
+    },
+    {
+      "id": "surface_class:validation%20contract",
+      "label": "validation contract",
       "type": "surface_class"
     },
     {

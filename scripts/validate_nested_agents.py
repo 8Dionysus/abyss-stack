@@ -130,36 +130,11 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
         'Model Context Protocol',
         'access planes',
         'mcp/protocol-lab/',
-        'mcp/services/aoa-memo-mcp/',
-        'mcp/services/aoa-decisions-mcp/',
-        'mcp/services/aoa-evals-mcp/',
-        'mcp/services/aoa-kag-mcp/',
-        'mcp/services/aoa-stats-mcp/',
-        'mcp/services/abyss-machine-mcp/',
-        'mcp/services/aoa-session-memory-mcp/',
-        'mcp/services/tos-corpus-mcp/',
-        'mcp/services/aoa-4pda-connector-mcp/',
-        'mcp/services/aoa-telegram-connector-mcp/',
-        'mcp/services/aoa-discord-connector-mcp/',
-        'mcp/services/aoa-course-connector-mcp/',
-        'mcp/services/aoa-stackoverflow-connector-mcp/',
-        'mcp/services/aoa-xda-connector-mcp/',
-        'mcp/services/abyss-stack-mcp/',
-        'python mcp/services/abyss-stack-mcp/scripts/validate_stack_mcp.py',
-        'python mcp/services/aoa-memo-mcp/scripts/validate_memo_mcp.py',
-        'python mcp/services/aoa-decisions-mcp/scripts/validate_decisions_mcp.py',
-        'python mcp/services/aoa-evals-mcp/scripts/validate_evals_mcp.py',
-        'python mcp/services/aoa-kag-mcp/scripts/validate_kag_mcp.py',
-        'python mcp/services/aoa-stats-mcp/scripts/validate_stats_mcp.py',
-        'python mcp/services/abyss-machine-mcp/scripts/validate_machine_mcp.py',
-        'python mcp/services/aoa-session-memory-mcp/scripts/validate_session_memory_mcp.py',
-        'python mcp/services/tos-corpus-mcp/scripts/validate_tos_corpus_mcp.py',
-        'python mcp/services/aoa-4pda-connector-mcp/scripts/validate_4pda_connector_mcp.py',
-        'python mcp/services/aoa-telegram-connector-mcp/scripts/validate_telegram_connector_mcp.py',
-        'python mcp/services/aoa-discord-connector-mcp/scripts/validate_discord_connector_mcp.py',
-        'python mcp/services/aoa-course-connector-mcp/scripts/validate_course_connector_mcp.py',
-        'python mcp/services/aoa-stackoverflow-connector-mcp/scripts/validate_stackoverflow_connector_mcp.py',
-        'python mcp/services/aoa-xda-connector-mcp/scripts/validate_xda_connector_mcp.py',
+        'mcp/services/README.md',
+        'service-local `AGENTS.md`',
+        'python scripts/ci_gate.py --mode mcp-services',
+        'python scripts/validate_stack.py',
+        'python scripts/validate_nested_agents.py',
         'python mcp/protocol-lab/scripts/validate_protocol_lab.py',
     ),
     'mcp/protocol-lab/AGENTS.md': (
@@ -174,36 +149,11 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
     'mcp/services/AGENTS.md': (
         'service-package district',
         'Model Context Protocol',
-        'aoa-memo-mcp',
-        'aoa-decisions-mcp',
-        'aoa-evals-mcp',
-        'aoa-kag-mcp',
-        'aoa-stats-mcp',
-        'abyss-machine-mcp',
-        'aoa-session-memory-mcp',
-        'tos-corpus-mcp',
-        'aoa-4pda-connector-mcp',
-        'aoa-telegram-connector-mcp',
-        'aoa-discord-connector-mcp',
-        'aoa-course-connector-mcp',
-        'aoa-stackoverflow-connector-mcp',
-        'aoa-xda-connector-mcp',
-        'abyss-stack-mcp',
-        'python mcp/services/abyss-stack-mcp/scripts/validate_stack_mcp.py',
-        'python mcp/services/aoa-memo-mcp/scripts/validate_memo_mcp.py',
-        'python mcp/services/aoa-decisions-mcp/scripts/validate_decisions_mcp.py',
-        'python mcp/services/aoa-evals-mcp/scripts/validate_evals_mcp.py',
-        'python mcp/services/aoa-kag-mcp/scripts/validate_kag_mcp.py',
-        'python mcp/services/aoa-stats-mcp/scripts/validate_stats_mcp.py',
-        'python mcp/services/abyss-machine-mcp/scripts/validate_machine_mcp.py',
-        'python mcp/services/aoa-session-memory-mcp/scripts/validate_session_memory_mcp.py',
-        'python mcp/services/tos-corpus-mcp/scripts/validate_tos_corpus_mcp.py',
-        'python mcp/services/aoa-4pda-connector-mcp/scripts/validate_4pda_connector_mcp.py',
-        'python mcp/services/aoa-telegram-connector-mcp/scripts/validate_telegram_connector_mcp.py',
-        'python mcp/services/aoa-discord-connector-mcp/scripts/validate_discord_connector_mcp.py',
-        'python mcp/services/aoa-course-connector-mcp/scripts/validate_course_connector_mcp.py',
-        'python mcp/services/aoa-stackoverflow-connector-mcp/scripts/validate_stackoverflow_connector_mcp.py',
-        'python mcp/services/aoa-xda-connector-mcp/scripts/validate_xda_connector_mcp.py',
+        'mcp/services/README.md',
+        'service-local `AGENTS.md`',
+        'python scripts/ci_gate.py --mode mcp-services',
+        'python scripts/validate_stack.py',
+        'python scripts/validate_nested_agents.py',
     ),
     'mcp/services/aoa-4pda-connector-mcp/AGENTS.md': (
         'read-only MCP access plane',
@@ -457,6 +407,7 @@ LEGACY_ARCHIVE_AGENTS_DOCS: tuple[str, ...] = (
 ADVISORY_AGENT_DIRS: tuple[str, ...] = ('config', 'manifests/recurrence')
 HEADING_PREFIXES = ("# AGENTS.md", "# AGENTS")
 IGNORED_DIRS = {".git", ".venv", "__pycache__", ".pytest_cache", ".mypy_cache"}
+AGENTS_CHAIN_BUDGET_BYTES = 32 * 1024
 
 
 @dataclass(frozen=True)
@@ -500,6 +451,16 @@ def discover_nested_agents(repo_root: Path) -> set[str]:
     return found
 
 
+def inherited_agents_chain(rel_path: str, available_agents: set[str]) -> tuple[str, ...]:
+    path = Path(rel_path)
+    candidates = ["AGENTS.md"]
+    current = Path()
+    for part in path.parent.parts:
+        current /= part
+        candidates.append((current / "AGENTS.md").as_posix())
+    return tuple(candidate for candidate in candidates if candidate in available_agents)
+
+
 def validate(
     repo_root: Path = REPO_ROOT,
     *,
@@ -534,6 +495,18 @@ def validate(
     required = set(REQUIRED_AGENTS_DOCS)
     known_legacy_archive = set(LEGACY_ARCHIVE_AGENTS_DOCS)
     actual = discover_nested_agents(repo_root)
+    available_agents = set(actual)
+    if root_agents.is_file():
+        available_agents.add("AGENTS.md")
+    for rel_path in sorted(available_agents):
+        chain = inherited_agents_chain(rel_path, available_agents)
+        chain_bytes = sum((repo_root / item).stat().st_size for item in chain)
+        if chain_bytes > AGENTS_CHAIN_BUDGET_BYTES:
+            rendered_chain = " + ".join(chain)
+            issues.append(
+                f"{rel_path}: inherited AGENTS chain is {chain_bytes} bytes, "
+                f"over {AGENTS_CHAIN_BUDGET_BYTES}: {rendered_chain}"
+            )
     untracked = sorted(actual - required - known_legacy_archive)
     if untracked:
         message = "untracked nested AGENTS.md not yet in validator map: " + ", ".join(untracked)
@@ -575,7 +548,8 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     print(
         f"Nested AGENTS validation passed for {REPOSITORY_NAME}: "
-        f"{len(REQUIRED_AGENTS_DOCS)} required nested document(s)."
+        f"{len(REQUIRED_AGENTS_DOCS)} required nested document(s); "
+        f"chain budget {AGENTS_CHAIN_BUDGET_BYTES} bytes."
     )
     for warning in result.warnings:
         print(f"[advisory] {warning}")

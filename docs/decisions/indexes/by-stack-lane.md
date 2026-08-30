@@ -193,6 +193,7 @@
 - [ABYSS-STACK-D-0109 Recover Expired Modern MCP Read Admission](../ABYSS-STACK-D-0109-recover-expired-modern-mcp-read-admission.md) (`docs/decisions/ABYSS-STACK-D-0109-recover-expired-modern-mcp-read-admission.md`)
 - [ABYSS-STACK-D-0125 Decouple Codex Availability From MCP Recovery](../ABYSS-STACK-D-0125-decouple-codex-availability-from-mcp-recovery.md) (`docs/decisions/ABYSS-STACK-D-0125-decouple-codex-availability-from-mcp-recovery.md`)
 - [ABYSS-STACK-D-0139 MCP SDK 2.1.1 Transition And Central Runtime Identity](../ABYSS-STACK-D-0139-mcp-sdk-2-1-1-transition.md) (`docs/decisions/ABYSS-STACK-D-0139-mcp-sdk-2-1-1-transition.md`)
+- [ABYSS-STACK-D-0140 Budget Inherited Agent Context](../ABYSS-STACK-D-0140-budget-inherited-agent-context.md) (`docs/decisions/ABYSS-STACK-D-0140-budget-inherited-agent-context.md`)
 
 ## federation seams
 
@@ -469,6 +470,7 @@
 - [ABYSS-STACK-D-0118 Admit Role-First Owner Reviewers to A2A Return](../ABYSS-STACK-D-0118-admit-role-first-owner-reviewers-to-a2a-return.md) (`docs/decisions/ABYSS-STACK-D-0118-admit-role-first-owner-reviewers-to-a2a-return.md`)
 - [ABYSS-STACK-D-0131 Codex PreToolUse Agent-Routing Adapter](../ABYSS-STACK-D-0131-codex-pretool-agent-routing-adapter.md) (`docs/decisions/ABYSS-STACK-D-0131-codex-pretool-agent-routing-adapter.md`)
 - [ABYSS-STACK-D-0132 Durable Codex Hook Install Profile](../ABYSS-STACK-D-0132-durable-codex-hook-install-profile.md) (`docs/decisions/ABYSS-STACK-D-0132-durable-codex-hook-install-profile.md`)
+- [ABYSS-STACK-D-0140 Budget Inherited Agent Context](../ABYSS-STACK-D-0140-budget-inherited-agent-context.md) (`docs/decisions/ABYSS-STACK-D-0140-budget-inherited-agent-context.md`)
 
 ## source validation
 
@@ -503,6 +505,7 @@
 - [ABYSS-STACK-D-0133 Owner-Bound External Goal Pause](../ABYSS-STACK-D-0133-owner-bound-external-goal-pause.md) (`docs/decisions/ABYSS-STACK-D-0133-owner-bound-external-goal-pause.md`)
 - [ABYSS-STACK-D-0134 Generic Responsibility-Movement Observation](../ABYSS-STACK-D-0134-generic-responsibility-movement-observation.md) (`docs/decisions/ABYSS-STACK-D-0134-generic-responsibility-movement-observation.md`)
 - [ABYSS-STACK-D-0135 Typed Incarnation Capability Projection](../ABYSS-STACK-D-0135-typed-incarnation-capability-projection.md) (`docs/decisions/ABYSS-STACK-D-0135-typed-incarnation-capability-projection.md`)
+- [ABYSS-STACK-D-0140 Budget Inherited Agent Context](../ABYSS-STACK-D-0140-budget-inherited-agent-context.md) (`docs/decisions/ABYSS-STACK-D-0140-budget-inherited-agent-context.md`)
 
 ## validation lane
 

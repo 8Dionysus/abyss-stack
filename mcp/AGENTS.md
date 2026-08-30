@@ -34,84 +34,10 @@ pairs, retains the stable registration, and blocks migration until pair-level
 conformance, read canary, and rollback receipts exist. It is a compatibility
 gate, not a server, and it never admits effectful migration.
 
-For stack runtime evidence,
-`mcp/services/abyss-stack-mcp/` exposes compact source/package/deploy/process/
-endpoint/consumer observations and separately prepares non-executing runtime
-plan candidates. It does not proxy owner tools or execute plans.
-Its Codex handoff reports exact runtime and foreign receipt refs but never
-edits consumer config, reads credentials, reloads Codex, removes registrations,
-or infers consumer-zero.
-
-For memory work, `mcp/services/aoa-memo-mcp/` exposes `aoa-memo`, `.aoa`, and
-local `memo/` routes while keeping durable memory review in `aoa-memo`.
-
-For decision-rationale navigation, `mcp/services/aoa-decisions-mcp/` exposes
-fresh workspace decision graph packets while keeping rationale authority in
-repo-local `docs/decisions/`.
-
-For bounded proof work, `mcp/services/aoa-evals-mcp/` exposes `aoa-evals`
-catalog, bundle, comparison, runtime-candidate, and report-skeleton routes
-while keeping proof authority in `aoa-evals`.
-
-For repository-knowledge access, `mcp/services/aoa-kag-mcp/` exposes compact
-discovery, search, addressed read, bounded traversal, and evidence explanation.
-Repo-local `kag/` homes retain canonical records, `aoa-kag` retains common KAG
-contracts and federation, and `kag-seam` retains mutable runtime projections.
-
-For federated statistical access, `mcp/services/aoa-stats-mcp/` exposes the
-`aoa-stats` derived catalog, compact boundary refs, canonical owner inventory,
-owner-local root `stats/` ports, and public packet compatibility while keeping
-shared statistical meaning in `aoa-stats` and local measurement meaning with
-each owner repository.
-
-For host-machine context work, `mcp/services/abyss-machine-mcp/` exposes
-`abyss-machine` bridge, evidence, resource, memory, typing, nervous, heartbeat,
-and change-ledger read models while keeping host authority in `abyss-machine`.
-
-For session-evidence context work, `mcp/services/aoa-session-memory-mcp/`
-exposes `.aoa` search, route traces, atlas maps, session briefs, retrieval
-packets, freshness checks, and diagnostics while keeping raw/session authority
-in `.aoa`.
-
-For Tree of Sophia corpus graph context work,
-`mcp/services/tos-corpus-mcp/` exposes ToS corpus index status, graph-view
-packets, resources, nodes, relation packs, and philosophy graph projection
-packets while keeping corpus and philosophy authority in `Tree-of-Sophia`.
-
-For 4PDA connector evidence work,
-`mcp/services/aoa-4pda-connector-mcp/` exposes local connector status,
-source-route, graph/hybrid query, and answer packets while keeping source
-policy, packet truth, and generated storage in `aoa-4pda-connector`.
-
-For Telegram connector evidence work,
-`mcp/services/aoa-telegram-connector-mcp/` exposes local connector status,
-source-route, graph query, and answer packets while keeping
-source policy, packet truth, account/session handling, and generated storage in
-`aoa-telegram-connector`.
-
-For Discord connector evidence work,
-`mcp/services/aoa-discord-connector-mcp/` exposes local connector status,
-source-route, graph query, and answer packets while keeping
-source policy, packet truth, token/session handling, and generated storage in
-`aoa-discord-connector`.
-
-For course connector evidence work,
-`mcp/services/aoa-course-connector-mcp/` filters the owner MCP dispatcher to
-nine local read tools. It excludes connected execution, live/network, plan,
-auth, browser, refresh, fixture-execution, and raw source-ref surfaces while
-keeping course meaning and evidence in `aoa-course-connector`.
-
-For StackOverflow connector evidence work,
-`mcp/services/aoa-stackoverflow-connector-mcp/` exposes local status,
-source-route, graph query, and answer packets while keeping score and
-accepted-answer signals as context rather than truth. It must not advertise
-the documented hybrid route until the owner CLI implements it.
-
-For XDA connector evidence work,
-`mcp/services/aoa-xda-connector-mcp/` exposes local status, source-route,
-graph query, and answer packets while keeping source policy, packet truth, and
-generated storage in `aoa-xda-connector`. It must not invent a hybrid command
-that is absent from the owner CLI.
+The runnable package map and human-facing role summaries live in
+`mcp/services/README.md`. Each service-local `AGENTS.md` owns its exact owner
+split, stop-lines, runtime-exposure posture, and executable checks. Do not copy
+that package catalog or its command matrix into this inherited district card.
 
 ## Validation
 
@@ -123,104 +49,11 @@ python mcp/protocol-lab/scripts/validate_protocol_lab.py
 python -m pytest mcp/protocol-lab/tests -q
 ```
 
-For `abyss-stack-mcp` changes, run:
+For one service package, run the exact `Run`, `Smoke`, and `Verify` route in
+its nearest `AGENTS.md`. For a change spanning the service district, run:
 
 ```bash
-python mcp/services/abyss-stack-mcp/scripts/validate_stack_mcp.py
-python -m pytest mcp/services/abyss-stack-mcp/tests -q
-```
-
-For `aoa-memo-mcp` changes, run:
-
-```bash
-python mcp/services/aoa-memo-mcp/scripts/validate_memo_mcp.py
-python -m pytest mcp/services/aoa-memo-mcp/tests -q
-```
-
-For `aoa-decisions-mcp` changes, run:
-
-```bash
-python mcp/services/aoa-decisions-mcp/scripts/validate_decisions_mcp.py
-python -m pytest mcp/services/aoa-decisions-mcp/tests -q
-```
-
-For `aoa-evals-mcp` changes, run:
-
-```bash
-python mcp/services/aoa-evals-mcp/scripts/validate_evals_mcp.py
-python -m pytest mcp/services/aoa-evals-mcp/tests -q
-```
-
-For `aoa-kag-mcp` changes, run:
-
-```bash
-python mcp/services/aoa-kag-mcp/scripts/validate_kag_mcp.py
-python -m pytest mcp/services/aoa-kag-mcp/tests -q
-```
-
-For `aoa-stats-mcp` changes, run:
-
-```bash
-python mcp/services/aoa-stats-mcp/scripts/validate_stats_mcp.py
-python -m pytest mcp/services/aoa-stats-mcp/tests -q
-```
-
-For `abyss-machine-mcp` changes, run:
-
-```bash
-python mcp/services/abyss-machine-mcp/scripts/validate_machine_mcp.py
-python -m pytest mcp/services/abyss-machine-mcp/tests -q
-```
-
-For `aoa-session-memory-mcp` changes, run:
-
-```bash
-python mcp/services/aoa-session-memory-mcp/scripts/validate_session_memory_mcp.py
-python mcp/services/tos-corpus-mcp/scripts/validate_tos_corpus_mcp.py
-python -m pytest mcp/services/aoa-session-memory-mcp/tests -q
-python -m pytest mcp/services/tos-corpus-mcp/tests -q
-```
-
-For `aoa-4pda-connector-mcp` changes, run:
-
-```bash
-python mcp/services/aoa-4pda-connector-mcp/scripts/validate_4pda_connector_mcp.py
-python -m pytest mcp/services/aoa-4pda-connector-mcp/tests -q
-```
-
-For `aoa-telegram-connector-mcp` changes, run:
-
-```bash
-python mcp/services/aoa-telegram-connector-mcp/scripts/validate_telegram_connector_mcp.py
-python -m pytest mcp/services/aoa-telegram-connector-mcp/tests -q
-```
-
-For `aoa-discord-connector-mcp` changes, run:
-
-```bash
-python mcp/services/aoa-discord-connector-mcp/scripts/validate_discord_connector_mcp.py
-python -m pytest mcp/services/aoa-discord-connector-mcp/tests -q
-```
-
-For `aoa-course-connector-mcp` changes, run:
-
-```bash
-python mcp/services/aoa-course-connector-mcp/scripts/validate_course_connector_mcp.py
-python -m pytest mcp/services/aoa-course-connector-mcp/tests -q
-```
-
-For `aoa-stackoverflow-connector-mcp` changes, run:
-
-```bash
-python mcp/services/aoa-stackoverflow-connector-mcp/scripts/validate_stackoverflow_connector_mcp.py
-python -m pytest mcp/services/aoa-stackoverflow-connector-mcp/tests -q
-```
-
-For `aoa-xda-connector-mcp` changes, run:
-
-```bash
-python mcp/services/aoa-xda-connector-mcp/scripts/validate_xda_connector_mcp.py
-python -m pytest mcp/services/aoa-xda-connector-mcp/tests -q
+python scripts/ci_gate.py --mode mcp-services
 ```
 
 For release-facing stack changes, also run:

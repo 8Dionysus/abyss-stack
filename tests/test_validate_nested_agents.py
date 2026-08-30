@@ -98,6 +98,37 @@ class ValidateNestedAgentsTests(unittest.TestCase):
             self.assertTrue(any("mechanics/new-surface/AGENTS.md" in warning for warning in result.warnings))
             self.assertTrue(any("mechanics/new-surface/AGENTS.md" in issue for issue in strict_result.issues))
 
+    def test_inherited_chain_budget_covers_unmodeled_cards(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            _write_minimal_required_tree(repo_root)
+            rel_path = "mcp/services/new-surface/AGENTS.md"
+            for parent in ("AGENTS.md", "mcp/AGENTS.md", "mcp/services/AGENTS.md"):
+                path = repo_root / parent
+                _write(path, path.read_text(encoding="utf-8") + ("parent route\n" * 900))
+            _write(repo_root / rel_path, "# AGENTS.md\nLocal delta.\n")
+
+            chain = validator.inherited_agents_chain(
+                rel_path,
+                validator.discover_nested_agents(repo_root) | {"AGENTS.md"},
+            )
+            self.assertTrue(
+                all(
+                    (repo_root / path).stat().st_size
+                    < validator.AGENTS_CHAIN_BUDGET_BYTES
+                    for path in chain
+                )
+            )
+
+            result = validator.validate(repo_root)
+
+            self.assertTrue(
+                any(
+                    rel_path in issue and "inherited AGENTS chain" in issue
+                    for issue in result.issues
+                )
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
