@@ -59,14 +59,45 @@ def _canonical_bytes(value: Any) -> bytes:
     return rendered.encode("utf-8")
 
 
+def _consume_json_string_budget(
+    value: str,
+    label: str,
+    remaining_bytes: list[int],
+) -> None:
+    """Account for ensure_ascii JSON string bytes without materializing them."""
+
+    if len(value) + 2 > remaining_bytes[0]:
+        raise EphemeralWorkerError(
+            f"{label} strings exceed max_transport_bytes before validation "
+            "and before serialization"
+        )
+    encoded_bytes = 2
+    for character in value:
+        codepoint = ord(character)
+        if character in {'"', "\\"} or character in "\b\f\n\r\t":
+            encoded_bytes += 2
+        elif codepoint < 0x20 or 0x7F <= codepoint <= 0xFFFF:
+            encoded_bytes += 6
+        elif codepoint > 0xFFFF:
+            encoded_bytes += 12
+        else:
+            encoded_bytes += 1
+        if encoded_bytes > remaining_bytes[0]:
+            raise EphemeralWorkerError(
+                f"{label} strings exceed max_transport_bytes before validation "
+                "and before serialization"
+            )
+    remaining_bytes[0] -= encoded_bytes
+
+
 def _normalize_json_value(
     value: object,
     label: str,
     *,
-    _max_string_length: int = MAX_BYTE_CEILING,
     _depth: int = 0,
     _active_containers: set[int] | None = None,
     _remaining_nodes: list[int] | None = None,
+    _remaining_string_bytes: list[int] | None = None,
 ) -> object:
     """Copy a JSON-like value through bounded, cycle-safe traversal."""
 
@@ -76,6 +107,8 @@ def _normalize_json_value(
         _active_containers = set()
     if _remaining_nodes is None:
         _remaining_nodes = [MAX_JSON_NODES]
+    if _remaining_string_bytes is None:
+        _remaining_string_bytes = [MAX_BYTE_CEILING]
     _remaining_nodes[0] -= 1
     if _remaining_nodes[0] < 0:
         raise EphemeralWorkerError("result exceeds the supported JSON node count")
@@ -100,18 +133,18 @@ def _normalize_json_value(
                         raise EphemeralWorkerError(
                             f"{label} object keys must be strings"
                         )
-                    if len(key) > _max_string_length:
-                        raise EphemeralWorkerError(
-                            f"{label} object key exceeds max_transport_bytes "
-                            "before validation and before serialization"
-                        )
+                    _consume_json_string_budget(
+                        key,
+                        f"{label} object key",
+                        _remaining_string_bytes,
+                    )
                     normalized[key] = _normalize_json_value(
                         item,
                         f"{label}.{key}",
-                        _max_string_length=_max_string_length,
                         _depth=_depth + 1,
                         _active_containers=_active_containers,
                         _remaining_nodes=_remaining_nodes,
+                        _remaining_string_bytes=_remaining_string_bytes,
                     )
                 return normalized
             sequence_value = cast(Sequence[object], value)
@@ -123,20 +156,17 @@ def _normalize_json_value(
                 _normalize_json_value(
                     item,
                     f"{label}[{index}]",
-                    _max_string_length=_max_string_length,
                     _depth=_depth + 1,
                     _active_containers=_active_containers,
                     _remaining_nodes=_remaining_nodes,
+                    _remaining_string_bytes=_remaining_string_bytes,
                 )
                 for index, item in enumerate(sequence_value)
             ]
         finally:
             _active_containers.remove(container_id)
-    if isinstance(value, str) and len(value) > _max_string_length:
-        raise EphemeralWorkerError(
-            f"{label} string exceeds max_transport_bytes before validation "
-            "and before serialization"
-        )
+    if isinstance(value, str):
+        _consume_json_string_budget(value, label, _remaining_string_bytes)
     if value is None or isinstance(value, (str, int, float, bool)):
         return value
     raise EphemeralWorkerError(f"{label} contains a non-JSON value")
@@ -563,7 +593,7 @@ def validate_ephemeral_read_result(
         candidate = _normalize_json_value(
             payload,
             "result",
-            _max_string_length=transport_ceiling,
+            _remaining_string_bytes=[transport_ceiling],
         )
         if len(_canonical_bytes(candidate)) > transport_ceiling:
             raise EphemeralWorkerError(

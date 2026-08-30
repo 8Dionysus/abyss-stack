@@ -282,6 +282,11 @@ def test_result_intake_bounds_mapping_normalization(tmp_path: Path) -> None:
     with pytest.raises(EphemeralWorkerError, match="before serialization"):
         validate_ephemeral_read_result(oversized_string, max_transport_bytes=64)
 
+    repeated_strings = UserDict(result)
+    repeated_strings["records"] = [result["records"][0]] * 32  # type: ignore[index]
+    with pytest.raises(EphemeralWorkerError, match="before serialization"):
+        validate_ephemeral_read_result(repeated_strings, max_transport_bytes=512)
+
 
 def test_result_intake_normalizes_oversized_json_integer_parse_failure() -> None:
     payload = '{"counter":' + ("9" * 5000) + "}"
