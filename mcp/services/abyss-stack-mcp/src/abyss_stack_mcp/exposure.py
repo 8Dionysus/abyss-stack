@@ -16,9 +16,17 @@ import math
 import re
 from collections.abc import Callable, Mapping
 from datetime import datetime, timedelta, timezone
+from types import MappingProxyType
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    PlainSerializer,
+    field_validator,
+    model_validator,
+)
 
 from .core import (
     StackMCPError,
@@ -116,32 +124,23 @@ class _ExposurePayloadTooLarge(ValueError):
     pass
 
 
-class _FrozenJSONMapping(dict[str, Any]):
-    """Serializable recursive mapping whose content cannot drift after hashing."""
+def _thaw_json(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {str(key): _thaw_json(nested) for key, nested in value.items()}
+    if isinstance(value, tuple):
+        return [_thaw_json(nested) for nested in value]
+    return value
 
-    @staticmethod
-    def _reject_mutation(*_args: Any, **_kwargs: Any) -> None:
-        raise TypeError("exposure mapping is frozen")
 
-    __setitem__ = _reject_mutation
-    __delitem__ = _reject_mutation
-    __ior__ = _reject_mutation
-    clear = _reject_mutation
-    pop = _reject_mutation
-    popitem = _reject_mutation
-    setdefault = _reject_mutation
-    update = _reject_mutation
-
-    def __copy__(self) -> _FrozenJSONMapping:
-        return self
-
-    def __deepcopy__(self, _memo: dict[int, Any]) -> _FrozenJSONMapping:
-        return self
+FrozenJSONMapping = Annotated[
+    Mapping[str, Any],
+    PlainSerializer(_thaw_json, return_type=dict[str, Any], when_used="json"),
+]
 
 
 def _freeze_json(value: Any) -> Any:
     if isinstance(value, Mapping):
-        return _FrozenJSONMapping(
+        return MappingProxyType(
             {str(key): _freeze_json(nested) for key, nested in value.items()}
         )
     if isinstance(value, (list, tuple)):
@@ -373,16 +372,16 @@ class StackExposureCapabilityBinding(StrictExposureModel):
     organ_id: NonEmpty
     capability_id: NonEmpty
     qualified_capability_id: NonEmpty
-    owners: Annotated[Mapping[str, Any], Field(max_length=MAX_EXPOSURE_MAPPING_ITEMS)]
+    owners: Annotated[FrozenJSONMapping, Field(max_length=MAX_EXPOSURE_MAPPING_ITEMS)]
     capability_digest: Digest
     schema_digest: Digest
     source_revision: Annotated[
-        Mapping[str, Any], Field(max_length=MAX_EXPOSURE_MAPPING_ITEMS)
+        FrozenJSONMapping, Field(max_length=MAX_EXPOSURE_MAPPING_ITEMS)
     ]
     freshness: StackExposureFreshness
     effect_ceiling: PolicyFamily
     approval_ref: Annotated[
-        Mapping[str, Any] | None, Field(max_length=MAX_EXPOSURE_MAPPING_ITEMS)
+        FrozenJSONMapping | None, Field(max_length=MAX_EXPOSURE_MAPPING_ITEMS)
     ] = None
     rollback_route: NonEmpty
 
@@ -420,7 +419,7 @@ class StackExposurePlan(StrictExposureModel):
     ] = ()
     rendered_snapshot: StackExposureSnapshot
     approval_ref: Annotated[
-        Mapping[str, Any] | None, Field(max_length=MAX_EXPOSURE_MAPPING_ITEMS)
+        FrozenJSONMapping | None, Field(max_length=MAX_EXPOSURE_MAPPING_ITEMS)
     ] = None
     rollback_bindings: Annotated[
         tuple[ExposureRollbackBinding, ...],
@@ -784,6 +783,12 @@ class ExposureRuntime:
             reasons.append("exposure_snapshot_from_future")
         if normalized.rendered_snapshot.expires_at <= now:
             reasons.append("exposure_snapshot_expired")
+        if (
+            normalized.rendered_snapshot.expires_at
+            - normalized.rendered_snapshot.observed_at
+            > MAX_CANDIDATE_TTL
+        ):
+            reasons.append("exposure_snapshot_ttl_exceeded")
         freshness = normalized.capability.freshness
         if freshness.state not in {"fresh", "provider_reported"}:
             reasons.append("capability_freshness_not_usable")

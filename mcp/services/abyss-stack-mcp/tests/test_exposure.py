@@ -371,8 +371,14 @@ def test_materialization_retains_a_revalidated_plan_snapshot() -> None:
     plan = StackExposurePlan.from_sdk_payload(_payload())
     materialization = runtime.materialize(plan)
 
-    with pytest.raises(TypeError, match="frozen"):
+    with pytest.raises(TypeError):
         plan.capability.owners["access_owner"] = "tampered-owner"
+    with pytest.raises(TypeError):
+        dict.__setitem__(
+            plan.capability.owners, "access_owner", "tampered-owner"
+        )
+    with pytest.raises(TypeError):
+        dict.__init__(plan.capability.owners, {"access_owner": "tampered-owner"})
     authorization_body = {
         "owner": "aoa-kag",
         "plan_id": plan.plan_id,
@@ -461,6 +467,29 @@ def test_stale_capability_freshness_is_not_materialized() -> None:
 
     assert receipt.decision == "denied"
     assert "capability_freshness_not_usable" in receipt.reason_codes
+
+
+def test_rendered_snapshot_lifetime_is_bounded_before_materialization() -> None:
+    runtime = ExposureRuntime(
+        progressive_exposure_enabled=True,
+        baseline_admitted=True,
+        baseline_admission_ref="receipt://d0/baseline-ready",
+        clock=lambda: NOW,
+    )
+    payload = _payload()
+    snapshot = payload["rendered_snapshot"]
+    snapshot["observed_at"] = (NOW - timedelta(days=1)).isoformat().replace(
+        "+00:00", "Z"
+    )
+    snapshot_body = {
+        key: value for key, value in snapshot.items() if key != "snapshot_id"
+    }
+    snapshot["snapshot_id"] = sha256_digest(snapshot_body)
+
+    receipt = runtime.materialize(_redigest_plan(payload))
+
+    assert receipt.decision == "denied"
+    assert "exposure_snapshot_ttl_exceeded" in receipt.reason_codes
 
 
 def test_inconsistent_capability_freshness_ttl_is_rejected() -> None:
