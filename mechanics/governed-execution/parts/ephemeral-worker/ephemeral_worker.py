@@ -548,6 +548,10 @@ def validate_ephemeral_read_result(
             raise EphemeralWorkerError("result is not canonical JSON input") from exc
     elif isinstance(payload, Mapping):
         candidate = _normalize_json_value(payload, "result")
+        if len(_canonical_bytes(candidate)) > transport_ceiling:
+            raise EphemeralWorkerError(
+                "mapped result exceeds max_transport_bytes before validation"
+            )
     else:
         raise EphemeralWorkerError("result must be JSON bytes, text, or an object")
 

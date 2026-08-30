@@ -181,8 +181,22 @@ def test_result_intake_bounds_mapped_base64_before_decode(tmp_path: Path) -> Non
     path.write_bytes(content)
     result = run_ephemeral_read_worker(_request(path, content))
 
-    with pytest.raises(EphemeralWorkerError, match="before decode"):
+    with pytest.raises(EphemeralWorkerError, match="before validation"):
         validate_ephemeral_read_result(result, max_transport_bytes=8)
+
+
+def test_result_intake_counts_mapped_metadata_before_record_validation(
+    tmp_path: Path,
+) -> None:
+    content = b"x"
+    path = tmp_path / "small.txt"
+    path.write_bytes(content)
+    result = run_ephemeral_read_worker(_request(path, content))
+    result["records"][0]["artifact_ref"] = "a" * 4096  # type: ignore[index]
+    _resign_result(result)
+
+    with pytest.raises(EphemeralWorkerError, match="before validation"):
+        validate_ephemeral_read_result(result, max_transport_bytes=512)
 
 
 def test_result_intake_accepts_schema_valid_integral_counters(tmp_path: Path) -> None:
