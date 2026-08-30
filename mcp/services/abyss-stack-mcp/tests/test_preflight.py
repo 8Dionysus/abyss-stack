@@ -423,8 +423,10 @@ def test_preflight_rejects_canary_from_predecessor_deployment(tmp_path: Path) ->
 
 def test_runtime_overlay_binds_authenticated_canary_to_exact_deployment(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     binding = _fixture(tmp_path)
+    monkeypatch.setenv("AOA_WORKSPACE_ROOT", str(tmp_path))
     registry = json.loads(Path(binding.registry_path).read_text(encoding="utf-8"))
     registry["records"][0]["contours"][0]["runtime_identity"]["source_revision"] = (
         "a" * 40
@@ -441,7 +443,7 @@ def test_runtime_overlay_binds_authenticated_canary_to_exact_deployment(
         registry_organ_id=binding.organ_id,
         service_id=binding.service_id,
         unit_name=binding.unit_name,
-        executable_ref=binding.executable_path,
+        executable_ref="${AOA_WORKSPACE_ROOT}/bin/demo-server",
         endpoint_ref=binding.endpoint_ref,
         protocol_versions=(binding.protocol_version,),
         effect_classes=("observe",),
@@ -486,6 +488,7 @@ def test_runtime_overlay_binds_authenticated_canary_to_exact_deployment(
     )
     runtime_identity = overlay["contours"][0]["runtime_identity"]
     assert runtime_identity["deployment_manifest_ref"] == deployment["record_ref"]
+    assert runtime_identity["process_ref"] == binding.executable_path
     assert runtime_identity["process_identity"] == (
         f"systemd-user:{binding.unit_name}:pid:321:start:654"
     )

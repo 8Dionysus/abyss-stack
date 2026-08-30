@@ -378,6 +378,14 @@ def _load_targets(path: Path) -> tuple[RuntimeTargetCatalog, str]:
             "runtime target catalog failed contract validation"
         ) from exc
     catalog_digest = _digest(catalog.model_dump(mode="json"))
+    return _resolve_runtime_target_catalog(catalog), catalog_digest
+
+
+def _resolve_runtime_target_catalog(
+    catalog: RuntimeTargetCatalog,
+) -> RuntimeTargetCatalog:
+    """Resolve deployment-owned target references before any consumer uses them."""
+
     resolved_payload = catalog.model_dump(mode="json")
     for target in resolved_payload["targets"]:
         target["executable_ref"] = _ENV_REF.sub(
@@ -390,7 +398,7 @@ def _load_targets(path: Path) -> tuple[RuntimeTargetCatalog, str]:
         raise ObservationProducerError(
             "runtime target catalog failed resolved executable contract"
         ) from exc
-    return catalog, catalog_digest
+    return catalog
 
 
 def _load_deployment(path: Path) -> tuple[dict[str, Any], str]:

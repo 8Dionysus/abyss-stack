@@ -26,7 +26,9 @@ from .observation import (
     RuntimeTargetCatalog,
     SystemctlRunner,
     _load_deployment,
+    _load_targets,
     _process_observation,
+    _resolve_runtime_target_catalog,
     _systemctl,
 )
 
@@ -47,6 +49,7 @@ def build_runtime_overlay(
     deployment_loader: DeploymentLoader = _load_deployment,
 ) -> tuple[dict[str, Any], tuple[dict[str, str], ...]]:
     now = (generated_at or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    targets = _resolve_runtime_target_catalog(targets)
     try:
         verified_deployment, verified_manifest_id = deployment_loader(
             deployment_manifest_path
@@ -314,9 +317,7 @@ def main() -> int:
     try:
         registry = _safe_json(args.registry, "v2 organ registry")
         deployment = _safe_json(args.deployment_manifest, "deployment manifest")
-        targets = RuntimeTargetCatalog.model_validate(
-            _safe_json(args.runtime_targets, "runtime targets")
-        )
+        targets, _ = _load_targets(args.runtime_targets)
         overlay, skipped = build_runtime_overlay(
             registry,
             deployment,
