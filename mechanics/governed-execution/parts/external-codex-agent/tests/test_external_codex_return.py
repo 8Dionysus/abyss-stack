@@ -4,8 +4,11 @@ import fcntl
 import importlib.util
 import json
 import os
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 from jsonschema import ValidationError, validate
@@ -18,6 +21,16 @@ SPEC = importlib.util.spec_from_file_location(
 assert SPEC is not None and SPEC.loader is not None
 MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
+
+
+@pytest.fixture(autouse=True)
+def _isolated_pause_lock_root(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pause-locks"
+    root.mkdir(mode=0o700)
+    monkeypatch.setattr(MODULE, "_pause_attempt_lock_root", lambda: root)
 
 
 def owner(*, goal: str, thread: str, endpoint: str | None = None) -> dict[str, object]:
@@ -56,7 +69,6 @@ class FakeRpc:
         bounded_turns: bool = False,
         fallback_active_turn: str | None = None,
         goal_set_status: str = "active",
-        atomic_goal_transition: bool = True,
     ) -> None:
         self.endpoint = endpoint
         self.active_turn = active_turn
@@ -66,75 +78,12 @@ class FakeRpc:
         self.bounded_turns = bounded_turns
         self.fallback_active_turn = fallback_active_turn
         self.goal_set_status = goal_set_status
-        self.supports_atomic_goal_transition = atomic_goal_transition
+        self.goal_get_extra: dict[str, object] = {}
+        self.lose_goal_set_response = False
         self.calls: list[tuple[str, dict[str, object] | None]] = []
         self.request_prepare_callback = None
         self.request_issued_callback = None
         self._counter = 0
-
-    def pause_transition_proof(
-        self,
-        *,
-        owner: dict[str, object],
-        precondition: dict[str, object],
-        mutation: dict[str, object],
-        goal_response: dict[str, object],
-    ) -> dict[str, object]:
-        return {
-            "schema_version": MODULE.PAUSE_TRANSITION_PROOF_SCHEMA_VERSION,
-            "kind": "server_compare_and_set",
-            "method": "thread/goal/set",
-            "thread_id": owner["thread_id"],
-            "from_status": "active",
-            "to_status": "paused",
-            "precondition_sha256": precondition["goal_response_sha256"],
-            "request_id": mutation["request_id"],
-            "request_sha256": mutation["request_sha256"],
-            "goal_response_sha256": MODULE._sha256_bytes(
-                MODULE._canonical_bytes(goal_response)
-            ),
-        }
-
-    def atomic_goal_transition(
-        self,
-        *,
-        owner: dict[str, object],
-        precondition: dict[str, object],
-        status: str,
-    ) -> dict[str, object]:
-        goal_response = self.call(
-            "thread/goal/set",
-            {"threadId": owner["thread_id"], "status": status},
-        )
-        mutation_params = next(
-            payload
-            for method, payload in self.calls
-            if method == "thread/goal/set"
-        )
-        assert isinstance(mutation_params, dict)
-        request_id = self._counter
-        request_sha256 = MODULE._sha256_bytes(
-            MODULE._canonical_bytes(
-                {
-                    "jsonrpc": "2.0",
-                    "id": request_id,
-                    "method": "thread/goal/set",
-                    "params": mutation_params,
-                }
-            )
-        )
-        return {
-            "goal_response": goal_response,
-            "transition_proof": self.pause_transition_proof(
-                owner=owner,
-                precondition=precondition,
-                mutation={
-                    "request_id": request_id,
-                    "request_sha256": request_sha256,
-                },
-                goal_response=goal_response,
-            ),
-        }
 
     def __enter__(self) -> "FakeRpc":
         return self
@@ -151,13 +100,16 @@ class FakeRpc:
         if method == "initialize":
             return {"protocolVersion": "1"}
         if method == "thread/goal/get":
-            return {
+            response: dict[str, object] = {
                 "goal": {
                     "threadId": self.thread_id,
                     "status": self.goal_status,
                 }
             }
+            response.update(self.goal_get_extra)
+            return response
         if method == "thread/goal/set":
+            self.goal_status = self.goal_set_status
             if self.request_prepare_callback is not None:
                 self.request_prepare_callback(
                     method,
@@ -181,6 +133,11 @@ class FakeRpc:
                         "method": method,
                         "params": params,
                     },
+                )
+            self.goal_status = self.goal_set_status
+            if self.lose_goal_set_response:
+                raise MODULE.ExternalCodexReturnError(
+                    "simulated Goal set response loss"
                 )
             return {
                 "goal": {
@@ -356,6 +313,12 @@ def test_pause_goal_proves_exact_active_to_paused_transition(
     assert receipt["lifecycle"]["mutation_dispatched"]["method"] == (
         "thread/goal/set"
     )
+    assert receipt["lifecycle"]["goal_response"] == {
+        "goal": {"threadId": "thread-pause", "status": "paused"}
+    }
+    assert receipt["lifecycle"]["goal_response_sha256"] == MODULE._sha256_bytes(
+        MODULE._canonical_bytes(receipt["lifecycle"]["goal_response"])
+    )
     validate(
         instance=receipt,
         schema=json.loads(
@@ -380,10 +343,11 @@ def test_pause_goal_proves_exact_active_to_paused_transition(
         "initialized",
         "thread/goal/get",
         "thread/goal/set",
+        "thread/goal/get",
     ]
 
 
-def test_pause_goal_refuses_non_atomic_app_server_before_mutation(
+def test_pause_goal_uses_the_current_public_goal_set_surface(
     tmp_path: Path,
 ) -> None:
     owner_path = tmp_path / "pause-owner.json"
@@ -409,23 +373,93 @@ def test_pause_goal_refuses_non_atomic_app_server_before_mutation(
         goal_status="active",
         goal_set_status="paused",
         thread_id="thread-pause-non-atomic",
-        atomic_goal_transition=False,
     )
 
-    with pytest.raises(
-        MODULE.ExternalCodexReturnError,
-        match="no server-supported compare-and-set/version proof",
-    ):
-        MODULE.pause_goal(
-            MODULE.validate_pause_owner(owner_value),
-            owner_path,
-            endpoint,
-            reservation_path=pause_path,
+    receipt = MODULE.pause_goal(
+        MODULE.validate_pause_owner(owner_value),
+        owner_path,
+        endpoint,
+        reservation_path=pause_path,
+        reservation=reservation,
+        rpc_factory=lambda _path: fake,
+    )
+
+    assert receipt["lifecycle"]["response_available"] is True
+    assert receipt["lifecycle"]["transition_proof"]["kind"] == (
+        "request_response_post_read"
+    )
+    assert [method for method, _params in fake.calls].count("thread/goal/set") == 1
+    assert [method for method, _params in fake.calls].count("thread/goal/get") == 2
+
+
+def test_run_pause_reconciles_a_lost_set_response_without_a_second_set(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    owner_path = tmp_path / "pause-owner.json"
+    endpoint = tmp_path / "app-server.sock"
+    owner_value = pause_owner(
+        goal="goal-pause-response-loss",
+        thread="thread-pause-response-loss",
+        endpoint=f"unix:{endpoint}",
+    )
+    owner_path.write_bytes(MODULE._canonical_bytes(owner_value) + b"\n")
+    pause_path = tmp_path / "pause-receipt.json"
+    fake = FakeRpc(
+        endpoint,
+        active_turn=None,
+        goal_status="active",
+        goal_set_status="paused",
+        thread_id="thread-pause-response-loss",
+    )
+    fake.lose_goal_set_response = True
+    monkeypatch.setattr(
+        MODULE,
+        "discover_app_server_socket",
+        lambda _owner: (endpoint, "explicit-endpoint"),
+    )
+    pause_impl = MODULE.pause_goal
+
+    def pause_once(
+        owner_value: dict[str, object],
+        owner_file: Path,
+        target: Path,
+        *,
+        owner_bytes: bytes,
+        reservation_path: Path | None = None,
+        reservation: dict[str, object] | None = None,
+    ) -> dict[str, object]:
+        return pause_impl(
+            owner_value,
+            owner_file,
+            target,
+            owner_bytes=owner_bytes,
+            reservation_path=reservation_path,
             reservation=reservation,
             rpc_factory=lambda _path: fake,
         )
 
-    assert not any(method == "thread/goal/set" for method, _params in fake.calls)
+    monkeypatch.setattr(MODULE, "pause_goal", pause_once)
+    args = SimpleNamespace(
+        pause_owner=str(owner_path),
+        pause_receipt=str(pause_path),
+    )
+    with pytest.raises(MODULE.ExternalCodexReturnError, match="response loss"):
+        MODULE.run_pause(args)
+    reserved = json.loads(pause_path.read_text(encoding="utf-8"))
+    assert reserved["state"] == "reserved"
+    assert "goal_response" not in reserved
+    assert reserved["mutation_dispatched"]["method"] == "thread/goal/set"
+
+    fake.lose_goal_set_response = False
+    receipt = MODULE.run_pause(args)
+    assert receipt["recovery"]["mode"] == "ambiguous_post_mutation"
+    assert receipt["recovery"]["mutation_response_available"] is False
+    assert receipt["lifecycle"]["response_available"] is False
+    assert receipt["lifecycle"]["transition_proof"]["kind"] == (
+        "dispatch_reconciled_post_read"
+    )
+    assert len([method for method, _params in fake.calls if method == "thread/goal/set"]) == 1
 
 
 def test_pause_goal_requires_durable_reservation_before_transport(
@@ -585,6 +619,21 @@ def test_pause_precondition_rejects_tampered_stored_goal_summary() -> None:
     ):
         MODULE._validated_pause_precondition(tampered_digest)
 
+    owner_value = pause_owner(
+        goal="goal-precondition-owner", thread="thread-precondition-owner"
+    )
+    foreign_precondition = MODULE._pause_precondition(
+        {"goal": {"threadId": "thread-foreign", "status": "active"}}
+    )
+    with pytest.raises(
+        MODULE.ExternalCodexReturnError,
+        match="different thread",
+    ):
+        MODULE._validated_pause_precondition(
+            {"precondition": foreign_precondition},
+            owner=MODULE.validate_pause_owner(owner_value),
+        )
+
 
 def test_run_pause_reserves_and_replays_without_second_transport_mutation(
     tmp_path: Path,
@@ -643,7 +692,46 @@ def test_run_pause_reserves_and_replays_without_second_transport_mutation(
     first = MODULE.run_pause(args)
     assert first["goal_binding"]["transition"] == "active_to_paused"
     assert first["pause_receipt_ref"] == str(pause_path.resolve())
+    assert isinstance(first["lifecycle"]["post_read_response"], dict)
+    assert first["lifecycle"]["post_read_response_sha256"] == MODULE._sha256_bytes(
+        MODULE._canonical_bytes(first["lifecycle"]["post_read_response"])
+    )
     assert len([method for method, _params in fake.calls if method == "thread/goal/set"]) == 1
+
+    tampered_post_read = json.loads(json.dumps(first))
+    tampered_post_read["lifecycle"]["post_read_response"]["server_metadata"] = {
+        "revision": 2
+    }
+    pause_path.write_bytes(MODULE._canonical_bytes(tampered_post_read) + b"\n")
+    with pytest.raises(
+        MODULE.ExternalCodexReturnError,
+        match="lifecycle evidence",
+    ):
+        MODULE.run_pause(args)
+
+    tampered_goal_response = json.loads(json.dumps(first))
+    tampered_goal_response["lifecycle"]["goal_response"]["server_metadata"] = {
+        "revision": 2
+    }
+    pause_path.write_bytes(
+        MODULE._canonical_bytes(tampered_goal_response) + b"\n"
+    )
+    with pytest.raises(
+        MODULE.ExternalCodexReturnError,
+        match="response digest",
+    ):
+        MODULE.run_pause(args)
+
+    tampered_post_read_summary = json.loads(json.dumps(first))
+    tampered_post_read_summary["lifecycle"]["post_read"]["id"] = "different"
+    pause_path.write_bytes(
+        MODULE._canonical_bytes(tampered_post_read_summary) + b"\n"
+    )
+    with pytest.raises(
+        MODULE.ExternalCodexReturnError,
+        match="post-read summary",
+    ):
+        MODULE.run_pause(args)
 
     incomplete = json.loads(json.dumps(first))
     incomplete["lifecycle"]["response_available"] = False
@@ -799,8 +887,254 @@ def test_run_pause_reserves_and_replays_without_second_transport_mutation(
         "pause_goal",
         lambda *_args, **_kwargs: pytest.fail("pause transport replayed"),
     )
+    fake.goal_get_extra = {"server_metadata": {"revision": 2}}
     second = MODULE.run_pause(args)
     assert second == first
+
+
+def test_run_pause_reasserts_owner_immediately_before_mutation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    owner_path = tmp_path / "pause-owner-drift-before-mutation.json"
+    endpoint = tmp_path / "pause-owner-drift-before-mutation.sock"
+    owner_value = pause_owner(
+        goal="goal-pause-owner-drift-before-mutation",
+        thread="thread-pause-owner-drift-before-mutation",
+        endpoint=f"unix:{endpoint}",
+    )
+    owner_path.write_bytes(MODULE._canonical_bytes(owner_value) + b"\n")
+    pause_path = tmp_path / "pause-owner-drift-before-mutation-receipt.json"
+    fake = FakeRpc(
+        endpoint,
+        active_turn=None,
+        goal_status="active",
+        goal_set_status="paused",
+        thread_id="thread-pause-owner-drift-before-mutation",
+    )
+    original_call = fake.call
+    owner_drifted = False
+
+    def call_with_owner_drift(
+        method: str,
+        params: dict[str, object] | None = None,
+    ) -> dict[str, object]:
+        nonlocal owner_drifted
+        response = original_call(method, params)
+        if method == "thread/goal/get" and not owner_drifted:
+            owner_drifted = True
+            drifted = {**owner_value, "acceptance_posture": "owner-drifted"}
+            owner_path.write_bytes(MODULE._canonical_bytes(drifted) + b"\n")
+        return response
+
+    fake.call = call_with_owner_drift  # type: ignore[method-assign]
+    monkeypatch.setattr(
+        MODULE,
+        "discover_app_server_socket",
+        lambda _owner: (endpoint, "explicit-endpoint"),
+    )
+    pause_impl = MODULE.pause_goal
+
+    def pause_once(
+        owner_value: dict[str, object],
+        owner_file: Path,
+        target: Path,
+        *,
+        owner_bytes: bytes,
+        reservation_path: Path | None = None,
+        reservation: dict[str, object] | None = None,
+    ) -> dict[str, object]:
+        return pause_impl(
+            owner_value,
+            owner_file,
+            target,
+            owner_bytes=owner_bytes,
+            reservation_path=reservation_path,
+            reservation=reservation,
+            rpc_factory=lambda _path: fake,
+        )
+
+    monkeypatch.setattr(MODULE, "pause_goal", pause_once)
+    with pytest.raises(MODULE.VISIBLE.IncarnationHomeError, match="pause owner"):
+        MODULE.run_pause(
+            SimpleNamespace(
+                pause_owner=str(owner_path),
+                pause_receipt=str(pause_path),
+            )
+        )
+
+    assert owner_drifted is True
+    assert not any(method == "thread/goal/set" for method, _params in fake.calls)
+
+
+def test_run_pause_reasserts_owner_after_proof_persistence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    owner_path = tmp_path / "pause-owner-drift-after-proof.json"
+    endpoint = tmp_path / "pause-owner-drift-after-proof.sock"
+    owner_value = pause_owner(
+        goal="goal-pause-owner-drift-after-proof",
+        thread="thread-pause-owner-drift-after-proof",
+        endpoint=f"unix:{endpoint}",
+    )
+    owner_path.write_bytes(MODULE._canonical_bytes(owner_value) + b"\n")
+    pause_path = tmp_path / "pause-owner-drift-after-proof-receipt.json"
+    fake = FakeRpc(
+        endpoint,
+        active_turn=None,
+        goal_status="active",
+        goal_set_status="paused",
+        thread_id="thread-pause-owner-drift-after-proof",
+    )
+    monkeypatch.setattr(
+        MODULE,
+        "discover_app_server_socket",
+        lambda _owner: (endpoint, "explicit-endpoint"),
+    )
+    pause_impl = MODULE.pause_goal
+
+    def pause_once(
+        owner_value: dict[str, object],
+        owner_file: Path,
+        target: Path,
+        *,
+        owner_bytes: bytes,
+        reservation_path: Path | None = None,
+        reservation: dict[str, object] | None = None,
+    ) -> dict[str, object]:
+        return pause_impl(
+            owner_value,
+            owner_file,
+            target,
+            owner_bytes=owner_bytes,
+            reservation_path=reservation_path,
+            reservation=reservation,
+            rpc_factory=lambda _path: fake,
+        )
+
+    monkeypatch.setattr(MODULE, "pause_goal", pause_once)
+    replace_json = MODULE._replace_json
+
+    def replace_with_owner_drift(
+        path: Path,
+        value: dict[str, object],
+        label: str,
+    ) -> None:
+        replace_json(path, value, label)
+        if label == "canonical Goal pause transition proof":
+            drifted = {**owner_value, "acceptance_posture": "owner-drifted"}
+            owner_path.write_bytes(MODULE._canonical_bytes(drifted) + b"\n")
+
+    monkeypatch.setattr(MODULE, "_replace_json", replace_with_owner_drift)
+    with pytest.raises(MODULE.VISIBLE.IncarnationHomeError, match="pause owner"):
+        MODULE.run_pause(
+            SimpleNamespace(
+                pause_owner=str(owner_path),
+                pause_receipt=str(pause_path),
+            )
+        )
+
+    assert [
+        method for method, _params in fake.calls if method == "thread/goal/set"
+    ] == ["thread/goal/set"]
+    reserved = json.loads(pause_path.read_text(encoding="utf-8"))
+    assert reserved["state"] == "reserved"
+    assert isinstance(reserved.get("transition_proof"), dict)
+    assert reserved.get("paused") is not True
+
+
+def test_legacy_pause_serializes_same_goal_across_receipt_paths(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    owner_path = tmp_path / "pause-owner-concurrent.json"
+    endpoint = tmp_path / "pause-concurrent.sock"
+    owner_value = pause_owner(
+        goal="goal-pause-concurrent",
+        thread="thread-pause-concurrent",
+        endpoint=f"unix:{endpoint}",
+    )
+    owner_path.write_text(
+        json.dumps(owner_value, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    fake = FakeRpc(
+        endpoint,
+        active_turn=None,
+        goal_status="active",
+        goal_set_status="paused",
+        thread_id="thread-pause-concurrent",
+    )
+    monkeypatch.setattr(
+        MODULE,
+        "discover_app_server_socket",
+        lambda _owner: (endpoint, "explicit-endpoint"),
+    )
+    pause_impl = MODULE.pause_goal
+
+    def pause_once(
+        owner_value: dict[str, object],
+        owner_file: Path,
+        target: Path,
+        *,
+        owner_bytes: bytes,
+        reservation_path: Path | None = None,
+        reservation: dict[str, object] | None = None,
+    ) -> dict[str, object]:
+        return pause_impl(
+            owner_value,
+            owner_file,
+            target,
+            owner_bytes=owner_bytes,
+            reservation_path=reservation_path,
+            reservation=reservation,
+            rpc_factory=lambda _path: fake,
+        )
+
+    monkeypatch.setattr(MODULE, "pause_goal", pause_once)
+    mutation_entered = threading.Event()
+    release_mutation = threading.Event()
+    callers_ready = threading.Barrier(2)
+    original_call = fake.call
+
+    def blocking_call(
+        method: str, params: dict[str, object] | None = None
+    ) -> dict[str, object]:
+        if method == "thread/goal/set":
+            mutation_entered.set()
+            assert release_mutation.wait(timeout=5)
+        return original_call(method, params)
+
+    fake.call = blocking_call  # type: ignore[method-assign]
+    invocations = [
+        SimpleNamespace(
+            pause_owner=str(owner_path),
+            pause_receipt=str(tmp_path / f"pause-concurrent-{index}.json"),
+        )
+        for index in range(2)
+    ]
+
+    def invoke(args: SimpleNamespace) -> dict[str, Any]:
+        callers_ready.wait(timeout=5)
+        return MODULE.run_pause(args)
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        futures = [executor.submit(invoke, args) for args in invocations]
+        assert mutation_entered.wait(timeout=5)
+        assert all(not future.done() for future in futures)
+        release_mutation.set()
+        outcomes: list[dict[str, Any] | Exception] = []
+        for future in futures:
+            try:
+                outcomes.append(future.result(timeout=5))
+            except Exception as exc:  # noqa: BLE001 - asserted below
+                outcomes.append(exc)
+
+    assert sum(isinstance(value, dict) for value in outcomes) == 1
+    assert sum(
+        isinstance(value, MODULE.ExternalCodexReturnError) for value in outcomes
+    ) == 1
+    assert [method for method, _params in fake.calls].count("thread/goal/set") == 1
 
 
 def test_run_pause_reconciles_reserved_mutation_after_receipt_publication_failure(
@@ -879,14 +1213,6 @@ def test_run_pause_reconciles_reserved_mutation_after_receipt_publication_failur
     assert len([method for method, _params in fake.calls if method == "thread/goal/set"]) == 1
 
     monkeypatch.setattr(MODULE, "_replace_json", replace_impl)
-    with pytest.raises(
-        MODULE.ExternalCodexReturnError,
-        match="already dispatched.*second lifecycle set",
-    ):
-        MODULE.run_pause(args)
-    assert len([method for method, _params in fake.calls if method == "thread/goal/set"]) == 1
-
-    fake.goal_status = "paused"
     replacement_endpoint = tmp_path / "replacement-app-server.sock"
     monkeypatch.setattr(
         MODULE,
@@ -947,9 +1273,15 @@ def test_run_pause_reconciles_reserved_mutation_after_receipt_publication_failur
         "discover_app_server_socket",
         lambda _owner: (endpoint, "explicit-endpoint"),
     )
+    historical_post_read = reserved["post_read_response"]
+    fake.goal_get_extra = {"server_metadata": {"revision": 2}}
     second = MODULE.run_pause(args)
     assert second["recovery"]["mode"] == "ambiguous_post_mutation"
-    assert second["lifecycle"]["response_available"] is False
+    assert second["lifecycle"]["response_available"] is True
+    assert second["lifecycle"]["post_read_response"] == historical_post_read
+    assert second["lifecycle"]["transition_proof"]["post_read_response_sha256"] == (
+        MODULE._sha256_bytes(MODULE._canonical_bytes(historical_post_read))
+    )
     assert len([method for method, _params in fake.calls if method == "thread/goal/set"]) == 1
 
 
@@ -1033,7 +1365,7 @@ def test_run_pause_reserves_ambiguous_dispatch_before_send(
     monkeypatch.setattr(MODULE, "_replace_json", replace_impl)
     with pytest.raises(
         MODULE.ExternalCodexReturnError,
-        match="reserved before transport dispatch",
+        match="mutation-dispatch evidence",
     ):
         MODULE.run_pause(args)
     assert len([method for method, _params in fake.calls if method == "thread/goal/set"]) == 1

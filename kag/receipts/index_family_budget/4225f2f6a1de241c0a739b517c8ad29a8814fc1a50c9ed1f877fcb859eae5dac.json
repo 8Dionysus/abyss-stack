@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 33391530,
+  "allowed_tracked_bytes": 41511141,
+  "approved_by": "repository-owner",
+  "base_ref": "3dc94628ab40b59fb09748bb94e43fb1dfb7a965",
+  "changed_generated_bytes": 33391530,
+  "changed_generated_files": 355,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "4225f2f6a1de241c0a739b517c8ad29a8814fc1a50c9ed1f877fcb859eae5dac",
+  "reason": "Refresh the portable owner family for the native Goal repair replayed over merged MCP deployment closure.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 41511141,
+  "tracked_bytes_max": 24117248
+}

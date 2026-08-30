@@ -116,26 +116,93 @@ Operations are:
   delivery into typed `wake_delivered` close authority;
 - `close --holder-receipt ... (--closure-authorization ... | --wake-receipt ...)
   --handoff ... --closure-receipt ...` closes only the exact bound holder.
-- `aoa-external-codex-return pause --pause-owner ... --pause-receipt ...` is the
-  canonical Goal lifecycle pause leaf. It validates a separate pause-owner
-  binding, reads the exact Goal identity first, requires the observed status to
-  be `active`, and requires an `atomic_goal_transition` adapter method that
-  performs a server-supported compare-and-set/version proof before calling
-  `thread/goal/set(status=paused)`. The installed public
-  `ThreadGoalSetParams` app-server method has no such precondition, so the
-  canonical adapter fails closed before mutation and cannot certify an
-  `active_to_paused` transition on that server. A future protocol adapter must
-  explicitly provide the typed
-  `abyss_stack_external_codex_atomic_goal_transition_v1` proof. That adapter
-  owns any version-token request fields; the runtime binds the resulting
-  request marker to the proof. The completed
-  `abyss_stack_external_codex_pause_receipt_v1` schema requires that proof and
-  binds the active precondition, exact request ID and digest, thread, method,
-  and returned Goal response digest.
+- `aoa-external-codex-return goal-transition --request ... --decision ...
+  --owner ... --receipt ...` is the generic Goal lifecycle leaf. The request
+  and accepted decision are owner-authored typed artifacts: the semantic
+  owner resolves Goal/DAG/ownership legitimacy before this adapter runs, and
+  the adapter only binds that exact decision to the current Codex
+  `thread/goal/get` and `thread/goal/set` surface. It supports the same seam
+  for `delegation_yield` (for example, active -> paused) and `accepted_return`
+  (for example, paused -> active), while state names and transition kinds stay
+  instance data. It reads the exact Goal binding first and confirms the
+  resulting state from a fresh authoritative Goal read. A successful receipt
+  claims only requested/accepted/executed; delivery, semantic acceptance,
+  owner acceptance, and closure remain separate.
 
-  The receipt is reserved before the app-server mutation and binds the owner
-  bytes, Goal/thread identities, transition proof, transport response digest,
-  and separate owner/semantic-acceptance markers. It does not read or start a
+  A mutating transition uses the installed native `ThreadGoalSetParams`
+  app-server method. The adapter binds the active precondition, exact
+  `thread/goal/set` request marker, returned Goal response when available, and
+  a bounded fresh `thread/goal/get` post-read. A response loss after dispatch
+  is reconciled only from the durable dispatch marker plus that post-read and
+  never by issuing a second lifecycle set. CLI and programmatic SDK entrypoints
+  acquire one outer owner-private lock from the qualified Goal identity, shared
+  with the legacy pause route, across endpoint discovery, attempt loading,
+  mutation, and proof persistence. A nested semantic lock binds the qualified
+  owner identity and idempotency key, while a globally ordered lock set binds
+  the resolved physical attempt and receipt coordinates before any sidecar is
+  loaded or written. This fixed Goal -> semantic request -> physical artifact order prevents competing
+  accepted requests from reading the same mutable precondition and prevents
+  unrelated requests from overwriting one caller-selected attempt path. A
+  non-replacing semantic anchor in persistent
+  owner-private state binds the first durable attempt path to the qualified
+  owner and idempotency key; advisory lock loss on reboot and later callers
+  resolve that path instead of selecting fresh state from their receipt path.
+  Caller-selected receipt/attempt paths, a later reverse transition,
+  app-server endpoint rebinding, and volatile runtime-directory replacement
+  therefore cannot split or repeat one accepted transition's native mutation.
+  Each missing persistent-state parent is created directly with mode `0700`;
+  every parent is then rejected if it is symlinked, foreign-owned, or writable
+  by group/other, while the final Goal-lifecycle root must remain owner-private.
+  The programmatic SDK entrypoint requires a durable attempt coordinate for
+  every invocation. It rejects a pathless request before transport rather than
+  returning an unanchored read-only completion that a later state reversal
+  could reopen under the same idempotency key.
+  An already-desired read-only execution records `read_only_recorded` at the
+  anchored attempt path; after a later reverse transition, the same
+  idempotency key therefore refuses mutation rather than treating the absent
+  sidecar as a new attempt. The v2 anchor distinguishes an unstarted transport
+  attempt from a persisted lifecycle attempt: endpoint discovery or RPC setup
+  failure before persistence may retry, while removal of a started anchored
+  sidecar is terminal and the adapter refuses to recreate it.
+  If the original attempt parent is cleaned before persistence, only an
+  explicitly unstarted v2 anchor may rebind to a newly validated retry path.
+  Replayed read-only receipts are bound byte-for-byte to the stored
+  `read_only_recorded` observation.
+  A caller-supplied attempt object is never authority by itself: its durable
+  sidecar must exist, be canonical, and match exactly before transport use.
+  Receipt and attempt coordinates share the same physical lock namespace, so a
+  path cannot be a receipt for one Goal while concurrently being overwritten
+  as another Goal's attempt.
+  Attempt and receipt owner digests come only from the initially
+  validated owner bytes. Both entrypoints reassert that snapshot immediately
+  before native mutation and after proof persistence, while the CLI also
+  reasserts the initially loaded request and decision bytes immediately before
+  dispatch and reasserts request, decision, and owner again after receipt
+  publication. Drift fails closed instead of mixing stale authority with
+  rewritten evidence. The
+  generic receipt uses
+  `abyss_stack_external_codex_goal_transition_v2`; it does not claim a
+  server-side CAS/version feature or mutation causality. No terminal input,
+  turn delivery, task-specific Goal, thread, model, version, or terminal
+  identity is selected by source.
+
+  `aoa-external-codex-return pause --pause-owner ... --pause-receipt ...` is a
+  backwards-compatible legacy pause projection and remains a mutating
+  compatibility entrypoint when no completed receipt exists: it reserves the
+  active precondition and issues the one native Goal-set request. New Masters
+  use the generic typed route above. Legacy callers serialize through an
+  owner-private lock derived from the qualified Goal identity, so different
+  pause-receipt paths cannot concurrently dispatch duplicate mutations. Once a
+  completed pause receipt exists,
+  replay of that receipt is read-only, while historical
+  `abyss_stack_external_codex_atomic_goal_transition_v1` evidence remains
+  accepted only for migration/replay.
+
+  The legacy projection's receipt is reserved before its app-server mutation
+  and binds the owner
+  bytes, Goal/thread identities, transition proof, raw mutation and post-read
+  responses with their digests, and separate owner/semantic-acceptance
+  markers. It does not read or start a
   turn, deliver a handoff, authorize or close a holder, or claim semantic
   acceptance. The reservation also stores the exact active precondition and
   mutation reservation before the WebSocket request is sent, then records a

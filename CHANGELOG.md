@@ -77,6 +77,42 @@ Tracking starts with the community-docs baseline for this repository.
   encoding, reject Unicode whitespace/control coordinates, accept lowercase
   RFC 3339 UTC designators, and carry SHA-256 Git heads through runtime,
   private-projection, binder, and study schemas.
+- Repair the owner-bound external Codex Goal pause contour to use the current
+  native `thread/goal/set` surface exactly once, bind its request and optional
+  response to a fresh post-read, and reconcile a lost response from durable
+  dispatch evidence without requiring an unsupported CAS/version field. CLI
+  and SDK callers now serialize on a coordinate derived from the qualified
+  owner identity and idempotency key in an owner-private runtime directory.
+  All typed and legacy mutations now also share an outer qualified-Goal lock,
+  and typed callers take a physical-attempt-coordinate lock before touching a
+  caller-selected sidecar, so different accepted requests, colliding evidence
+  paths, and app-server endpoint rebinding cannot issue duplicate lifecycle
+  mutations. Persistent state parents are created one component at a time with
+  owner-only modes and are rejected if symlinked, foreign-owned, or writable by
+  group/other. Programmatic callers must supply a durable attempt coordinate
+  even for an already-desired read-only completion; pathless SDK calls fail
+  before transport and cannot create an unrecorded idempotent result. A protected semantic
+  anchor in persistent owner state retains the first durable attempt across
+  runtime-directory loss, later receipt paths, and state reversals; CLI
+  read-only completion now records the already-desired observation at that
+  anchored attempt path, so a later reversal cannot reopen the same
+  idempotency key. The v2 anchor remains explicitly unstarted until a valid
+  attempt is persisted, so transient endpoint discovery or RPC setup failures
+  can retry without burning the key; if cleanup removes the old attempt parent,
+  that unstarted anchor can rebind to the retry's newly validated durable path.
+  If a started anchored sidecar is later
+  removed, the surviving owner-state anchor is terminal and refuses to recreate it; replayed
+  read-only receipts must also match the exact recorded observation. Supplied
+  SDK attempts are accepted only when an existing canonical sidecar matches
+  the in-memory object exactly, before transport is opened. Receipt and attempt
+  coordinates now acquire one globally sorted physical-lock set, closing
+  crossed-path races between different Goals. CLI
+  request/decision artifacts are reasserted immediately before dispatch and
+  again after receipt publication, and the SDK binds attempt/receipt evidence to the initially
+  loaded owner bytes while rejecting owner drift before dispatch and after
+  proof persistence. Legacy pause callers now lock by qualified Goal identity
+  instead of receipt path and reassert their owner snapshot immediately before
+  mutation, after proof persistence, and before completed-receipt publication.
 - Bind the canonical `aoa-kag` MCP adapter to an authored absolute
   `AOA_KAG_ARTIFACT_ROOT` seam for v4 cold-CAS reads, preserving fail-closed
   loader behavior and separate artifact-admission verdicts.

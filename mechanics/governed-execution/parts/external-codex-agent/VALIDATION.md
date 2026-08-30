@@ -40,6 +40,7 @@ python -m py_compile \
   mechanics/governed-execution/parts/external-codex-agent/external_codex_supervisor.py \
   mechanics/governed-execution/parts/external-codex-agent/install_external_codex_runtime.py \
   mechanics/governed-execution/parts/external-codex-agent/external_codex_return.py \
+  mechanics/governed-execution/parts/external-codex-agent/goal_lifecycle_adapter.py \
   mechanics/governed-execution/parts/external-codex-agent/external_codex_responsibility_movement.py \
   mechanics/governed-execution/parts/external-codex-agent/prepare_landing_study.py \
   mechanics/governed-execution/parts/external-codex-agent/visible_incarnation_home.py
@@ -94,18 +95,84 @@ its replacement provenance is missing. These checks still do not claim a live
 app-server delivery, holder closure, semantic acceptance, or installed-release
 parity.
 
-The focused external-return tests also cover the separate Goal pause contour:
-an exact active owner-bound Goal is refused before `thread/goal/set` when the
-app-server adapter lacks an `atomic_goal_transition` method with a
-server-supported compare-and-set/version proof; the fixture adapter supplies
-that explicit atomic method and typed proof and verifies that the
-returned identity, status, request, precondition, and response digest are
-bound before a receipt is published. Non-active Goals are refused without a
-lifecycle mutation, and a completed pause receipt replays without a second
-app-server call. The suite also forces dispatch-marker, transition-proof, and
-receipt publication failure at their respective boundaries and verifies that
-a pre-send reservation fails closed while a matching post-send proof is
-reconciled through a read-only Goal read without a second `thread/goal/set`.
+The focused external-return tests cover the generic Goal lifecycle contour:
+owner-resolved typed requests and decisions reject stale Goal/DAG/ownership
+state before transport, and the same adapter executes both delegation pause
+  and accepted-return activation through `thread/goal/get`, one native
+`thread/goal/set`, and an authoritative read. The fixture receipt keeps
+requested, accepted, executed, delivered, semantically accepted, and closed
+claims separate and asserts that no turn or terminal transport is used. The
+adapter also rejects mismatched decisions and replays an already desired
+state through a read-only path. A mutating attempt persists its exact Goal
+precondition and dispatch marker before transport, records the server proof
+before receipt publication, and reconciles a proof-recorded ambiguous retry
+through `thread/goal/get` without a second `thread/goal/set`. Receipt replay
+revalidates the exact decision reference, transition frame, proof, and
+response digests; executed receipt replay also requires the mutation attempt
+sidecar, binds the authoritative result response to its digest and safe
+summary, and rejects a receipt whose path identity is missing or changed. A
+concurrent SDK regression drives two callers through different durable attempt
+paths, and a CLI regression drives the same accepted request through different
+receipt paths. Both prove that the owner/idempotency-derived lock permits
+exactly one native Goal mutation while the other caller resolves the same
+proof-recorded attempt. A separate concurrency regression gives the same
+owner-bound Goal two accepted requests with different idempotency keys and
+proves the common Goal-identity lock permits exactly one native mutation. A
+physical-coordinate regression disables that wider Goal lock, races two
+different semantic requests against one attempt path, and proves one durable
+claim, one fail-closed loser, and one native set. An umask regression starts
+without `.local/state`, applies `0002`, and proves every newly created
+persistent-state parent is mode `0700`. A later-state-reversal regression proves
+that the same idempotency key resolves that original attempt from its protected
+semantic anchor and refuses a second mutation even through a different
+receipt. A runtime-reset regression replaces the complete volatile lock root,
+then proves that the persistent owner-state anchor still resolves the original
+attempt and refuses a second mutation after state reversal. An already-desired
+regression records `read_only_recorded`, reverses the Goal, retries through a
+different receipt, and proves zero native sets. Additional regressions remove
+the anchored sidecar and prove the surviving owner-state anchor is terminal,
+and replace an otherwise valid replayed read-only response to prove the receipt
+must match the exact recorded observation. Parameterized transport regressions
+fail the first invocation during endpoint discovery and RPC setup, verify the
+v2 anchor remains unstarted, then prove a retry persists one attempt and issues
+exactly one native set. A cleanup regression removes the original unstarted
+attempt parent and proves a retry can rebind to a new validated path without
+issuing more than one native set. Programmatic regressions also supply an
+attempt with a missing or mismatched sidecar and prove rejection before RPC.
+A crossed-coordinate concurrency regression holds one Goal's attempt path
+while another Goal names it as a receipt and proves the second transition
+cannot enter until the shared physical lock is released.
+A separate programmatic regression places the Goal in
+the desired state, omits the attempt path, and proves the adapter refuses the
+call before any RPC rather than publishing an unanchored read-only result. A
+dynamic-endpoint regression additionally
+returns different owner-proved app-server paths to the two callers and proves
+that endpoint discovery remains inside the same stable semantic lock while the
+attempt retains its historical endpoint evidence. Separate CLI regressions
+rewrite the request and decision after the pre-read and prove both are
+reasserted before dispatch with zero mutations; publication-boundary
+regressions rewrite each artifact after the receipt write and prove the final
+snapshot reassertion rejects it. Separate
+legacy-pause regressions rewrite the owner after the pre-read and after proof
+persistence, proving zero mutation in the first case and refusal to publish a
+completed receipt in the second. Separate
+programmatic regressions rewrite the owner after the precondition read and
+after the authoritative post-read: the former proves no mutation is sent, and
+the latter proves the persisted attempt remains bound to the original owner
+bytes while receipt return fails closed.
+
+The legacy external-return tests also cover the separate Goal pause contour:
+an exact active owner-bound Goal uses the current public `thread/goal/set`
+surface once, then proves the returned identity, status, request, precondition,
+and fresh post-read before a receipt is published. Non-active Goals are refused
+without a lifecycle mutation, and a completed pause receipt replays without a
+second app-server call. Concurrent legacy callers using different receipt
+paths serialize on the qualified Goal identity and issue exactly one native
+mutation. The suite also forces dispatch-marker, transition-proof,
+and receipt publication failure at their respective boundaries and verifies
+that a pre-send reservation fails closed while a matching post-send dispatch
+marker is reconciled through a read-only Goal read without a second
+`thread/goal/set`.
 Companion cases prove that an active observation after dispatch fails closed, a
 paused observation through a replacement app-server endpoint fails closed, a
 paused observation without the marker or proof fails closed, and incomplete or
@@ -115,8 +182,8 @@ evidence. The reservation fixture validates the initial, prepared, pre-send,
 and post-send reservation states against the separate
 `abyss_stack_external_codex_pause_reservation_v1` schema, while completed
 evidence remains validated by the pause-receipt schema. The current public
-Codex app-server is therefore a known capability blocker for a live fresh
-`active_to_paused` canary; no source test double is a live canary claim.
+Codex app-server can now serve the live fresh `active_to_paused` canary through
+its public Goal set method; no source test double is a live canary claim.
 
 The responsibility-movement tests prove the required branch independently:
 the compiled obligation and exact handoff digest are carried through a

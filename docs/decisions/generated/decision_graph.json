@@ -1,19 +1,19 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
-  "decision_count": 139,
-  "edge_count": 3131,
+  "decision_count": 140,
+  "edge_count": 3153,
   "edge_type_counts": {
-    "CITES_SOURCE_SURFACE": 1139,
-    "DATED": 139,
-    "GUARDED_BY": 430,
-    "HAS_STATUS": 139,
-    "HAS_SURFACE_CLASS": 380,
-    "IN_STACK_LANE": 333,
-    "NEXT_DECISION": 138,
-    "OWNED_BY_SURFACE": 145,
-    "OWNS_DECISION": 139,
-    "SUPERSEDED_BY": 4,
-    "UNDER_MECHANIC_PARENT": 145
+    "CITES_SOURCE_SURFACE": 1145,
+    "DATED": 140,
+    "GUARDED_BY": 433,
+    "HAS_STATUS": 140,
+    "HAS_SURFACE_CLASS": 383,
+    "IN_STACK_LANE": 336,
+    "NEXT_DECISION": 139,
+    "OWNED_BY_SURFACE": 146,
+    "OWNS_DECISION": 140,
+    "SUPERSEDED_BY": 5,
+    "UNDER_MECHANIC_PARENT": 146
   },
   "edges": [
     {
@@ -14268,7 +14268,7 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0133",
-      "target": "status:accepted",
+      "target": "status:superseded",
       "type": "HAS_STATUS"
     },
     {
@@ -14310,6 +14310,11 @@
       "source": "decision:ABYSS-STACK-D-0133",
       "target": "owner_surface:mechanics/governed-execution/parts/external-codex-agent",
       "type": "OWNED_BY_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0133",
+      "target": "decision:ABYSS-STACK-D-0140",
+      "type": "SUPERSEDED_BY"
     },
     {
       "source": "decision:ABYSS-STACK-D-0133",
@@ -14968,12 +14973,112 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0139",
+      "target": "decision:ABYSS-STACK-D-0140",
+      "type": "NEXT_DECISION"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0139",
       "target": "owner_surface:mcp/services/_shared/",
       "type": "OWNED_BY_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0139",
       "target": "mechanic_parent:runtime-lifecycle",
+      "type": "UNDER_MECHANIC_PARENT"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0140",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/external_codex_return.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0140",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/goal_lifecycle_adapter.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0140",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-goal-lifecycle-attempt.schema.json",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0140",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-pause-reservation.schema.json",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0140",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/tests/test_external_codex_return.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0140",
+      "target": "source_surface:mechanics/governed-execution/parts/external-codex-agent/tests/test_goal_lifecycle_adapter.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0140",
+      "target": "date:2026-08-26",
+      "type": "DATED"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0140",
+      "target": "guard_family:Goal%20identity%20binding",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0140",
+      "target": "guard_family:evidence%20separation",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0140",
+      "target": "guard_family:lifecycle%20transition",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0140",
+      "target": "status:accepted",
+      "type": "HAS_STATUS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0140",
+      "target": "surface_class:lifecycle",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0140",
+      "target": "surface_class:public-contract",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0140",
+      "target": "surface_class:source/runtime%20boundary",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0140",
+      "target": "stack_lane:external%20Codex%20runtime",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0140",
+      "target": "stack_lane:governed-execution",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0140",
+      "target": "stack_lane:validation",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0140",
+      "target": "owner_surface:mechanics/governed-execution/parts/external-codex-agent",
+      "type": "OWNED_BY_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0140",
+      "target": "mechanic_parent:%60mechanics/governed-execution%60",
       "type": "UNDER_MECHANIC_PARENT"
     },
     {
@@ -15670,18 +15775,23 @@
       "source": "repo:abyss-stack",
       "target": "decision:ABYSS-STACK-D-0139",
       "type": "OWNS_DECISION"
+    },
+    {
+      "source": "repo:abyss-stack",
+      "target": "decision:ABYSS-STACK-D-0140",
+      "type": "OWNS_DECISION"
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 1367,
+  "node_count": 1372,
   "node_type_counts": {
     "date": 48,
-    "decision": 139,
+    "decision": 140,
     "guard_family": 236,
     "mechanic_parent": 13,
     "owner_surface": 70,
     "repo": 1,
-    "source_surface": 645,
+    "source_surface": 649,
     "stack_lane": 58,
     "status": 4,
     "surface_class": 153
@@ -17253,7 +17363,7 @@
       "label": "ABYSS-STACK-D-0133",
       "path": "docs/decisions/ABYSS-STACK-D-0133-owner-bound-external-goal-pause.md",
       "posture": "accepted runtime rationale",
-      "status": "accepted",
+      "status": "superseded",
       "title": "ABYSS-STACK-D-0133 Owner-Bound External Goal Pause",
       "type": "decision"
     },
@@ -17315,6 +17425,16 @@
       "posture": "accepted transition with admitted-read deployment follow-up completed",
       "status": "accepted",
       "title": "ABYSS-STACK-D-0139 MCP SDK 2.1.1 Transition And Central Runtime Identity",
+      "type": "decision"
+    },
+    {
+      "date": "2026-08-26",
+      "id": "decision:ABYSS-STACK-D-0140",
+      "label": "ABYSS-STACK-D-0140",
+      "path": "docs/decisions/ABYSS-STACK-D-0140-native-goal-pause-request-and-post-read-proof.md",
+      "posture": "accepted repair rationale",
+      "status": "accepted",
+      "title": "ABYSS-STACK-D-0140 Native Goal Pause Request And Post-Read Proof",
       "type": "decision"
     },
     {
@@ -20954,6 +21074,11 @@
       "type": "source_surface"
     },
     {
+      "id": "source_surface:mechanics/governed-execution/parts/external-codex-agent/goal_lifecycle_adapter.py",
+      "label": "mechanics/governed-execution/parts/external-codex-agent/goal_lifecycle_adapter.py",
+      "type": "source_surface"
+    },
+    {
       "id": "source_surface:mechanics/governed-execution/parts/external-codex-agent/install_external_codex_runtime.py",
       "label": "mechanics/governed-execution/parts/external-codex-agent/install_external_codex_runtime.py",
       "type": "source_surface"
@@ -20981,6 +21106,11 @@
     {
       "id": "source_surface:mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-capability-grant.schema.json",
       "label": "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-capability-grant.schema.json",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-goal-lifecycle-attempt.schema.json",
+      "label": "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-goal-lifecycle-attempt.schema.json",
       "type": "source_surface"
     },
     {
@@ -21026,6 +21156,11 @@
     {
       "id": "source_surface:mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-pause-receipt.schema.json",
       "label": "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-pause-receipt.schema.json",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-pause-reservation.schema.json",
+      "label": "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-pause-reservation.schema.json",
       "type": "source_surface"
     },
     {
@@ -21091,6 +21226,11 @@
     {
       "id": "source_surface:mechanics/governed-execution/parts/external-codex-agent/tests/test_external_codex_workspace_hygiene.py",
       "label": "mechanics/governed-execution/parts/external-codex-agent/tests/test_external_codex_workspace_hygiene.py",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/governed-execution/parts/external-codex-agent/tests/test_goal_lifecycle_adapter.py",
+      "label": "mechanics/governed-execution/parts/external-codex-agent/tests/test_goal_lifecycle_adapter.py",
       "type": "source_surface"
     },
     {

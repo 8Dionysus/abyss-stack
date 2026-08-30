@@ -88,6 +88,10 @@ def make_sources(tmp_path: Path) -> tuple[Path, Path, Path, Path]:
         "import aoa_sdk\nprint('return:' + aoa_sdk.MARKER)\n",
         encoding="utf-8",
     )
+    (part / "goal_lifecycle_adapter.py").write_text(
+        "import aoa_sdk\nprint('goal-lifecycle:' + aoa_sdk.MARKER)\n",
+        encoding="utf-8",
+    )
     (part / "external_codex_responsibility_movement.py").write_text(
         "import aoa_sdk\nprint('stasis:' + aoa_sdk.MARKER)\n",
         encoding="utf-8",
