@@ -600,6 +600,10 @@ def run_ephemeral_read_worker(request: Mapping[str, object]) -> dict[str, object
     projected_result_bytes = _projected_result_base_bytes(
         request_id, parent_holder, input_snapshot_digest, inputs
     )
+    if projected_result_bytes > max_transport_bytes:
+        raise EphemeralWorkerError(
+            "projected result exceeds max_transport_bytes before reading"
+        )
     projected_input_digits = 1
     projected_output_digits = 1
     for index, item in enumerate(inputs):

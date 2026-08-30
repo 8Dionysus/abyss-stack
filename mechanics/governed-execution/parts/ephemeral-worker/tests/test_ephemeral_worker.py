@@ -621,10 +621,15 @@ def test_worker_accounts_metadata_before_base64_encoding(
         max_transport_bytes=request["max_transport_bytes"],
     )
 
+    def unexpected_read(*_args: object, **_kwargs: object) -> bytes:
+        raise AssertionError("metadata overflow must reject before file I/O")
+
     def unexpected_encode(_content: bytes) -> bytes:
         raise AssertionError("metadata overflow must reject before base64 encoding")
 
-    worker_base64 = run_ephemeral_read_worker.__globals__["base64"]
+    worker_globals = run_ephemeral_read_worker.__globals__
+    monkeypatch.setitem(worker_globals, "_read_verified", unexpected_read)
+    worker_base64 = worker_globals["base64"]
     monkeypatch.setattr(worker_base64, "b64encode", unexpected_encode)
 
     with pytest.raises(EphemeralWorkerError, match="projected result"):
