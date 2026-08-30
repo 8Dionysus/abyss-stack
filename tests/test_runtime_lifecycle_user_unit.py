@@ -1963,6 +1963,31 @@ esac
                 first_content_digest,
                 r"\A[0-9a-f]{64}\Z",
             )
+            generated_bytecode = (
+                venv
+                / "lib"
+                / "python"
+                / "site-packages"
+                / "test_package"
+                / "__pycache__"
+                / "generated.cpython-test.pyc"
+            )
+            generated_bytecode.parent.mkdir(parents=True)
+            generated_bytecode.write_bytes(b"regenerable bytecode\n")
+            bytecode_only_verify = subprocess.run(
+                read_verify_command,
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(
+                bytecode_only_verify.returncode,
+                0,
+                bytecode_only_verify.stderr,
+            )
+            generated_bytecode.unlink()
             self.assertTrue((venv / "bin" / "python").is_file())
             self.assertFalse((venv / "bin" / "python").is_symlink())
             entrypoint = venv / "bin" / "abyss-stack-mcp"
