@@ -162,6 +162,7 @@ def _attempt_binding(
     decision: Any,
     owner: dict[str, Any],
     owner_path: Path,
+    owner_bytes: bytes,
     endpoint: Path,
     attempt_path: Path,
     precondition: dict[str, Any],
@@ -185,7 +186,7 @@ def _attempt_binding(
         "expected_state": request.expected_state,
         "desired_state": request.desired_state,
         "owner_ref": str(owner_path.resolve()),
-        "owner_sha256": runtime._sha256_bytes(owner_path.read_bytes()),
+        "owner_sha256": runtime._sha256_bytes(owner_bytes),
         "owner": runtime._owner_projection(owner),
         "transport": {
             "kind": "codex_app_server_websocket_unix",
@@ -340,6 +341,7 @@ def _validate_attempt(
     decision: Any,
     owner: dict[str, Any],
     owner_path: Path,
+    owner_bytes: bytes,
     endpoint: Path,
     attempt_path: Path,
 ) -> dict[str, Any]:
@@ -357,8 +359,7 @@ def _validate_attempt(
         or value.get("request_ref") != decision.request_ref.model_dump(mode="json")
         or value.get("decision_ref") != expected_decision_ref
         or value.get("owner_ref") != str(owner_path.resolve())
-        or value.get("owner_sha256")
-        != runtime._sha256_bytes(owner_path.read_bytes())
+        or value.get("owner_sha256") != runtime._sha256_bytes(owner_bytes)
         or value.get("owner") != runtime._owner_projection(owner)
         or value.get("expected_state") != request.expected_state
         or value.get("desired_state") != request.desired_state
@@ -390,6 +391,7 @@ def _write_attempt(
     decision: Any,
     owner: dict[str, Any],
     owner_path: Path,
+    owner_bytes: bytes,
     endpoint: Path,
 ) -> dict[str, Any]:
     runtime = _runtime()
@@ -399,6 +401,7 @@ def _write_attempt(
         decision=decision,
         owner=owner,
         owner_path=owner_path,
+        owner_bytes=owner_bytes,
         endpoint=endpoint,
         attempt_path=path,
     )
@@ -677,6 +680,7 @@ def _execution_projection(
     decision: Any,
     owner: dict[str, Any],
     owner_path: Path,
+    owner_bytes: bytes,
     endpoint: Path,
     initialize: dict[str, Any],
     before_response: dict[str, Any],
@@ -747,7 +751,7 @@ def _execution_projection(
     receipt = {
         **base,
         "owner_ref": str(owner_path.resolve()),
-        "owner_sha256": runtime._sha256_bytes(owner_path.read_bytes()),
+        "owner_sha256": runtime._sha256_bytes(owner_bytes),
         "owner": runtime._owner_projection(owner),
         "transport": {
             "kind": "codex_app_server_websocket_unix",
@@ -817,7 +821,7 @@ def _execute_goal_transition_unlocked(
     decision = _model(decision, decision_type, "Goal lifecycle decision")
     assert_scope(request, decision)
     owner_path = runtime._regular_file(Path(owner_path), "Goal lifecycle owner")
-    owner_artifact, _owner_bytes = runtime._load_json_file(
+    owner_artifact, owner_bytes = runtime._load_json_file(
         owner_path, "Goal lifecycle owner"
     )
     owner = runtime.validate_goal_lifecycle_owner(owner)
@@ -863,6 +867,7 @@ def _execute_goal_transition_unlocked(
             decision=decision,
             owner=owner,
             owner_path=owner_path,
+            owner_bytes=owner_bytes,
             endpoint=endpoint,
             attempt_path=attempt_path,
         )
@@ -1053,6 +1058,7 @@ def _execute_goal_transition_unlocked(
                 decision=decision,
                 owner=owner,
                 owner_path=owner_path,
+                owner_bytes=owner_bytes,
                 endpoint=endpoint,
             )
             mutation_response = stored_response
@@ -1105,6 +1111,7 @@ def _execute_goal_transition_unlocked(
                     decision=decision,
                     owner=owner,
                     owner_path=owner_path,
+                    owner_bytes=owner_bytes,
                     endpoint=endpoint,
                     attempt_path=attempt_path,
                     precondition=precondition,
@@ -1118,6 +1125,7 @@ def _execute_goal_transition_unlocked(
                     decision=decision,
                     owner=owner,
                     owner_path=owner_path,
+                    owner_bytes=owner_bytes,
                     endpoint=endpoint,
                 )
 
@@ -1175,6 +1183,7 @@ def _execute_goal_transition_unlocked(
                     decision=decision,
                     owner=owner,
                     owner_path=owner_path,
+                    owner_bytes=owner_bytes,
                     endpoint=endpoint,
                 )
 
@@ -1199,6 +1208,7 @@ def _execute_goal_transition_unlocked(
                     owner=owner,
                     endpoint=endpoint,
                     owner_path=owner_path,
+                    owner_bytes=owner_bytes,
                 )
 
             previous_prepare_callback = getattr(rpc, "request_prepare_callback", None)
@@ -1206,6 +1216,9 @@ def _execute_goal_transition_unlocked(
             setattr(rpc, "request_prepare_callback", record_request_prepared)
             setattr(rpc, "request_issued_callback", record_request_issued)
             try:
+                runtime.VISIBLE._assert_file_snapshot(
+                    owner_path, owner_bytes, "Goal lifecycle owner"
+                )
                 mutation_response = rpc.call(
                     GOAL_TRANSITION_METHOD,
                     {"threadId": owner["thread_id"], "status": request.desired_state},
@@ -1240,6 +1253,7 @@ def _execute_goal_transition_unlocked(
                 decision=decision,
                 owner=owner,
                 owner_path=owner_path,
+                owner_bytes=owner_bytes,
                 endpoint=endpoint,
             )
             authoritative_response = rpc.call(
@@ -1275,6 +1289,7 @@ def _execute_goal_transition_unlocked(
                 decision=decision,
                 owner=owner,
                 owner_path=owner_path,
+                owner_bytes=owner_bytes,
                 endpoint=endpoint,
             )
             resulting_response = authoritative_response
@@ -1282,11 +1297,15 @@ def _execute_goal_transition_unlocked(
             status = "executed"
             method = GOAL_TRANSITION_METHOD
             recovery = None
-    return _execution_projection(
+    runtime.VISIBLE._assert_file_snapshot(
+        owner_path, owner_bytes, "Goal lifecycle owner"
+    )
+    receipt = _execution_projection(
         request=request,
         decision=decision,
         owner=owner,
         owner_path=owner_path,
+        owner_bytes=owner_bytes,
         endpoint=endpoint,
         initialize=initialize,
         before_response=before_response,
@@ -1301,6 +1320,10 @@ def _execute_goal_transition_unlocked(
         attempt_path=attempt_path,
         recovery=recovery,
     )
+    runtime.VISIBLE._assert_file_snapshot(
+        owner_path, owner_bytes, "Goal lifecycle owner"
+    )
+    return receipt
 
 
 def execute_goal_transition(
@@ -1627,6 +1650,7 @@ def _validate_existing_receipt(
     authoritative_response: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     runtime = _runtime()
+    owner_bytes = owner_path.read_bytes()
     (
         content_ref_type,
         _decision_type,
@@ -1720,6 +1744,7 @@ def _validate_existing_receipt(
             decision=decision,
             owner=owner,
             owner_path=owner_path,
+            owner_bytes=owner_bytes,
             endpoint=Path(value["transport"]["endpoint"]),
             attempt_path=attempt_path,
         )
@@ -1731,7 +1756,7 @@ def _validate_existing_receipt(
         )
     if (
         value.get("owner_ref") != str(owner_path.resolve())
-        or value.get("owner_sha256") != runtime._sha256_bytes(owner_path.read_bytes())
+        or value.get("owner_sha256") != runtime._sha256_bytes(owner_bytes)
         or value.get("owner") != runtime._owner_projection(owner)
     ):
         raise runtime.ExternalCodexReturnError(

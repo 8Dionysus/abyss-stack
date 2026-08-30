@@ -137,7 +137,11 @@ Operations are:
   never by issuing a second lifecycle set. CLI and programmatic SDK entrypoints
   hold the same attempt-artifact lock across attempt loading, mutation, and
   proof persistence, so concurrent consumers cannot both dispatch the same
-  accepted transition. The generic receipt uses
+  accepted transition. Attempt and receipt owner digests come only from the
+  initially validated owner bytes; both entrypoints reassert that snapshot
+  immediately before native mutation and after proof persistence, failing
+  closed instead of mixing stale authority with rewritten owner evidence. The
+  generic receipt uses
   `abyss_stack_external_codex_goal_transition_v2`; it does not claim a
   server-side CAS/version feature or mutation causality. No terminal input,
   turn delivery, task-specific Goal, thread, model, version, or terminal

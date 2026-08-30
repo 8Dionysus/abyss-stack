@@ -113,7 +113,11 @@ sidecar, binds the authoritative result response to its digest and safe
 summary, and rejects a receipt whose path identity is missing or changed. A
 concurrent SDK regression drives two callers through one durable attempt path
 and proves that the shared CLI/programmatic lock permits exactly one native
-Goal mutation while the second caller reconciles the recorded proof.
+Goal mutation while the second caller reconciles the recorded proof. Separate
+programmatic regressions rewrite the owner after the precondition read and
+after the authoritative post-read: the former proves no mutation is sent, and
+the latter proves the persisted attempt remains bound to the original owner
+bytes while receipt return fails closed.
 
 The legacy external-return tests also cover the separate Goal pause contour:
 an exact active owner-bound Goal uses the current public `thread/goal/set`

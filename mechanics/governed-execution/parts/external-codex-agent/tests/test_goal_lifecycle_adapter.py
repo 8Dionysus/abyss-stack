@@ -711,6 +711,7 @@ def test_generic_adapter_loads_existing_attempt_before_replacing_it(
         decision=decision,
         owner=owner,
         owner_path=owner_path,
+        owner_bytes=owner_path.read_bytes(),
         endpoint=endpoint,
         attempt_path=attempt_path,
         precondition=ADAPTER._precondition(goal_response, "active"),
@@ -953,6 +954,111 @@ def test_programmatic_adapter_serializes_one_durable_attempt(
 
     assert {receipt["status"] for receipt in receipts} == {"executed"}
     assert [method for method, _params in rpc.calls].count("thread/goal/set") == 1
+
+
+def test_programmatic_adapter_rejects_owner_drift_before_mutation(
+    tmp_path: Path,
+) -> None:
+    endpoint = tmp_path / "owner-drift-before-mutation.sock"
+    owner = _owner(endpoint)
+    owner_path = tmp_path / "owner-drift-before-mutation.json"
+    owner_bytes = RUNTIME._canonical_bytes(owner) + b"\n"
+    owner_path.write_bytes(owner_bytes)
+    request = _request(
+        observed="active",
+        desired="paused",
+        kind="delegation_yield",
+        request_id="request:owner-drift-before-mutation",
+    )
+    decision = _decision(request)
+    attempt_path = tmp_path / "owner-drift-before-mutation.attempt.json"
+    rpc = FakeGoalRpc(endpoint, status="active")
+    original_call = rpc.call
+    goal_get_count = 0
+
+    def drift_after_precondition(
+        method: str, params: dict[str, object] | None = None
+    ) -> dict[str, object]:
+        nonlocal goal_get_count
+        result = original_call(method, params)
+        if method == "thread/goal/get":
+            goal_get_count += 1
+            if goal_get_count == 1:
+                owner_path.write_bytes(b"{}\n")
+        return result
+
+    rpc.call = drift_after_precondition  # type: ignore[method-assign]
+
+    with pytest.raises(
+        RUNTIME.VISIBLE.IncarnationHomeError,
+        match="changed during validation",
+    ):
+        ADAPTER.execute_goal_transition(
+            request,
+            decision,
+            owner,
+            owner_path,
+            endpoint,
+            rpc_factory=lambda _endpoint: rpc,
+            attempt_path=attempt_path,
+        )
+
+    assert [method for method, _params in rpc.calls].count("thread/goal/set") == 0
+    attempt = json.loads(attempt_path.read_text(encoding="utf-8"))
+    assert attempt["owner_sha256"] == RUNTIME._sha256_bytes(owner_bytes)
+
+
+def test_programmatic_adapter_rejects_owner_drift_after_proof_persistence(
+    tmp_path: Path,
+) -> None:
+    endpoint = tmp_path / "owner-drift-after-proof.sock"
+    owner = _owner(endpoint)
+    owner_path = tmp_path / "owner-drift-after-proof.json"
+    owner_bytes = RUNTIME._canonical_bytes(owner) + b"\n"
+    owner_path.write_bytes(owner_bytes)
+    request = _request(
+        observed="active",
+        desired="paused",
+        kind="delegation_yield",
+        request_id="request:owner-drift-after-proof",
+    )
+    decision = _decision(request)
+    attempt_path = tmp_path / "owner-drift-after-proof.attempt.json"
+    rpc = FakeGoalRpc(endpoint, status="active")
+    original_call = rpc.call
+    goal_get_count = 0
+
+    def drift_after_post_read(
+        method: str, params: dict[str, object] | None = None
+    ) -> dict[str, object]:
+        nonlocal goal_get_count
+        result = original_call(method, params)
+        if method == "thread/goal/get":
+            goal_get_count += 1
+            if goal_get_count == 2:
+                owner_path.write_bytes(b"{}\n")
+        return result
+
+    rpc.call = drift_after_post_read  # type: ignore[method-assign]
+
+    with pytest.raises(
+        RUNTIME.VISIBLE.IncarnationHomeError,
+        match="changed during validation",
+    ):
+        ADAPTER.execute_goal_transition(
+            request,
+            decision,
+            owner,
+            owner_path,
+            endpoint,
+            rpc_factory=lambda _endpoint: rpc,
+            attempt_path=attempt_path,
+        )
+
+    assert [method for method, _params in rpc.calls].count("thread/goal/set") == 1
+    attempt = json.loads(attempt_path.read_text(encoding="utf-8"))
+    assert attempt["state"] == "proof_recorded"
+    assert attempt["owner_sha256"] == RUNTIME._sha256_bytes(owner_bytes)
 
 
 def test_generic_adapter_reconciles_a_lost_set_response_without_a_second_set(
