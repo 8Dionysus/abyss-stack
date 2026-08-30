@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import importlib.util
 import json
+import os
 import sys
 import threading
 from concurrent.futures import ThreadPoolExecutor
@@ -36,6 +38,7 @@ def _load(name: str, path: Path) -> Any:
 
 RUNTIME = _load("external_codex_return", PART / "external_codex_return.py")
 ADAPTER = _load("goal_lifecycle_adapter", PART / "goal_lifecycle_adapter.py")
+REAL_SEMANTIC_ATTEMPT_STATE_ROOT = ADAPTER._semantic_attempt_state_root
 
 
 NOW = datetime(2026, 8, 25, 12, 0, tzinfo=timezone.utc)
@@ -47,11 +50,41 @@ def _isolated_semantic_attempt_root(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     lock_root = tmp_path / "semantic-attempt-locks"
+    goal_lock_root = tmp_path / "goal-identity-locks"
     state_root = tmp_path / "semantic-attempt-state"
     lock_root.mkdir(mode=0o700)
+    goal_lock_root.mkdir(mode=0o700)
     state_root.mkdir(mode=0o700)
     monkeypatch.setattr(ADAPTER, "_semantic_attempt_lock_root", lambda: lock_root)
     monkeypatch.setattr(ADAPTER, "_semantic_attempt_state_root", lambda: state_root)
+    monkeypatch.setattr(RUNTIME, "_pause_attempt_lock_root", lambda: goal_lock_root)
+
+
+def test_semantic_state_root_creates_each_parent_owner_private(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    home = tmp_path / "home"
+    home.mkdir(mode=0o700)
+    monkeypatch.setattr(
+        ADAPTER.pwd,
+        "getpwuid",
+        lambda _uid: SimpleNamespace(pw_dir=str(home)),
+    )
+    previous_umask = os.umask(0o002)
+    try:
+        root = REAL_SEMANTIC_ATTEMPT_STATE_ROOT()
+    finally:
+        os.umask(previous_umask)
+
+    assert root == home / ".local" / "state" / "aoa-external-codex" / "goal-lifecycle"
+    for directory in (
+        home / ".local",
+        home / ".local" / "state",
+        home / ".local" / "state" / "aoa-external-codex",
+        root,
+    ):
+        assert directory.stat().st_mode & 0o777 == 0o700
 
 
 def _digest(value: object) -> str:
@@ -1093,6 +1126,141 @@ def test_programmatic_adapter_serializes_one_semantic_attempt_across_paths(
         tmp_path / "concurrent-programmatic-second.attempt.json",
     ]
     assert sum(path.exists() for path in attempt_paths) == 1
+
+
+def test_programmatic_adapter_serializes_different_requests_by_goal_identity(
+    tmp_path: Path,
+) -> None:
+    endpoint = tmp_path / "concurrent-goal-identity.sock"
+    owner = _owner(endpoint)
+    owner_path = tmp_path / "owner-concurrent-goal-identity.json"
+    owner_path.write_bytes(RUNTIME._canonical_bytes(owner) + b"\n")
+    requests = [
+        _request(
+            observed="active",
+            desired="paused",
+            kind="delegation_yield",
+            request_id=f"request:goal-identity-{index}",
+        )
+        for index in range(2)
+    ]
+    decisions = [_decision(request) for request in requests]
+    rpc = FakeGoalRpc(endpoint, status="active")
+    adapters = [
+        ADAPTER.CodexGoalLifecycleAdapter(
+            owner=owner,
+            owner_path=owner_path,
+            endpoint=endpoint,
+            rpc_factory=lambda _endpoint: rpc,
+            attempt_path=tmp_path / f"goal-identity-{index}.attempt.json",
+        )
+        for index in range(2)
+    ]
+    callers_ready = threading.Barrier(2)
+    preconditions_ready = threading.Barrier(2)
+    original_call = rpc.call
+
+    def synchronized_precondition(
+        method: str, params: dict[str, object] | None = None
+    ) -> dict[str, object]:
+        if method == "thread/goal/get" and rpc.status == "active":
+            try:
+                preconditions_ready.wait(timeout=0.25)
+            except threading.BrokenBarrierError:
+                pass
+        return original_call(method, params)
+
+    rpc.call = synchronized_precondition  # type: ignore[method-assign]
+
+    def invoke(index: int) -> dict[str, Any]:
+        callers_ready.wait(timeout=5)
+        return adapters[index].execute_goal_transition(
+            requests[index], decisions[index]
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        receipts = [
+            future.result(timeout=5)
+            for future in [executor.submit(invoke, index) for index in range(2)]
+        ]
+
+    assert {receipt["status"] for receipt in receipts} == {"executed", "replayed"}
+    assert [method for method, _params in rpc.calls].count("thread/goal/set") == 1
+
+
+def test_programmatic_adapter_claims_shared_attempt_path_atomically(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    endpoint = tmp_path / "shared-physical-attempt.sock"
+    owner = _owner(endpoint)
+    owner_path = tmp_path / "owner-shared-physical-attempt.json"
+    owner_path.write_bytes(RUNTIME._canonical_bytes(owner) + b"\n")
+    requests = [
+        _request(
+            observed="active",
+            desired="paused",
+            kind="delegation_yield",
+            request_id=f"request:shared-physical-attempt-{index}",
+        )
+        for index in range(2)
+    ]
+    decisions = [_decision(request) for request in requests]
+    shared_attempt = tmp_path / "shared-physical.attempt.json"
+    rpc = FakeGoalRpc(endpoint, status="active")
+    adapters = [
+        ADAPTER.CodexGoalLifecycleAdapter(
+            owner=owner,
+            owner_path=owner_path,
+            endpoint=endpoint,
+            rpc_factory=lambda _endpoint: rpc,
+            attempt_path=shared_attempt,
+        )
+        for _index in range(2)
+    ]
+    # Isolate the physical-coordinate guard from the wider Goal lock so this
+    # regression proves the caller-selected path has its own atomic claim.
+    monkeypatch.setattr(
+        RUNTIME,
+        "_pause_attempt_lock",
+        lambda _owner: contextlib.nullcontext(),
+    )
+    callers_ready = threading.Barrier(2)
+    preconditions_ready = threading.Barrier(2)
+    original_call = rpc.call
+
+    def synchronized_precondition(
+        method: str, params: dict[str, object] | None = None
+    ) -> dict[str, object]:
+        if method == "thread/goal/get" and rpc.status == "active":
+            try:
+                preconditions_ready.wait(timeout=0.25)
+            except threading.BrokenBarrierError:
+                pass
+        return original_call(method, params)
+
+    rpc.call = synchronized_precondition  # type: ignore[method-assign]
+
+    def invoke(index: int) -> dict[str, Any]:
+        callers_ready.wait(timeout=5)
+        return adapters[index].execute_goal_transition(
+            requests[index], decisions[index]
+        )
+
+    receipts: list[dict[str, Any]] = []
+    failures: list[Exception] = []
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        futures = [executor.submit(invoke, index) for index in range(2)]
+        for future in futures:
+            try:
+                receipts.append(future.result(timeout=5))
+            except RUNTIME.ExternalCodexReturnError as exc:
+                failures.append(exc)
+
+    assert len(receipts) == 1
+    assert receipts[0]["status"] == "executed"
+    assert len(failures) == 1
+    assert [method for method, _params in rpc.calls].count("thread/goal/set") == 1
 
 
 def test_cli_adapter_serializes_one_semantic_attempt_across_receipts(

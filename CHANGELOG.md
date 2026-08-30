@@ -82,9 +82,14 @@ Tracking starts with the community-docs baseline for this repository.
   response to a fresh post-read, and reconcile a lost response from durable
   dispatch evidence without requiring an unsupported CAS/version field. CLI
   and SDK callers now serialize on a coordinate derived from the qualified
-  owner identity and idempotency key in an owner-private runtime directory, so
-  different caller-selected receipt/attempt paths and app-server endpoint
-  rebinding cannot issue duplicate lifecycle mutations. A protected semantic
+  owner identity and idempotency key in an owner-private runtime directory.
+  All typed and legacy mutations now also share an outer qualified-Goal lock,
+  and typed callers take a physical-attempt-coordinate lock before touching a
+  caller-selected sidecar, so different accepted requests, colliding evidence
+  paths, and app-server endpoint rebinding cannot issue duplicate lifecycle
+  mutations. Persistent state parents are created one component at a time with
+  owner-only modes and are rejected if symlinked, foreign-owned, or writable by
+  group/other. A protected semantic
   anchor in persistent owner state retains the first durable attempt across
   runtime-directory loss, later receipt paths, and state reversals; CLI
   read-only completion now records the already-desired observation at that

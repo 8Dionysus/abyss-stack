@@ -1463,8 +1463,9 @@ def execute_goal_transition(
     """Execute one accepted semantic request through the Codex Goal API.
 
     A transition that can mutate a Goal must name a durable attempt artifact.
-    Serialization is derived from the owner identity and idempotency key so
-    caller-selected evidence paths cannot split one semantic attempt.
+    Serialization combines the qualified Goal identity, semantic idempotency
+    key, and physical attempt coordinate so neither competing requests nor
+    caller-selected evidence paths can split one mutation attempt.
     """
 
     if attempt_path is None:
@@ -1486,16 +1487,11 @@ def execute_goal_transition(
     typed_request = _model(request, request_type, "Goal lifecycle request")
     validated_owner = runtime.validate_goal_lifecycle_owner(owner)
     _validate_request_owner_scope(typed_request, validated_owner)
-    lock_path = _semantic_attempt_lock_path(
+    with _goal_transition_attempt_locks(
         typed_request,
         validated_owner,
-    )
-    with _attempt_lock(lock_path):
-        attempt_path = _resolve_semantic_attempt_path(
-            typed_request,
-            validated_owner,
-            attempt_path,
-        )
+        attempt_path,
+    ) as attempt_path:
         resolved_endpoint = _resolve_owner_endpoint(
             validated_owner,
             Path(endpoint),
@@ -1968,6 +1964,18 @@ def _semantic_attempt_lock_path(
     return _semantic_attempt_lock_root() / f"{digest}.lock"
 
 
+def _physical_attempt_lock_path(attempt_path: Path) -> Path:
+    """Bind one lock to the caller-selected durable attempt coordinate."""
+
+    runtime = _runtime()
+    binding = {
+        "schema_version": "abyss_stack_goal_lifecycle_physical_attempt_lock_v1",
+        "attempt_ref": str(Path(attempt_path).resolve()),
+    }
+    digest = runtime._sha256_bytes(runtime._canonical_bytes(binding))
+    return _semantic_attempt_lock_root() / f"physical-{digest}.lock"
+
+
 def _semantic_attempt_digest(request: Any, owner: dict[str, Any]) -> str:
     """Bind lock and durable attempt selection to one semantic request."""
 
@@ -2190,29 +2198,32 @@ def _semantic_attempt_state_root() -> Path:
         raise runtime.ExternalCodexReturnError(
             f"Goal lifecycle semantic state home is not owner-controlled: {home}"
         )
-    state_parent = home / ".local" / "state"
-    root = state_parent / "aoa-external-codex" / "goal-lifecycle"
-    try:
-        root.mkdir(mode=0o700, parents=True, exist_ok=True)
-        parent_stat = state_parent.stat(follow_symlinks=False)
-        root_stat = root.stat(follow_symlinks=False)
-    except OSError as exc:
-        raise runtime.ExternalCodexReturnError(
-            f"Goal lifecycle semantic state root cannot be prepared: {root}"
-        ) from exc
-    if (
-        state_parent.is_symlink()
-        or not stat.S_ISDIR(parent_stat.st_mode)
-        or parent_stat.st_uid != uid
-        or stat.S_IMODE(parent_stat.st_mode) & 0o022
-        or root.is_symlink()
-        or not stat.S_ISDIR(root_stat.st_mode)
-        or root_stat.st_uid != uid
-        or stat.S_IMODE(root_stat.st_mode) & 0o077
+    local_parent = home / ".local"
+    state_parent = local_parent / "state"
+    owner_parent = state_parent / "aoa-external-codex"
+    root = owner_parent / "goal-lifecycle"
+    for directory, forbidden_mode in (
+        (local_parent, 0o022),
+        (state_parent, 0o022),
+        (owner_parent, 0o022),
+        (root, 0o077),
     ):
-        raise runtime.ExternalCodexReturnError(
-            f"Goal lifecycle semantic state root is not owner-private: {root}"
-        )
+        try:
+            directory.mkdir(mode=0o700, exist_ok=True)
+            observed = directory.stat(follow_symlinks=False)
+        except OSError as exc:
+            raise runtime.ExternalCodexReturnError(
+                f"Goal lifecycle semantic state directory cannot be prepared: {directory}"
+            ) from exc
+        if (
+            directory.is_symlink()
+            or not stat.S_ISDIR(observed.st_mode)
+            or observed.st_uid != uid
+            or stat.S_IMODE(observed.st_mode) & forbidden_mode
+        ):
+            raise runtime.ExternalCodexReturnError(
+                f"Goal lifecycle semantic state directory is not owner-controlled: {directory}"
+            )
     return root
 
 
@@ -2243,6 +2254,30 @@ def _attempt_lock(path: Path):
     finally:
         fcntl.flock(descriptor, fcntl.LOCK_UN)
         os.close(descriptor)
+
+
+@contextlib.contextmanager
+def _goal_transition_attempt_locks(
+    request: Any,
+    owner: dict[str, Any],
+    requested_attempt_path: Path,
+):
+    """Serialize one transition by Goal, semantic request, and output path."""
+
+    runtime = _runtime()
+    semantic_lock_path = _semantic_attempt_lock_path(request, owner)
+    # Reuse the legacy pause lock as the common native Goal mutation boundary.
+    # Goal identity is always outermost so every lifecycle route has one lock
+    # order and cannot deadlock while acquiring narrower request/path locks.
+    with runtime._pause_attempt_lock(owner):
+        with _attempt_lock(semantic_lock_path):
+            attempt_path = _resolve_semantic_attempt_path(
+                request,
+                owner,
+                requested_attempt_path,
+            )
+            with _attempt_lock(_physical_attempt_lock_path(attempt_path)):
+                yield attempt_path
 
 
 def run_goal_transition(args: Any) -> dict[str, Any]:
@@ -2289,13 +2324,11 @@ def run_goal_transition(args: Any) -> dict[str, Any]:
         raise runtime.ExternalCodexReturnError(
             "Goal lifecycle receipt must be distinct from all input artifacts"
         )
-    lock_path = _semantic_attempt_lock_path(request, owner)
-    with _attempt_lock(lock_path):
-        attempt_path = _resolve_semantic_attempt_path(
-            request,
-            owner,
-            attempt_path,
-        )
+    with _goal_transition_attempt_locks(
+        request,
+        owner,
+        attempt_path,
+    ) as attempt_path:
         if {receipt_path.resolve(), attempt_path.resolve()} & input_paths:
             raise runtime.ExternalCodexReturnError(
                 "Goal lifecycle receipt and anchored attempt must be distinct from all input artifacts"

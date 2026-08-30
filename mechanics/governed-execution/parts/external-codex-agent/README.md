@@ -163,7 +163,13 @@ and replay only through their matching legacy wake reservation. A retry after a 
   sidecar, and bind the file-backed receipt to its canonical path. A protected
   owner/idempotency anchor in persistent owner state retains the first attempt
   path across alternate receipt paths, later reverse transitions, and volatile
-  runtime-lock loss. An already-desired read records a durable no-mutation
+  runtime-lock loss. Every typed mutation shares the legacy route's outer lock
+  for the qualified Goal identity, then takes narrower semantic-request and
+  physical-attempt-coordinate locks; two accepted requests cannot observe the
+  same mutable precondition concurrently, and two callers cannot overwrite one
+  selected attempt sidecar. Persistent state parents are created component by
+  component with owner-only modes and validated before use. An already-desired
+  read records a durable no-mutation
   completion at that path. The v2 anchor stays unstarted until a valid attempt
   is persisted, so a transient transport failure before that point may retry.
   A started anchor with a missing attempt is terminal rather than permission to recreate the attempt, and replayed

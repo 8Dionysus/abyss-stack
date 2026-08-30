@@ -111,11 +111,18 @@ revalidates the exact decision reference, transition frame, proof, and
 response digests; executed receipt replay also requires the mutation attempt
 sidecar, binds the authoritative result response to its digest and safe
 summary, and rejects a receipt whose path identity is missing or changed. A
-concurrent SDK regression drives two callers through different durable
-attempt paths, and a CLI regression drives the same accepted request through
-different receipt paths. Both prove that the owner/idempotency-derived lock
-permits exactly one native Goal mutation while the other caller resolves the
-same proof-recorded attempt. A later-state-reversal regression proves that the
+  concurrent SDK regression drives two callers through different durable
+  attempt paths, and a CLI regression drives the same accepted request through
+  different receipt paths. Both prove that the owner/idempotency-derived lock
+  permits exactly one native Goal mutation while the other caller resolves the
+  same proof-recorded attempt. A separate concurrency regression gives the same
+  owner-bound Goal two accepted requests with different idempotency keys and
+  proves the common Goal-identity lock permits exactly one native mutation. A
+  physical-coordinate regression disables that wider Goal lock, races two
+  different semantic requests against one attempt path, and proves one durable
+  claim, one fail-closed loser, and one native set. An umask regression starts
+  without `.local/state`, applies `0002`, and proves every newly created
+  persistent-state parent is mode `0700`. A later-state-reversal regression proves that the
 same idempotency key resolves that original attempt from its protected
 semantic anchor and refuses a second mutation even through a different
 receipt. A runtime-reset regression replaces the complete volatile lock root,

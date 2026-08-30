@@ -64,6 +64,15 @@ receipt is accepted only when its historical response bytes, summaries, and
 digests match the anchored `read_only_recorded` observation.
 Dynamic endpoint rebinding may change the fresh transport coordinate but does
 not rewrite the attempt's historical endpoint evidence.
+All Goal mutations share an outer lock derived only from the qualified Goal
+identity, including the legacy pause route. Typed requests then acquire their
+owner/idempotency lock and a lock derived from the resolved physical attempt
+path in that fixed order. Different accepted requests therefore cannot both
+read one mutable precondition before dispatch, and even requests outside one
+semantic anchor cannot overwrite a colliding caller-selected attempt sidecar.
+Persistent owner-state parents are created directly with owner-only modes and
+validated component by component rather than relying on a recursive mkdir
+whose intermediate modes depend on the process umask.
 The CLI reasserts the original request, decision, and owner bytes immediately
 before dispatch and after receipt publication. The legacy pause compatibility route lacks the typed
 idempotency artifact, so it serializes by qualified Goal identity across
@@ -106,6 +115,10 @@ route.
   mutation/proof boundary.
 - Positive: a transport failure before any attempt exists does not permanently
   consume the accepted idempotency key.
+- Positive: different accepted requests for one Goal and colliding physical
+  attempt paths serialize before native mutation or evidence replacement.
+- Positive: a common group-writable umask cannot create a permanently rejected
+  intermediate semantic-state directory.
 - Tradeoff: without a protocol CAS/version field, a receipt proves the bound
   request and post-read observation, not server-side compare-and-set causality.
 - Follow-up: live pause, root wake, holder closure, owner acceptance, and

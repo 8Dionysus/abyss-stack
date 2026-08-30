@@ -135,15 +135,24 @@ Operations are:
   a bounded fresh `thread/goal/get` post-read. A response loss after dispatch
   is reconciled only from the durable dispatch marker plus that post-read and
   never by issuing a second lifecycle set. CLI and programmatic SDK entrypoints
-  derive the same owner-private runtime lock from the qualified owner identity
-  and idempotency key across endpoint discovery, attempt loading, mutation,
-  and proof persistence. A non-replacing semantic anchor in persistent
+  acquire one outer owner-private lock from the qualified Goal identity, shared
+  with the legacy pause route, across endpoint discovery, attempt loading,
+  mutation, and proof persistence. A nested semantic lock binds the qualified
+  owner identity and idempotency key, while a third lock binds the resolved
+  physical attempt coordinate before any sidecar is loaded or written. This
+  fixed Goal -> semantic request -> physical attempt order prevents competing
+  accepted requests from reading the same mutable precondition and prevents
+  unrelated requests from overwriting one caller-selected attempt path. A
+  non-replacing semantic anchor in persistent
   owner-private state binds the first durable attempt path to the qualified
   owner and idempotency key; advisory lock loss on reboot and later callers
   resolve that path instead of selecting fresh state from their receipt path.
   Caller-selected receipt/attempt paths, a later reverse transition,
   app-server endpoint rebinding, and volatile runtime-directory replacement
   therefore cannot split or repeat one accepted transition's native mutation.
+  Each missing persistent-state parent is created directly with mode `0700`;
+  every parent is then rejected if it is symlinked, foreign-owned, or writable
+  by group/other, while the final Goal-lifecycle root must remain owner-private.
   An already-desired read-only execution records `read_only_recorded` at the
   anchored attempt path; after a later reverse transition, the same
   idempotency key therefore refuses mutation rather than treating the absent
