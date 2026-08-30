@@ -41,6 +41,16 @@ EffectClass = Literal[
     "external_change",
 ]
 ExposureDecision = Literal["allowed", "denied"]
+ExposureFreshnessState = Literal[
+    "fresh",
+    "stale",
+    "expired",
+    "unknown",
+    "missing",
+    "partial",
+    "estimated",
+    "provider_reported",
+]
 
 _POLICY_RANK = {
     "read": 0,
@@ -60,6 +70,8 @@ _EFFECT_POLICY = {
 }
 MAX_CANDIDATE_TTL = timedelta(minutes=10)
 MAX_FUTURE_CLOCK_SKEW = timedelta(seconds=30)
+MAX_RETAINED_EXPOSURE_RECEIPTS = 256
+MAX_RETAINED_MATERIALIZATIONS = 256
 ZERO_DIGEST = "sha256:" + "0" * 64
 BASELINE_ADMISSION_REF = "receipt://d0/baseline-ready"
 CLAIM_LIMIT = (
@@ -168,6 +180,39 @@ class ExposureRollbackBinding(StrictExposureModel):
     rollback_route: NonEmpty
 
 
+class StackExposureFreshness(StrictExposureModel):
+    state: ExposureFreshnessState
+    source_ref: NonEmpty
+    source_digest: Digest
+    observed_at: datetime
+    expires_at: datetime | None = None
+    ttl_seconds: Annotated[int | None, Field(ge=0)] = None
+    provider_watermark: NonEmpty | None = None
+    reason_codes: tuple[NonEmpty, ...] = ()
+
+    @field_validator("observed_at", "expires_at")
+    @classmethod
+    def require_aware_time(cls, value: datetime | None) -> datetime | None:
+        return _aware_utc(value)
+
+    @model_validator(mode="after")
+    def validate_freshness(self) -> StackExposureFreshness:
+        if self.expires_at is not None and self.expires_at <= self.observed_at:
+            raise ValueError("stack exposure freshness expiry must follow observation")
+        if self.state in {"fresh", "provider_reported"} and self.expires_at is None:
+            raise ValueError("usable stack exposure freshness requires an expiry")
+        if self.state != "fresh" and not self.reason_codes:
+            raise ValueError("non-fresh stack exposure state requires reason codes")
+        if self.expires_at is None:
+            if self.ttl_seconds is not None:
+                raise ValueError("freshness TTL requires an expiry")
+        else:
+            expected_ttl = int((self.expires_at - self.observed_at).total_seconds())
+            if self.ttl_seconds != expected_ttl:
+                raise ValueError("stack exposure freshness TTL is inconsistent")
+        return self
+
+
 class StackExposureCapabilityBinding(StrictExposureModel):
     """Nested capability identity carried by the SDK plan ingress."""
 
@@ -178,7 +223,7 @@ class StackExposureCapabilityBinding(StrictExposureModel):
     capability_digest: Digest
     schema_digest: Digest
     source_revision: Mapping[str, Any]
-    freshness: Mapping[str, Any]
+    freshness: StackExposureFreshness
     effect_ceiling: PolicyFamily
     approval_ref: Mapping[str, Any] | None = None
     rollback_route: NonEmpty
@@ -254,7 +299,7 @@ class StackExposurePlan(StrictExposureModel):
                 > _POLICY_RANK[self.requested_policy_family]
             ):
                 raise ValueError("stack plan visible tool exceeds requested policy")
-        freshness_source_digest = self.capability.freshness.get("source_digest")
+        freshness_source_digest = self.capability.freshness.source_digest
         if self.rendered_snapshot.source_digest != freshness_source_digest:
             raise ValueError("stack snapshot source is not capability-bound")
         visible_primitives = tuple(tool.primitive_id for tool in self.visible_tools)
@@ -467,8 +512,19 @@ class ExposureRuntime:
     def _emit(self, receipt: StrictExposureModel) -> None:
         payload = receipt.model_dump(mode="json")
         self._receipts.append(copy.deepcopy(payload))
+        if len(self._receipts) > MAX_RETAINED_EXPOSURE_RECEIPTS:
+            del self._receipts[:-MAX_RETAINED_EXPOSURE_RECEIPTS]
         if self._receipt_sink is not None:
             self._receipt_sink(copy.deepcopy(payload))
+
+    def _prune_materializations(self, now: datetime) -> None:
+        expired = [
+            receipt_id
+            for receipt_id, plan in self._materializations.items()
+            if plan.expires_at <= now or plan.rendered_snapshot.expires_at <= now
+        ]
+        for receipt_id in expired:
+            del self._materializations[receipt_id]
 
     def materialize(
         self,
@@ -482,6 +538,7 @@ class ExposureRuntime:
             )
         )
         now = self._now()
+        self._prune_materializations(now)
         reasons: list[str] = []
         if not self._enabled or not normalized.feature_enabled:
             reasons.append("progressive_exposure_disabled")
@@ -499,8 +556,21 @@ class ExposureRuntime:
             reasons.append("exposure_snapshot_from_future")
         if normalized.rendered_snapshot.expires_at <= now:
             reasons.append("exposure_snapshot_expired")
+        freshness = normalized.capability.freshness
+        if freshness.state not in {"fresh", "provider_reported"}:
+            reasons.append("capability_freshness_not_usable")
+        if freshness.observed_at > now + MAX_FUTURE_CLOCK_SKEW:
+            reasons.append("capability_freshness_from_future")
+        if freshness.expires_at is None or freshness.expires_at <= now:
+            reasons.append("capability_freshness_expired")
+        elif normalized.expires_at > freshness.expires_at:
+            reasons.append("exposure_plan_outlives_capability_freshness")
         if normalized.execution_authorized or normalized.activation_authorized:
             reasons.append("authorization_ceiling_violation")
+        try:
+            _reject_secret_material(normalized.model_dump(mode="json"))
+        except StackMCPError:
+            reasons.append("secret_material_rejected")
         decision: ExposureDecision = "allowed" if not reasons else "denied"
         receipt_expires_at = max(normalized.expires_at, now + timedelta(seconds=1))
         receipt_body = {
@@ -516,10 +586,14 @@ class ExposureRuntime:
             "visible_tool_ids": list(normalized.rendered_snapshot.visible_tool_ids),
             "visible_bytes": normalized.rendered_snapshot.rendered_bytes,
             "visible_tokens": normalized.rendered_snapshot.rendered_tokens,
-            "rollback_bindings": [
-                binding.model_dump(mode="json")
-                for binding in normalized.rollback_bindings
-            ],
+            "rollback_bindings": (
+                [
+                    binding.model_dump(mode="json")
+                    for binding in normalized.rollback_bindings
+                ]
+                if "secret_material_rejected" not in reasons
+                else []
+            ),
             "baseline_admission_ref": self._baseline_admission_ref,
             "activation_authorized": False,
             "execution_authorized": False,
@@ -530,6 +604,8 @@ class ExposureRuntime:
             {"receipt_id": _digest(receipt_body), **receipt_body}
         )
         if decision == "allowed":
+            while len(self._materializations) >= MAX_RETAINED_MATERIALIZATIONS:
+                del self._materializations[next(iter(self._materializations))]
             self._materializations[receipt.receipt_id] = normalized
         self._emit(receipt)
         return receipt
@@ -547,6 +623,7 @@ class ExposureRuntime:
         """Record an invocation request; owner-tool execution is out of scope."""
 
         now = self._now()
+        self._prune_materializations(now)
         valid_request_id = isinstance(request_id, str) and 1 <= len(request_id) <= 512
         valid_caller_id = isinstance(caller_id, str) and 1 <= len(caller_id) <= 512
         valid_tool_id = isinstance(tool_id, str) and 1 <= len(tool_id) <= 512

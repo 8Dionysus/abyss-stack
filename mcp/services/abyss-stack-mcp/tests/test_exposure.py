@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import jsonschema
+import pytest
 
 from abyss_stack_mcp.core import canonical_json_bytes, sha256_digest
 from abyss_stack_mcp.exposure import (
@@ -167,6 +168,12 @@ def _effect_payload() -> dict:
     payload["plan_id"] = (
         "sha256:" + hashlib.sha256(canonical_json_bytes(unsigned)).hexdigest()
     )
+    return payload
+
+
+def _redigest_plan(payload: dict) -> dict:
+    unsigned = {key: value for key, value in payload.items() if key != "plan_id"}
+    payload["plan_id"] = sha256_digest(unsigned)
     return payload
 
 
@@ -394,6 +401,76 @@ def test_non_json_invocation_arguments_emit_a_denial_receipt() -> None:
     assert receipt.decision == "denied"
     assert "malformed_invocation_arguments" in receipt.reason_codes
     assert receipt.input_digest == sha256_digest({})
+
+
+def test_stale_capability_freshness_is_not_materialized() -> None:
+    runtime = ExposureRuntime(
+        progressive_exposure_enabled=True,
+        baseline_admitted=True,
+        baseline_admission_ref="receipt://d0/baseline-ready",
+        clock=lambda: NOW,
+    )
+    payload = _payload()
+    payload["capability"]["freshness"]["state"] = "stale"
+    payload["capability"]["freshness"]["reason_codes"] = ["owner_stale"]
+
+    receipt = runtime.materialize(_redigest_plan(payload))
+
+    assert receipt.decision == "denied"
+    assert "capability_freshness_not_usable" in receipt.reason_codes
+
+
+def test_inconsistent_capability_freshness_ttl_is_rejected() -> None:
+    payload = _payload()
+    payload["capability"]["freshness"]["ttl_seconds"] = 301
+
+    with pytest.raises(Exception, match="failed stack normalization"):
+        StackExposurePlan.from_sdk_payload(_redigest_plan(payload))
+
+
+def test_secret_rollback_route_is_denied_without_receipt_disclosure() -> None:
+    runtime = ExposureRuntime(
+        progressive_exposure_enabled=True,
+        baseline_admitted=True,
+        baseline_admission_ref="receipt://d0/baseline-ready",
+        clock=lambda: NOW,
+    )
+    payload = _effect_payload()
+    payload["rollback_bindings"][0]["rollback_route"] = (
+        "https://owner.invalid/rollback?token=secret-value"
+    )
+
+    receipt = runtime.materialize(_redigest_plan(payload))
+
+    assert receipt.decision == "denied"
+    assert "secret_material_rejected" in receipt.reason_codes
+    assert receipt.rollback_bindings == ()
+    assert "secret-value" not in json.dumps(runtime.recent_receipts())
+
+
+def test_exposure_runtime_bounds_receipts_and_prunes_expired_plans() -> None:
+    now = NOW
+    runtime = ExposureRuntime(
+        progressive_exposure_enabled=True,
+        baseline_admitted=True,
+        baseline_admission_ref="receipt://d0/baseline-ready",
+        clock=lambda: now,
+    )
+    materialization = runtime.materialize(_payload())
+    for _ in range(300):
+        runtime.materialize(_payload())
+
+    assert len(runtime.recent_receipts()) == 256
+    now = NOW + timedelta(minutes=6)
+    denied = runtime.invoke(
+        materialization.receipt_id,
+        request_id="after-expiry",
+        caller_id="test-caller",
+        tool_id="knowledge-inspect.inspect-knowledge",
+        arguments={},
+        authorization_ref=None,
+    )
+    assert "materialization_receipt_not_found" in denied.reason_codes
 
 
 def test_stack_normalization_rejects_visible_tool_schema_drift() -> None:

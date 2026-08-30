@@ -69,9 +69,7 @@
           "type": "string"
         },
         "freshness": {
-          "additionalProperties": true,
-          "title": "Freshness",
-          "type": "object"
+          "$ref": "#/$defs/StackExposureFreshness"
         },
         "organ_id": {
           "maxLength": 512,
@@ -120,6 +118,99 @@
         "rollback_route"
       ],
       "title": "StackExposureCapabilityBinding",
+      "type": "object"
+    },
+    "StackExposureFreshness": {
+      "additionalProperties": false,
+      "properties": {
+        "expires_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expires At"
+        },
+        "observed_at": {
+          "format": "date-time",
+          "title": "Observed At",
+          "type": "string"
+        },
+        "provider_watermark": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Provider Watermark"
+        },
+        "reason_codes": {
+          "default": [],
+          "items": {
+            "maxLength": 512,
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Reason Codes",
+          "type": "array"
+        },
+        "source_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Source Digest",
+          "type": "string"
+        },
+        "source_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Source Ref",
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "fresh",
+            "stale",
+            "expired",
+            "unknown",
+            "missing",
+            "partial",
+            "estimated",
+            "provider_reported"
+          ],
+          "title": "State",
+          "type": "string"
+        },
+        "ttl_seconds": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ttl Seconds"
+        }
+      },
+      "required": [
+        "state",
+        "source_ref",
+        "source_digest",
+        "observed_at"
+      ],
+      "title": "StackExposureFreshness",
       "type": "object"
     },
     "StackExposureSnapshot": {
