@@ -1,5 +1,35 @@
 {
   "$defs": {
+    "ExposureRollbackBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "primitive_id": {
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Primitive Id",
+          "type": "string"
+        },
+        "rollback_route": {
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Rollback Route",
+          "type": "string"
+        },
+        "tool_id": {
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Tool Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tool_id",
+        "primitive_id",
+        "rollback_route"
+      ],
+      "title": "ExposureRollbackBinding",
+      "type": "object"
+    },
     "StackExposureCapabilityBinding": {
       "additionalProperties": false,
       "description": "Nested capability identity carried by the SDK plan ingress.",
@@ -31,7 +61,9 @@
         "effect_ceiling": {
           "enum": [
             "read",
-            "candidate"
+            "candidate",
+            "internal_effect",
+            "external_effect"
           ],
           "title": "Effect Ceiling",
           "type": "string"
@@ -221,7 +253,9 @@
         "effect_ceiling": {
           "enum": [
             "read",
-            "candidate"
+            "candidate",
+            "internal_effect",
+            "external_effect"
           ],
           "title": "Effect Ceiling",
           "type": "string"
@@ -231,7 +265,11 @@
             "observe",
             "derive",
             "validate",
-            "prepare_candidate"
+            "prepare_candidate",
+            "apply_runtime",
+            "accept_source",
+            "external_emit",
+            "external_change"
           ],
           "title": "Effect Class",
           "type": "string"
@@ -265,7 +303,9 @@
         "policy_family": {
           "enum": [
             "read",
-            "candidate"
+            "candidate",
+            "internal_effect",
+            "external_effect"
           ],
           "title": "Policy Family",
           "type": "string"
@@ -405,7 +445,9 @@
     "requested_policy_family": {
       "enum": [
         "read",
-        "candidate"
+        "candidate",
+        "internal_effect",
+        "external_effect"
       ],
       "title": "Requested Policy Family",
       "type": "string"
@@ -418,6 +460,14 @@
         "type": "string"
       },
       "title": "Requested Primitive Ids",
+      "type": "array"
+    },
+    "rollback_bindings": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/ExposureRollbackBinding"
+      },
+      "title": "Rollback Bindings",
       "type": "array"
     },
     "rollback_route": {

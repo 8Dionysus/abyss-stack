@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+import jsonschema
 
 from abyss_stack_mcp.core import canonical_json_bytes
 from abyss_stack_mcp.exposure import (
@@ -13,6 +17,8 @@ from abyss_stack_mcp.exposure import (
 
 
 NOW = datetime(2026, 8, 26, 5, 0, tzinfo=timezone.utc)
+
+
 def digest(letter: str) -> str:
     return "sha256:" + letter * 64
 
@@ -99,12 +105,64 @@ def _payload() -> dict:
         "visible_tools": tools,
         "rendered_snapshot": snapshot,
         "approval_ref": None,
+        "rollback_bindings": [],
         "rollback_route": "owner://aoa-kag/rollback",
         "requested_at": NOW.isoformat().replace("+00:00", "Z"),
         "expires_at": (NOW + timedelta(minutes=5)).isoformat().replace("+00:00", "Z"),
         "expansion_reasons": ["baseline_gate_satisfied"],
         "refusal_reasons": [],
     }
+    unsigned = {key: value for key, value in payload.items() if key != "plan_id"}
+    payload["plan_id"] = "sha256:" + hashlib.sha256(
+        canonical_json_bytes(unsigned)
+    ).hexdigest()
+    return payload
+
+
+def _effect_payload() -> dict:
+    payload = _payload()
+    tool = payload["visible_tools"][0]
+    tool.update(
+        {
+            "tool_id": "knowledge-publish.publish-change",
+            "capability_id": "knowledge-publish",
+            "primitive_id": "publish-change",
+            "mcp_name": "runtime-publish",
+            "effect_class": "external_change",
+            "policy_family": "external_effect",
+            "effect_ceiling": "external_effect",
+        }
+    )
+    capability = payload["capability"]
+    capability.update(
+        {
+            "capability_id": "knowledge-publish",
+            "qualified_capability_id": "aoa-kag:aoa-kag:knowledge-publish",
+            "effect_ceiling": "external_effect",
+        }
+    )
+    payload["requested_policy_family"] = "external_effect"
+    payload["requested_primitive_ids"] = ["publish-change"]
+    payload["rollback_bindings"] = [
+        {
+            "tool_id": "knowledge-publish.publish-change",
+            "primitive_id": "publish-change",
+            "rollback_route": "owner://rollback/publish",
+        }
+    ]
+    snapshot = payload["rendered_snapshot"]
+    snapshot["tools"] = [tool]
+    snapshot["visible_tool_ids"] = [tool["tool_id"]]
+    snapshot["rendered_bytes"] = len(canonical_json_bytes([tool]))
+    snapshot["rendered_schema_digest"] = "sha256:" + hashlib.sha256(
+        canonical_json_bytes([tool])
+    ).hexdigest()
+    snapshot_unsigned = {
+        key: value for key, value in snapshot.items() if key != "snapshot_id"
+    }
+    snapshot["snapshot_id"] = "sha256:" + hashlib.sha256(
+        canonical_json_bytes(snapshot_unsigned)
+    ).hexdigest()
     unsigned = {key: value for key, value in payload.items() if key != "plan_id"}
     payload["plan_id"] = "sha256:" + hashlib.sha256(
         canonical_json_bytes(unsigned)
@@ -123,6 +181,45 @@ def test_stack_materialization_is_default_off_and_receipt_bound() -> None:
     assert receipt.execution_authorized is False
     assert receipt.receipt_id.startswith("sha256:")
     assert len(runtime.recent_receipts()) == 1
+
+
+def test_published_plan_schema_accepts_the_sdk_ingress_shape() -> None:
+    schema = json.loads(
+        (
+            Path(__file__).resolve().parents[1]
+            / "schemas"
+            / "progressive-exposure-plan.schema.json"
+        ).read_text(encoding="utf-8")
+    )
+
+    assert list(jsonschema.Draft202012Validator(schema).iter_errors(_payload())) == []
+
+
+def test_effect_plan_preserves_primitive_rollback_without_executing_owner_tool() -> None:
+    runtime = ExposureRuntime(
+        progressive_exposure_enabled=True,
+        baseline_admitted=True,
+        baseline_admission_ref="receipt://d0/baseline-ready",
+        clock=lambda: NOW,
+    )
+
+    materialization = runtime.materialize(_effect_payload())
+
+    assert materialization.decision == "allowed"
+    assert materialization.rollback_bindings[0].rollback_route == (
+        "owner://rollback/publish"
+    )
+    denied = runtime.invoke(
+        materialization.receipt_id,
+        request_id="effect-invocation",
+        caller_id="test-caller",
+        tool_id="knowledge-publish.publish-change",
+        arguments={"change": "bounded"},
+        authorization_ref=None,
+    )
+    assert denied.decision == "denied"
+    assert "non_read_tool_requires_runtime_effect_authority" in denied.reason_codes
+    assert "owner_tool_execution_not_owned_by_stack" in denied.reason_codes
 
 
 def test_admitted_runtime_requires_canonical_baseline_receipt() -> None:
@@ -154,6 +251,7 @@ def test_admitted_runtime_requires_explicit_invocation_authority_and_emits_recei
     assert materialization.visible_tool_ids == (
         "knowledge-inspect.inspect-knowledge",
     )
+    assert materialization.rollback_bindings == ()
 
     denied = runtime.invoke(
         materialization.receipt_id,

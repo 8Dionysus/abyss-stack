@@ -29,16 +29,34 @@ from .core import (
 
 Digest = Annotated[str, Field(pattern=r"^sha256:[0-9a-f]{64}$")]
 NonEmpty = Annotated[str, Field(min_length=1, max_length=512)]
-PolicyFamily = Literal["read", "candidate"]
-EffectClass = Literal["observe", "derive", "validate", "prepare_candidate"]
+PolicyFamily = Literal["read", "candidate", "internal_effect", "external_effect"]
+EffectClass = Literal[
+    "observe",
+    "derive",
+    "validate",
+    "prepare_candidate",
+    "apply_runtime",
+    "accept_source",
+    "external_emit",
+    "external_change",
+]
 ExposureDecision = Literal["allowed", "denied"]
 
-_POLICY_RANK = {"read": 0, "candidate": 1}
+_POLICY_RANK = {
+    "read": 0,
+    "candidate": 1,
+    "internal_effect": 2,
+    "external_effect": 3,
+}
 _EFFECT_POLICY = {
     "observe": "read",
     "derive": "read",
     "validate": "read",
     "prepare_candidate": "candidate",
+    "apply_runtime": "internal_effect",
+    "accept_source": "internal_effect",
+    "external_emit": "external_effect",
+    "external_change": "external_effect",
 }
 MAX_CANDIDATE_TTL = timedelta(minutes=10)
 MAX_FUTURE_CLOCK_SKEW = timedelta(seconds=30)
@@ -144,6 +162,12 @@ class StackExposureSnapshot(StrictExposureModel):
         return self
 
 
+class ExposureRollbackBinding(StrictExposureModel):
+    tool_id: NonEmpty
+    primitive_id: NonEmpty
+    rollback_route: NonEmpty
+
+
 class StackExposureCapabilityBinding(StrictExposureModel):
     """Nested capability identity carried by the SDK plan ingress."""
 
@@ -166,8 +190,6 @@ class StackExposureCapabilityBinding(StrictExposureModel):
             f"{source_owner}:{self.organ_id}:{self.capability_id}"
         ):
             raise ValueError("stack capability binding is not owner-qualified")
-        if _POLICY_RANK[self.effect_ceiling] > _POLICY_RANK["candidate"]:
-            raise ValueError("stack capability effect ceiling is outside its plane")
         return self
 
 
@@ -188,6 +210,7 @@ class StackExposurePlan(StrictExposureModel):
     visible_tools: tuple[StackExposureTool, ...] = ()
     rendered_snapshot: StackExposureSnapshot
     approval_ref: Mapping[str, Any] | None = None
+    rollback_bindings: tuple[ExposureRollbackBinding, ...] = ()
     rollback_route: NonEmpty
     requested_at: datetime
     expires_at: datetime
@@ -231,6 +254,19 @@ class StackExposurePlan(StrictExposureModel):
         if self.rendered_snapshot.source_digest != freshness_source_digest:
             raise ValueError("stack snapshot source is not capability-bound")
         visible_primitives = tuple(tool.primitive_id for tool in self.visible_tools)
+        expected_rollback_tools = tuple(
+            (tool.tool_id, tool.primitive_id)
+            for tool in self.visible_tools
+            if tool.policy_family != "read"
+        )
+        actual_rollback_tools = tuple(
+            (binding.tool_id, binding.primitive_id)
+            for binding in self.rollback_bindings
+        )
+        if actual_rollback_tools != expected_rollback_tools:
+            raise ValueError(
+                "stack rollback bindings must preserve every effectful visible tool"
+            )
         if self.plan_state == "candidate" and visible_primitives != self.requested_primitive_ids:
             raise ValueError("stack plan visible tools do not match requested selection")
         if self.plan_state == "blocked" and (
@@ -307,6 +343,7 @@ class ExposureMaterializationReceipt(StrictExposureModel):
     visible_tool_ids: tuple[NonEmpty, ...] = ()
     visible_bytes: Annotated[int, Field(ge=0)]
     visible_tokens: Annotated[int, Field(ge=0)] | None = None
+    rollback_bindings: tuple[ExposureRollbackBinding, ...] = ()
     baseline_admission_ref: NonEmpty | None = None
     activation_authorized: Literal[False] = False
     execution_authorized: Literal[False] = False
@@ -468,6 +505,10 @@ class ExposureRuntime:
             "visible_tool_ids": list(normalized.rendered_snapshot.visible_tool_ids),
             "visible_bytes": normalized.rendered_snapshot.rendered_bytes,
             "visible_tokens": normalized.rendered_snapshot.rendered_tokens,
+            "rollback_bindings": [
+                binding.model_dump(mode="json")
+                for binding in normalized.rollback_bindings
+            ],
             "baseline_admission_ref": self._baseline_admission_ref,
             "activation_authorized": False,
             "execution_authorized": False,

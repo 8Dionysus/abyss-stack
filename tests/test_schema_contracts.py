@@ -56,6 +56,9 @@ EXPECTED_ACTIVE_SCHEMA_PATHS = {
     Path("mcp/services/abyss-stack-mcp/schemas/runtime-observation.schema.json"),
     Path("mcp/services/abyss-stack-mcp/schemas/runtime-plan-candidate.schema.json"),
     Path(
+        "mcp/services/abyss-stack-mcp/schemas/progressive-exposure-invocation-authorization.schema.json"
+    ),
+    Path(
         "mcp/services/abyss-stack-mcp/schemas/progressive-exposure-invocation-receipt.schema.json"
     ),
     Path(

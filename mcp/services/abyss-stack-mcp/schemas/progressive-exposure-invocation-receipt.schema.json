@@ -41,7 +41,11 @@
         "observe",
         "derive",
         "validate",
-        "prepare_candidate"
+        "prepare_candidate",
+        "apply_runtime",
+        "accept_source",
+        "external_emit",
+        "external_change"
       ],
       "title": "Effect Class",
       "type": "string"
@@ -93,7 +97,9 @@
     "policy_family": {
       "enum": [
         "read",
-        "candidate"
+        "candidate",
+        "internal_effect",
+        "external_effect"
       ],
       "title": "Policy Family",
       "type": "string"

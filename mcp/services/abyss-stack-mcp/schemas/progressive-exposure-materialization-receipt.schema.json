@@ -1,4 +1,36 @@
 {
+  "$defs": {
+    "ExposureRollbackBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "primitive_id": {
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Primitive Id",
+          "type": "string"
+        },
+        "rollback_route": {
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Rollback Route",
+          "type": "string"
+        },
+        "tool_id": {
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Tool Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tool_id",
+        "primitive_id",
+        "rollback_route"
+      ],
+      "title": "ExposureRollbackBinding",
+      "type": "object"
+    }
+  },
   "$id": "https://8dionysus.github.io/schemas/abyss-stack-mcp/progressive-exposure-materialization-receipt.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -84,6 +116,14 @@
       "minLength": 1,
       "title": "Request Id",
       "type": "string"
+    },
+    "rollback_bindings": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/ExposureRollbackBinding"
+      },
+      "title": "Rollback Bindings",
+      "type": "array"
     },
     "schema_version": {
       "const": "abyss_stack_exposure_materialization_receipt_v1",
