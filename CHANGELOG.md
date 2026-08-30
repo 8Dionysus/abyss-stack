@@ -85,8 +85,9 @@ Tracking starts with the community-docs baseline for this repository.
   owner identity and idempotency key in an owner-private runtime directory, so
   different caller-selected receipt/attempt paths and app-server endpoint
   rebinding cannot issue duplicate lifecycle mutations. A protected semantic
-  anchor retains the first durable attempt across later receipt paths and
-  state reversals; CLI request/decision artifacts are reasserted immediately
+  anchor in persistent owner state retains the first durable attempt across
+  runtime-directory loss, later receipt paths, and state reversals; CLI
+  request/decision artifacts are reasserted immediately
   before dispatch, and the SDK binds attempt/receipt evidence to the initially
   loaded owner bytes while rejecting owner drift before dispatch and after
   proof persistence. Legacy pause callers now lock by qualified Goal identity

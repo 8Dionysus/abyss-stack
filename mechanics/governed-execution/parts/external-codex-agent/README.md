@@ -161,9 +161,10 @@ and replay only through their matching legacy wake reservation. A retry after a 
   server-side CAS or mutation causality. Executed receipts retain and
   revalidate the authoritative result response, require the mutation attempt
   sidecar, and bind the file-backed receipt to its canonical path. A protected
-  owner/idempotency anchor retains the first attempt path across alternate
-  receipt paths and later reverse transitions; the CLI reasserts request,
-  decision, and owner bytes immediately before mutation;
+  owner/idempotency anchor in persistent owner state retains the first attempt
+  path across alternate receipt paths, later reverse transitions, and volatile
+  runtime-lock loss; the CLI reasserts request, decision, and owner bytes
+  immediately before mutation;
 - keeps `aoa-external-codex-return pause` as a backwards-compatible legacy
   pause projection. It remains a mutating compatibility entrypoint when no
   completed receipt exists, reserving the exact precondition and issuing one

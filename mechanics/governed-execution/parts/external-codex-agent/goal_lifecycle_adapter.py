@@ -12,6 +12,7 @@ import contextlib
 import fcntl
 import importlib.util
 import os
+import pwd
 import stat
 import sys
 from pathlib import Path
@@ -1860,7 +1861,7 @@ def _semantic_attempt_digest(request: Any, owner: dict[str, Any]) -> str:
 
 def _semantic_attempt_anchor_path(request: Any, owner: dict[str, Any]) -> Path:
     digest = _semantic_attempt_digest(request, owner)
-    return _semantic_attempt_lock_root() / f"{digest}.attempt-anchor.json"
+    return _semantic_attempt_state_root() / f"{digest}.attempt-anchor.json"
 
 
 def _resolve_semantic_attempt_path(
@@ -1947,6 +1948,52 @@ def _semantic_attempt_lock_root() -> Path:
     ):
         raise runtime.ExternalCodexReturnError(
             f"Goal lifecycle semantic lock root is not owner-private: {root}"
+        )
+    return root
+
+
+def _semantic_attempt_state_root() -> Path:
+    """Return persistent owner state for semantic idempotency anchors."""
+
+    runtime = _runtime()
+    uid = os.getuid()
+    try:
+        home = Path(pwd.getpwuid(uid).pw_dir).resolve(strict=True)
+        home_stat = home.stat(follow_symlinks=False)
+    except (KeyError, OSError) as exc:
+        raise runtime.ExternalCodexReturnError(
+            "Goal lifecycle semantic state home cannot be resolved"
+        ) from exc
+    if (
+        not stat.S_ISDIR(home_stat.st_mode)
+        or home_stat.st_uid != uid
+        or stat.S_IMODE(home_stat.st_mode) & 0o022
+    ):
+        raise runtime.ExternalCodexReturnError(
+            f"Goal lifecycle semantic state home is not owner-controlled: {home}"
+        )
+    state_parent = home / ".local" / "state"
+    root = state_parent / "aoa-external-codex" / "goal-lifecycle"
+    try:
+        root.mkdir(mode=0o700, parents=True, exist_ok=True)
+        parent_stat = state_parent.stat(follow_symlinks=False)
+        root_stat = root.stat(follow_symlinks=False)
+    except OSError as exc:
+        raise runtime.ExternalCodexReturnError(
+            f"Goal lifecycle semantic state root cannot be prepared: {root}"
+        ) from exc
+    if (
+        state_parent.is_symlink()
+        or not stat.S_ISDIR(parent_stat.st_mode)
+        or parent_stat.st_uid != uid
+        or stat.S_IMODE(parent_stat.st_mode) & 0o022
+        or root.is_symlink()
+        or not stat.S_ISDIR(root_stat.st_mode)
+        or root_stat.st_uid != uid
+        or stat.S_IMODE(root_stat.st_mode) & 0o077
+    ):
+        raise runtime.ExternalCodexReturnError(
+            f"Goal lifecycle semantic state root is not owner-private: {root}"
         )
     return root
 

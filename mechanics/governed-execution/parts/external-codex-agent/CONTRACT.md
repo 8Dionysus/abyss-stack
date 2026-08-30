@@ -137,13 +137,14 @@ Operations are:
   never by issuing a second lifecycle set. CLI and programmatic SDK entrypoints
   derive the same owner-private runtime lock from the qualified owner identity
   and idempotency key across endpoint discovery, attempt loading, mutation,
-  and proof persistence. A non-replacing semantic anchor in that same
-  owner-private root binds the first durable attempt path to the qualified
-  owner and idempotency key; later callers resolve that path instead of
-  selecting fresh state from their receipt path. Caller-selected
-  receipt/attempt paths, a later reverse transition, and app-server endpoint
-  rebinding therefore cannot split or repeat one accepted transition's native
-  mutation. Attempt and receipt owner digests come only from the initially
+  and proof persistence. A non-replacing semantic anchor in persistent
+  owner-private state binds the first durable attempt path to the qualified
+  owner and idempotency key; advisory lock loss on reboot and later callers
+  resolve that path instead of selecting fresh state from their receipt path.
+  Caller-selected receipt/attempt paths, a later reverse transition,
+  app-server endpoint rebinding, and volatile runtime-directory replacement
+  therefore cannot split or repeat one accepted transition's native mutation.
+  Attempt and receipt owner digests come only from the initially
   validated owner bytes. Both entrypoints reassert that snapshot immediately
   before native mutation and after proof persistence, while the CLI also
   reasserts the initially loaded request and decision bytes immediately before

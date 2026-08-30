@@ -118,7 +118,10 @@ permits exactly one native Goal mutation while the other caller resolves the
 same proof-recorded attempt. A later-state-reversal regression proves that the
 same idempotency key resolves that original attempt from its protected
 semantic anchor and refuses a second mutation even through a different
-receipt. A dynamic-endpoint regression additionally
+receipt. A runtime-reset regression replaces the complete volatile lock root,
+then proves that the persistent owner-state anchor still resolves the original
+attempt and refuses a second mutation after state reversal. A dynamic-endpoint
+regression additionally
 returns different owner-proved app-server paths to the two callers and proves
 that endpoint discovery remains inside the same stable semantic lock while the
 attempt retains its historical endpoint evidence. Separate CLI regressions

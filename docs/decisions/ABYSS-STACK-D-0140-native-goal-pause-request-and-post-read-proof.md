@@ -46,12 +46,14 @@ atomic proof records remain readable only for migration/replay and do not
 authorize a new mutation.
 
 The qualified owner identity and accepted idempotency key also own a protected
-runtime anchor for the first durable attempt path. Alternate caller-selected
-receipt paths resolve that anchor instead of creating fresh lifecycle state;
-if another accepted transition later restores the original Goal state, a
-retry of the old idempotency key still finds the completed attempt and refuses
-a second mutation. Dynamic endpoint rebinding may change the fresh transport
-coordinate but does not rewrite the attempt's historical endpoint evidence.
+anchor in persistent owner state for the first durable attempt path. The
+advisory lock remains in volatile runtime state, but reboot or runtime-directory
+replacement cannot erase the owner anchor. Alternate caller-selected receipt
+paths resolve that anchor instead of creating fresh lifecycle state; if another
+accepted transition later restores the original Goal state, a retry of the old
+idempotency key still finds the completed attempt and refuses a second mutation.
+Dynamic endpoint rebinding may change the fresh transport coordinate but does
+not rewrite the attempt's historical endpoint evidence.
 The CLI reasserts the original request, decision, and owner bytes immediately
 before dispatch. The legacy pause compatibility route lacks the typed
 idempotency artifact, so it serializes by qualified Goal identity across
@@ -84,8 +86,8 @@ route.
 - Positive: a lost response can be reconciled without replaying the mutation
   when the durable dispatch marker proves that the exact request was issued.
 - Positive: alternate receipt paths, endpoint rebinding, later state reversal,
-  and concurrent legacy pause callers cannot cause a duplicate native set for
-  the same admitted contour.
+  volatile runtime-directory loss, and concurrent legacy pause callers cannot
+  cause a duplicate native set for the same admitted contour.
 - Tradeoff: without a protocol CAS/version field, a receipt proves the bound
   request and post-read observation, not server-side compare-and-set causality.
 - Follow-up: live pause, root wake, holder closure, owner acceptance, and

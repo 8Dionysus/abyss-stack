@@ -46,9 +46,12 @@ def _isolated_semantic_attempt_root(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    root = tmp_path / "semantic-attempt-state"
-    root.mkdir(mode=0o700)
-    monkeypatch.setattr(ADAPTER, "_semantic_attempt_lock_root", lambda: root)
+    lock_root = tmp_path / "semantic-attempt-locks"
+    state_root = tmp_path / "semantic-attempt-state"
+    lock_root.mkdir(mode=0o700)
+    state_root.mkdir(mode=0o700)
+    monkeypatch.setattr(ADAPTER, "_semantic_attempt_lock_root", lambda: lock_root)
+    monkeypatch.setattr(ADAPTER, "_semantic_attempt_state_root", lambda: state_root)
 
 
 def _digest(value: object) -> str:
@@ -1109,6 +1112,47 @@ def test_cli_retry_after_reverse_uses_original_semantic_attempt(
     ):
         ADAPTER.run_goal_transition(second_args)
 
+    assert [method for method, _params in rpc.calls].count("thread/goal/set") == 1
+    assert not ADAPTER._attempt_path(second_receipt).exists()
+    assert not second_receipt.exists()
+
+
+def test_cli_retry_after_runtime_reset_uses_persistent_semantic_attempt(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    args, _request_path, _decision_path, first_receipt, rpc = _cli_fixture(
+        tmp_path,
+        monkeypatch,
+        request_id="request:persistent-semantic-attempt",
+    )
+    first = ADAPTER.run_goal_transition(args)
+    first_attempt = Path(first["attempt_artifact"]["ref"])
+
+    # Runtime locks are advisory and may disappear across a reboot. Persistent
+    # owner state must still bind the idempotency key to the first attempt.
+    replacement_lock_root = tmp_path / "replacement-runtime-locks"
+    replacement_lock_root.mkdir(mode=0o700)
+    monkeypatch.setattr(
+        ADAPTER,
+        "_semantic_attempt_lock_root",
+        lambda: replacement_lock_root,
+    )
+    rpc.status = "active"
+    second_receipt = tmp_path / "persistent-semantic-attempt-retry.json"
+    second_args = SimpleNamespace(
+        request=args.request,
+        decision=args.decision,
+        owner=args.owner,
+        receipt=str(second_receipt),
+    )
+    with pytest.raises(
+        RUNTIME.ExternalCodexReturnError,
+        match="already has a durable attempt",
+    ):
+        ADAPTER.run_goal_transition(second_args)
+
+    assert first_attempt.exists()
     assert [method for method, _params in rpc.calls].count("thread/goal/set") == 1
     assert not ADAPTER._attempt_path(second_receipt).exists()
     assert not second_receipt.exists()
