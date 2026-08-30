@@ -426,7 +426,8 @@ def test_runtime_overlay_binds_authenticated_canary_to_exact_deployment(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     binding = _fixture(tmp_path)
-    monkeypatch.setenv("AOA_WORKSPACE_ROOT", str(tmp_path))
+    monkeypatch.delenv("AOA_WORKSPACE_ROOT", raising=False)
+    monkeypatch.delenv("AOA_ABYSS_STACK_ROOT", raising=False)
     registry = json.loads(Path(binding.registry_path).read_text(encoding="utf-8"))
     registry["records"][0]["contours"][0]["runtime_identity"]["source_revision"] = (
         "a" * 40
@@ -478,6 +479,8 @@ def test_runtime_overlay_binds_authenticated_canary_to_exact_deployment(
         canary_public_key_path=Path(binding.canary_public_key_path),
         deployment_manifest_path=deployment_path,
         generated_at=NOW,
+        runtime_workspace_root=tmp_path,
+        runtime_stack_root=tmp_path / "stack",
         systemctl_runner=process_runner,
         deployment_loader=lambda path: (deployment, deployment["manifest_id"]),
     )

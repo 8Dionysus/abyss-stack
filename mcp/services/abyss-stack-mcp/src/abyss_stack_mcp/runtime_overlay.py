@@ -45,11 +45,17 @@ def build_runtime_overlay(
     canary_public_key_path: Path,
     deployment_manifest_path: Path,
     generated_at: datetime | None = None,
+    runtime_workspace_root: Path | None = None,
+    runtime_stack_root: Path | None = None,
     systemctl_runner: SystemctlRunner = _systemctl,
     deployment_loader: DeploymentLoader = _load_deployment,
 ) -> tuple[dict[str, Any], tuple[dict[str, str], ...]]:
     now = (generated_at or datetime.now(timezone.utc)).astimezone(timezone.utc)
-    targets = _resolve_runtime_target_catalog(targets)
+    targets = _resolve_runtime_target_catalog(
+        targets,
+        workspace_root=runtime_workspace_root,
+        stack_root=runtime_stack_root,
+    )
     try:
         verified_deployment, verified_manifest_id = deployment_loader(
             deployment_manifest_path

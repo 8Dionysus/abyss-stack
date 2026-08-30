@@ -101,6 +101,8 @@ def run_admission_automation(
         canary_public_key_path=canary_public_key_path,
         deployment_manifest_path=deployment_manifest_path,
         generated_at=now,
+        runtime_workspace_root=deployed_root.parent,
+        runtime_stack_root=deployed_root,
     )
     overlay_path = output_root / "runtime-overlay.candidate.json"
     publish_private_json(overlay, overlay_path)

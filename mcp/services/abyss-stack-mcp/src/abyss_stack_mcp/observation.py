@@ -20,7 +20,7 @@ import tempfile
 from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, Mapping
 
 from pydantic import Field, ValidationError, field_validator
 
@@ -74,8 +74,12 @@ ObservationCanaryPurpose = Literal["current", "last-known-good"]
 _ENV_REF = re.compile(r"\$\{([A-Z][A-Z0-9_]*)\}")
 
 
-def _resolve_runtime_env_ref(match: re.Match[str]) -> str:
-    value = os.environ.get(match.group(1))
+def _resolve_runtime_env_ref(
+    match: re.Match[str],
+    environment: Mapping[str, str] | None = None,
+) -> str:
+    configured = environment if environment is not None else os.environ
+    value = configured.get(match.group(1))
     if value is None:
         return match.group(0)
     if match.group(1) == PATH_CONFIG.stack_root_env_var:
@@ -383,13 +387,33 @@ def _load_targets(path: Path) -> tuple[RuntimeTargetCatalog, str]:
 
 def _resolve_runtime_target_catalog(
     catalog: RuntimeTargetCatalog,
+    *,
+    workspace_root: str | Path | None = None,
+    stack_root: str | Path | None = None,
 ) -> RuntimeTargetCatalog:
-    """Resolve deployment-owned target references before any consumer uses them."""
+    """Resolve deployment-owned target references before any consumer uses them.
 
+    A caller that already owns an explicit deployed root supplies it here so a
+    systemd invocation does not depend on ambient environment variables.  The
+    environment remains a compatibility fallback for standalone consumers.
+    """
+
+    environment: dict[str, str] = {}
+    if workspace_root is not None:
+        environment[PATH_CONFIG.workspace_env_var] = str(
+            Path(workspace_root).expanduser().resolve()
+        )
+    if stack_root is not None:
+        environment[PATH_CONFIG.stack_root_env_var] = str(
+            Path(stack_root).expanduser().resolve()
+        )
     resolved_payload = catalog.model_dump(mode="json")
     for target in resolved_payload["targets"]:
         target["executable_ref"] = _ENV_REF.sub(
-            _resolve_runtime_env_ref,
+            lambda match: _resolve_runtime_env_ref(
+                match,
+                environment if environment else None,
+            ),
             target["executable_ref"],
         )
     try:
