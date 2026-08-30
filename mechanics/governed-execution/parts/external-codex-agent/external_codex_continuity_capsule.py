@@ -11,6 +11,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import math
 from collections.abc import Mapping
 from datetime import datetime
 from typing import Any
@@ -28,6 +29,8 @@ MAX_PROTECTED_TAIL_BYTES = 512 * 1024
 MAX_CAPSULE_BYTES = 1024 * 1024
 MAX_MATERIALIZATION_BYTES = MAX_CAPSULE_BYTES + MAX_PROTECTED_TAIL_BYTES + 64 * 1024
 MAX_REINJECTION_BYTES = 2 * MAX_MATERIALIZATION_BYTES + 64 * 1024
+MAX_JSON_ITEMS = 4096
+MAX_JSON_DEPTH = 32
 CAPSULE_CONTENT_FIELDS = (
     "capsule_id",
     "goal",
@@ -44,6 +47,104 @@ CAPSULE_CONTENT_FIELDS = (
 
 class ContinuityCapsuleReinjectionError(ValueError):
     """Raised when the runtime envelope is not an exact capsule pair."""
+
+
+def _bounded_json_preflight(value: Any) -> None:
+    """Bound the full JSON graph before canonical serialization or copying."""
+
+    estimated_bytes = 0
+    observed_items = 0
+    active_containers: set[int] = set()
+
+    def add_bytes(amount: int) -> None:
+        nonlocal estimated_bytes
+        estimated_bytes += amount
+        if estimated_bytes > MAX_REINJECTION_BYTES:
+            raise ContinuityCapsuleReinjectionError(
+                "continuity reinjection envelope exceeds its byte ceiling"
+            )
+
+    def add_items(amount: int) -> None:
+        nonlocal observed_items
+        observed_items += amount
+        if observed_items > MAX_JSON_ITEMS:
+            raise ContinuityCapsuleReinjectionError(
+                "continuity reinjection envelope exceeds its item ceiling"
+            )
+
+    def visit(item: Any, depth: int) -> None:
+        if depth > MAX_JSON_DEPTH:
+            raise ContinuityCapsuleReinjectionError(
+                "continuity reinjection envelope exceeds its depth ceiling"
+            )
+        if item is None:
+            add_bytes(4)
+        elif isinstance(item, bool):
+            add_bytes(4 if item else 5)
+        elif isinstance(item, int):
+            bit_length = abs(item).bit_length()
+            decimal_digits_upper_bound = (bit_length * 30103) // 100000 + 2
+            add_bytes(decimal_digits_upper_bound + (1 if item < 0 else 0))
+        elif isinstance(item, float):
+            if not math.isfinite(item):
+                raise ContinuityCapsuleReinjectionError(
+                    "continuity payload must contain finite JSON numbers"
+                )
+            add_bytes(32)
+        elif isinstance(item, str):
+            add_bytes(2)
+            for character in item:
+                codepoint = ord(character)
+                if character in {'"', "\\", "\b", "\f", "\n", "\r", "\t"}:
+                    add_bytes(2)
+                elif codepoint < 0x20 or codepoint > 0x7F:
+                    if 0xD800 <= codepoint <= 0xDFFF:
+                        raise ContinuityCapsuleReinjectionError(
+                            "continuity payload contains an invalid surrogate"
+                        )
+                    add_bytes(6 if codepoint <= 0xFFFF else 12)
+                else:
+                    add_bytes(1)
+        elif isinstance(item, Mapping):
+            identity = id(item)
+            if identity in active_containers:
+                raise ContinuityCapsuleReinjectionError(
+                    "continuity payload contains a cycle"
+                )
+            add_items(len(item))
+            active_containers.add(identity)
+            add_bytes(2 + max(0, len(item) - 1))
+            try:
+                for key, nested in item.items():
+                    if not isinstance(key, str):
+                        raise ContinuityCapsuleReinjectionError(
+                            "continuity payload keys must be strings"
+                        )
+                    visit(key, depth + 1)
+                    add_bytes(1)
+                    visit(nested, depth + 1)
+            finally:
+                active_containers.remove(identity)
+        elif isinstance(item, (list, tuple)):
+            identity = id(item)
+            if identity in active_containers:
+                raise ContinuityCapsuleReinjectionError(
+                    "continuity payload contains a cycle"
+                )
+            add_items(len(item))
+            active_containers.add(identity)
+            add_bytes(2 + max(0, len(item) - 1))
+            try:
+                for nested in item:
+                    visit(nested, depth + 1)
+            finally:
+                active_containers.remove(identity)
+        else:
+            raise ContinuityCapsuleReinjectionError(
+                "continuity payload must be canonical JSON"
+            )
+
+    visit(value, 0)
 
 
 def _canonical_bytes(payload: Mapping[str, Any]) -> bytes:
@@ -366,6 +467,7 @@ def validate_continuity_capsule_reinjection(
 ) -> dict[str, Any]:
     """Validate and return a copy of one exact portable/private pair."""
 
+    _bounded_json_preflight(value)
     envelope = dict(_require_mapping(value, label="continuity_capsule"))
     _require_exact_keys(
         envelope,

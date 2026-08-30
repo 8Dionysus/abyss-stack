@@ -191,3 +191,33 @@ def test_owner_byte_and_list_ceilings_are_enforced() -> None:
         match="bounded list of strings",
     ):
         CAPSULE.validate_continuity_capsule_reinjection(envelope)
+
+
+def test_oversized_envelope_is_rejected_before_canonical_serialization(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    envelope = _envelope()
+    private = envelope["private_view"]
+    assert isinstance(private, dict)
+    private["protected_tail"] = "x" * (CAPSULE.MAX_REINJECTION_BYTES + 1)
+
+    def fail_if_serialized(*_args: object, **_kwargs: object) -> str:
+        raise AssertionError("oversized input reached json.dumps")
+
+    monkeypatch.setattr(CAPSULE.json, "dumps", fail_if_serialized)
+    with pytest.raises(
+        CAPSULE.ContinuityCapsuleReinjectionError,
+        match="byte ceiling",
+    ):
+        CAPSULE.validate_continuity_capsule_reinjection(envelope)
+
+
+def test_cyclic_envelope_is_rejected_before_copy_or_digest() -> None:
+    envelope = _envelope()
+    envelope["cycle"] = envelope
+
+    with pytest.raises(
+        CAPSULE.ContinuityCapsuleReinjectionError,
+        match="cycle",
+    ):
+        CAPSULE.validate_continuity_capsule_reinjection(envelope)
