@@ -78,6 +78,7 @@ _EFFECT_POLICY = {
     "external_change": "external_effect",
 }
 MAX_CANDIDATE_TTL = timedelta(minutes=10)
+MAX_CAPABILITY_FRESHNESS_TTL = timedelta(hours=24)
 MAX_FUTURE_CLOCK_SKEW = timedelta(seconds=30)
 MAX_RETAINED_EXPOSURE_RECEIPTS = 256
 MAX_RETAINED_MATERIALIZATIONS = 256
@@ -796,8 +797,13 @@ class ExposureRuntime:
             reasons.append("capability_freshness_from_future")
         if freshness.expires_at is None or freshness.expires_at <= now:
             reasons.append("capability_freshness_expired")
-        elif normalized.expires_at > freshness.expires_at:
-            reasons.append("exposure_plan_outlives_capability_freshness")
+        else:
+            if freshness.expires_at - freshness.observed_at > (
+                MAX_CAPABILITY_FRESHNESS_TTL
+            ):
+                reasons.append("capability_freshness_ttl_exceeded")
+            if normalized.expires_at > freshness.expires_at:
+                reasons.append("exposure_plan_outlives_capability_freshness")
         if normalized.execution_authorized or normalized.activation_authorized:
             reasons.append("authorization_ceiling_violation")
         try:

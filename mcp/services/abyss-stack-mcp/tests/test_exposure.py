@@ -500,6 +500,26 @@ def test_inconsistent_capability_freshness_ttl_is_rejected() -> None:
         StackExposurePlan.from_sdk_payload(_redigest_plan(payload))
 
 
+def test_capability_freshness_lifetime_is_bounded_before_materialization() -> None:
+    runtime = ExposureRuntime(
+        progressive_exposure_enabled=True,
+        baseline_admitted=True,
+        baseline_admission_ref="receipt://d0/baseline-ready",
+        clock=lambda: NOW,
+    )
+    payload = _payload()
+    freshness = payload["capability"]["freshness"]
+    freshness["observed_at"] = (NOW - timedelta(days=2)).isoformat().replace(
+        "+00:00", "Z"
+    )
+    freshness["ttl_seconds"] = 2 * 24 * 60 * 60 + 5 * 60
+
+    receipt = runtime.materialize(_redigest_plan(payload))
+
+    assert receipt.decision == "denied"
+    assert "capability_freshness_ttl_exceeded" in receipt.reason_codes
+
+
 def test_secret_rollback_route_is_denied_without_receipt_disclosure() -> None:
     runtime = ExposureRuntime(
         progressive_exposure_enabled=True,
