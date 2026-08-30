@@ -29,7 +29,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Collection, Iterator, Mapping, Sequence
+from typing import Any, Collection, Iterator, Mapping, MutableMapping, Sequence
 from urllib.parse import unquote, urlsplit
 
 try:
@@ -2942,6 +2942,7 @@ class ManagedLspSession:
                 if (
                     isinstance(response_id, int)
                     and not isinstance(response_id, bool)
+                    and payload.get("jsonrpc") == "2.0"
                     and "method" not in payload
                     and ("result" in payload or "error" in payload)
                 ):
@@ -5698,6 +5699,62 @@ class LiveCodeIntelligenceRuntime:
             return False
         return True
 
+    @staticmethod
+    def _observation_output_limit_diagnostic() -> dict[str, str]:
+        return {
+            "code": "observation_output_limit",
+            "severity": "error",
+            "message": (
+                "serialized provider observations exceeded the authored "
+                f"aggregate envelope of {OBSERVATION_MAX_SERIALIZED_BYTES} bytes "
+                "before promotion"
+            ),
+        }
+
+    def _bound_observation_records(
+        self,
+        records: MutableMapping[str, dict[str, Any]],
+    ) -> None:
+        """Bound parsed and reused observations before a state is promoted."""
+
+        serialized_bytes = 0
+        budget_exceeded = False
+        for path in sorted(records):
+            record = records[path]
+            observation = record.get("observation")
+            if not isinstance(observation, Mapping):
+                continue
+            if budget_exceeded:
+                record["observation"] = None
+                record["diagnostics"] = [
+                    *(
+                        dict(item)
+                        for item in record.get("diagnostics", [])
+                        if isinstance(item, Mapping)
+                    ),
+                    self._observation_output_limit_diagnostic(),
+                ]
+                continue
+            try:
+                record_bytes = len(_canonical_json(record).encode("utf-8"))
+            except (TypeError, ValueError) as exc:
+                raise LiveCodeIntelligenceError(
+                    f"provider observation for {path} is not serializable"
+                ) from exc
+            if serialized_bytes + record_bytes <= OBSERVATION_MAX_SERIALIZED_BYTES:
+                serialized_bytes += record_bytes
+                continue
+            budget_exceeded = True
+            record["observation"] = None
+            record["diagnostics"] = [
+                *(
+                    dict(item)
+                    for item in record.get("diagnostics", [])
+                    if isinstance(item, Mapping)
+                ),
+                self._observation_output_limit_diagnostic(),
+            ]
+
     def _persisted_observations_match_source(
         self,
         *,
@@ -5948,6 +6005,7 @@ class LiveCodeIntelligenceRuntime:
             else:
                 records[path] = copy.deepcopy(previous_files[path])
                 reused.add(path)
+        self._bound_observation_records(records)
         diagnostics = [
             diagnostic
             | {"path": path}

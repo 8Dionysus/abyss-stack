@@ -813,6 +813,30 @@ class LiveCodeIntelligenceRuntimeTests(unittest.TestCase):
         self.assertTrue(destination.empty())
         self.assertEqual(payload, session._responses.get_nowait())
 
+    def test_lsp_reader_does_not_match_non_jsonrpc2_responses(self) -> None:
+        for marker in (None, "1.0"):
+            with self.subTest(marker=marker):
+                session = object.__new__(ManagedLspSession)
+                process = mock.Mock()
+                process.poll.return_value = None
+                session._process = process
+                session._closing = True
+                destination = live_code_intelligence.queue.Queue(maxsize=1)
+                session._pending = {1: destination}
+                session._pending_lock = threading.Lock()
+                session._responses = live_code_intelligence.queue.Queue(maxsize=2)
+                session._last_error = None
+                payload = {
+                    **({} if marker is None else {"jsonrpc": marker}),
+                    "id": 1,
+                    "result": {"capabilities": {}},
+                }
+                session._read_message = mock.Mock(side_effect=[payload, None])
+                session._reader_loop()
+
+                self.assertTrue(destination.empty())
+                self.assertEqual(payload, session._responses.get_nowait())
+
     @unittest.skipUnless(
         ManagedLspSession._can_use_immutable_launch_fds(),
         "sealed launch descriptors are Linux-only",
@@ -1205,6 +1229,52 @@ class LiveCodeIntelligenceRuntimeTests(unittest.TestCase):
             state["degradation"][0]["code"],
             "observation_output_limit",
         )
+
+    def test_observation_budget_includes_reused_records_before_promotion(self) -> None:
+        self.write_source(
+            "stable.py",
+            "".join(
+                f"def stable_{index}(value):\n    return value + {index}\n"
+                for index in range(100)
+            ),
+        )
+        self.write_source("changed.py", "VALUE = 1\n")
+
+        with mock.patch.object(
+            live_code_intelligence,
+            "OBSERVATION_MAX_SERIALIZED_BYTES",
+            1_000_000,
+        ):
+            first = self.runtime.refresh()
+        self.assertEqual(first["status"], "current")
+        initial_bytes = sum(
+            len(live_code_intelligence._canonical_json(record).encode("utf-8"))
+            for record in first["files"].values()
+            if record["observation"] is not None
+        )
+
+        self.write_source(
+            "changed.py",
+            "".join(
+                f"def changed_{index}(value):\n    return value + {index}\n"
+                for index in range(50)
+            ),
+        )
+        with mock.patch.object(
+            live_code_intelligence,
+            "OBSERVATION_MAX_SERIALIZED_BYTES",
+            initial_bytes,
+        ):
+            state = self.runtime.refresh()
+
+        self.assertEqual(state["status"], "degraded")
+        self.assertEqual(state["invalidation"]["reused_paths"], ["stable.py"])
+        self.assertEqual(
+            state["files"]["stable.py"]["diagnostics"][0]["code"],
+            "observation_output_limit",
+        )
+        self.assertIsNone(state["files"]["stable.py"]["observation"])
+        self.assertTrue(self.runtime.candidate_path.is_file())
 
     def test_concurrent_lsp_starts_launch_one_process(self) -> None:
         runtime_root = self.root / "machine-runtime"
