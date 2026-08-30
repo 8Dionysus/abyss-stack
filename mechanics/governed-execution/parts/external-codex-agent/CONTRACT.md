@@ -147,8 +147,10 @@ Operations are:
   An already-desired read-only execution records `read_only_recorded` at the
   anchored attempt path; after a later reverse transition, the same
   idempotency key therefore refuses mutation rather than treating the absent
-  sidecar as a new attempt. If that anchored sidecar is later removed, the
-  surviving anchor is terminal and the adapter refuses to recreate it.
+  sidecar as a new attempt. The v2 anchor distinguishes an unstarted transport
+  attempt from a persisted lifecycle attempt: endpoint discovery or RPC setup
+  failure before persistence may retry, while removal of a started anchored
+  sidecar is terminal and the adapter refuses to recreate it.
   Replayed read-only receipts are bound byte-for-byte to the stored
   `read_only_recorded` observation.
   Attempt and receipt owner digests come only from the initially

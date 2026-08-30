@@ -125,7 +125,10 @@ regression records `read_only_recorded`, reverses the Goal, retries through a
 different receipt, and proves zero native sets. Additional regressions remove
 the anchored sidecar and prove the surviving owner-state anchor is terminal,
 and replace an otherwise valid replayed read-only response to prove the receipt
-must match the exact recorded observation. A dynamic-endpoint
+must match the exact recorded observation. Parameterized transport regressions
+fail the first invocation during endpoint discovery and RPC setup, verify the
+v2 anchor remains unstarted, then prove a retry persists one attempt and issues
+exactly one native set. A dynamic-endpoint
 regression additionally
 returns different owner-proved app-server paths to the two callers and proves
 that endpoint discovery remains inside the same stable semantic lock while the

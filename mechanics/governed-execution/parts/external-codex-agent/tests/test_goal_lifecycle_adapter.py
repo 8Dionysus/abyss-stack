@@ -1285,6 +1285,63 @@ def test_cli_missing_anchored_read_only_attempt_is_terminal(
     assert not retry_receipt.exists()
 
 
+@pytest.mark.parametrize("failure_stage", ("discovery", "rpc_setup"))
+def test_cli_unstarted_anchor_allows_retry_after_transient_transport_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    failure_stage: str,
+) -> None:
+    args, _request_path, _decision_path, receipt_path, rpc = _cli_fixture(
+        tmp_path,
+        monkeypatch,
+        request_id=f"request:unstarted-anchor-{failure_stage}",
+    )
+    failed_once = False
+
+    if failure_stage == "discovery":
+        def flaky_discovery(
+            _owner: dict[str, Any], **_kwargs: object
+        ) -> tuple[Path, str]:
+            nonlocal failed_once
+            if not failed_once:
+                failed_once = True
+                raise RUNTIME.ExternalCodexReturnError(
+                    "simulated transient endpoint discovery failure"
+                )
+            return rpc.endpoint, "test-fixture"
+
+        monkeypatch.setattr(RUNTIME, "discover_app_server_socket", flaky_discovery)
+    else:
+        def flaky_rpc_factory(_endpoint: Path) -> FakeGoalRpc:
+            nonlocal failed_once
+            if not failed_once:
+                failed_once = True
+                raise RUNTIME.ExternalCodexReturnError(
+                    "simulated transient RPC setup failure"
+                )
+            return rpc
+
+        monkeypatch.setattr(RUNTIME, "UnixWebSocketRpc", flaky_rpc_factory)
+
+    with pytest.raises(
+        RUNTIME.ExternalCodexReturnError,
+        match="simulated transient",
+    ):
+        ADAPTER.run_goal_transition(args)
+
+    anchors = list((tmp_path / "semantic-attempt-state").glob("*.json"))
+    assert len(anchors) == 1
+    assert json.loads(anchors[0].read_text(encoding="utf-8"))["attempt_started"] is False
+    assert not ADAPTER._attempt_path(receipt_path).exists()
+    assert not receipt_path.exists()
+
+    result = ADAPTER.run_goal_transition(args)
+
+    assert result["status"] == "executed"
+    assert json.loads(anchors[0].read_text(encoding="utf-8"))["attempt_started"] is True
+    assert [method for method, _params in rpc.calls].count("thread/goal/set") == 1
+
+
 def test_cli_retry_after_runtime_reset_uses_persistent_semantic_attempt(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

@@ -89,8 +89,10 @@ Tracking starts with the community-docs baseline for this repository.
   runtime-directory loss, later receipt paths, and state reversals; CLI
   read-only completion now records the already-desired observation at that
   anchored attempt path, so a later reversal cannot reopen the same
-  idempotency key. If the anchored sidecar is later removed, the surviving
-  owner-state anchor is terminal and refuses to recreate it; replayed
+  idempotency key. The v2 anchor remains explicitly unstarted until a valid
+  attempt is persisted, so transient endpoint discovery or RPC setup failures
+  can retry without burning the key. If a started anchored sidecar is later
+  removed, the surviving owner-state anchor is terminal and refuses to recreate it; replayed
   read-only receipts must also match the exact recorded observation. CLI
   request/decision artifacts are reasserted immediately before dispatch and
   again after receipt publication, and the SDK binds attempt/receipt evidence to the initially

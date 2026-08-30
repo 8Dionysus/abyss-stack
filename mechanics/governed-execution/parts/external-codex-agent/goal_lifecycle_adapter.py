@@ -27,8 +27,11 @@ LEGACY_GOAL_TRANSITION_PROOF_SCHEMA_VERSION = (
     "abyss_stack_external_codex_goal_transition_v1"
 )
 GOAL_TRANSITION_METHOD = "thread/goal/set"
-SEMANTIC_ATTEMPT_ANCHOR_SCHEMA_VERSION = (
+LEGACY_SEMANTIC_ATTEMPT_ANCHOR_SCHEMA_VERSION = (
     "abyss_stack_external_codex_goal_lifecycle_attempt_anchor_v1"
+)
+SEMANTIC_ATTEMPT_ANCHOR_SCHEMA_VERSION = (
+    "abyss_stack_external_codex_goal_lifecycle_attempt_anchor_v2"
 )
 
 
@@ -466,6 +469,7 @@ def _write_attempt(
         attempt_path=path,
     )
     runtime._replace_json(path, value, "Goal lifecycle attempt reservation")
+    _mark_semantic_attempt_started(request, owner, path)
     return value
 
 
@@ -940,6 +944,7 @@ def _execute_goal_transition_unlocked(
             endpoint=endpoint,
             attempt_path=attempt_path,
         )
+        _mark_semantic_attempt_started(request, owner, attempt_path)
 
     rpc_factory = rpc_factory or runtime.UnixWebSocketRpc
     mutation_response: dict[str, Any] | None = None
@@ -2011,15 +2016,30 @@ def _resolve_semantic_attempt_path(
             raise runtime.ExternalCodexReturnError(
                 "Goal lifecycle semantic attempt anchor is not canonically encoded"
             )
-        if (
+        legacy_anchor = (
             set(anchor)
-            != {
+            == {
                 "schema_version",
                 "semantic_attempt_sha256",
                 "attempt_ref",
             }
-            or anchor.get("schema_version")
-            != SEMANTIC_ATTEMPT_ANCHOR_SCHEMA_VERSION
+            and anchor.get("schema_version")
+            == LEGACY_SEMANTIC_ATTEMPT_ANCHOR_SCHEMA_VERSION
+        )
+        current_anchor = (
+            set(anchor)
+            == {
+                "schema_version",
+                "semantic_attempt_sha256",
+                "attempt_ref",
+                "attempt_started",
+            }
+            and anchor.get("schema_version")
+            == SEMANTIC_ATTEMPT_ANCHOR_SCHEMA_VERSION
+            and isinstance(anchor.get("attempt_started"), bool)
+        )
+        if (
+            not (legacy_anchor or current_anchor)
             or anchor.get("semantic_attempt_sha256") != digest
             or not isinstance(anchor.get("attempt_ref"), str)
         ):
@@ -2030,7 +2050,10 @@ def _resolve_semantic_attempt_path(
             Path(anchor["attempt_ref"]),
             "Goal lifecycle anchored attempt reservation",
         )
-        if not anchored_path.exists():
+        if (
+            not anchored_path.exists()
+            and (legacy_anchor or anchor["attempt_started"])
+        ):
             raise runtime.ExternalCodexReturnError(
                 "Goal lifecycle anchored attempt reservation is missing; refusing to recreate a completed semantic attempt"
             )
@@ -2039,6 +2062,7 @@ def _resolve_semantic_attempt_path(
         "schema_version": SEMANTIC_ATTEMPT_ANCHOR_SCHEMA_VERSION,
         "semantic_attempt_sha256": digest,
         "attempt_ref": str(requested_path.resolve()),
+        "attempt_started": False,
     }
     runtime._write_new_json(
         anchor_path,
@@ -2046,6 +2070,72 @@ def _resolve_semantic_attempt_path(
         "Goal lifecycle semantic attempt anchor",
     )
     return requested_path
+
+
+def _mark_semantic_attempt_started(
+    request: Any,
+    owner: dict[str, Any],
+    attempt_path: Path,
+) -> None:
+    """Promote an anchor only after its bound attempt exists and validates."""
+
+    runtime = _runtime()
+    anchor_path = runtime._validate_output_path(
+        _semantic_attempt_anchor_path(request, owner),
+        "Goal lifecycle semantic attempt anchor",
+    )
+    anchor, raw = runtime._load_json_file(
+        runtime._regular_file(anchor_path, "Goal lifecycle semantic attempt anchor"),
+        "Goal lifecycle semantic attempt anchor",
+    )
+    if raw != runtime._canonical_bytes(anchor) + b"\n":
+        raise runtime.ExternalCodexReturnError(
+            "Goal lifecycle semantic attempt anchor is not canonically encoded"
+        )
+    digest = _semantic_attempt_digest(request, owner)
+    expected_ref = str(Path(attempt_path).resolve())
+    legacy_anchor = (
+        set(anchor)
+        == {
+            "schema_version",
+            "semantic_attempt_sha256",
+            "attempt_ref",
+        }
+        and anchor.get("schema_version")
+        == LEGACY_SEMANTIC_ATTEMPT_ANCHOR_SCHEMA_VERSION
+    )
+    current_anchor = (
+        set(anchor)
+        == {
+            "schema_version",
+            "semantic_attempt_sha256",
+            "attempt_ref",
+            "attempt_started",
+        }
+        and anchor.get("schema_version")
+        == SEMANTIC_ATTEMPT_ANCHOR_SCHEMA_VERSION
+        and isinstance(anchor.get("attempt_started"), bool)
+    )
+    if (
+        not (legacy_anchor or current_anchor)
+        or anchor.get("semantic_attempt_sha256") != digest
+        or anchor.get("attempt_ref") != expected_ref
+    ):
+        raise runtime.ExternalCodexReturnError(
+            "Goal lifecycle semantic attempt anchor binding mismatch"
+        )
+    if current_anchor and anchor["attempt_started"]:
+        return
+    runtime._replace_json(
+        anchor_path,
+        {
+            "schema_version": SEMANTIC_ATTEMPT_ANCHOR_SCHEMA_VERSION,
+            "semantic_attempt_sha256": digest,
+            "attempt_ref": expected_ref,
+            "attempt_started": True,
+        },
+        "Goal lifecycle semantic attempt anchor",
+    )
 
 
 def _semantic_attempt_lock_root() -> Path:

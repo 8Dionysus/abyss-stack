@@ -56,7 +56,10 @@ When the first execution only observes an already-desired state, it records a
 durable `read_only_recorded` attempt at the same anchor. A later reversal cannot
 turn that no-mutation completion into permission to issue a delayed set. The
 anchor remains authoritative if a caller later cleans the referenced sidecar:
-the missing target is terminal and must not be recreated. A replayed read-only
+the missing target is terminal and must not be recreated. The v2 anchor records
+whether a valid attempt has actually started; endpoint discovery or RPC setup
+failure before that point leaves an explicit unstarted anchor that a retry may
+reuse. A replayed read-only
 receipt is accepted only when its historical response bytes, summaries, and
 digests match the anchored `read_only_recorded` observation.
 Dynamic endpoint rebinding may change the fresh transport coordinate but does
@@ -101,6 +104,8 @@ route.
   reversal even if its sidecar is later removed, its receipts remain bound to
   the recorded observation, and legacy owner drift is detected at the
   mutation/proof boundary.
+- Positive: a transport failure before any attempt exists does not permanently
+  consume the accepted idempotency key.
 - Tradeoff: without a protocol CAS/version field, a receipt proves the bound
   request and post-read observation, not server-side compare-and-set causality.
 - Follow-up: live pause, root wake, holder closure, owner acceptance, and
