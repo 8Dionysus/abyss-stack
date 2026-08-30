@@ -33,6 +33,7 @@ EXPECTED_DEPLOYMENT_MCP_COMMIT = "6f69a3758ebf2ee55ce050f58b470ce11af71133"
 EXPECTED_AOA_KAG_COMMIT = "578e4cea9a04b76a881bde240d5479efceea4926"
 EXPECTED_KAG_CANONICAL_SOURCE_DIGEST = "5aeb7b89dce54b414281f5390c8cc063f59bb75d02b28e1a014da2d96701e164"
 EXPECTED_STACK_SOURCE_COMMIT = "cbb387567b193cd75762894fd77e192d2bf5cb80"
+EXPECTED_CODEX_LAB_STACK_SOURCE_COMMIT = "b8bb0bdb4f4984c7338adddf606e7d3509ff6d0b"
 FIXTURES = {
     "wire": (
         "codex-0.146.0-wire-observation.json",
@@ -133,6 +134,7 @@ def _live_fleet_identity_attested(payload: dict[str, Any]) -> bool:
         and read_fleet.get("sdk_identity_count") == 11
         and read_fleet.get("sdk_identity_unique_count") == 1
         and read_fleet.get("runtime_identity_attested") is True
+        and read_fleet.get("listener_attested") is True
     )
 
 
@@ -380,14 +382,14 @@ def validate(checked_at: datetime | None = None) -> list[str]:
         or codex_lab["server"]["python_mcp_artifact_digest"]
         != EXPECTED_PYTHON_MCP_ARTIFACT_DIGEST
         or codex_lab["server"]["source_revisions"]["abyss_stack"]
-        != EXPECTED_STACK_SOURCE_COMMIT
+        != EXPECTED_CODEX_LAB_STACK_SOURCE_COMMIT
         or codex_lab["server"]["source_revisions"]["aoa_kag"]
         != EXPECTED_AOA_KAG_COMMIT
         or codex_lab["server"]["source_artifacts"]
         != {
             "adapter_harness_sha256": "3dc4b78352072340e3677ae50ceb94a25671e00e5e1ff8dfbf4407f85f8e8f56",
-            "adapter_package_tree_sha256": "ac7f2a70de13a69d14f5b43b0ffd01f9f797112e5929f6008b2cae0357210078",
-            "driver_sha256": "d7dae0ae03795c9041413ca0662809411ca8106b7ce991e673ab603878c33b66",
+            "adapter_package_tree_sha256": "2e59d88a3c41dda4aa92ce4add7514c2eb09cd0f0327a24ea729993bb70d491d",
+            "driver_sha256": "0d2f00c27e9178acbfa515102c9d03366abf20e26efdeaa0cd13e345ef787162",
         }
         or not codex_lab["stable_registration"]["unchanged"]
         or codex_lab["wire"]["tasks_extension_advertised"]

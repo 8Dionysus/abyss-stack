@@ -525,7 +525,7 @@ def test_mcp_211_candidate_receipts_are_source_bound(builder: Any) -> None:
         "sha256:1ef71b1a3cfb3daba29b61d9f280896b35bdc1038474285cc8295071418b01e5"
     )
     assert codex["server"]["source_revisions"] == {
-        "abyss_stack": "cbb387567b193cd75762894fd77e192d2bf5cb80",
+        "abyss_stack": "b8bb0bdb4f4984c7338adddf606e7d3509ff6d0b",
         "aoa_kag": "578e4cea9a04b76a881bde240d5479efceea4926",
     }
     assert codex["consumer"]["production_authority"] is False

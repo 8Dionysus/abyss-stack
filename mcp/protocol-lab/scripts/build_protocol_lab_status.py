@@ -181,7 +181,11 @@ def _deployment_artifact_identity_current(
         if artifact not in EXPECTED_CANDIDATE_MCP_ARTIFACT_DIGESTS:
             return False
         artifacts.append(artifact)
-    return bool(artifacts) and len(set(artifacts)) == 1
+    # A fully historical deployment has no candidate artifact to reconcile;
+    # it remains migration-ineligible through the exact SDK/version gates
+    # below.  Requiring a candidate artifact here would make the validator
+    # reject the intentionally retained MCP 2.0.0 baseline.
+    return not artifacts or len(set(artifacts)) == 1
 
 
 def validate_payload(payload: dict[str, Any], schema_path: Path) -> None:

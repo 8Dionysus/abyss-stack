@@ -12,12 +12,12 @@
     "A registered alias does not prove schema observation or a grounded call.",
     "Final publication and stable SDKs never authorize production migration without exact pair receipts."
   ],
-  "codex_lab_observation_digest": "sha256:45902bebcc89f1221f7bc91b4c8bd2926df2ee3623b4d5db44c309dfcf3bcfbb",
+  "codex_lab_observation_digest": "sha256:94da4db329420e3158a5f153ecd51658209a70e01b4ff89250e0fbe2dc4d9995",
   "codex_tasks_production_pair_digest": "sha256:5bf3a280c869fadcda6c170907f5116995a8d8601d4e44e02e962abc6c734704",
   "core_read_migration_allowed": false,
   "deployment_evidence_current": false,
   "deployment_evidence_expires_at": "2026-08-15T08:33:46.547214Z",
-  "evaluated_at": "2026-08-30T03:23:32.594954Z",
+  "evaluated_at": "2026-08-30T04:26:36.182268Z",
   "evidence_expires_at": "2026-08-15T08:33:46.547214Z",
   "external_effect_migration_allowed": false,
   "gate_counts": {
@@ -71,7 +71,7 @@
   "schema_version": "abyss_mcp_protocol_lab_status_v2",
   "stable_registration_retained": true,
   "stable_rollback_observation_digest": "sha256:140a64d223ddec2494b67852a369e09747fe17539a740f66922ba50b2725917d",
-  "status_digest": "sha256:54d23b383d8b9311a61eb7d672a3f0b604fd1b255398eb4229fea7d2242b7789",
+  "status_digest": "sha256:681f6d2b1f1d760dbdb086b8713ad0b571454418b951e5832941e15e4e6d0a91",
   "tasks_blockers": [
     "input_required_update_live_pair_unproved",
     "tasks_notifications_unproved",
