@@ -12228,6 +12228,43 @@ Runtime session identity: {state["session_id"]}
             launch, _, binding, task, realization, role_raw = (
                 self._materialized_payloads(state)
             )
+            continuity_capsule = None
+            if mode == "resume":
+                continuity_capsule_input = (
+                    resume_payload.get("continuity_capsule")
+                    if isinstance(resume_payload, Mapping)
+                    else None
+                )
+                bound_capsule_ref = getattr(
+                    binding, "continuity_capsule_ref", None
+                )
+                expected_capsule_ref = (
+                    bound_capsule_ref.model_dump(mode="json")
+                    if bound_capsule_ref is not None
+                    else None
+                )
+                try:
+                    continuity_capsule = validate_continuity_capsule_binding(
+                        continuity_capsule_input,
+                        expected_ref=expected_capsule_ref,
+                    )
+                except ContinuityCapsuleReinjectionError as exc:
+                    raise ExternalCodexRuntimeError(
+                        "resume_continuity_capsule_invalid",
+                        str(exc),
+                    ) from exc
+                if continuity_capsule is not None:
+                    self._append_event(
+                        state,
+                        event_type=(
+                            "external_agent.continuity_capsule_reinjected"
+                        ),
+                        payload=reinjection_event_payload(continuity_capsule),
+                        attempt_id=attempt_id,
+                        thread_id=str(state["thread_id"]),
+                        significance="checkpoint",
+                    )
+                    self._save_state(state)
             workspace_manifest_input_id = str(launch["workspace_manifest_input_id"])
             controller_inputs = state.get(
                 "controller_materialized_task_inputs",
@@ -14727,23 +14764,6 @@ Runtime session identity: {state["session_id"]}
                 raise ExternalCodexRuntimeError(
                     "resume_thread_missing", "no durable Codex thread is available"
                 )
-            _, _, binding, _, _, _ = self._materialized_payloads(state)
-            bound_capsule_ref = getattr(binding, "continuity_capsule_ref", None)
-            expected_capsule_ref = (
-                bound_capsule_ref.model_dump(mode="json")
-                if bound_capsule_ref is not None
-                else None
-            )
-            try:
-                continuity_capsule = validate_continuity_capsule_binding(
-                    continuity_capsule_input,
-                    expected_ref=expected_capsule_ref,
-                )
-            except ContinuityCapsuleReinjectionError as exc:
-                raise ExternalCodexRuntimeError(
-                    "resume_continuity_capsule_invalid",
-                    str(exc),
-                ) from exc
             task: Mapping[str, Any] | None = None
             if (
                 failed_terminal_followup
@@ -15044,15 +15064,6 @@ Runtime session identity: {state["session_id"]}
                 resume,
                 attempt_id=str(prior_attempt["attempt_id"]),
             )
-            if continuity_capsule is not None:
-                self._append_event(
-                    state,
-                    event_type="external_agent.continuity_capsule_reinjected",
-                    payload=reinjection_event_payload(continuity_capsule),
-                    attempt_id=str(prior_attempt["attempt_id"]),
-                    thread_id=str(state["thread_id"]),
-                    significance="checkpoint",
-                )
             state["finished_at"] = None
             state["result_path"] = None
             state["result_digest"] = None
