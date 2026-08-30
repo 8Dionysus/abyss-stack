@@ -164,8 +164,11 @@ and replay only through their matching legacy wake reservation. A retry after a 
   owner/idempotency anchor in persistent owner state retains the first attempt
   path across alternate receipt paths, later reverse transitions, and volatile
   runtime-lock loss. An already-desired read records a durable no-mutation
-  completion at that path. The CLI reasserts request, decision, and owner bytes
-  immediately before mutation;
+  completion at that path. A surviving anchor with a missing attempt is
+  terminal rather than permission to recreate the attempt, and replayed
+  read-only receipts must match the recorded observation. The CLI reasserts
+  request, decision, and owner bytes immediately before mutation and after
+  receipt publication;
 - keeps `aoa-external-codex-return pause` as a backwards-compatible legacy
   pause projection. It remains a mutating compatibility entrypoint when no
   completed receipt exists, reserving the exact precondition and issuing one

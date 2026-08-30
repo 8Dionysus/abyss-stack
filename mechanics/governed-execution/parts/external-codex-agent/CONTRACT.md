@@ -147,12 +147,16 @@ Operations are:
   An already-desired read-only execution records `read_only_recorded` at the
   anchored attempt path; after a later reverse transition, the same
   idempotency key therefore refuses mutation rather than treating the absent
-  sidecar as a new attempt.
+  sidecar as a new attempt. If that anchored sidecar is later removed, the
+  surviving anchor is terminal and the adapter refuses to recreate it.
+  Replayed read-only receipts are bound byte-for-byte to the stored
+  `read_only_recorded` observation.
   Attempt and receipt owner digests come only from the initially
   validated owner bytes. Both entrypoints reassert that snapshot immediately
   before native mutation and after proof persistence, while the CLI also
   reasserts the initially loaded request and decision bytes immediately before
-  dispatch. Drift fails closed instead of mixing stale authority with
+  dispatch and reasserts request, decision, and owner again after receipt
+  publication. Drift fails closed instead of mixing stale authority with
   rewritten evidence. The
   generic receipt uses
   `abyss_stack_external_codex_goal_transition_v2`; it does not claim a

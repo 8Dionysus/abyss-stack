@@ -89,8 +89,11 @@ Tracking starts with the community-docs baseline for this repository.
   runtime-directory loss, later receipt paths, and state reversals; CLI
   read-only completion now records the already-desired observation at that
   anchored attempt path, so a later reversal cannot reopen the same
-  idempotency key. CLI request/decision artifacts are reasserted immediately
-  before dispatch, and the SDK binds attempt/receipt evidence to the initially
+  idempotency key. If the anchored sidecar is later removed, the surviving
+  owner-state anchor is terminal and refuses to recreate it; replayed
+  read-only receipts must also match the exact recorded observation. CLI
+  request/decision artifacts are reasserted immediately before dispatch and
+  again after receipt publication, and the SDK binds attempt/receipt evidence to the initially
   loaded owner bytes while rejecting owner drift before dispatch and after
   proof persistence. Legacy pause callers now lock by qualified Goal identity
   instead of receipt path and reassert their owner snapshot immediately before

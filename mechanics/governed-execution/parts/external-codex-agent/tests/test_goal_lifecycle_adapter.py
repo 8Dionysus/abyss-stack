@@ -364,6 +364,45 @@ def test_generic_adapter_binds_receipt_transition_evidence_to_attempt(
     assert rpc.calls == before_calls
 
 
+def test_generic_adapter_binds_read_only_receipt_to_attempt_observation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    args, request_path, decision_path, receipt_path, rpc = _cli_fixture(
+        tmp_path, monkeypatch, request_id="request:read-only-receipt-binding"
+    )
+    request = _request(
+        observed="active",
+        desired="active",
+        kind="accepted_return",
+        request_id="request:read-only-receipt-binding",
+    )
+    decision = _decision(request)
+    request_path.write_bytes(
+        RUNTIME._canonical_bytes(request.model_dump(mode="json")) + b"\n"
+    )
+    decision_path.write_bytes(
+        RUNTIME._canonical_bytes(decision.model_dump(mode="json")) + b"\n"
+    )
+    ADAPTER.run_goal_transition(args)
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    tampered_read = {
+        "goal": {"threadId": "thread:test", "status": "active"},
+        "server_metadata": {"revision": 99},
+    }
+    receipt["lifecycle"]["result"] = RUNTIME._safe_response_summary(tampered_read)
+    receipt["lifecycle"]["result_response"] = tampered_read
+    receipt["lifecycle"]["result_response_sha256"] = _digest(tampered_read)
+    receipt_path.write_bytes(RUNTIME._canonical_bytes(receipt) + b"\n")
+    before_calls = list(rpc.calls)
+
+    with pytest.raises(
+        RUNTIME.ExternalCodexReturnError,
+        match="read-only evidence does not match its attempt",
+    ):
+        ADAPTER.run_goal_transition(args)
+    assert rpc.calls == before_calls
+
+
 def test_generic_adapter_cli_route_replays_canonical_receipt(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -890,6 +929,34 @@ def test_generic_adapter_rechecks_all_inputs_before_publishing_receipt(
 
 
 @pytest.mark.parametrize("artifact_name", ("request", "decision"))
+def test_cli_rechecks_authority_artifacts_after_receipt_publication(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    artifact_name: str,
+) -> None:
+    args, request_path, decision_path, receipt_path, _rpc = _cli_fixture(
+        tmp_path,
+        monkeypatch,
+        request_id=f"request:{artifact_name}-drift-after-publication",
+    )
+    target = request_path if artifact_name == "request" else decision_path
+    original_replace_json = RUNTIME._replace_json
+
+    def replace_then_drift(path: Path, value: object, label: str) -> None:
+        original_replace_json(path, value, label)
+        if label == "Goal lifecycle receipt":
+            target.write_bytes(b"{}\n")
+
+    monkeypatch.setattr(RUNTIME, "_replace_json", replace_then_drift)
+    with pytest.raises(
+        RUNTIME.VISIBLE.IncarnationHomeError,
+        match="changed during validation",
+    ):
+        ADAPTER.run_goal_transition(args)
+    assert receipt_path.exists()
+
+
+@pytest.mark.parametrize("artifact_name", ("request", "decision"))
 def test_cli_rechecks_authority_artifacts_immediately_before_mutation(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1171,6 +1238,51 @@ def test_cli_read_only_completion_blocks_later_mutation_after_reverse(
     assert not any(method == "thread/goal/set" for method, _params in rpc.calls)
     assert not ADAPTER._attempt_path(second_receipt).exists()
     assert not second_receipt.exists()
+
+
+def test_cli_missing_anchored_read_only_attempt_is_terminal(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    args, request_path, decision_path, _first_receipt, rpc = _cli_fixture(
+        tmp_path,
+        monkeypatch,
+        request_id="request:missing-read-only-attempt",
+    )
+    request = _request(
+        observed="active",
+        desired="active",
+        kind="accepted_return",
+        request_id="request:missing-read-only-attempt",
+    )
+    decision = _decision(request)
+    request_path.write_bytes(
+        RUNTIME._canonical_bytes(request.model_dump(mode="json")) + b"\n"
+    )
+    decision_path.write_bytes(
+        RUNTIME._canonical_bytes(decision.model_dump(mode="json")) + b"\n"
+    )
+    first = ADAPTER.run_goal_transition(args)
+    first_attempt = Path(first["attempt_artifact"]["ref"])
+    first_attempt.unlink()
+
+    rpc.status = "paused"
+    retry_receipt = tmp_path / "missing-read-only-attempt-retry.json"
+    with pytest.raises(
+        RUNTIME.ExternalCodexReturnError,
+        match="anchored attempt reservation is missing",
+    ):
+        ADAPTER.run_goal_transition(
+            SimpleNamespace(
+                request=args.request,
+                decision=args.decision,
+                owner=args.owner,
+                receipt=str(retry_receipt),
+            )
+        )
+
+    assert not any(method == "thread/goal/set" for method, _params in rpc.calls)
+    assert not retry_receipt.exists()
 
 
 def test_cli_retry_after_runtime_reset_uses_persistent_semantic_attempt(

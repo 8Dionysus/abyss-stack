@@ -54,11 +54,15 @@ accepted transition later restores the original Goal state, a retry of the old
 idempotency key still finds the completed attempt and refuses a second mutation.
 When the first execution only observes an already-desired state, it records a
 durable `read_only_recorded` attempt at the same anchor. A later reversal cannot
-turn that no-mutation completion into permission to issue a delayed set.
+turn that no-mutation completion into permission to issue a delayed set. The
+anchor remains authoritative if a caller later cleans the referenced sidecar:
+the missing target is terminal and must not be recreated. A replayed read-only
+receipt is accepted only when its historical response bytes, summaries, and
+digests match the anchored `read_only_recorded` observation.
 Dynamic endpoint rebinding may change the fresh transport coordinate but does
 not rewrite the attempt's historical endpoint evidence.
 The CLI reasserts the original request, decision, and owner bytes immediately
-before dispatch. The legacy pause compatibility route lacks the typed
+before dispatch and after receipt publication. The legacy pause compatibility route lacks the typed
 idempotency artifact, so it serializes by qualified Goal identity across
 receipt paths, reasserts its owner snapshot before mutation and after proof
 persistence, and fails closed rather than issuing a concurrent duplicate or
@@ -94,7 +98,9 @@ route.
   volatile runtime-directory loss, and concurrent legacy pause callers cannot
   cause a duplicate native set for the same admitted contour.
 - Positive: read-only completion remains idempotent after a later state
-  reversal, and legacy owner drift is detected at the mutation/proof boundary.
+  reversal even if its sidecar is later removed, its receipts remain bound to
+  the recorded observation, and legacy owner drift is detected at the
+  mutation/proof boundary.
 - Tradeoff: without a protocol CAS/version field, a receipt proves the bound
   request and post-read observation, not server-side compare-and-set causality.
 - Follow-up: live pause, root wake, holder closure, owner acceptance, and

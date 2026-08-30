@@ -122,13 +122,18 @@ receipt. A runtime-reset regression replaces the complete volatile lock root,
 then proves that the persistent owner-state anchor still resolves the original
 attempt and refuses a second mutation after state reversal. An already-desired
 regression records `read_only_recorded`, reverses the Goal, retries through a
-different receipt, and proves zero native sets. A dynamic-endpoint
+different receipt, and proves zero native sets. Additional regressions remove
+the anchored sidecar and prove the surviving owner-state anchor is terminal,
+and replace an otherwise valid replayed read-only response to prove the receipt
+must match the exact recorded observation. A dynamic-endpoint
 regression additionally
 returns different owner-proved app-server paths to the two callers and proves
 that endpoint discovery remains inside the same stable semantic lock while the
 attempt retains its historical endpoint evidence. Separate CLI regressions
 rewrite the request and decision after the pre-read and prove both are
-reasserted before dispatch with zero mutations. Separate
+reasserted before dispatch with zero mutations; publication-boundary
+regressions rewrite each artifact after the receipt write and prove the final
+snapshot reassertion rejects it. Separate
 legacy-pause regressions rewrite the owner after the pre-read and after proof
 persistence, proving zero mutation in the first case and refusal to publish a
 completed receipt in the second. Separate

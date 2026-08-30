@@ -1662,9 +1662,39 @@ def _validate_receipt_attempt_binding(
     request: Any,
     owner: dict[str, Any],
 ) -> None:
-    """Bind an executed receipt's transition evidence to its attempt sidecar."""
+    """Bind receipt evidence to the durable attempt that authorized it."""
 
-    if value.get("status") != "executed":
+    status = value.get("status")
+    if status == "replayed":
+        runtime = _runtime()
+        if attempt.get("state") != "read_only_recorded":
+            raise runtime.ExternalCodexReturnError(
+                "existing replayed Goal lifecycle receipt requires a read-only-recorded attempt"
+            )
+        stored_read = _validated_read_only_precondition(
+            attempt.get("precondition"),
+            owner=owner,
+            desired_state=request.desired_state,
+        )
+        stored_summary = runtime._safe_response_summary(stored_read)
+        stored_digest = runtime._sha256_bytes(runtime._canonical_bytes(stored_read))
+        lifecycle = value.get("lifecycle")
+        if (
+            not isinstance(lifecycle, dict)
+            or lifecycle.get("before") != stored_summary
+            or lifecycle.get("result") != stored_summary
+            or lifecycle.get("result_response") != stored_read
+            or lifecycle.get("before_response_sha256") != stored_digest
+            or lifecycle.get("result_response_sha256") != stored_digest
+            or lifecycle.get("mutation_response_sha256") is not None
+            or lifecycle.get("transition_request") is not None
+            or lifecycle.get("transition_proof") is not None
+        ):
+            raise runtime.ExternalCodexReturnError(
+                "existing replayed Goal lifecycle receipt read-only evidence does not match its attempt"
+            )
+        return
+    if status != "executed":
         return
     runtime = _runtime()
     if attempt.get("state") != "proof_recorded":
@@ -1996,10 +2026,15 @@ def _resolve_semantic_attempt_path(
             raise runtime.ExternalCodexReturnError(
                 "Goal lifecycle semantic attempt anchor binding mismatch"
             )
-        return runtime._validate_output_path(
+        anchored_path = runtime._validate_output_path(
             Path(anchor["attempt_ref"]),
             "Goal lifecycle anchored attempt reservation",
         )
+        if not anchored_path.exists():
+            raise runtime.ExternalCodexReturnError(
+                "Goal lifecycle anchored attempt reservation is missing; refusing to recreate a completed semantic attempt"
+            )
+        return anchored_path
     anchor = {
         "schema_version": SEMANTIC_ATTEMPT_ANCHOR_SCHEMA_VERSION,
         "semantic_attempt_sha256": digest,
@@ -2270,7 +2305,12 @@ def run_goal_transition(args: Any) -> dict[str, Any]:
         ):
             runtime.VISIBLE._assert_file_snapshot(path, expected, label)
         runtime._replace_json(receipt_path, receipt, "Goal lifecycle receipt")
-        runtime.VISIBLE._assert_file_snapshot(owner_path, owner_bytes, "Goal lifecycle owner")
+        for path, expected, label in (
+            (request_path, request_bytes, "Goal lifecycle request"),
+            (decision_path, decision_bytes, "Goal lifecycle decision"),
+            (owner_path, owner_bytes, "Goal lifecycle owner"),
+        ):
+            runtime.VISIBLE._assert_file_snapshot(path, expected, label)
         return _validate_existing_receipt(
             receipt,
             request,
