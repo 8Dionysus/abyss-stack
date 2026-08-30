@@ -1462,22 +1462,16 @@ def execute_goal_transition(
 ) -> dict[str, Any]:
     """Execute one accepted semantic request through the Codex Goal API.
 
-    A transition that can mutate a Goal must name a durable attempt artifact.
+    Every execution must name a durable attempt artifact, including a
+    no-mutation read-only completion.
     Serialization combines the qualified Goal identity, semantic idempotency
     key, and physical attempt coordinate so neither competing requests nor
     caller-selected evidence paths can split one mutation attempt.
     """
 
     if attempt_path is None:
-        return _execute_goal_transition_unlocked(
-            request,
-            decision,
-            owner,
-            owner_path,
-            endpoint,
-            rpc_factory=rpc_factory,
-            attempt_path=None,
-            attempt=attempt,
+        raise _runtime().ExternalCodexReturnError(
+            "Goal lifecycle execution requires a durable attempt path"
         )
     runtime = _runtime()
     attempt_path = runtime._validate_output_path(
@@ -1486,6 +1480,15 @@ def execute_goal_transition(
     request_type = _contract_types()[3]
     typed_request = _model(request, request_type, "Goal lifecycle request")
     validated_owner = runtime.validate_goal_lifecycle_owner(owner)
+    owner_path = runtime._regular_file(Path(owner_path), "Goal lifecycle owner")
+    owner_artifact, _owner_bytes = runtime._load_json_file(
+        owner_path, "Goal lifecycle owner"
+    )
+    owner_artifact = runtime.validate_goal_lifecycle_owner(owner_artifact)
+    if owner_artifact != validated_owner:
+        raise runtime.ExternalCodexReturnError(
+            "Goal lifecycle owner artifact does not match the supplied owner"
+        )
     _validate_request_owner_scope(typed_request, validated_owner)
     with _goal_transition_attempt_locks(
         typed_request,

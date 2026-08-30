@@ -370,6 +370,38 @@ def test_generic_adapter_replays_an_already_desired_state_read_only(tmp_path: Pa
     assert not any(method == "thread/goal/set" for method, _params in rpc.calls)
 
 
+def test_generic_adapter_rejects_pathless_read_only_completion(
+    tmp_path: Path,
+) -> None:
+    endpoint = tmp_path / "pathless-read-only.sock"
+    owner = _owner(endpoint)
+    owner_path = tmp_path / "owner-pathless-read-only.json"
+    owner_path.write_bytes(RUNTIME._canonical_bytes(owner) + b"\n")
+    request = _request(
+        observed="active",
+        desired="paused",
+        kind="delegation_yield",
+        request_id="request:pathless-read-only",
+    )
+    decision = _decision(request)
+    rpc = FakeGoalRpc(endpoint, status="paused")
+
+    with pytest.raises(
+        RUNTIME.ExternalCodexReturnError,
+        match="requires a durable attempt path",
+    ):
+        ADAPTER.execute_goal_transition(
+            request,
+            decision,
+            owner,
+            owner_path,
+            endpoint,
+            rpc_factory=lambda _endpoint: rpc,
+        )
+
+    assert rpc.calls == []
+
+
 def test_generic_adapter_binds_receipt_transition_evidence_to_attempt(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -700,6 +732,7 @@ def test_generic_adapter_binds_complete_owner_qualified_references(
             owner_path,
             endpoint,
             rpc_factory=lambda _endpoint: rpc,
+            attempt_path=tmp_path / "owner-ref.attempt.json",
         )
     assert rpc.calls == []
 
@@ -733,6 +766,7 @@ def test_generic_adapter_rejects_owner_path_projection_split(
             owner_path,
             endpoint,
             rpc_factory=lambda _endpoint: rpc,
+            attempt_path=tmp_path / "owner-projection.attempt.json",
         )
     assert rpc.calls == []
 
@@ -771,6 +805,7 @@ def test_generic_adapter_binds_supplied_endpoint_before_opening_transport(
             owner_path,
             supplied_endpoint,
             rpc_factory=factory,
+            attempt_path=tmp_path / "endpoint-binding.attempt.json",
         )
 
     assert opened == []

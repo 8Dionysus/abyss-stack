@@ -89,7 +89,9 @@ Tracking starts with the community-docs baseline for this repository.
   paths, and app-server endpoint rebinding cannot issue duplicate lifecycle
   mutations. Persistent state parents are created one component at a time with
   owner-only modes and are rejected if symlinked, foreign-owned, or writable by
-  group/other. A protected semantic
+  group/other. Programmatic callers must supply a durable attempt coordinate
+  even for an already-desired read-only completion; pathless SDK calls fail
+  before transport and cannot create an unrecorded idempotent result. A protected semantic
   anchor in persistent owner state retains the first durable attempt across
   runtime-directory loss, later receipt paths, and state reversals; CLI
   read-only completion now records the already-desired observation at that

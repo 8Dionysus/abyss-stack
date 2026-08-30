@@ -168,7 +168,10 @@ and replay only through their matching legacy wake reservation. A retry after a 
   physical-attempt-coordinate locks; two accepted requests cannot observe the
   same mutable precondition concurrently, and two callers cannot overwrite one
   selected attempt sidecar. Persistent state parents are created component by
-  component with owner-only modes and validated before use. An already-desired
+  component with owner-only modes and validated before use. The programmatic
+  adapter requires that durable attempt coordinate for every result; a
+  pathless call fails before transport, including when the Goal is already in
+  the desired state. An already-desired
   read records a durable no-mutation
   completion at that path. The v2 anchor stays unstarted until a valid attempt
   is persisted, so a transient transport failure before that point may retry.

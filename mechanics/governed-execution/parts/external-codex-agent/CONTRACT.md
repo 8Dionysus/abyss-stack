@@ -153,6 +153,10 @@ Operations are:
   Each missing persistent-state parent is created directly with mode `0700`;
   every parent is then rejected if it is symlinked, foreign-owned, or writable
   by group/other, while the final Goal-lifecycle root must remain owner-private.
+  The programmatic SDK entrypoint requires a durable attempt coordinate for
+  every invocation. It rejects a pathless request before transport rather than
+  returning an unanchored read-only completion that a later state reversal
+  could reopen under the same idempotency key.
   An already-desired read-only execution records `read_only_recorded` at the
   anchored attempt path; after a later reverse transition, the same
   idempotency key therefore refuses mutation rather than treating the absent

@@ -73,6 +73,10 @@ semantic anchor cannot overwrite a colliding caller-selected attempt sidecar.
 Persistent owner-state parents are created directly with owner-only modes and
 validated component by component rather than relying on a recursive mkdir
 whose intermediate modes depend on the process umask.
+The programmatic lifecycle adapter requires a durable attempt coordinate for
+read-only completion as well as mutation. A pathless call is rejected before
+transport, so it cannot claim completion without the anchor that makes later
+replay safe across state reversal.
 The CLI reasserts the original request, decision, and owner bytes immediately
 before dispatch and after receipt publication. The legacy pause compatibility route lacks the typed
 idempotency artifact, so it serializes by qualified Goal identity across
@@ -119,6 +123,8 @@ route.
   attempt paths serialize before native mutation or evidence replacement.
 - Positive: a common group-writable umask cannot create a permanently rejected
   intermediate semantic-state directory.
+- Positive: an SDK caller cannot create an unanchored read-only completion and
+  later reuse that idempotency key as a fresh mutating transition.
 - Tradeoff: without a protocol CAS/version field, a receipt proves the bound
   request and post-read observation, not server-side compare-and-set causality.
 - Follow-up: live pause, root wake, holder closure, owner acceptance, and
