@@ -75,7 +75,7 @@ from external_codex_continuity_capsule import (  # noqa: E402
     ContinuityCapsuleReinjectionError,
     model_reinjection_payload,
     reinjection_event_payload,
-    validate_continuity_capsule_reinjection,
+    validate_continuity_capsule_binding,
 )
 from external_codex_landing_effect import (  # noqa: E402
     LANDING_EFFECTS as _LANDING_EFFECTS,
@@ -14687,20 +14687,13 @@ Runtime session identity: {state["session_id"]}
     def resume(self, session_id: str, resume_path: str | Path) -> dict[str, Any]:
         resume = load_json(Path(resume_path), label="resume request")
         validate_json(resume, RESUME_SCHEMA_PATH, label="resume request")
-        continuity_capsule = resume.get("continuity_capsule")
-        if continuity_capsule is not None:
+        continuity_capsule_input = resume.get("continuity_capsule")
+        if continuity_capsule_input is not None:
             validate_json(
-                continuity_capsule,
+                continuity_capsule_input,
                 CONTINUITY_CAPSULE_REINJECTION_SCHEMA_PATH,
                 label="continuity capsule reinjection",
             )
-            try:
-                validate_continuity_capsule_reinjection(continuity_capsule)
-            except ContinuityCapsuleReinjectionError as exc:
-                raise ExternalCodexRuntimeError(
-                    "resume_continuity_capsule_invalid",
-                    str(exc),
-                ) from exc
         with self._lock(session_id):
             state = self._load_state(session_id)
             if state["schema_version"] not in PROJECTION_STATE_SCHEMA_VERSIONS:
@@ -14734,6 +14727,23 @@ Runtime session identity: {state["session_id"]}
                 raise ExternalCodexRuntimeError(
                     "resume_thread_missing", "no durable Codex thread is available"
                 )
+            _, _, binding, _, _, _ = self._materialized_payloads(state)
+            bound_capsule_ref = getattr(binding, "continuity_capsule_ref", None)
+            expected_capsule_ref = (
+                bound_capsule_ref.model_dump(mode="json")
+                if bound_capsule_ref is not None
+                else None
+            )
+            try:
+                continuity_capsule = validate_continuity_capsule_binding(
+                    continuity_capsule_input,
+                    expected_ref=expected_capsule_ref,
+                )
+            except ContinuityCapsuleReinjectionError as exc:
+                raise ExternalCodexRuntimeError(
+                    "resume_continuity_capsule_invalid",
+                    str(exc),
+                ) from exc
             task: Mapping[str, Any] | None = None
             if (
                 failed_terminal_followup

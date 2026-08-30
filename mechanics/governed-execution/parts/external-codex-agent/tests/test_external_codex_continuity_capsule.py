@@ -221,3 +221,38 @@ def test_cyclic_envelope_is_rejected_before_copy_or_digest() -> None:
         match="cycle",
     ):
         CAPSULE.validate_continuity_capsule_reinjection(envelope)
+
+
+def test_reinjection_requires_the_exact_sdk_bound_capsule_ref() -> None:
+    envelope = _envelope()
+    expected_ref = envelope["capsule_ref"]
+    assert isinstance(expected_ref, dict)
+
+    validated = CAPSULE.validate_continuity_capsule_binding(
+        envelope,
+        expected_ref=expected_ref,
+    )
+    assert validated is not None
+    assert validated["capsule_ref"] == expected_ref
+
+    with pytest.raises(
+        CAPSULE.ContinuityCapsuleReinjectionError,
+        match="omitted",
+    ):
+        CAPSULE.validate_continuity_capsule_binding(None, expected_ref=expected_ref)
+    with pytest.raises(
+        CAPSULE.ContinuityCapsuleReinjectionError,
+        match="absent from the incarnation binding",
+    ):
+        CAPSULE.validate_continuity_capsule_binding(envelope, expected_ref=None)
+
+    wrong_ref = dict(expected_ref)
+    wrong_ref["object_id"] = "continuity-capsule:different"
+    with pytest.raises(
+        CAPSULE.ContinuityCapsuleReinjectionError,
+        match="differs from the SDK-bound reference",
+    ):
+        CAPSULE.validate_continuity_capsule_binding(
+            envelope,
+            expected_ref=wrong_ref,
+        )

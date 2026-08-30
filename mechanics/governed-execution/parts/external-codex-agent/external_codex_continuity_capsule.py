@@ -542,6 +542,39 @@ def validate_continuity_capsule_reinjection(
     return copy.deepcopy(envelope)
 
 
+def validate_continuity_capsule_binding(
+    value: Mapping[str, Any] | None,
+    *,
+    expected_ref: Mapping[str, Any] | None,
+) -> dict[str, Any] | None:
+    """Require resume materialization to match the SDK-bound capsule reference."""
+
+    if value is None:
+        if expected_ref is not None:
+            raise ContinuityCapsuleReinjectionError(
+                "resume omitted the continuation-bound continuity capsule"
+            )
+        return None
+    if expected_ref is None:
+        raise ContinuityCapsuleReinjectionError(
+            "resume supplied a continuity capsule absent from the incarnation binding"
+        )
+    expected_digest = _require_digest(
+        expected_ref.get("digest"), label="expected_capsule_ref.digest"
+    )
+    expected = _validate_ref(
+        expected_ref,
+        digest=expected_digest,
+        label="expected_capsule_ref",
+    )
+    envelope = validate_continuity_capsule_reinjection(value)
+    if envelope["capsule_ref"] != expected:
+        raise ContinuityCapsuleReinjectionError(
+            "resume continuity capsule differs from the SDK-bound reference"
+        )
+    return envelope
+
+
 def model_reinjection_payload(value: Mapping[str, Any]) -> dict[str, Any]:
     """Project one exact private view without duplicating portable content."""
 
@@ -588,5 +621,6 @@ __all__ = [
     "ContinuityCapsuleReinjectionError",
     "model_reinjection_payload",
     "reinjection_event_payload",
+    "validate_continuity_capsule_binding",
     "validate_continuity_capsule_reinjection",
 ]
