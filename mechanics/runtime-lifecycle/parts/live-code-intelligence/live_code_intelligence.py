@@ -3871,6 +3871,11 @@ class LiveCodeIntelligenceRuntime:
         # runtime instance so a same-UID writer cannot replace a historical
         # snapshot and make its replacement self-authenticating.
         self._trusted_observation_digests: dict[str, str] = {}
+        # The observation digest alone does not cover transition metadata.
+        # Keep an in-memory digest of the complete state transition so a
+        # same-UID writer cannot rewrite invalidation history while retaining
+        # otherwise valid observations.
+        self._trusted_transition_digests: dict[str, str] = {}
         self._captured_machine_evidence_summary = (
             copy.deepcopy(self._machine_evidence_summary(config.machine_evidence))
             if isinstance(config.machine_evidence, _AuthenticatedMachineEvidence)
@@ -5692,6 +5697,12 @@ class LiveCodeIntelligenceRuntime:
             "full_rebuild": invalidation.get("full_rebuild"),
         }:
             return False
+        if not self._persisted_invalidation_matches_source(
+            state=state,
+            source_epoch=source_epoch,
+            files=files,
+        ):
+            return False
         if not self._persisted_observations_match_source(
             source_epoch=source_epoch,
             files=files,
@@ -5710,6 +5721,15 @@ class LiveCodeIntelligenceRuntime:
                 "before promotion"
             ),
         }
+
+    @staticmethod
+    def _transition_digest(
+        files: Mapping[str, Mapping[str, Any]],
+        invalidation: Mapping[str, Any],
+    ) -> str:
+        return _digest_payload(
+            {"files": dict(files), "invalidation": dict(invalidation)}
+        )
 
     def _bound_observation_records(
         self,
@@ -5754,6 +5774,60 @@ class LiveCodeIntelligenceRuntime:
                 ),
                 self._observation_output_limit_diagnostic(),
             ]
+
+    def _persisted_invalidation_matches_source(
+        self,
+        *,
+        state: Mapping[str, Any],
+        source_epoch: str,
+        files: Mapping[str, Mapping[str, Any]],
+    ) -> bool:
+        """Authenticate transition metadata before exposing persisted state."""
+
+        actual_digest = self._transition_digest(files, state["invalidation"])
+        trusted_digest = self._trusted_transition_digests.get(source_epoch)
+        if trusted_digest is not None:
+            return trusted_digest == actual_digest
+        try:
+            scanned = self._scan()
+            if self._source_epoch(scanned) != source_epoch:
+                return False
+            predecessor_path = (
+                self.current_path
+                if state.get("status") == "degraded"
+                else self.last_good_path
+            )
+            predecessor = _read_json(predecessor_path)
+            if predecessor:
+                if predecessor.get("status") != "current":
+                    return False
+                predecessor_files = _state_files(predecessor)
+                predecessor_epoch = self._state_epoch(predecessor)
+                if predecessor_epoch is None:
+                    return False
+                if predecessor_epoch != source_epoch:
+                    predecessor_digest = self._trusted_transition_digests.get(
+                        predecessor_epoch
+                    )
+                    if predecessor_digest != self._transition_digest(
+                        predecessor_files,
+                        predecessor.get("invalidation", {}),
+                    ):
+                        return False
+                elif self._source_epoch(predecessor_files) != predecessor_epoch:
+                    return False
+            else:
+                predecessor_files = {}
+                if state["invalidation"].get("full_rebuild") is not True:
+                    return False
+            expected = self._expected_invalidation(
+                scanned=scanned,
+                previous_files=predecessor_files,
+                full_rebuild=state["invalidation"]["full_rebuild"],
+            )
+            return dict(state["invalidation"]) == expected
+        except Exception:
+            return False
 
     def _persisted_observations_match_source(
         self,
@@ -5919,31 +5993,15 @@ class LiveCodeIntelligenceRuntime:
             return last_good, "last-good"
         return None, None
 
-    def _refresh_unlocked(self, *, force_rebuild: bool = False) -> dict[str, Any]:
-        self._refresh_receipt_snapshot = None
-        self._refresh_attempt_source_epoch = None
-        scanned = self._scan()
-        source_epoch = self._source_epoch(scanned)
-        self._refresh_attempt_source_epoch = source_epoch
-        transition_receipt_path = self.receipts_path / (
-            f"{source_epoch.removeprefix('sha256:')}.json"
-        )
-        self._refresh_receipt_snapshot = (
-            transition_receipt_path,
-            _read_json(transition_receipt_path),
-        )
-        previous_current = _read_json(self.current_path)
-        existing_candidate = _read_json(self.candidate_path)
-        previous_files = _state_files(previous_current)
-        compatible = self._state_identity_matches_config(previous_current) and (
-            previous_current.get("status") == "current"
-        )
-        previous_epoch = (
-            str(previous_current.get("source", {}).get("source_epoch"))
-            if compatible and previous_current.get("source", {}).get("source_epoch")
-            else None
-        )
-        full_rebuild = force_rebuild or not compatible
+    def _expected_invalidation(
+        self,
+        *,
+        scanned: Mapping[str, Mapping[str, Any]],
+        previous_files: Mapping[str, Mapping[str, Any]],
+        full_rebuild: bool,
+    ) -> dict[str, Any]:
+        """Derive the transition metadata from source and its prior state."""
+
         current_meta = {
             path: {
                 key: value
@@ -5981,6 +6039,62 @@ class LiveCodeIntelligenceRuntime:
             if full_rebuild
             else content_changed.union(dependency_impacted)
         )
+        stable_universe = set(previous_files).union(current_meta)
+        invalidated_paths = parse_paths.union(deleted)
+        stable_universe_count = len(stable_universe)
+        return {
+            "changed_paths": sorted(content_changed),
+            "added_paths": sorted(set(content_changed).difference(previous_files)),
+            "deleted_paths": sorted(deleted),
+            "dependency_impacted_paths": sorted(dependency_impacted),
+            "invalidated_paths": sorted(invalidated_paths),
+            "reused_paths": sorted(set(current_meta).difference(parse_paths)),
+            "full_rebuild": full_rebuild,
+            "blast_radius_universe": {
+                "kind": "previous-and-current-source-files",
+                "count": stable_universe_count,
+                "paths": sorted(stable_universe),
+            },
+            "blast_radius": round(
+                (len(invalidated_paths) / stable_universe_count)
+                if stable_universe_count
+                else 0.0,
+                6,
+            ),
+        }
+
+    def _refresh_unlocked(self, *, force_rebuild: bool = False) -> dict[str, Any]:
+        self._refresh_receipt_snapshot = None
+        self._refresh_attempt_source_epoch = None
+        scanned = self._scan()
+        source_epoch = self._source_epoch(scanned)
+        self._refresh_attempt_source_epoch = source_epoch
+        transition_receipt_path = self.receipts_path / (
+            f"{source_epoch.removeprefix('sha256:')}.json"
+        )
+        self._refresh_receipt_snapshot = (
+            transition_receipt_path,
+            _read_json(transition_receipt_path),
+        )
+        previous_current = _read_json(self.current_path)
+        existing_candidate = _read_json(self.candidate_path)
+        previous_files = _state_files(previous_current)
+        compatible = self._state_identity_matches_config(previous_current) and (
+            previous_current.get("status") == "current"
+        )
+        previous_epoch = (
+            str(previous_current.get("source", {}).get("source_epoch"))
+            if compatible and previous_current.get("source", {}).get("source_epoch")
+            else None
+        )
+        full_rebuild = force_rebuild or not compatible
+        invalidation = self._expected_invalidation(
+            scanned=scanned,
+            previous_files=previous_files,
+            full_rebuild=full_rebuild,
+        )
+        deleted = set(invalidation["deleted_paths"])
+        parse_paths = set(invalidation["invalidated_paths"]).difference(deleted)
         records: dict[str, dict[str, Any]] = {}
         reused: set[str] = set()
         parsed, parse_diagnostics = self._run_provider_work_queue(parse_paths, scanned)
@@ -6012,29 +6126,7 @@ class LiveCodeIntelligenceRuntime:
             for path, record in records.items()
             for diagnostic in record.get("diagnostics", [])
         ]
-        stable_universe = set(previous_files).union(current_meta)
-        invalidated_paths = parse_paths.union(deleted)
-        stable_universe_count = len(stable_universe)
-        invalidation = {
-            "changed_paths": sorted(content_changed),
-            "added_paths": sorted(set(content_changed).difference(previous_files)),
-            "deleted_paths": sorted(deleted),
-            "dependency_impacted_paths": sorted(dependency_impacted),
-            "invalidated_paths": sorted(invalidated_paths),
-            "reused_paths": sorted(reused),
-            "full_rebuild": full_rebuild,
-            "blast_radius_universe": {
-                "kind": "previous-and-current-source-files",
-                "count": stable_universe_count,
-                "paths": sorted(stable_universe),
-            },
-            "blast_radius": round(
-                (len(invalidated_paths) / stable_universe_count)
-                if stable_universe_count
-                else 0.0,
-                6,
-            ),
-        }
+        invalidation["reused_paths"] = sorted(reused)
         existing_last_good = _read_json(self.last_good_path)
         last_good_available = bool(
             self._state_identity_matches_config(existing_last_good)
@@ -6202,6 +6294,9 @@ class LiveCodeIntelligenceRuntime:
             if source_epoch is not None:
                 self._trusted_observation_digests[source_epoch] = _digest_payload(
                     state["files"]
+                )
+                self._trusted_transition_digests[source_epoch] = (
+                    self._transition_digest(state["files"], state["invalidation"])
                 )
         except Exception:
             self._restore_json_snapshot(self.current_path, previous_current)
@@ -6509,6 +6604,11 @@ class LiveCodeIntelligenceRuntime:
                     source_epoch=target_epoch,
                     previous_source_epoch=previous_epoch,
                     target_source_epoch=target_epoch,
+                )
+                self._trusted_transition_digests[target_epoch] = (
+                    self._transition_digest(
+                        last_good["files"], last_good["invalidation"]
+                    )
                 )
             except Exception:
                 if current:

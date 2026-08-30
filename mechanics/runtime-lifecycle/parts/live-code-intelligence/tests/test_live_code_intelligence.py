@@ -2080,6 +2080,35 @@ class LiveCodeIntelligenceRuntimeTests(unittest.TestCase):
         self.assertEqual(self.runtime.status()["state"], "unavailable")
         self.assertEqual(self.runtime.definitions()["freshness"], "unknown")
 
+    def test_tampered_persisted_invalidation_is_not_a_query_source(self) -> None:
+        self.write_source("module.py", "VALUE = 1\n")
+        self.runtime.refresh()
+        persisted = self.read_json(self.runtime.current_path)
+        persisted["invalidation"] = {
+            "changed_paths": [],
+            "added_paths": [],
+            "deleted_paths": [],
+            "dependency_impacted_paths": [],
+            "invalidated_paths": [],
+            "reused_paths": ["module.py"],
+            "full_rebuild": False,
+            "blast_radius_universe": {
+                "kind": "previous-and-current-source-files",
+                "count": 1,
+                "paths": ["module.py"],
+            },
+            "blast_radius": 0.0,
+        }
+        persisted["observation_envelope"]["invalidation"] = persisted[
+            "invalidation"
+        ]
+        persisted["provenance"]["full_rebuild"] = False
+        self.runtime.current_path.write_text(json.dumps(persisted), encoding="utf-8")
+
+        self.assertEqual(self.runtime.status()["state"], "unavailable")
+        restarted_runtime = LiveCodeIntelligenceRuntime(self.config)
+        self.assertEqual(restarted_runtime.status()["state"], "unavailable")
+
     def test_discover_does_not_overclaim_malformed_last_good(self) -> None:
         self.write_source("module.py", "VALUE = 1\n")
         self.runtime.refresh()
