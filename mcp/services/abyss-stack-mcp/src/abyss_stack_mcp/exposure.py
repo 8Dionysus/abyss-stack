@@ -231,9 +231,10 @@ class StackExposurePlan(StrictExposureModel):
             raise ValueError("stack exposure plan expiry must follow request")
         if len(set(self.requested_primitive_ids)) != len(self.requested_primitive_ids):
             raise ValueError("stack plan requested primitive ids must be unique")
-        if _POLICY_RANK[self.requested_policy_family] > _POLICY_RANK[
-            self.capability.effect_ceiling
-        ]:
+        if (
+            _POLICY_RANK[self.requested_policy_family]
+            > _POLICY_RANK[self.capability.effect_ceiling]
+        ):
             raise ValueError("stack plan exceeds the capability effect ceiling")
         if self.visible_tools != self.rendered_snapshot.tools:
             raise ValueError("stack plan and snapshot visible tools differ")
@@ -245,10 +246,13 @@ class StackExposurePlan(StrictExposureModel):
             if tool.capability_id != self.capability.capability_id:
                 raise ValueError("stack plan visible tool capability is not bound")
             if tool.schema_digest != self.capability.schema_digest:
-                raise ValueError("stack plan visible tool schema is not capability-bound")
-            if _POLICY_RANK[tool.policy_family] > _POLICY_RANK[
-                self.requested_policy_family
-            ]:
+                raise ValueError(
+                    "stack plan visible tool schema is not capability-bound"
+                )
+            if (
+                _POLICY_RANK[tool.policy_family]
+                > _POLICY_RANK[self.requested_policy_family]
+            ):
                 raise ValueError("stack plan visible tool exceeds requested policy")
         freshness_source_digest = self.capability.freshness.get("source_digest")
         if self.rendered_snapshot.source_digest != freshness_source_digest:
@@ -267,8 +271,13 @@ class StackExposurePlan(StrictExposureModel):
             raise ValueError(
                 "stack rollback bindings must preserve every effectful visible tool"
             )
-        if self.plan_state == "candidate" and visible_primitives != self.requested_primitive_ids:
-            raise ValueError("stack plan visible tools do not match requested selection")
+        if (
+            self.plan_state == "candidate"
+            and visible_primitives != self.requested_primitive_ids
+        ):
+            raise ValueError(
+                "stack plan visible tools do not match requested selection"
+            )
         if self.plan_state == "blocked" and (
             self.visible_tools or self.rendered_snapshot.rendered_bytes != 2
         ):
@@ -465,10 +474,12 @@ class ExposureRuntime:
         self,
         plan: StackExposurePlan | Mapping[str, Any],
     ) -> ExposureMaterializationReceipt:
-        normalized = (
-            plan
-            if isinstance(plan, StackExposurePlan)
-            else StackExposurePlan.from_sdk_payload(plan)
+        normalized = StackExposurePlan.from_sdk_payload(
+            copy.deepcopy(
+                plan.model_dump(mode="json")
+                if isinstance(plan, StackExposurePlan)
+                else plan
+            )
         )
         now = self._now()
         reasons: list[str] = []
@@ -585,14 +596,19 @@ class ExposureRuntime:
                 authorization = (
                     authorization_ref
                     if isinstance(authorization_ref, ExposureInvocationAuthorization)
-                    else ExposureInvocationAuthorization.model_validate(authorization_ref)
+                    else ExposureInvocationAuthorization.model_validate(
+                        authorization_ref
+                    )
                 )
             except Exception:
                 reasons.append("invocation_authorization_invalid")
             if authorization is not None:
                 if plan is None or authorization.plan_id != plan.plan_id:
                     reasons.append("invocation_authorization_plan_mismatch")
-                if authorization.materialization_receipt_id != receipt_materialization_id:
+                if (
+                    authorization.materialization_receipt_id
+                    != receipt_materialization_id
+                ):
                     reasons.append("invocation_authorization_materialization_mismatch")
                 if authorization.tool_id != receipt_tool_id:
                     reasons.append("invocation_authorization_tool_mismatch")
@@ -611,13 +627,15 @@ class ExposureRuntime:
         try:
             normalized_arguments = dict(arguments)
             _reject_secret_material(normalized_arguments)
+            input_digest = sha256_digest(normalized_arguments)
         except StackMCPError:
             normalized_arguments = {}
+            input_digest = sha256_digest(normalized_arguments)
             reasons.append("secret_material_rejected")
         except Exception:
             normalized_arguments = {}
+            input_digest = sha256_digest(normalized_arguments)
             reasons.append("malformed_invocation_arguments")
-        input_digest = sha256_digest(normalized_arguments)
         effect_class: EffectClass = tool.effect_class if tool is not None else "observe"
         policy_family: PolicyFamily = tool.policy_family if tool is not None else "read"
         output_digest: str | None = None

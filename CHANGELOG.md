@@ -7,6 +7,13 @@ Tracking starts with the community-docs baseline for this repository.
 
 ## [Unreleased]
 
+### Added
+
+- Add the default-off progressive tool-exposure adapter with five published
+  contracts for exact plan/snapshot materialization, invocation authorization,
+  and content-addressed receipts. The stack surface admits and observes
+  bounded disclosure but never executes or proxies an owner tool.
+
 ### Fixed
 
 - Bind MCP 2.1.1 protocol-lab and KAG receipts to the actually imported SDK
