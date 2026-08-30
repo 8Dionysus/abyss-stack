@@ -66,6 +66,12 @@ Source/runtime parity now routes through
 `mechanics/runtime-lifecycle/parts/config-sync-boundary/docs/SOURCE_RUNTIME_PARITY_PACKET.md`,
 and live runtime cutover inspection routes through
 `mechanics/runtime-lifecycle/parts/start-stop/docs/LIVE_RUNTIME_CUTOVER_PACKET.md`.
+The first source-local LIVE code-intelligence route is contained in
+`mechanics/runtime-lifecycle/parts/live-code-intelligence/`; it is a
+stdlib-only Python bootstrap observer with explicit candidate/current/last-good
+state, a JSON executable/provider boundary, and a machine-bound observation
+envelope. It remains a source candidate with no service activation or provider
+admission claim.
 Stack MCP runtime provisioning and its read-only pre-launch integrity check
 route through
 `scripts/aoa-install-systemd --provision-abyss-stack-mcp-runtime` and

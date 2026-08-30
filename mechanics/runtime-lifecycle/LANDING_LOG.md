@@ -55,3 +55,13 @@ the active organ readers. Post-quiesce failure restores the prior runtime and
 every previously active reader; the stack peer uses an exact, private, read-only
 rollback grant. Successful activation keeps exact repair-fallback counterparts live
 until admission commits, and any later admission failure restores that fallback.
+
+## 2026-08-26 - LIVE code-intelligence source candidate
+
+Added the source-local Python bootstrap observer under
+`parts/live-code-intelligence/`. It binds observations to a source epoch,
+serializes candidate/current/last-good transitions, retains a bounded
+provider-worker route, and verifies only an externally supplied,
+machine-authenticated evidence gate. The source route does not install or
+activate providers, create trust anchors, or claim normalized meaning, proof,
+deployment, or owner acceptance.

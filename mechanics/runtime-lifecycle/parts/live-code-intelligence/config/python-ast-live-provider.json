@@ -1,0 +1,51 @@
+{
+  "$schema": "schemas/live-code-intelligence-provider.schema.json",
+  "schema_version": "abyss-stack-live-code-intelligence-provider-v1",
+  "provider": {
+    "id": "python-ast-bootstrap",
+    "version": "1.1.0",
+    "language": "python",
+    "mode": "bootstrap",
+    "observation_schema": "abyss-stack-code-observation-v1",
+    "boundary_schema": "abyss-stack-live-code-intelligence-provider-boundary-v1",
+    "executable": "python3",
+    "entrypoint": "mechanics/runtime-lifecycle/parts/live-code-intelligence/live_code_intelligence.py",
+    "protocol": "json-command-v1",
+    "operations": ["discover", "refresh", "status", "definitions", "references", "restart", "last_good", "canary", "rollback"]
+  },
+  "source": {
+    "include_suffixes": [".py"],
+    "exclude_dirs": [".git", ".hg", ".venv", "__pycache__", "node_modules"],
+    "max_file_bytes": 1000000
+  },
+  "state": {
+    "relative_root": "Knowledge/code-intelligence/live/python",
+    "promotion": "complete-observation-only",
+    "fallback": "current-then-last-good"
+  },
+  "machine_binding": {
+    "schema_version": "abyss-machine-code-intelligence-provider-binding-v1",
+    "owner": "abyss-machine",
+    "installation_identity": "source-local-provider-candidate",
+    "artifact_subject": {
+      "kind": "source-local-provider",
+      "source_ref": "mechanics/runtime-lifecycle/parts/live-code-intelligence/live_code_intelligence.py",
+      "trust_state": "not-admitted",
+      "admission_state": "unknown"
+    },
+    "resource_envelope": {
+      "max_file_bytes": 1000000,
+      "max_query_results": 100
+    },
+    "live_measurement": {
+      "required_for_admission": true,
+      "state": "unobserved"
+    }
+  },
+  "owner_boundaries": {
+    "runtime_lifecycle": "abyss-stack",
+    "observation_meaning": "aoa-kag",
+    "installation_and_admission": "abyss-machine",
+    "proof_and_verdict": "aoa-evals"
+  }
+}

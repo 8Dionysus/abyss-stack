@@ -29,6 +29,9 @@ activation, persistence, storage mutation, and service state.
 - [parts/status-readouts/docs/GATEWAY_CACHE_POLICY.md](parts/status-readouts/docs/GATEWAY_CACHE_POLICY.md)
   and [parts/status-readouts/docs/USAGE_BUDGET_POLICY.md](parts/status-readouts/docs/USAGE_BUDGET_POLICY.md)
   own source-safe status readout contracts.
+- [parts/live-code-intelligence/README.md](parts/live-code-intelligence/README.md)
+  owns the source-local LIVE observation candidate, its state transitions, and
+  its provider-neutral machine boundary.
 - [../config-projection/README.md](../config-projection/README.md) owns
   config material and [../machine-fit/README.md](../machine-fit/README.md)
   owns host fit.

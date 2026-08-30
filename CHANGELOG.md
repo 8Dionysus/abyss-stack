@@ -518,6 +518,10 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Added
 
+- A source-local LIVE code-intelligence route now provides bounded Python AST
+  observations with source-epoch invalidation, candidate/current/last-good
+  state, an executable JSON boundary, and an explicit unadmitted machine ABI;
+  it does not install or activate providers or claim semantic proof.
 - Reranker owner memory relief now uses a separate
   `AOA_RERANK_EXIT_AFTER_MEMORY_RELIEF` switch, atomically drains new requests
   before a clean container restart, and commits one of up to 32 action-ID
