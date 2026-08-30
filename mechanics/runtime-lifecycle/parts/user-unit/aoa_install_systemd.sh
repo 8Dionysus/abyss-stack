@@ -2995,9 +2995,11 @@ aoa_write_mcp_http_chatgpt_desktop_entry() {
       return 0
     fi
     rm -f -- "$mcp_http_chatgpt_desktop_target"
-    command -v update-desktop-database >/dev/null 2>&1 && \
-      update-desktop-database "$(dirname -- "$mcp_http_chatgpt_desktop_target")" \
+    if command -v update-desktop-database >/dev/null 2>&1; then
+      update-desktop-database \
+        "$(dirname -- "$mcp_http_chatgpt_desktop_target")" \
         >/dev/null 2>&1 || true
+    fi
     return 0
   fi
   [[ "$mode" == "install" ]] || \
@@ -3036,8 +3038,9 @@ aoa_write_mcp_http_chatgpt_desktop_entry() {
     rm -f -- "$temp_path"
     aoa_die "failed to install the MCP HTTP ChatGPT desktop entry"
   fi
-  command -v update-desktop-database >/dev/null 2>&1 && \
+  if command -v update-desktop-database >/dev/null 2>&1; then
     update-desktop-database "$target_dir" >/dev/null 2>&1 || true
+  fi
 }
 
 aoa_preflight_mcp_http_chatgpt_install() {
