@@ -131,12 +131,17 @@ manifest binds each opened document to the observed `source_epoch`; changing
 the working-tree file after admission is rejected rather than silently
 re-attributed to the old epoch.
 
-Successful source epochs also receive a separate content-addressed trust record
-under `trusted-epochs/`. Each epoch/transition pair is created with exclusive
-creation and finalized read-only, so a later CLI process can authenticate the
-historical observation and invalidation digests without treating the mutable
-refresh receipt or state pointer as an authenticator. Conflicting or malformed
-records fail closed; repeated refreshes of the same epoch may retain distinct
+When the machine owner supplies an explicit historical-trust root and private
+key outside the mutable state root, successful source epochs also receive a
+content-addressed, HMAC-authenticated trust record there. Each
+epoch/transition pair is created with exclusive creation and finalized
+read-only, so a later CLI process can authenticate the complete historical
+observation and invalidation transition without treating the mutable refresh
+receipt, state pointer, or state-root sibling as an authenticator. The provider
+never creates or rotates the key; if the owner boundary is absent or invalid,
+historical fallback is unavailable across processes and the runtime fails
+closed rather than accepting mutable state. Conflicting or malformed records
+fail closed; repeated refreshes of the same epoch may retain distinct
 full-rebuild and incremental transition records.
 
 The runtime exposes provider-neutral lifecycle operations (`refresh`,

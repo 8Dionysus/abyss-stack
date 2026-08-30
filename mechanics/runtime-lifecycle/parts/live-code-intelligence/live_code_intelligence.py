@@ -14,6 +14,7 @@ import base64
 import copy
 import errno
 import hashlib
+import hmac
 import json
 import os
 import queue
@@ -53,6 +54,8 @@ PROVIDER_LIFECYCLE_SCHEMA = "abyss-stack-live-code-intelligence-provider-lifecyc
 LSP_SESSION_SCHEMA = "abyss-stack-live-code-intelligence-lsp-session-v1"
 OWNER_REVIEW_SCHEMA = "abyss-stack-live-code-intelligence-owner-review-v1"
 HISTORICAL_TRUST_SCHEMA = "abyss-stack-live-code-intelligence-historical-trust-v1"
+HISTORICAL_TRUST_ALGORITHM = "hmac-sha256-owner-key-v1"
+HISTORICAL_TRUST_KEY_BYTES = 32
 PROVIDER_ID = "python-ast-bootstrap"
 PROVIDER_VERSION = "1.1.0"
 PROVIDER_LANGUAGE = "python"
@@ -2177,6 +2180,12 @@ class LiveCodeIntelligenceConfig:
     # this out of config_identity means a storage routing choice cannot alter
     # the admitted provider/config digest.
     launch_scratch_root: Path | None = None
+    # Historical trust is an owner-boundary input, not mutable provider state.
+    # The machine owner may provision a private root and an out-of-band key;
+    # absent either input, historical fallback remains unavailable across
+    # processes rather than trusting state_root files.
+    historical_trust_root: Path | None = None
+    historical_trust_key_path: Path | None = None
 
     def __post_init__(self) -> None:
         source_input = Path(self.source_root).expanduser()
@@ -2200,6 +2209,55 @@ class LiveCodeIntelligenceConfig:
                     "LSP launch scratch root must not contain symlinks"
                 )
             object.__setattr__(self, "launch_scratch_root", scratch_input.resolve())
+        if (self.historical_trust_root is None) != (
+            self.historical_trust_key_path is None
+        ):
+            raise LiveCodeIntelligenceError(
+                "historical trust root and owner key must be supplied together"
+            )
+        if self.historical_trust_root is not None:
+            trust_root_input = Path(self.historical_trust_root).expanduser()
+            key_input = Path(self.historical_trust_key_path).expanduser()
+            for path, label in (
+                (trust_root_input, "historical trust root"),
+                (key_input, "historical trust key path"),
+            ):
+                if not path.is_absolute():
+                    raise LiveCodeIntelligenceError(
+                        f"{label} must be an absolute path"
+                    )
+                if _contains_symlink(path):
+                    raise LiveCodeIntelligenceError(
+                        f"{label} must not contain symlinks"
+                    )
+            trust_root = trust_root_input.resolve()
+            key_path = key_input.resolve()
+            for path, label in (
+                (trust_root, "historical trust root"),
+                (key_path, "historical trust key path"),
+            ):
+                try:
+                    path.relative_to(source_root)
+                except ValueError:
+                    pass
+                else:
+                    raise LiveCodeIntelligenceError(
+                        f"{label} must remain outside the source root"
+                    )
+                try:
+                    path.relative_to(state_root)
+                except ValueError:
+                    pass
+                else:
+                    raise LiveCodeIntelligenceError(
+                        f"{label} must remain outside the mutable state root"
+                    )
+            if key_path == trust_root or trust_root in key_path.parents:
+                raise LiveCodeIntelligenceError(
+                    "historical trust key must remain outside the trust record root"
+                )
+            object.__setattr__(self, "historical_trust_root", trust_root)
+            object.__setattr__(self, "historical_trust_key_path", key_path)
         if not source_root.is_dir():
             raise LiveCodeIntelligenceError(
                 f"source root does not exist: {source_root}"
@@ -2331,6 +2389,8 @@ class LiveCodeIntelligenceConfig:
         state_root: str | Path,
         machine_evidence_path: str | Path | None = None,
         launch_scratch_root: str | Path | None = None,
+        historical_trust_root: str | Path | None = None,
+        historical_trust_key_path: str | Path | None = None,
     ) -> "LiveCodeIntelligenceConfig":
         config_input = Path(config_path).expanduser()
         if _contains_symlink(config_input):
@@ -2365,6 +2425,8 @@ class LiveCodeIntelligenceConfig:
             machine_binding=payload["machine_binding"],
             owner_boundaries=tuple(owner_boundaries.items()),
             launch_scratch_root=launch_scratch_root,
+            historical_trust_root=historical_trust_root,
+            historical_trust_key_path=historical_trust_key_path,
         )
         if machine_evidence_path is None:
             return config
@@ -3875,11 +3937,11 @@ class LiveCodeIntelligenceRuntime:
             config.state_root / OPERATION_RECEIPTS_DIRECTORY
         )
         # Historical observations outlive one CLI process.  Each successful
-        # epoch gets a content-addressed, write-once trust record separate
-        # from mutable current/last-good snapshots and ordinary receipts.
-        self.historical_trust_path = (
-            config.state_root / HISTORICAL_TRUST_DIRECTORY
-        )
+        # epoch gets a content-addressed, owner-keyed trust record in the
+        # machine-provided root, never under mutable current/last-good state.
+        # Without an explicit owner root/key, cross-process historical trust is
+        # unavailable and the runtime falls back to source rederivation only.
+        self.historical_trust_path = config.historical_trust_root
         self.lock_path = config.state_root / STATE_LOCK_NAME
         self._refresh_receipt_snapshot: tuple[Path, dict[str, Any]] | None = None
         self._refresh_attempt_source_epoch: str | None = None
@@ -5749,9 +5811,50 @@ class LiveCodeIntelligenceRuntime:
         )
 
     def _historical_trust_record_directory(self, source_epoch: str) -> Path | None:
-        if not _is_sha256_reference(source_epoch):
+        if self.historical_trust_path is None or not _is_sha256_reference(source_epoch):
             return None
         return self.historical_trust_path / source_epoch.removeprefix("sha256:")
+
+    def _historical_trust_key(self) -> bytes | None:
+        """Read the owner-supplied key without accepting mutable state data.
+
+        The key is deliberately outside both the source tree and the mutable
+        runtime state root.  A private, non-symlinked regular file with no
+        group/world permissions is required.  The machine owner may place it
+        behind its own protected storage or secret-delivery boundary; this
+        provider never creates, rotates, or copies it.
+        """
+
+        path = self.config.historical_trust_key_path
+        if path is None:
+            return None
+        try:
+            if _contains_symlink(path) or not path.is_file():
+                return None
+            metadata = path.stat()
+            if (
+                not stat.S_ISREG(metadata.st_mode)
+                or metadata.st_mode & 0o077
+                or metadata.st_size != HISTORICAL_TRUST_KEY_BYTES
+            ):
+                return None
+            key = path.read_bytes()
+        except (OSError, UnicodeError):
+            return None
+        return key if len(key) == HISTORICAL_TRUST_KEY_BYTES else None
+
+    def _historical_trust_auth_tag(self, record: Mapping[str, Any]) -> str | None:
+        key = self._historical_trust_key()
+        if key is None:
+            return None
+        unsigned = dict(record)
+        unsigned.pop("auth_tag", None)
+        tag = hmac.new(
+            key,
+            _canonical_json(unsigned).encode("utf-8"),
+            hashlib.sha256,
+        ).hexdigest()
+        return f"sha256:{tag}"
 
     def _read_historical_trust_records(
         self,
@@ -5761,8 +5864,11 @@ class LiveCodeIntelligenceRuntime:
 
         directory = self._historical_trust_record_directory(source_epoch)
         if directory is None:
-            return []
+            return None
         try:
+            key = self._historical_trust_key()
+            if key is None:
+                return []
             if not self.historical_trust_path.exists():
                 return None
             if (
@@ -5785,6 +5891,9 @@ class LiveCodeIntelligenceRuntime:
                 "source_epoch",
                 "observation_digest",
                 "transition_digest",
+                "algorithm",
+                "key_ref",
+                "auth_tag",
             }
             for path in sorted(directory.iterdir(), key=lambda item: item.name):
                 if path.suffix != ".json" or _contains_symlink(path):
@@ -5805,8 +5914,16 @@ class LiveCodeIntelligenceRuntime:
                     or payload.get("source_epoch") != source_epoch
                     or not _is_sha256_reference(payload.get("observation_digest"))
                     or not _is_sha256_reference(payload.get("transition_digest"))
+                    or payload.get("algorithm") != HISTORICAL_TRUST_ALGORITHM
+                    or payload.get("key_ref")
+                    != str(self.config.historical_trust_key_path)
+                    or not _is_sha256_reference(payload.get("auth_tag"))
                     or path.stem
                     != str(payload["transition_digest"]).removeprefix("sha256:")
+                    or not hmac.compare_digest(
+                        str(payload["auth_tag"]),
+                        self._historical_trust_auth_tag(payload) or "",
+                    )
                 ):
                     return []
                 records.append(dict(payload))
@@ -5845,6 +5962,11 @@ class LiveCodeIntelligenceRuntime:
         separate from mutable lifecycle receipts and state pointers.
         """
 
+        if self.config.historical_trust_root is None:
+            # A source-only caller has no owner-boundary storage.  Keep the
+            # current process usable, but never create a mutable state-root
+            # record that a later process could mistake for an authenticator.
+            return
         source_epoch = self._state_epoch(state)
         if source_epoch is None or state.get("status") != "current":
             raise LiveCodeIntelligenceError(
@@ -5859,6 +5981,11 @@ class LiveCodeIntelligenceRuntime:
             state["files"], state["invalidation"]
         )
         path = directory / f"{transition_digest.removeprefix('sha256:')}.json"
+        key = self._historical_trust_key()
+        if key is None:
+            raise LiveCodeIntelligenceError(
+                "owner historical trust key is unavailable or not private"
+            )
         record = {
             "schema_version": HISTORICAL_TRUST_SCHEMA,
             "owner": "abyss-stack",
@@ -5868,7 +5995,14 @@ class LiveCodeIntelligenceRuntime:
             "source_epoch": source_epoch,
             "observation_digest": _digest_payload(state["files"]),
             "transition_digest": transition_digest,
+            "algorithm": HISTORICAL_TRUST_ALGORITHM,
+            "key_ref": str(self.config.historical_trust_key_path),
         }
+        record["auth_tag"] = self._historical_trust_auth_tag(record)
+        if not isinstance(record["auth_tag"], str):
+            raise LiveCodeIntelligenceError(
+                "owner historical trust record could not be authenticated"
+            )
         try:
             if _contains_symlink(self.historical_trust_path):
                 raise LiveCodeIntelligenceError(
@@ -6857,8 +6991,15 @@ class LiveCodeIntelligenceRuntime:
         else:
             state = "unavailable"
 
-        def pointer(payload: Mapping[str, Any], label: str) -> dict[str, Any] | None:
-            if not self._state_identity_matches_config(payload):
+        def pointer(
+            payload: Mapping[str, Any],
+            label: str,
+            *,
+            identity_valid: bool | None = None,
+        ) -> dict[str, Any] | None:
+            if identity_valid is None:
+                identity_valid = self._state_identity_matches_config(payload)
+            if not identity_valid:
                 return None
             source = payload.get("source")
             summary = payload.get("summary")
@@ -6895,9 +7036,21 @@ class LiveCodeIntelligenceRuntime:
                 last_good_available=last_good_valid
             ),
             "owner_review": self._owner_review_surface(),
-            "current": pointer(current, "current"),
-            "candidate": pointer(candidate, "candidate"),
-            "last_good": pointer(last_good, "last-good"),
+            "current": pointer(
+                current,
+                "current",
+                identity_valid=current_valid,
+            ),
+            "candidate": pointer(
+                candidate,
+                "candidate",
+                identity_valid=candidate_valid,
+            ),
+            "last_good": pointer(
+                last_good,
+                "last-good",
+                identity_valid=last_good_valid,
+            ),
             "degradation": (
                 list(candidate.get("degradation", []))
                 if candidate_valid and isinstance(candidate.get("degradation"), list)
@@ -7189,6 +7342,18 @@ def _provider_parser() -> argparse.ArgumentParser:
         "--machine-evidence",
         help="owner-authenticated content-addressed abyss-machine gate bundle JSON path",
     )
+    parser.add_argument(
+        "--historical-trust-root",
+        help=(
+            "machine-owner-provisioned root for authenticated historical trust "
+            "records (outside mutable state)"
+        ),
+    )
+    parser.add_argument(
+        "--historical-trust-key",
+        dest="historical_trust_key_path",
+        help="machine-owner-provisioned private key file for historical trust records",
+    )
     parser.add_argument("--source-root", required=True, help="working-tree source root")
     parser.add_argument("--state-root", required=True, help="runtime state root")
     parser.add_argument("--name", help="definition or reference name")
@@ -7208,6 +7373,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             source_root=args.source_root,
             state_root=args.state_root,
             machine_evidence_path=args.machine_evidence,
+            historical_trust_root=args.historical_trust_root,
+            historical_trust_key_path=args.historical_trust_key_path,
         )
         runtime = LiveCodeIntelligenceRuntime(config)
         result = runtime.execute(operation, name=args.name)

@@ -60,7 +60,7 @@
             "claim_limits_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
           }
         },
-        "signature": {"type": "string", "minLength": 1},
+        "signature": {"type": "string", "pattern": "^[A-Za-z0-9+/]{86}==$", "minLength": 88, "maxLength": 88},
         "gate_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
       }
     },

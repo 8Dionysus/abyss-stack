@@ -49,12 +49,18 @@ class LiveCodeIntelligenceRuntimeTests(unittest.TestCase):
         self.root = Path(self.tempdir.name)
         self.source = self.root / "source"
         self.state = self.root / "runtime-state"
+        self.historical_trust_root = self.root / "historical-trust"
+        self.historical_trust_key = self.root / "historical-trust.key"
+        self.historical_trust_key.write_bytes(os.urandom(32))
+        self.historical_trust_key.chmod(0o400)
         self.source.mkdir()
         config_path = PART_ROOT / "config" / "python-ast-live-provider.json"
         self.config = LiveCodeIntelligenceConfig.from_file(
             config_path,
             source_root=self.source,
             state_root=self.state,
+            historical_trust_root=self.historical_trust_root,
+            historical_trust_key_path=self.historical_trust_key,
         )
         self.runtime = LiveCodeIntelligenceRuntime(self.config)
 
@@ -68,6 +74,14 @@ class LiveCodeIntelligenceRuntimeTests(unittest.TestCase):
 
     def read_json(self, path: Path) -> dict:
         return json.loads(path.read_text(encoding="utf-8"))
+
+    def historical_trust_cli_args(self) -> list[str]:
+        return [
+            "--historical-trust-root",
+            str(self.historical_trust_root),
+            "--historical-trust-key",
+            str(self.historical_trust_key),
+        ]
 
     def machine_evidence(
         self,
@@ -1945,6 +1959,27 @@ class LiveCodeIntelligenceRuntimeTests(unittest.TestCase):
                 invalid = {**valid, "public_key": public_key}
                 self.assertTrue(list(validator.iter_errors(invalid)))
 
+    def test_gate_schema_requires_fixed_ed25519_signature_base64(self) -> None:
+        schema_path = (
+            PART_ROOT
+            / "config"
+            / "schemas"
+            / "machine-code-intelligence-gate.schema.json"
+        )
+        schema = self.read_json(schema_path)
+        signature_schema = schema["properties"]["gate"]["properties"]["signature"]
+        validator = Draft202012Validator(signature_schema)
+        valid = base64.b64encode(bytes(64)).decode("ascii")
+        self.assertEqual([], list(validator.iter_errors(valid)))
+        for signature in (
+            "x",
+            base64.b64encode(bytes(63)).decode("ascii"),
+            base64.b64encode(bytes(65)).decode("ascii"),
+            "A" * 88,
+        ):
+            with self.subTest(signature=signature):
+                self.assertTrue(list(validator.iter_errors(signature)))
+
     def test_owner_signature_verifier_accepts_only_the_exact_signed_bytes(self) -> None:
         public_key = bytes.fromhex(
             "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a"
@@ -2082,6 +2117,24 @@ class LiveCodeIntelligenceRuntimeTests(unittest.TestCase):
         self.assertTrue(all(item.get("content") is None for item in scanned.values()))
         self.assertEqual(self.runtime.refresh()["status"], "current")
 
+    def test_status_reuses_each_validated_state_for_its_pointer(self) -> None:
+        self.write_source("module.py", "VALUE = 1\n")
+        self.runtime.refresh()
+        self.write_source("module.py", "VALUE = 2\n")
+        self.runtime.refresh()
+
+        with mock.patch.object(
+            self.runtime,
+            "_state_identity_matches_config",
+            wraps=self.runtime._state_identity_matches_config,
+        ) as identity_check:
+            status = self.runtime.status()
+
+        self.assertEqual(identity_check.call_count, 3)
+        self.assertIsNotNone(status["current"])
+        self.assertIsNotNone(status["last_good"])
+        self.assertIsNone(status["candidate"])
+
     def test_incompatible_last_good_is_not_used_after_config_drift(self) -> None:
         self.write_source("module.py", "VALUE = 1\n")
         self.runtime.refresh()
@@ -2213,6 +2266,7 @@ class LiveCodeIntelligenceRuntimeTests(unittest.TestCase):
                 str(self.source),
                 "--state-root",
                 str(self.state),
+                *self.historical_trust_cli_args(),
             ],
             check=False,
             capture_output=True,
@@ -2298,6 +2352,7 @@ class LiveCodeIntelligenceRuntimeTests(unittest.TestCase):
                 str(self.source),
                 "--state-root",
                 str(self.state),
+                *self.historical_trust_cli_args(),
             ],
             check=False,
             capture_output=True,
@@ -2328,6 +2383,7 @@ class LiveCodeIntelligenceRuntimeTests(unittest.TestCase):
                 str(self.source),
                 "--state-root",
                 str(self.state),
+                *self.historical_trust_cli_args(),
             ],
             check=False,
             capture_output=True,
@@ -2352,6 +2408,7 @@ class LiveCodeIntelligenceRuntimeTests(unittest.TestCase):
                 str(self.source),
                 "--state-root",
                 str(self.state),
+                *self.historical_trust_cli_args(),
             ],
             check=False,
             capture_output=True,
@@ -2643,6 +2700,8 @@ class LiveCodeIntelligenceRuntimeTests(unittest.TestCase):
     def test_historical_trust_record_tamper_is_not_a_query_source(self) -> None:
         self.write_source("module.py", "def stable():\n    return 1\n")
         state = self.runtime.refresh()
+        self.assertNotIn(self.state, self.runtime.historical_trust_path.parents)
+        self.assertNotEqual(self.runtime.historical_trust_path, self.state)
         records = sorted(self.runtime.historical_trust_path.rglob("*.json"))
         self.assertEqual(len(records), 1)
         record_path = records[0]
@@ -2661,6 +2720,23 @@ class LiveCodeIntelligenceRuntimeTests(unittest.TestCase):
             state["source"]["source_epoch"],
             record["source_epoch"],
         )
+
+    def test_historical_trust_requires_an_external_owner_boundary(self) -> None:
+        with self.assertRaisesRegex(
+            LiveCodeIntelligenceError,
+            "outside the mutable state root",
+        ):
+            replace(
+                self.config,
+                historical_trust_root=self.state / "trusted-epochs",
+                historical_trust_key_path=self.root / "historical-trust.key",
+            )
+
+        with self.assertRaisesRegex(
+            LiveCodeIntelligenceError,
+            "supplied together",
+        ):
+            replace(self.config, historical_trust_root=None)
 
     def test_persisted_authenticated_summary_must_match_capture(self) -> None:
         self.write_source("module.py", "def stable(): return 1\n")
