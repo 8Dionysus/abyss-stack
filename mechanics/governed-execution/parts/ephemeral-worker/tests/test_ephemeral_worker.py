@@ -606,6 +606,35 @@ def test_worker_rejects_projected_base64_before_encoding(
         run_ephemeral_read_worker(_request(path, content, max_transport_bytes=128))
 
 
+def test_worker_caps_reads_by_remaining_output_budget(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    content = b"x" * 4096
+    path = tmp_path / "output-bounded.bin"
+    path.write_bytes(content)
+    request = _request(path, content)
+    request["max_output_bytes"] = 1
+    request["input_snapshot_digest"] = snapshot_digest_for_request(
+        request["inputs"],  # type: ignore[arg-type]
+        max_input_bytes=request["max_input_bytes"],
+        max_output_bytes=request["max_output_bytes"],
+        max_transport_bytes=request["max_transport_bytes"],
+    )
+    worker_globals = run_ephemeral_read_worker.__globals__
+    original_read = worker_globals["_read_verified"]
+    observed_ceilings: list[int] = []
+
+    def observed_read(*args: object) -> bytes:
+        observed_ceilings.append(args[2])  # type: ignore[arg-type]
+        return original_read(*args)
+
+    monkeypatch.setitem(worker_globals, "_read_verified", observed_read)
+
+    with pytest.raises(EphemeralWorkerError, match="byte ceiling"):
+        run_ephemeral_read_worker(request)
+    assert observed_ceilings == [1]
+
+
 def test_worker_accounts_metadata_before_base64_encoding(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -607,10 +607,19 @@ def run_ephemeral_read_worker(request: Mapping[str, object]) -> dict[str, object
     projected_input_digits = 1
     projected_output_digits = 1
     for index, item in enumerate(inputs):
+        remaining_input_bytes = max_input_bytes - input_bytes
+        remaining_output_bytes = max_output_bytes - output_bytes
+        if remaining_input_bytes <= 0 or remaining_output_bytes <= 0:
+            raise EphemeralWorkerError("no aggregate byte budget remains for input")
+        read_ceiling = min(
+            _require_positive_int(item["max_bytes"], f"inputs[{index}].max_bytes"),
+            remaining_input_bytes,
+            remaining_output_bytes,
+        )
         content = _read_verified(
             str(item["path"]),
             str(item["digest"]),
-            _require_positive_int(item["max_bytes"], f"inputs[{index}].max_bytes"),
+            read_ceiling,
             f"inputs[{index}]",
         )
         input_bytes += len(content)
