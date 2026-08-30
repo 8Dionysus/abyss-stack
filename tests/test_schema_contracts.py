@@ -227,6 +227,9 @@ EXPECTED_ACTIVE_SCHEMA_PATHS = {
         "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-capability-grant.schema.json"
     ),
     Path(
+        "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-continuity-capsule-reinjection.schema.json"
+    ),
+    Path(
         "mechanics/governed-execution/parts/external-codex-agent/schemas/external-codex-event.schema.json"
     ),
     Path(
