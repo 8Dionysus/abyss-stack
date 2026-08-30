@@ -164,6 +164,13 @@ DEFAULT_OWNER_BOUNDARIES = (
 SOURCE_READ_CHUNK_BYTES = 64 * 1024
 LSP_RUNTIME_MANIFEST_MAX_FILES = 4_096
 LSP_RUNTIME_MANIFEST_MAX_BYTES = 256 * 1024 * 1024
+# Source discovery has its own aggregate envelope.  A per-file limit does not
+# bound the metadata retained for a tree containing many individually valid
+# files, so the scan stops with a degraded candidate before that work can grow
+# without limit.  Keep this aligned with the machine-owned manifest envelope
+# while retaining an explicit source-scan contract.
+SOURCE_SCAN_MAX_FILES = 4_096
+SOURCE_SCAN_MAX_BYTES = 256 * 1024 * 1024
 STATE_LOCK_NAME = ".refresh.lock"
 OPERATION_RECEIPTS_DIRECTORY = "operations"
 MACHINE_HEALTH_MAX_AGE_SECONDS = 15 * 60
@@ -2925,6 +2932,7 @@ class ManagedLspSession:
                 response_id = payload.get("id")
                 if (
                     isinstance(response_id, int)
+                    and not isinstance(response_id, bool)
                     and "method" not in payload
                     and ("result" in payload or "error" in payload)
                 ):
@@ -4033,6 +4041,7 @@ class LiveCodeIntelligenceRuntime:
                 f"source root must be a real directory: {self.config.source_root}"
             )
         files: dict[str, dict[str, Any]] = {}
+        total_bytes = 0
         def traversal_error(exc: OSError) -> None:
             raise LiveCodeIntelligenceError(
                 f"unable to traverse source tree: {exc.filename or self.config.source_root}"
@@ -4073,7 +4082,37 @@ class LiveCodeIntelligenceRuntime:
                                 "message": "source filename is not valid UTF-8",
                             }
                         ]
+                    if len(files) >= SOURCE_SCAN_MAX_FILES:
+                        # Keep the bounded partial candidate queryable only as
+                        # degraded state.  Attach the envelope diagnostic to
+                        # the last admitted record because persisted
+                        # degradation diagnostics are intentionally
+                        # path-qualified by the state contract.
+                        diagnostic = {
+                            "code": "source_scan_limit",
+                            "severity": "error",
+                            "message": (
+                                "source scan exceeded the authored aggregate "
+                                f"file-count envelope of {SOURCE_SCAN_MAX_FILES}"
+                            ),
+                        }
+                        target = files[max(files)]
+                        target.setdefault("scan_diagnostics", []).append(diagnostic)
+                        return files
                     files[metadata["path"]] = metadata
+                    total_bytes += int(metadata.get("size_bytes", 0))
+                    if total_bytes > SOURCE_SCAN_MAX_BYTES:
+                        metadata.setdefault("scan_diagnostics", []).append(
+                            {
+                                "code": "source_scan_limit",
+                                "severity": "error",
+                                "message": (
+                                    "source scan exceeded the authored aggregate "
+                                    f"byte envelope of {SOURCE_SCAN_MAX_BYTES}"
+                                ),
+                            }
+                        )
+                        return files
         return files
 
     def _source_epoch(self, files: Mapping[str, Mapping[str, Any]]) -> str:

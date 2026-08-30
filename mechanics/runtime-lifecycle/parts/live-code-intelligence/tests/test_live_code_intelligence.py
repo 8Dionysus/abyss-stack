@@ -791,6 +791,28 @@ class LiveCodeIntelligenceRuntimeTests(unittest.TestCase):
             }
         )
 
+    def test_lsp_reader_does_not_match_boolean_response_ids(self) -> None:
+        session = object.__new__(ManagedLspSession)
+        process = mock.Mock()
+        process.poll.return_value = None
+        session._process = process
+        session._closing = True
+        destination = live_code_intelligence.queue.Queue(maxsize=1)
+        session._pending = {1: destination}
+        session._pending_lock = threading.Lock()
+        session._responses = live_code_intelligence.queue.Queue(maxsize=2)
+        session._last_error = None
+        payload = {
+            "jsonrpc": "2.0",
+            "id": True,
+            "result": {"capabilities": {}},
+        }
+        session._read_message = mock.Mock(side_effect=[payload, None])
+        session._reader_loop()
+
+        self.assertTrue(destination.empty())
+        self.assertEqual(payload, session._responses.get_nowait())
+
     @unittest.skipUnless(
         ManagedLspSession._can_use_immutable_launch_fds(),
         "sealed launch descriptors are Linux-only",
@@ -806,6 +828,7 @@ class LiveCodeIntelligenceRuntimeTests(unittest.TestCase):
         nested_runtime_file.parent.mkdir()
         nested_runtime_file.write_text("nested\n", encoding="utf-8")
         self.write_source("workspace.py", "SOURCE = 'admitted-source'\n")
+        self.write_source("package/helper.py", "HELPER = 'admitted-helper'\n")
         server = runtime_root / "fake-lsp"
         original_script = (
             f"#!{sys.executable}\n"
@@ -902,6 +925,12 @@ class LiveCodeIntelligenceRuntimeTests(unittest.TestCase):
             )
             self.assertIn(str(self.root / "lsp-scratch"), launch["command"][-1])
             self.assertIn(str(self.source), launch["command"])
+            for source_path in (
+                self.source / "workspace.py",
+                self.source / "package" / "helper.py",
+            ):
+                target_index = launch["command"].index(str(source_path))
+                self.assertEqual("--ro-bind-data", launch["command"][target_index - 2])
         finally:
             session.close()
 
@@ -1147,6 +1176,18 @@ class LiveCodeIntelligenceRuntimeTests(unittest.TestCase):
         self.assertEqual(state["status"], "current")
         self.assertEqual(state["summary"]["source_file_count"], 0)
         self.assertFalse(self.runtime.candidate_path.exists())
+
+    def test_source_scan_aggregate_file_limit_degrades_without_unbounded_state(self) -> None:
+        for name in ("one.py", "two.py", "three.py"):
+            self.write_source(name, "VALUE = 1\n")
+
+        with mock.patch.object(live_code_intelligence, "SOURCE_SCAN_MAX_FILES", 2):
+            state = self.runtime.refresh()
+
+        self.assertEqual(state["status"], "degraded")
+        self.assertEqual(state["summary"]["source_file_count"], 2)
+        self.assertEqual(state["degradation"][0]["code"], "source_scan_limit")
+        self.assertTrue(self.runtime.candidate_path.exists())
 
     def test_concurrent_lsp_starts_launch_one_process(self) -> None:
         runtime_root = self.root / "machine-runtime"
