@@ -38,6 +38,7 @@
           "anyOf": [
             {
               "additionalProperties": true,
+              "maxProperties": 64,
               "type": "object"
             },
             {
@@ -79,6 +80,7 @@
         },
         "owners": {
           "additionalProperties": true,
+          "maxProperties": 64,
           "title": "Owners",
           "type": "object"
         },
@@ -101,6 +103,7 @@
         },
         "source_revision": {
           "additionalProperties": true,
+          "maxProperties": 64,
           "title": "Source Revision",
           "type": "object"
         }
@@ -233,6 +236,7 @@
             "minLength": 1,
             "type": "string"
           },
+          "maxItems": 256,
           "title": "Refusal Reasons",
           "type": "array"
         },
@@ -305,6 +309,7 @@
           "items": {
             "$ref": "#/$defs/StackExposureTool"
           },
+          "maxItems": 256,
           "title": "Tools",
           "type": "array"
         },
@@ -315,6 +320,7 @@
             "minLength": 1,
             "type": "string"
           },
+          "maxItems": 256,
           "title": "Visible Tool Ids",
           "type": "array"
         }
@@ -449,6 +455,7 @@
       "anyOf": [
         {
           "additionalProperties": true,
+          "maxProperties": 64,
           "type": "object"
         },
         {
@@ -484,6 +491,7 @@
         "minLength": 1,
         "type": "string"
       },
+      "maxItems": 256,
       "title": "Expansion Reasons",
       "type": "array"
     },
@@ -516,6 +524,7 @@
         "minLength": 1,
         "type": "string"
       },
+      "maxItems": 256,
       "title": "Refusal Reasons",
       "type": "array"
     },
@@ -550,6 +559,7 @@
         "minLength": 1,
         "type": "string"
       },
+      "maxItems": 256,
       "title": "Requested Primitive Ids",
       "type": "array"
     },
@@ -558,6 +568,7 @@
       "items": {
         "$ref": "#/$defs/ExposureRollbackBinding"
       },
+      "maxItems": 256,
       "title": "Rollback Bindings",
       "type": "array"
     },
@@ -577,6 +588,7 @@
       "items": {
         "$ref": "#/$defs/StackExposureTool"
       },
+      "maxItems": 256,
       "title": "Visible Tools",
       "type": "array"
     }

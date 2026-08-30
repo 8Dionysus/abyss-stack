@@ -8,7 +8,7 @@ from pathlib import Path
 import jsonschema
 import pytest
 
-from abyss_stack_mcp.core import canonical_json_bytes, sha256_digest
+from abyss_stack_mcp.core import StackMCPError, canonical_json_bytes, sha256_digest
 from abyss_stack_mcp.exposure import (
     ExposureInvocationAuthorization,
     ExposureRuntime,
@@ -563,6 +563,42 @@ def test_secret_plan_refusal_reason_is_replaced_before_emission() -> None:
     assert "secret_material_rejected" in receipt.reason_codes
     assert secret_reason not in receipt.reason_codes
     assert secret_reason not in json.dumps(runtime.recent_receipts())
+
+
+def test_oversized_plan_is_rejected_before_retention_or_emission() -> None:
+    emitted: list[dict] = []
+    runtime = ExposureRuntime(
+        progressive_exposure_enabled=True,
+        baseline_admitted=True,
+        baseline_admission_ref="receipt://d0/baseline-ready",
+        clock=lambda: NOW,
+        receipt_sink=emitted.append,
+    )
+    payload = _payload()
+    payload["approval_ref"] = {"owner_note": "x" * 1_048_576}
+
+    with pytest.raises(StackMCPError, match="canonical byte limit"):
+        runtime.materialize(_redigest_plan(payload))
+
+    assert emitted == []
+    assert runtime.recent_receipts() == ()
+
+
+def test_plan_collection_counts_are_bounded() -> None:
+    payload = _payload()
+    payload["refusal_reasons"] = ["bounded"] * 257
+
+    with pytest.raises(StackMCPError, match="failed stack normalization"):
+        StackExposurePlan.from_sdk_payload(_redigest_plan(payload))
+
+
+def test_non_json_plan_is_rejected_before_normalization() -> None:
+    runtime = ExposureRuntime(clock=lambda: NOW)
+    payload = _payload()
+    payload["approval_ref"] = {"not_json": object()}
+
+    with pytest.raises(StackMCPError, match="failed stack normalization"):
+        runtime.materialize(payload)
 
 
 def test_stack_normalization_rejects_visible_tool_schema_drift() -> None:

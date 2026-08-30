@@ -72,6 +72,9 @@ MAX_CANDIDATE_TTL = timedelta(minutes=10)
 MAX_FUTURE_CLOCK_SKEW = timedelta(seconds=30)
 MAX_RETAINED_EXPOSURE_RECEIPTS = 256
 MAX_RETAINED_MATERIALIZATIONS = 256
+MAX_EXPOSURE_PLAN_BYTES = 1_048_576
+MAX_EXPOSURE_COLLECTION_ITEMS = 256
+MAX_EXPOSURE_MAPPING_ITEMS = 64
 ZERO_DIGEST = "sha256:" + "0" * 64
 BASELINE_ADMISSION_REF = "receipt://d0/baseline-ready"
 CLAIM_LIMIT = (
@@ -134,8 +137,12 @@ class StackExposureSnapshot(StrictExposureModel):
     schema_version: Literal["aoa_organ_exposure_snapshot_v1"]
     snapshot_id: Digest
     source_digest: Digest
-    tools: tuple[StackExposureTool, ...] = ()
-    visible_tool_ids: tuple[NonEmpty, ...] = ()
+    tools: Annotated[
+        tuple[StackExposureTool, ...], Field(max_length=MAX_EXPOSURE_COLLECTION_ITEMS)
+    ] = ()
+    visible_tool_ids: Annotated[
+        tuple[NonEmpty, ...], Field(max_length=MAX_EXPOSURE_COLLECTION_ITEMS)
+    ] = ()
     rendered_schema_digest: Digest
     rendered_bytes: Annotated[int, Field(ge=0)]
     rendered_tokens: Annotated[int, Field(ge=0)] | None = None
@@ -145,7 +152,9 @@ class StackExposureSnapshot(StrictExposureModel):
     token_count_method: NonEmpty | None = None
     observed_at: datetime
     expires_at: datetime
-    refusal_reasons: tuple[NonEmpty, ...] = ()
+    refusal_reasons: Annotated[
+        tuple[NonEmpty, ...], Field(max_length=MAX_EXPOSURE_COLLECTION_ITEMS)
+    ] = ()
 
     @field_validator("observed_at", "expires_at")
     @classmethod
@@ -229,13 +238,17 @@ class StackExposureCapabilityBinding(StrictExposureModel):
     organ_id: NonEmpty
     capability_id: NonEmpty
     qualified_capability_id: NonEmpty
-    owners: Mapping[str, Any]
+    owners: Annotated[Mapping[str, Any], Field(max_length=MAX_EXPOSURE_MAPPING_ITEMS)]
     capability_digest: Digest
     schema_digest: Digest
-    source_revision: Mapping[str, Any]
+    source_revision: Annotated[
+        Mapping[str, Any], Field(max_length=MAX_EXPOSURE_MAPPING_ITEMS)
+    ]
     freshness: StackExposureFreshness
     effect_ceiling: PolicyFamily
-    approval_ref: Mapping[str, Any] | None = None
+    approval_ref: Annotated[
+        Mapping[str, Any] | None, Field(max_length=MAX_EXPOSURE_MAPPING_ITEMS)
+    ] = None
     rollback_route: NonEmpty
 
     @model_validator(mode="after")
@@ -261,16 +274,29 @@ class StackExposurePlan(StrictExposureModel):
     request_id: NonEmpty
     capability: StackExposureCapabilityBinding
     requested_policy_family: PolicyFamily
-    requested_primitive_ids: tuple[NonEmpty, ...] = ()
-    visible_tools: tuple[StackExposureTool, ...] = ()
+    requested_primitive_ids: Annotated[
+        tuple[NonEmpty, ...], Field(max_length=MAX_EXPOSURE_COLLECTION_ITEMS)
+    ] = ()
+    visible_tools: Annotated[
+        tuple[StackExposureTool, ...], Field(max_length=MAX_EXPOSURE_COLLECTION_ITEMS)
+    ] = ()
     rendered_snapshot: StackExposureSnapshot
-    approval_ref: Mapping[str, Any] | None = None
-    rollback_bindings: tuple[ExposureRollbackBinding, ...] = ()
+    approval_ref: Annotated[
+        Mapping[str, Any] | None, Field(max_length=MAX_EXPOSURE_MAPPING_ITEMS)
+    ] = None
+    rollback_bindings: Annotated[
+        tuple[ExposureRollbackBinding, ...],
+        Field(max_length=MAX_EXPOSURE_COLLECTION_ITEMS),
+    ] = ()
     rollback_route: NonEmpty
     requested_at: datetime
     expires_at: datetime
-    expansion_reasons: tuple[NonEmpty, ...] = ()
-    refusal_reasons: tuple[NonEmpty, ...] = ()
+    expansion_reasons: Annotated[
+        tuple[NonEmpty, ...], Field(max_length=MAX_EXPOSURE_COLLECTION_ITEMS)
+    ] = ()
+    refusal_reasons: Annotated[
+        tuple[NonEmpty, ...], Field(max_length=MAX_EXPOSURE_COLLECTION_ITEMS)
+    ] = ()
     claim_limit: Literal[CLAIM_LIMIT] = CLAIM_LIMIT
 
     @field_validator("requested_at", "expires_at")
@@ -545,12 +571,19 @@ class ExposureRuntime:
         self,
         plan: StackExposurePlan | Mapping[str, Any],
     ) -> ExposureMaterializationReceipt:
+        raw_plan = copy.deepcopy(
+            plan.model_dump(mode="json")
+            if isinstance(plan, StackExposurePlan)
+            else plan
+        )
+        try:
+            raw_plan_bytes = canonical_json_bytes(raw_plan)
+        except (TypeError, ValueError) as exc:
+            raise StackMCPError("exposure plan failed stack normalization") from exc
+        if len(raw_plan_bytes) > MAX_EXPOSURE_PLAN_BYTES:
+            raise StackMCPError("exposure plan exceeds canonical byte limit")
         normalized = StackExposurePlan.from_sdk_payload(
-            copy.deepcopy(
-                plan.model_dump(mode="json")
-                if isinstance(plan, StackExposurePlan)
-                else plan
-            )
+            raw_plan
         )
         now = self._now()
         self._prune_materializations(now)
