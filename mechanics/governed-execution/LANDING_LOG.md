@@ -22,6 +22,22 @@ This records source, generated-family, and CI evidence only. It does not
 claim provider binding, activation, live runtime execution, paired baseline,
 economy comparison, eval, promotion, closeout, or owner acceptance.
 
+## 2026-08-26 - Default-off provider-neutral ephemeral worker landing
+
+Recorded the source-only landing of the `ephemeral_read_worker_v1` bounded
+read worker and its Codex/local-provider `external_incarnation_v1` adapter
+profiles. The request schema and runtime now enforce a 16 MiB byte ceiling
+before opening any input and walk parents through descriptor-bound no-follow
+directories, while digest schemas require exact full-string coordinates. The
+adapter pair binds the exact ABI, requires the Codex `--disable multi_agent`
+command override, and rejects ambiguous built-in transport values. Request
+cardinality and metadata strings are bounded, and normalized duplicate paths
+are rejected. Focused tests cover the positive and negative contract paths.
+This records source,
+validation, and review movement only; baseline admission, activation, pilot,
+promotion, runtime deployment, eval, closeout, and owner acceptance remain
+separate gates.
+
 ## 2026-08-25 - Review repair for staged-index and loader boundaries
 
 Commit admission now requires a strict non-zero

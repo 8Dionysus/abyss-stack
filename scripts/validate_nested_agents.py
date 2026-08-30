@@ -429,6 +429,12 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
         'workspace-byte drift',
         'AOA_SDK_SOURCE_ROOT',
     ),
+    'mechanics/governed-execution/parts/ephemeral-worker/AGENTS.md': (
+        'bounded runtime-side read worker',
+        'default-off',
+        'content-addressed in-memory evidence',
+        'Built-in Codex child-agent transport is forbidden.',
+    ),
     'mechanics/diagnostic-spine/AGENTS.md': (
         'diagnostic-spine',
         'doctor readiness',

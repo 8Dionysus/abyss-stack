@@ -23,6 +23,13 @@ Tracking starts with the community-docs baseline for this repository.
   boundaries, validated observation handoff, and distinct adapter versus
   post-execution sink failures; retain the exact d0 paired-baseline trigger
   before binding real invokers.
+- Record the default-off ephemeral worker landing and harden its
+  provider-neutral adapter boundary: byte ceilings are capped at 16 MiB before
+  reads, path parents are traversed through no-follow descriptors, digest
+  schemas require exact full-string coordinates, Codex explicitly disables
+  `multi_agent`, request cardinality and metadata are bounded, normalized
+  duplicate paths are rejected, and mismatched ABI or ambiguous built-in
+  transport values fail closed.
 - Harden governed landing-effect admission with an independent artifact-byte
   digest, descriptor-bound bounded no-follow reads, duplicate-member rejection,
   complete Git ref validation, effect-specific target constraints, and a

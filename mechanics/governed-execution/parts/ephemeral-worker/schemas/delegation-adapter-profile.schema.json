@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/8Dionysus/abyss-stack/main/mechanics/governed-execution/parts/ephemeral-worker/schemas/delegation-adapter-profile.schema.json",
+  "title": "abyss-stack delegation adapter profile",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "adapter_id",
+    "adapter_kind",
+    "delegation_class",
+    "abi_version",
+    "provider_neutral_abi",
+    "uses_builtin_codex_subagents",
+    "enabled_by_default",
+    "command"
+  ],
+  "properties": {
+    "schema_version": {"const": "aoa_delegation_adapter_v1"},
+    "adapter_id": {"type": "string", "minLength": 1, "maxLength": 4096, "pattern": "^[a-z0-9._-]+(?![\\s\\S])"},
+    "adapter_kind": {"enum": ["codex_cli", "local_provider"]},
+    "delegation_class": {"enum": ["ephemeral_read_worker_v1", "external_incarnation_v1"]},
+    "abi_version": {"const": "aoa_delegation_class_v1"},
+    "provider_neutral_abi": {"const": true},
+    "uses_builtin_codex_subagents": {"const": false},
+    "enabled_by_default": {"const": false},
+    "command": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}}
+  }
+}

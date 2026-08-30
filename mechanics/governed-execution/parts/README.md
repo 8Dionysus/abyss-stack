@@ -12,3 +12,4 @@ policy contracts, candidate exports, tests, and local worker paths.
 - [candidate-exports](candidate-exports/README.md)
 - [local-worker-path](local-worker-path/README.md)
 - [programmatic-tool-execution](programmatic-tool-execution/README.md)
+- [ephemeral-worker](ephemeral-worker/README.md)

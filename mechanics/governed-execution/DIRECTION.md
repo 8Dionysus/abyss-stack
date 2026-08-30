@@ -21,6 +21,9 @@ Current posture:
   effects
 - keep governed mutation owner-bound to `abyss-stack`; the routing predecessor
   is retained for compatibility rollback, not as a mutable external target
+- keep the default-off ephemeral read worker bounded by immutable file digests,
+  byte ceilings, and parent-retained responsibility; share its delegation ABI
+  with the Codex CLI and local/provider external-incarnation profiles
 
 Near direction:
 

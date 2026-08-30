@@ -1,0 +1,11 @@
+{
+  "schema_version": "aoa_delegation_adapter_v1",
+  "adapter_id": "abyss_stack_local_provider_external_incarnation_v1",
+  "adapter_kind": "local_provider",
+  "delegation_class": "external_incarnation_v1",
+  "abi_version": "aoa_delegation_class_v1",
+  "provider_neutral_abi": true,
+  "uses_builtin_codex_subagents": false,
+  "enabled_by_default": false,
+  "command": ["local-provider", "--json"]
+}
