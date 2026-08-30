@@ -549,18 +549,34 @@ def codex_client_settings(
     deployment = deployment_settings(catalog)
     registry_file = registry_path(catalog, stack_root)
     registry: Mapping[str, Any] | None = None
+    registry_degraded = False
     if registry_file.is_file():
         try:
             loaded = json.loads(registry_file.read_text(encoding="utf-8"))
-        except (OSError, UnicodeError, json.JSONDecodeError) as exc:
-            raise RuntimeCatalogError(
-                f"unable to read MCP admission registry: {registry_file}"
-            ) from exc
-        if not isinstance(loaded, dict):
-            raise RuntimeCatalogError("MCP admission registry must be a JSON object")
-        registry = loaded
+        except (OSError, UnicodeError, json.JSONDecodeError):
+            registry_degraded = True
+        else:
+            if isinstance(loaded, dict):
+                registry = loaded
+            else:
+                registry_degraded = True
+    try:
+        client_entries = client_read_entries(catalog, registry)
+    except RuntimeCatalogError:
+        # The operator client remains available when admission state is
+        # malformed.  This fallback projects only the catalog-declared recovery
+        # rows; admission validation and registry mutation stay with their
+        # strict owners.
+        registry_degraded = True
+        client_entries = declared_client_read_entries(catalog)
+    if registry_degraded:
+        print(
+            "runtime catalog warning: MCP admission registry is unavailable; "
+            "using declared recovery rows",
+            file=sys.stderr,
+        )
     rows: list[tuple[str, int, str, str]] = []
-    for organ_id, service_id, _service, contour in client_read_entries(catalog, registry):
+    for organ_id, service_id, _service, contour in client_entries:
         auth = contour["auth"]
         rows.append(
             (

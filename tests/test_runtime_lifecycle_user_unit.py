@@ -3896,6 +3896,36 @@ esac
                 ],
             )
 
+            registry.write_text("{", encoding="utf-8")
+            executed.unlink()
+            malformed_registry = subprocess.run(
+                [str(MCP_HTTP_CODEX_CLIENT), "exec", "malformed-registry"],
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(
+                malformed_registry.returncode,
+                0,
+                malformed_registry.stderr,
+            )
+            self.assertTrue(executed.exists())
+            self.assertIn(
+                "using declared recovery rows",
+                malformed_registry.stderr,
+            )
+            self.assertIn(
+                "background recovery requested",
+                malformed_registry.stderr,
+            )
+            self.assertEqual(
+                len(systemctl_log.read_text(encoding="utf-8").splitlines()),
+                3,
+            )
+            registry.write_text('{"records": []}\n', encoding="utf-8")
+
             ready_marker.touch()
             env["LISTENER_HOST"] = "0.0.0.0"
             exposed = subprocess.run(
@@ -3910,7 +3940,7 @@ esac
             self.assertIn("background recovery requested", exposed.stderr)
             self.assertEqual(
                 len(systemctl_log.read_text(encoding="utf-8").splitlines()),
-                3,
+                4,
             )
 
             env["LISTENER_HOST"] = "127.0.0.1"
@@ -3926,7 +3956,7 @@ esac
             self.assertNotIn("background recovery requested", loopback.stderr)
             self.assertEqual(
                 len(systemctl_log.read_text(encoding="utf-8").splitlines()),
-                3,
+                4,
             )
 
     @unittest.skipIf(

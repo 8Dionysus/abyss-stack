@@ -149,6 +149,64 @@ def test_codex_client_uses_declared_recovery_rows_when_admission_is_empty() -> N
         runtime_catalog.admitted_read_entries(catalog, {"records": []})
 
 
+@pytest.mark.parametrize(
+    "registry_payload",
+    (
+        "{",
+        "[]",
+        '{"records": {}}',
+    ),
+)
+def test_codex_client_settings_degrade_malformed_registry_to_declared_rows(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    registry_payload: str,
+) -> None:
+    runtime_catalog = _load_runtime_catalog()
+    catalog = runtime_catalog.load_runtime_catalog()
+    stack_root = tmp_path / "abyss-stack"
+    registry = runtime_catalog.registry_path(catalog, stack_root)
+    registry.parent.mkdir(parents=True)
+    registry.write_text(registry_payload, encoding="utf-8")
+
+    _feature, _recovery, rows = runtime_catalog.codex_client_settings(
+        catalog,
+        stack_root,
+    )
+
+    assert len(rows) == len(catalog["deployment"]["client_read_contours"])
+    assert "using declared recovery rows" in capsys.readouterr().err
+
+
+def test_codex_client_settings_degrade_unreadable_registry_to_declared_rows(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    runtime_catalog = _load_runtime_catalog()
+    catalog = runtime_catalog.load_runtime_catalog()
+    stack_root = tmp_path / "abyss-stack"
+    registry = runtime_catalog.registry_path(catalog, stack_root)
+    registry.parent.mkdir(parents=True)
+    registry.write_text('{"records": []}', encoding="utf-8")
+    original_read_text = Path.read_text
+
+    def deny_registry_read(path: Path, *args: Any, **kwargs: Any) -> str:
+        if path == registry:
+            raise PermissionError("registry read denied")
+        return original_read_text(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", deny_registry_read)
+
+    _feature, _recovery, rows = runtime_catalog.codex_client_settings(
+        catalog,
+        stack_root,
+    )
+
+    assert len(rows) == len(catalog["deployment"]["client_read_contours"])
+    assert "using declared recovery rows" in capsys.readouterr().err
+
+
 @pytest.fixture
 def builder() -> Any:
     return _load_builder()
