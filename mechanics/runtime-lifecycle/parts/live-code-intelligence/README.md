@@ -131,9 +131,12 @@ manifest binds each opened document to the observed `source_epoch`; changing
 the working-tree file after admission is rejected rather than silently
 re-attributed to the old epoch.
 
-When the machine owner supplies an explicit historical-trust root and private
-key outside the mutable state root, successful source epochs also receive a
-content-addressed, HMAC-authenticated trust record there. Each
+By default the owner boundary is
+`/var/lib/abyss-machine/code-intelligence/trusted-epochs` plus the private key at
+`/etc/abyss-machine/trust/code-intelligence-history.key`; an owner may bind an
+equivalent explicit pair outside the mutable state root. Successful source
+epochs then receive a content-addressed, HMAC-authenticated trust record
+there. Each
 epoch/transition pair is created with exclusive creation and finalized
 read-only, so a later CLI process can authenticate the complete historical
 observation and invalidation transition without treating the mutable refresh

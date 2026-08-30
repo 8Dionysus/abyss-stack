@@ -56,6 +56,12 @@ OWNER_REVIEW_SCHEMA = "abyss-stack-live-code-intelligence-owner-review-v1"
 HISTORICAL_TRUST_SCHEMA = "abyss-stack-live-code-intelligence-historical-trust-v1"
 HISTORICAL_TRUST_ALGORITHM = "hmac-sha256-owner-key-v1"
 HISTORICAL_TRUST_KEY_BYTES = 32
+DEFAULT_HISTORICAL_TRUST_ROOT = Path(
+    "/var/lib/abyss-machine/code-intelligence/trusted-epochs"
+)
+DEFAULT_HISTORICAL_TRUST_KEY_PATH = Path(
+    "/etc/abyss-machine/trust/code-intelligence-history.key"
+)
 PROVIDER_ID = "python-ast-bootstrap"
 PROVIDER_VERSION = "1.1.0"
 PROVIDER_LANGUAGE = "python"
@@ -2184,8 +2190,8 @@ class LiveCodeIntelligenceConfig:
     # The machine owner may provision a private root and an out-of-band key;
     # absent either input, historical fallback remains unavailable across
     # processes rather than trusting state_root files.
-    historical_trust_root: Path | None = None
-    historical_trust_key_path: Path | None = None
+    historical_trust_root: Path | None = DEFAULT_HISTORICAL_TRUST_ROOT
+    historical_trust_key_path: Path | None = DEFAULT_HISTORICAL_TRUST_KEY_PATH
 
     def __post_init__(self) -> None:
         source_input = Path(self.source_root).expanduser()
@@ -2389,8 +2395,8 @@ class LiveCodeIntelligenceConfig:
         state_root: str | Path,
         machine_evidence_path: str | Path | None = None,
         launch_scratch_root: str | Path | None = None,
-        historical_trust_root: str | Path | None = None,
-        historical_trust_key_path: str | Path | None = None,
+        historical_trust_root: str | Path | None = DEFAULT_HISTORICAL_TRUST_ROOT,
+        historical_trust_key_path: str | Path | None = DEFAULT_HISTORICAL_TRUST_KEY_PATH,
     ) -> "LiveCodeIntelligenceConfig":
         config_input = Path(config_path).expanduser()
         if _contains_symlink(config_input):
@@ -5868,6 +5874,12 @@ class LiveCodeIntelligenceRuntime:
         try:
             key = self._historical_trust_key()
             if key is None:
+                key_path = self.config.historical_trust_key_path
+                # No owner key means no historical trust surface has been
+                # provisioned yet.  Treat that as absent; a present but
+                # malformed/unreadable key is instead a fail-closed boundary.
+                if key_path is None or not key_path.exists():
+                    return None
                 return []
             if not self.historical_trust_path.exists():
                 return None
@@ -5983,6 +5995,12 @@ class LiveCodeIntelligenceRuntime:
         path = directory / f"{transition_digest.removeprefix('sha256:')}.json"
         key = self._historical_trust_key()
         if key is None:
+            key_path = self.config.historical_trust_key_path
+            if key_path is None or not key_path.exists():
+                # The machine owner has not provisioned the optional durable
+                # trust boundary yet.  Keep source-only refresh usable while
+                # refusing to create an unauthenticated record.
+                return
             raise LiveCodeIntelligenceError(
                 "owner historical trust key is unavailable or not private"
             )
@@ -7344,6 +7362,7 @@ def _provider_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--historical-trust-root",
+        default=str(DEFAULT_HISTORICAL_TRUST_ROOT),
         help=(
             "machine-owner-provisioned root for authenticated historical trust "
             "records (outside mutable state)"
@@ -7352,6 +7371,7 @@ def _provider_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--historical-trust-key",
         dest="historical_trust_key_path",
+        default=str(DEFAULT_HISTORICAL_TRUST_KEY_PATH),
         help="machine-owner-provisioned private key file for historical trust records",
     )
     parser.add_argument("--source-root", required=True, help="working-tree source root")
