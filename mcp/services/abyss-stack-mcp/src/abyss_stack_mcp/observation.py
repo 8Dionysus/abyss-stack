@@ -13,6 +13,7 @@ import errno
 import hashlib
 import json
 import os
+import re
 import stat
 import subprocess
 import tempfile
@@ -70,6 +71,7 @@ MAX_INPUT_BYTES = 2 * 1024 * 1024
 MAX_OVERLAY_FUTURE_SKEW = timedelta(seconds=30)
 UNKNOWN_DIGEST = "sha256:" + ("0" * 64)
 ObservationCanaryPurpose = Literal["current", "last-known-good"]
+_ENV_REF = re.compile(r"\$\{([A-Z][A-Z0-9_]*)\}")
 
 
 class ObservationProducerError(ValueError):
@@ -366,7 +368,20 @@ def _load_targets(path: Path) -> tuple[RuntimeTargetCatalog, str]:
         raise ObservationProducerError(
             "runtime target catalog failed contract validation"
         ) from exc
-    return catalog, _digest(catalog.model_dump(mode="json"))
+    catalog_digest = _digest(catalog.model_dump(mode="json"))
+    resolved_payload = catalog.model_dump(mode="json")
+    for target in resolved_payload["targets"]:
+        target["executable_ref"] = _ENV_REF.sub(
+            lambda match: os.environ.get(match.group(1), match.group(0)),
+            target["executable_ref"],
+        )
+    try:
+        catalog = RuntimeTargetCatalog.model_validate(resolved_payload)
+    except ValidationError as exc:
+        raise ObservationProducerError(
+            "runtime target catalog failed resolved executable contract"
+        ) from exc
+    return catalog, catalog_digest
 
 
 def _load_deployment(path: Path) -> tuple[dict[str, Any], str]:

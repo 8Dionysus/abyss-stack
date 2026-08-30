@@ -267,6 +267,8 @@ capture_canary_family() {
   for organ in "${selected_organs[@]}"; do
     VENV="$VENV" \
     CANARY_BIN="$CANARY_BIN" \
+    AOA_WORKSPACE_ROOT="$WORKSPACE_ROOT" \
+    AOA_ABYSS_STACK_ROOT="$STACK" \
     TARGETS="$TARGETS" \
     CREDENTIALS_ROOT="$CREDENTIALS_ROOT" \
     CANARY_ROOT="$CANARY_ROOT" \
