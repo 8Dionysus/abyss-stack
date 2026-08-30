@@ -5827,8 +5827,9 @@ class LiveCodeIntelligenceRuntime:
         The key is deliberately outside both the source tree and the mutable
         runtime state root.  A private, non-symlinked regular file with no
         group/world permissions is required.  The machine owner may place it
-        behind its own protected storage or secret-delivery boundary; this
-        provider never creates, rotates, or copies it.
+        behind its own protected storage or secret-delivery boundary; the
+        default machine path additionally requires root ownership. This
+        provider never creates, rotates, or copies the key.
         """
 
         path = self.config.historical_trust_key_path
@@ -5842,6 +5843,10 @@ class LiveCodeIntelligenceRuntime:
                 not stat.S_ISREG(metadata.st_mode)
                 or metadata.st_mode & 0o077
                 or metadata.st_size != HISTORICAL_TRUST_KEY_BYTES
+                or (
+                    path == DEFAULT_HISTORICAL_TRUST_KEY_PATH
+                    and metadata.st_uid != 0
+                )
             ):
                 return None
             key = path.read_bytes()
