@@ -205,6 +205,12 @@ _PERSISTED_MACHINE_DYNAMIC_KEYS = frozenset(
     }
 )
 _KNOWN_PYTHON_IMPORT_ROOTS = frozenset({"app", "lib", "python", "source", "src"})
+# These roots are mounted from the host into the LSP namespace.  A source root
+# below one of them would leave unadmitted host files visible alongside the
+# sealed manifest bindings, so such roots must be rejected before launch.
+_HOST_BACKED_NAMESPACE_ROOTS = tuple(
+    Path(item) for item in ("/bin", "/etc", "/lib", "/lib64", "/sbin", "/usr")
+)
 
 
 _THREAD_LOCKS: dict[str, threading.RLock] = {}
@@ -1813,7 +1819,13 @@ def _module_name_variants(
         marker = "/".join(parts[:marker_end] + ["__init__.py"])
         if marker not in known:
             continue
-        package_start = marker_end - (2 if is_package_init else 1)
+        # For an initializer, ``marker_end`` includes the directory containing
+        # the matched marker while ``module_parts`` does not include the
+        # ``__init__`` component.  Starting one component before that marker
+        # therefore yields the package suffix (``pkg`` for
+        # ``workspace/vendor/pkg/__init__.py``), rather than leaking the
+        # unrelated monorepo prefix (``vendor.pkg``).
+        package_start = marker_end - 1
         candidate = module_parts[package_start:]
         if candidate:
             variants.add(".".join(candidate))
@@ -3397,9 +3409,14 @@ class ManagedLspSession:
         snapshot_root: Path,
         runtime_fds: tuple[tuple[int, str], ...],
         source_fds: tuple[tuple[int, str], ...],
+        launch_bindings: tuple[tuple[int, str], ...] = (),
     ) -> tuple[str, ...]:
         """Run the launch with sealed runtime and source files in its namespace."""
 
+        if self._source_root_uses_host_backed_mount(self.source_root):
+            raise LiveCodeIntelligenceError(
+                "LSP source root must not be nested under a host-backed system mount"
+            )
         launcher = self._launch_namespace_binary()
         sandbox: list[str] = [
             launcher,
@@ -3416,12 +3433,25 @@ class ManagedLspSession:
             if Path(system_root).exists():
                 sandbox.extend(("--ro-bind", system_root, system_root))
         sandbox.extend(("--proc", "/proc", "--dev", "/dev", "--tmpfs", "/tmp"))
-        for directory in self._snapshot_namespace_directories(
-            snapshot_root,
-            runtime_fds,
-            self.source_root,
-            source_fds,
-        ):
+        directories = set(
+            self._snapshot_namespace_directories(
+                snapshot_root,
+                runtime_fds,
+                self.source_root,
+                source_fds,
+            )
+        )
+        for _, target in launch_bindings:
+            target_path = Path(target)
+            if not target_path.is_absolute() or target_path == Path("/"):
+                raise LiveCodeIntelligenceError(
+                    "LSP sealed launch binding must use a safe absolute target"
+                )
+            current = target_path.parent
+            while current != Path("/"):
+                directories.add(current)
+                current = current.parent
+        for directory in sorted(directories, key=lambda path: len(path.parts)):
             if (
                 directory == snapshot_root
                 or snapshot_root in directory.parents
@@ -3460,9 +3490,32 @@ class ManagedLspSession:
                     str(snapshot_root / Path(relative)),
                 )
             )
+        # Execute the executable and (for scripts) interpreter through
+        # read-only bind targets populated directly from their sealed
+        # descriptors.  This gives the payload a stable execution boundary
+        # without relying on bubblewrap retaining arbitrary inherited FDs.
+        for descriptor, target in launch_bindings:
+            sandbox.extend(
+                (
+                    "--perms",
+                    "0555",
+                    "--ro-bind-data",
+                    str(descriptor),
+                    target,
+                )
+            )
         sandbox.extend(("--chdir", str(snapshot_root), "--"))
         sandbox.extend(command)
         return tuple(sandbox)
+
+    @staticmethod
+    def _source_root_uses_host_backed_mount(source_root: Path) -> bool:
+        """Whether a source root would expose an already-mounted host tree."""
+
+        return source_root == Path("/") or any(
+            source_root == root or root in source_root.parents
+            for root in _HOST_BACKED_NAMESPACE_ROOTS
+        )
 
     def _snapshot_command_arguments(self, snapshot_root: Path) -> tuple[str, ...]:
         arguments: list[str] = []
@@ -3537,12 +3590,8 @@ class ManagedLspSession:
                     label="LSP script interpreter",
                 )
                 descriptors.append(interpreter_descriptor)
-            executable_ref = f"/proc/self/fd/{executable_descriptor}"
-            interpreter_ref = (
-                f"/proc/self/fd/{interpreter_descriptor}"
-                if interpreter_descriptor is not None
-                else None
-            )
+            executable_target = "/run/abyss-lsp/executable"
+            interpreter_target = "/run/abyss-lsp/interpreter"
             for directory in sorted(
                 (path for path in snapshot_root.rglob("*") if path.is_dir()),
                 key=lambda path: len(path.parts),
@@ -3551,19 +3600,29 @@ class ManagedLspSession:
                 directory.chmod(0o500)
             snapshot_root.chmod(0o500)
             arguments = self._snapshot_command_arguments(snapshot_root)
-            if interpreter_ref is not None:
+            if interpreter_descriptor is not None:
                 command = (
-                    (interpreter_ref, "-S", executable_ref, *arguments)
+                    (interpreter_target, "-S", executable_target, *arguments)
                     if _is_python_interpreter(self._interpreter_path)
-                    else (interpreter_ref, executable_ref, *arguments)
+                    else (interpreter_target, executable_target, *arguments)
                 )
             else:
-                command = (executable_ref, *arguments)
+                command = (executable_target, *arguments)
             command = self._sandbox_command(
                 tuple(command),
                 snapshot_root=snapshot_root,
                 runtime_fds=runtime_fds,
                 source_fds=source_fds,
+                launch_bindings=tuple(
+                    [
+                        (executable_descriptor, executable_target),
+                        *(
+                            [(interpreter_descriptor, interpreter_target)]
+                            if interpreter_descriptor is not None
+                            else []
+                        ),
+                    ]
+                ),
             )
             return _LspLaunchBinding(
                 command=tuple(command),
@@ -5913,6 +5972,15 @@ class LiveCodeIntelligenceRuntime:
                 "auth_tag",
             }
             for path in sorted(directory.iterdir(), key=lambda item: item.name):
+                if (
+                    path.name.startswith(".")
+                    and path.name.endswith(".tmp")
+                ):
+                    # A writer may still be syncing its private publication
+                    # inode.  It is intentionally not a trust record and must
+                    # not turn a concurrent reader's existing final record
+                    # into a false conflict.
+                    continue
                 if path.suffix != ".json" or _contains_symlink(path):
                     return []
                 metadata = path.stat()
@@ -5973,10 +6041,11 @@ class LiveCodeIntelligenceRuntime:
     ) -> None:
         """Persist a successful epoch's exact observation/transition digests.
 
-        The record is created with ``O_EXCL`` and finalized read-only.  A
-        later process may consume an existing record but cannot replace it;
-        a conflicting record is a hard failure.  This store is deliberately
-        separate from mutable lifecycle receipts and state pointers.
+        The record is fully written and synced in a private temporary file,
+        then published with an atomic no-replace link.  A later process may
+        consume an existing record but cannot replace it; a conflicting record
+        is a hard failure.  This store is deliberately separate from mutable
+        lifecycle receipts and state pointers.
         """
 
         if self.config.historical_trust_root is None:
@@ -6044,12 +6113,15 @@ class LiveCodeIntelligenceRuntime:
                 raise LiveCodeIntelligenceError(
                     "historical trust epoch path must be a real directory"
                 )
-            flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
-            if hasattr(os, "O_NOFOLLOW"):
-                flags |= os.O_NOFOLLOW
             descriptor: int | None = None
+            temporary_path: Path | None = None
             try:
-                descriptor = os.open(path, flags, 0o400)
+                descriptor, temporary_name = tempfile.mkstemp(
+                    prefix=f".{transition_digest.removeprefix('sha256:')}.",
+                    suffix=".tmp",
+                    dir=str(directory),
+                )
+                temporary_path = Path(temporary_name)
                 encoded = (
                     _canonical_json(record) + "\n"
                 ).encode("utf-8")
@@ -6058,17 +6130,40 @@ class LiveCodeIntelligenceRuntime:
                     offset += os.write(descriptor, encoded[offset:])
                 os.fchmod(descriptor, 0o400)
                 os.fsync(descriptor)
-            except FileExistsError:
-                existing = self._read_historical_trust_record(
-                    source_epoch, transition_digest
-                )
-                if existing != record:
-                    raise LiveCodeIntelligenceError(
-                        "historical trust record conflicts with the admitted epoch"
+                os.close(descriptor)
+                descriptor = None
+                try:
+                    # Hard-linking the completed temporary inode gives the
+                    # final name atomically without allowing an existing
+                    # authenticated record to be replaced.
+                    os.link(temporary_path, path)
+                except FileExistsError:
+                    existing = self._read_historical_trust_record(
+                        source_epoch, transition_digest
                     )
+                    if existing != record:
+                        raise LiveCodeIntelligenceError(
+                            "historical trust record conflicts with the admitted epoch"
+                        )
+                else:
+                    directory_descriptor: int | None = None
+                    try:
+                        directory_flags = os.O_RDONLY
+                        if hasattr(os, "O_DIRECTORY"):
+                            directory_flags |= os.O_DIRECTORY
+                        directory_descriptor = os.open(directory, directory_flags)
+                        os.fsync(directory_descriptor)
+                    finally:
+                        if directory_descriptor is not None:
+                            os.close(directory_descriptor)
             finally:
                 if descriptor is not None:
                     os.close(descriptor)
+                if temporary_path is not None:
+                    try:
+                        temporary_path.unlink()
+                    except FileNotFoundError:
+                        pass
         except LiveCodeIntelligenceError:
             raise
         except OSError as exc:

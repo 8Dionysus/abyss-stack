@@ -713,22 +713,24 @@ class LiveCodeIntelligenceRuntimeTests(unittest.TestCase):
             )
             self.assertIn("--ro-bind-data", launch_command)
             inner_command = launch_command[launch_command.index("--") + 1 :]
-            self.assertTrue(inner_command[0].startswith("/proc/self/fd/"))
+            self.assertEqual("/run/abyss-lsp/interpreter", inner_command[0])
             self.assertEqual("-S", inner_command[1])
-            self.assertTrue(inner_command[2].startswith("/proc/self/fd/"))
+            self.assertEqual("/run/abyss-lsp/executable", inner_command[2])
+            launch_targets = {
+                launch_command[index + 2]: int(launch_command[index + 1])
+                for index, item in enumerate(launch_command)
+                if item == "--ro-bind-data"
+                and index + 2 < len(launch_command)
+                and launch_command[index + 2].startswith("/run/abyss-lsp/")
+            }
             self.assertEqual(
-                {
-                    int(item.rsplit("/", 1)[-1])
-                    for item in inner_command
-                    if item.startswith("/proc/self/fd/")
-                },
-                set(popen.call_args.kwargs["pass_fds"]).intersection(
-                    {
-                        int(item.rsplit("/", 1)[-1])
-                        for item in inner_command
-                        if item.startswith("/proc/self/fd/")
-                    }
-                ),
+                {"/run/abyss-lsp/executable", "/run/abyss-lsp/interpreter"},
+                set(launch_targets),
+            )
+            self.assertTrue(
+                set(launch_targets.values()).issubset(
+                    set(popen.call_args.kwargs["pass_fds"])
+                )
             )
             self.assertEqual(
                 {
@@ -745,6 +747,44 @@ class LiveCodeIntelligenceRuntimeTests(unittest.TestCase):
             session._reader.join(timeout=2)
         session._process = None
         session._cleanup_launch_snapshot()
+
+    def test_lsp_launch_rejects_host_backed_source_root(self) -> None:
+        runtime_root = self.root / "machine-runtime"
+        runtime_root.mkdir()
+        server = runtime_root / "fake-lsp"
+        server.write_text(f"#!{sys.executable}\n", encoding="utf-8")
+        server.chmod(0o755)
+        admitted_config = self.admitted_config(
+            self.machine_evidence(
+                artifact_digest=_digest_bytes(server.read_bytes()),
+                fresh_health=True,
+            )
+        )
+        session = ManagedLspSession(
+            [str(server)],
+            provider_id="typescript-lsp",
+            language="typescript",
+            source_epoch="sha256:" + ("b" * 64),
+            admission_config=admitted_config,
+            runtime_root=runtime_root,
+        )
+        session.source_root = Path("/usr/src/project")
+
+        self.assertTrue(
+            ManagedLspSession._source_root_uses_host_backed_mount(
+                session.source_root
+            )
+        )
+        with self.assertRaisesRegex(
+            LiveCodeIntelligenceError,
+            "host-backed system mount",
+        ):
+            session._sandbox_command(
+                ("payload",),
+                snapshot_root=self.root / "snapshot",
+                runtime_fds=(),
+                source_fds=(),
+            )
 
     def test_lsp_namespace_launcher_ignores_caller_path(self) -> None:
         attacker = self.root / "bwrap"
@@ -982,8 +1022,8 @@ class LiveCodeIntelligenceRuntimeTests(unittest.TestCase):
                 launch["command"][0],
             )
             inner_command = launch["command"][launch["command"].index("--") + 1 :]
-            self.assertTrue(inner_command[0].startswith("/proc/self/fd/"))
-            self.assertTrue(inner_command[2].startswith("/proc/self/fd/"))
+            self.assertEqual("/run/abyss-lsp/interpreter", inner_command[0])
+            self.assertEqual("/run/abyss-lsp/executable", inner_command[2])
             self.assertGreaterEqual(len(launch["pass_fds"]), 2)
             self.assertIn(
                 "--config=",
@@ -2602,6 +2642,22 @@ class LiveCodeIntelligenceRuntimeTests(unittest.TestCase):
             ["workspace/vendor/pkg/consumer.py"],
         )
 
+    def test_discovered_package_initializer_invalidates_importers(self) -> None:
+        self.write_source("workspace/vendor/pkg/__init__.py", "VALUE = 1\n")
+        self.write_source(
+            "workspace/vendor/pkg/consumer.py",
+            "from pkg import VALUE\n",
+        )
+        self.runtime.refresh()
+
+        self.write_source("workspace/vendor/pkg/__init__.py", "VALUE = 2\n")
+        state = self.runtime.refresh()
+
+        self.assertEqual(
+            state["invalidation"]["dependency_impacted_paths"],
+            ["workspace/vendor/pkg/consumer.py"],
+        )
+
     def test_persisted_snapshot_survives_expired_machine_health(self) -> None:
         self.write_source("module.py", "def stable(): return 1\n")
         evidence = self.machine_evidence(fresh_health=True)
@@ -2720,6 +2776,31 @@ class LiveCodeIntelligenceRuntimeTests(unittest.TestCase):
             state["source"]["source_epoch"],
             record["source_epoch"],
         )
+
+    def test_historical_trust_record_failure_does_not_publish_partial_json(self) -> None:
+        self.write_source("module.py", "def stable():\n    return 1\n")
+        state = self.runtime.refresh()
+        trust_directory = self.runtime.historical_trust_path / (
+            state["source"]["source_epoch"].removeprefix("sha256:")
+        )
+        for record_path in trust_directory.glob("*.json"):
+            record_path.unlink()
+
+        with (
+            mock.patch(
+                "live_code_intelligence.os.fsync",
+                side_effect=OSError("simulated publication failure"),
+            ),
+            self.assertRaisesRegex(
+                LiveCodeIntelligenceError,
+                "unable to persist historical trust record",
+            ),
+        ):
+            self.runtime._persist_historical_trust_record(state)
+
+        self.assertEqual([], list(trust_directory.iterdir()))
+        self.runtime._persist_historical_trust_record(state)
+        self.assertEqual(1, len(list(trust_directory.glob("*.json"))))
 
     def test_historical_trust_requires_an_external_owner_boundary(self) -> None:
         with self.assertRaisesRegex(
