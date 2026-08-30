@@ -837,6 +837,34 @@ class LiveCodeIntelligenceRuntimeTests(unittest.TestCase):
                 self.assertTrue(destination.empty())
                 self.assertEqual(payload, session._responses.get_nowait())
 
+    def test_lsp_reader_reports_child_exit_to_pending_requests(self) -> None:
+        session = object.__new__(ManagedLspSession)
+        process = mock.Mock()
+        process.poll.return_value = 17
+        session._process = process
+        session._closing = False
+        destination = live_code_intelligence.queue.Queue(maxsize=1)
+        session._pending = {1: destination}
+        session._pending_lock = threading.Lock()
+        session._responses = live_code_intelligence.queue.Queue(maxsize=1)
+        session._last_error = None
+        session._read_message = mock.Mock()
+
+        session._reader_loop()
+
+        self.assertEqual(session._last_error, "LSP child exited unexpectedly")
+        self.assertEqual(
+            destination.get_nowait(),
+            {
+                "jsonrpc": "2.0",
+                "error": {
+                    "code": -32000,
+                    "message": "LSP child exited unexpectedly",
+                },
+            },
+        )
+        session._read_message.assert_not_called()
+
     @unittest.skipUnless(
         ManagedLspSession._can_use_immutable_launch_fds(),
         "sealed launch descriptors are Linux-only",
@@ -1895,6 +1923,28 @@ class LiveCodeIntelligenceRuntimeTests(unittest.TestCase):
                 machine_evidence_path=bundle_path,
             )
 
+    def test_public_key_schema_requires_fixed_ed25519_base64(self) -> None:
+        schema_path = (
+            PART_ROOT
+            / "config"
+            / "schemas"
+            / "machine-code-intelligence-gate-public-key.schema.json"
+        )
+        schema = self.read_json(schema_path)
+        validator = Draft202012Validator(schema)
+        valid = {
+            "schema_version": "abyss-machine-code-intelligence-gate-public-key-v1",
+            "owner": "abyss-machine",
+            "key_id": "key:fixture",
+            "algorithm": "ed25519",
+            "public_key": base64.b64encode(bytes(32)).decode("ascii"),
+        }
+        self.assertEqual([], list(validator.iter_errors(valid)))
+        for public_key in ("x", "A" * 44, base64.b64encode(bytes(31)).decode("ascii")):
+            with self.subTest(public_key=public_key):
+                invalid = {**valid, "public_key": public_key}
+                self.assertTrue(list(validator.iter_errors(invalid)))
+
     def test_owner_signature_verifier_accepts_only_the_exact_signed_bytes(self) -> None:
         public_key = bytes.fromhex(
             "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a"
@@ -2256,10 +2306,64 @@ class LiveCodeIntelligenceRuntimeTests(unittest.TestCase):
         self.assertEqual(completed.returncode, 0, completed.stderr)
         payload = json.loads(completed.stdout)
         self.assertEqual(payload["operation"], "last_good")
-        # A new process has no in-memory trust for a historical epoch after
-        # the source moved.  The writable transition receipt cannot make that
-        # old snapshot authenticated, so the operation reports unavailable.
-        self.assertEqual(payload["result"]["state"], "unavailable")
+        self.assertEqual(payload["result"]["state"], "available")
+
+    def test_cli_refresh_and_rollback_preserve_historical_trust_across_processes(
+        self,
+    ) -> None:
+        self.write_source("module.py", "def stable():\n    return 1\n")
+        first = self.runtime.refresh()
+        first_epoch = first["source"]["source_epoch"]
+        self.write_source("module.py", "def stable():\n    return 2\n")
+        config_path = PART_ROOT / "config" / "python-ast-live-provider.json"
+
+        refreshed = subprocess.run(
+            [
+                sys.executable,
+                str(PART_ROOT / "live_code_intelligence.py"),
+                "refresh",
+                "--config",
+                str(config_path),
+                "--source-root",
+                str(self.source),
+                "--state-root",
+                str(self.state),
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(refreshed.returncode, 0, refreshed.stderr)
+        refreshed_payload = json.loads(refreshed.stdout)
+        self.assertEqual(refreshed_payload["result"]["status"], "current")
+        self.assertEqual(
+            self.read_json(self.runtime.last_good_path)["source"]["source_epoch"],
+            first_epoch,
+        )
+
+        rolled_back = subprocess.run(
+            [
+                sys.executable,
+                str(PART_ROOT / "live_code_intelligence.py"),
+                "rollback",
+                "--config",
+                str(config_path),
+                "--source-root",
+                str(self.source),
+                "--state-root",
+                str(self.state),
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(rolled_back.returncode, 0, rolled_back.stderr)
+        rolled_back_payload = json.loads(rolled_back.stdout)
+        self.assertEqual(rolled_back_payload["result"]["state"], "rolled-back")
+        self.assertEqual(
+            rolled_back_payload["result"]["target_source_epoch"],
+            first_epoch,
+        )
 
     def test_rollback_without_last_good_records_failed_operation_receipt(self) -> None:
         self.write_source("module.py", "VALUE = 1\n")
@@ -2425,20 +2529,20 @@ class LiveCodeIntelligenceRuntimeTests(unittest.TestCase):
         )
 
     def test_discovered_package_import_root_invalidates_importers(self) -> None:
-        self.write_source("workspace/lib/pkg/__init__.py", "\n")
-        self.write_source("workspace/lib/pkg/provider.py", "VALUE = 1\n")
+        self.write_source("workspace/vendor/pkg/__init__.py", "\n")
+        self.write_source("workspace/vendor/pkg/provider.py", "VALUE = 1\n")
         self.write_source(
-            "workspace/lib/pkg/consumer.py",
+            "workspace/vendor/pkg/consumer.py",
             "from pkg.provider import VALUE\n",
         )
         self.runtime.refresh()
 
-        self.write_source("workspace/lib/pkg/provider.py", "VALUE = 2\n")
+        self.write_source("workspace/vendor/pkg/provider.py", "VALUE = 2\n")
         state = self.runtime.refresh()
 
         self.assertEqual(
             state["invalidation"]["dependency_impacted_paths"],
-            ["workspace/lib/pkg/consumer.py"],
+            ["workspace/vendor/pkg/consumer.py"],
         )
 
     def test_persisted_snapshot_survives_expired_machine_health(self) -> None:
@@ -2535,6 +2639,28 @@ class LiveCodeIntelligenceRuntimeTests(unittest.TestCase):
         receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
 
         self.assertEqual(self.runtime.status()["state"], "unavailable")
+
+    def test_historical_trust_record_tamper_is_not_a_query_source(self) -> None:
+        self.write_source("module.py", "def stable():\n    return 1\n")
+        state = self.runtime.refresh()
+        records = sorted(self.runtime.historical_trust_path.rglob("*.json"))
+        self.assertEqual(len(records), 1)
+        record_path = records[0]
+        record = self.read_json(record_path)
+        os.chmod(record_path, 0o600)
+        record["observation_digest"] = "sha256:" + ("f" * 64)
+        record_path.write_text(json.dumps(record), encoding="utf-8")
+
+        restarted_runtime = LiveCodeIntelligenceRuntime(self.config)
+        self.assertEqual(restarted_runtime.status()["state"], "unavailable")
+        self.assertEqual(
+            restarted_runtime.definitions()["freshness"],
+            "unknown",
+        )
+        self.assertEqual(
+            state["source"]["source_epoch"],
+            record["source_epoch"],
+        )
 
     def test_persisted_authenticated_summary_must_match_capture(self) -> None:
         self.write_source("module.py", "def stable(): return 1\n")

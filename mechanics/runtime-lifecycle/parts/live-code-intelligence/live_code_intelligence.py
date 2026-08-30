@@ -52,6 +52,7 @@ MACHINE_EVIDENCE_SCHEMA = "abyss-stack-machine-code-intelligence-evidence-v1"
 PROVIDER_LIFECYCLE_SCHEMA = "abyss-stack-live-code-intelligence-provider-lifecycle-v1"
 LSP_SESSION_SCHEMA = "abyss-stack-live-code-intelligence-lsp-session-v1"
 OWNER_REVIEW_SCHEMA = "abyss-stack-live-code-intelligence-owner-review-v1"
+HISTORICAL_TRUST_SCHEMA = "abyss-stack-live-code-intelligence-historical-trust-v1"
 PROVIDER_ID = "python-ast-bootstrap"
 PROVIDER_VERSION = "1.1.0"
 PROVIDER_LANGUAGE = "python"
@@ -177,6 +178,7 @@ SOURCE_SCAN_MAX_BYTES = 256 * 1024 * 1024
 OBSERVATION_MAX_SERIALIZED_BYTES = 16 * 1024 * 1024
 STATE_LOCK_NAME = ".refresh.lock"
 OPERATION_RECEIPTS_DIRECTORY = "operations"
+HISTORICAL_TRUST_DIRECTORY = "trusted-epochs"
 MACHINE_HEALTH_MAX_AGE_SECONDS = 15 * 60
 LSP_MAX_HEADER_LINE_BYTES = 16 * 1024
 LSP_MAX_HEADER_BYTES = 64 * 1024
@@ -1792,18 +1794,20 @@ def _module_name_variants(
         if stripped:
             variants.add(".".join(stripped))
 
-    # Otherwise discover a package root from the source manifest.  For a
-    # regular module, the package marker is the directory containing it.  For
-    # __init__.py, the marker is the module itself.
+    # Otherwise discover a package root from the source manifest.  Probe the
+    # complete source-relative marker path before deriving the import-root
+    # suffix.  Starting the probe at index 1 loses a monorepo prefix such as
+    # ``workspace/vendor/pkg/__init__.py`` and leaves consumers of ``pkg`` in
+    # the reused set after ``pkg/provider.py`` changes.
     marker_directory_end = len(parts) - 1 if not is_package_init else len(parts)
-    for start in range(1, marker_directory_end):
-        for marker_end in range(start + 1, marker_directory_end + 1):
-            marker = "/".join(parts[start:marker_end] + ["__init__.py"])
-            if marker in known:
-                candidate = module_parts[start:]
-                if candidate:
-                    variants.add(".".join(candidate))
-                break
+    for marker_end in range(1, marker_directory_end + 1):
+        marker = "/".join(parts[:marker_end] + ["__init__.py"])
+        if marker not in known:
+            continue
+        package_start = marker_end - (2 if is_package_init else 1)
+        candidate = module_parts[package_start:]
+        if candidate:
+            variants.add(".".join(candidate))
     return {variant for variant in variants if variant}
 
 
@@ -2932,7 +2936,14 @@ class ManagedLspSession:
 
     def _reader_loop(self) -> None:
         try:
-            while self._process is not None and self._process.poll() is None:
+            while True:
+                process = self._process
+                if process is None:
+                    break
+                if process.poll() is not None:
+                    if not self._closing:
+                        self._fail_pending("LSP child exited unexpectedly")
+                    break
                 payload = self._read_message()
                 if payload is None:
                     if not self._closing:
@@ -3862,6 +3873,12 @@ class LiveCodeIntelligenceRuntime:
         self.receipts_path = config.state_root / "receipts"
         self.operation_receipts_path = (
             config.state_root / OPERATION_RECEIPTS_DIRECTORY
+        )
+        # Historical observations outlive one CLI process.  Each successful
+        # epoch gets a content-addressed, write-once trust record separate
+        # from mutable current/last-good snapshots and ordinary receipts.
+        self.historical_trust_path = (
+            config.state_root / HISTORICAL_TRUST_DIRECTORY
         )
         self.lock_path = config.state_root / STATE_LOCK_NAME
         self._refresh_receipt_snapshot: tuple[Path, dict[str, Any]] | None = None
@@ -5731,6 +5748,177 @@ class LiveCodeIntelligenceRuntime:
             {"files": dict(files), "invalidation": dict(invalidation)}
         )
 
+    def _historical_trust_record_directory(self, source_epoch: str) -> Path | None:
+        if not _is_sha256_reference(source_epoch):
+            return None
+        return self.historical_trust_path / source_epoch.removeprefix("sha256:")
+
+    def _read_historical_trust_records(
+        self,
+        source_epoch: str,
+    ) -> list[dict[str, Any]] | None:
+        """Read durable epoch records, distinguishing absent from corrupt."""
+
+        directory = self._historical_trust_record_directory(source_epoch)
+        if directory is None:
+            return []
+        try:
+            if not self.historical_trust_path.exists():
+                return None
+            if (
+                _contains_symlink(self.historical_trust_path)
+                or not self.historical_trust_path.is_dir()
+                or _contains_symlink(directory)
+            ):
+                return []
+            if not directory.exists():
+                return None
+            if not directory.is_dir():
+                return []
+            records: list[dict[str, Any]] = []
+            expected_keys = {
+                "schema_version",
+                "owner",
+                "provider",
+                "config_digest",
+                "source_root",
+                "source_epoch",
+                "observation_digest",
+                "transition_digest",
+            }
+            for path in sorted(directory.iterdir(), key=lambda item: item.name):
+                if path.suffix != ".json" or _contains_symlink(path):
+                    return []
+                metadata = path.stat()
+                if not stat.S_ISREG(metadata.st_mode) or metadata.st_mode & 0o222:
+                    return []
+                payload = json.loads(path.read_text(encoding="utf-8"))
+                if not isinstance(payload, Mapping):
+                    return []
+                if (
+                    set(payload) != expected_keys
+                    or payload.get("schema_version") != HISTORICAL_TRUST_SCHEMA
+                    or payload.get("owner") != "abyss-stack"
+                    or payload.get("provider") != self.config.provider_identity
+                    or payload.get("config_digest") != self.config.config_digest
+                    or payload.get("source_root") != str(self.config.source_root)
+                    or payload.get("source_epoch") != source_epoch
+                    or not _is_sha256_reference(payload.get("observation_digest"))
+                    or not _is_sha256_reference(payload.get("transition_digest"))
+                    or path.stem
+                    != str(payload["transition_digest"]).removeprefix("sha256:")
+                ):
+                    return []
+                records.append(dict(payload))
+            return records
+        except (OSError, UnicodeError, json.JSONDecodeError):
+            return []
+
+    def _read_historical_trust_record(
+        self,
+        source_epoch: str,
+        transition_digest: str | None = None,
+    ) -> dict[str, Any] | None:
+        records = self._read_historical_trust_records(source_epoch)
+        if records is None:
+            return None
+        if transition_digest is None:
+            return records[0] if records else {}
+        return next(
+            (
+                record
+                for record in records
+                if record.get("transition_digest") == transition_digest
+            ),
+            {},
+        )
+
+    def _persist_historical_trust_record(
+        self,
+        state: Mapping[str, Any],
+    ) -> None:
+        """Persist a successful epoch's exact observation/transition digests.
+
+        The record is created with ``O_EXCL`` and finalized read-only.  A
+        later process may consume an existing record but cannot replace it;
+        a conflicting record is a hard failure.  This store is deliberately
+        separate from mutable lifecycle receipts and state pointers.
+        """
+
+        source_epoch = self._state_epoch(state)
+        if source_epoch is None or state.get("status") != "current":
+            raise LiveCodeIntelligenceError(
+                "historical trust requires a current state with a source epoch"
+            )
+        directory = self._historical_trust_record_directory(source_epoch)
+        if directory is None:
+            raise LiveCodeIntelligenceError(
+                "historical trust source epoch must be a SHA-256 reference"
+            )
+        transition_digest = self._transition_digest(
+            state["files"], state["invalidation"]
+        )
+        path = directory / f"{transition_digest.removeprefix('sha256:')}.json"
+        record = {
+            "schema_version": HISTORICAL_TRUST_SCHEMA,
+            "owner": "abyss-stack",
+            "provider": copy.deepcopy(self.config.provider_identity),
+            "config_digest": self.config.config_digest,
+            "source_root": str(self.config.source_root),
+            "source_epoch": source_epoch,
+            "observation_digest": _digest_payload(state["files"]),
+            "transition_digest": transition_digest,
+        }
+        try:
+            if _contains_symlink(self.historical_trust_path):
+                raise LiveCodeIntelligenceError(
+                    "historical trust directory must not contain symlinks"
+                )
+            self.historical_trust_path.mkdir(parents=True, exist_ok=True)
+            if (
+                not self.historical_trust_path.is_dir()
+                or self.historical_trust_path.is_symlink()
+            ):
+                raise LiveCodeIntelligenceError(
+                    "historical trust path must be a real directory"
+                )
+            directory.mkdir(parents=True, exist_ok=True)
+            if directory.is_symlink() or not directory.is_dir():
+                raise LiveCodeIntelligenceError(
+                    "historical trust epoch path must be a real directory"
+                )
+            flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+            if hasattr(os, "O_NOFOLLOW"):
+                flags |= os.O_NOFOLLOW
+            descriptor: int | None = None
+            try:
+                descriptor = os.open(path, flags, 0o400)
+                encoded = (
+                    _canonical_json(record) + "\n"
+                ).encode("utf-8")
+                offset = 0
+                while offset < len(encoded):
+                    offset += os.write(descriptor, encoded[offset:])
+                os.fchmod(descriptor, 0o400)
+                os.fsync(descriptor)
+            except FileExistsError:
+                existing = self._read_historical_trust_record(
+                    source_epoch, transition_digest
+                )
+                if existing != record:
+                    raise LiveCodeIntelligenceError(
+                        "historical trust record conflicts with the admitted epoch"
+                    )
+            finally:
+                if descriptor is not None:
+                    os.close(descriptor)
+        except LiveCodeIntelligenceError:
+            raise
+        except OSError as exc:
+            raise LiveCodeIntelligenceError(
+                "unable to persist historical trust record"
+            ) from exc
+
     def _bound_observation_records(
         self,
         records: MutableMapping[str, dict[str, Any]],
@@ -5785,6 +5973,12 @@ class LiveCodeIntelligenceRuntime:
         """Authenticate transition metadata before exposing persisted state."""
 
         actual_digest = self._transition_digest(files, state["invalidation"])
+        durable_records = self._read_historical_trust_records(source_epoch)
+        if durable_records is not None:
+            return any(
+                record.get("transition_digest") == actual_digest
+                for record in durable_records
+            )
         trusted_digest = self._trusted_transition_digests.get(source_epoch)
         if trusted_digest is not None:
             return trusted_digest == actual_digest
@@ -5849,10 +6043,16 @@ class LiveCodeIntelligenceRuntime:
             scanned = self._scan()
             if self._source_epoch(scanned) != source_epoch:
                 # A historical snapshot has no live source bytes to rederive
-                # against.  A receipt beside the state is writable by the
-                # same UID and therefore cannot authenticate it.  Only a
-                # state committed by this still-live runtime instance may be
-                # used until an owner-backed immutable epoch store exists.
+                # against.  Consume only the separate, write-once epoch
+                # record; the ordinary refresh receipt remains integrity-only
+                # and cannot authenticate a same-UID replacement.
+                durable_records = self._read_historical_trust_records(source_epoch)
+                if durable_records is not None:
+                    return any(
+                        record.get("observation_digest")
+                        == _digest_payload(files)
+                        for record in durable_records
+                    )
                 return self._trusted_observation_digests.get(source_epoch) == (
                     _digest_payload(files)
                 )
@@ -6177,6 +6377,7 @@ class LiveCodeIntelligenceRuntime:
                 outcome="current",
                 previous_epoch=previous_epoch,
             )
+            self._persist_historical_trust_record(state)
             self.candidate_path.unlink(missing_ok=True)
         except Exception:
             if previous_current:

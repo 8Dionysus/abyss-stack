@@ -131,6 +131,14 @@ manifest binds each opened document to the observed `source_epoch`; changing
 the working-tree file after admission is rejected rather than silently
 re-attributed to the old epoch.
 
+Successful source epochs also receive a separate content-addressed trust record
+under `trusted-epochs/`. Each epoch/transition pair is created with exclusive
+creation and finalized read-only, so a later CLI process can authenticate the
+historical observation and invalidation digests without treating the mutable
+refresh receipt or state pointer as an authenticator. Conflicting or malformed
+records fail closed; repeated refreshes of the same epoch may retain distinct
+full-rebuild and incremental transition records.
+
 The runtime exposes provider-neutral lifecycle operations (`refresh`,
 `restart`, `last_good`, `canary`, and `rollback`), an explicit LSP-session
 surface, observation lanes, an explicit bounded provider-worker queue, and an

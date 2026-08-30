@@ -11,6 +11,11 @@
     "owner": {"const": "abyss-machine"},
     "key_id": {"type": "string", "minLength": 1},
     "algorithm": {"const": "ed25519"},
-    "public_key": {"type": "string", "minLength": 1}
+    "public_key": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9+/]{43}=$",
+      "minLength": 44,
+      "maxLength": 44
+    }
   }
 }
