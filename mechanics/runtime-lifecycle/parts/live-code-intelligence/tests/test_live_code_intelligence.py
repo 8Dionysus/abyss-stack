@@ -332,7 +332,7 @@ class LiveCodeIntelligenceRuntimeTests(unittest.TestCase):
             "    if message.get('method') == 'initialize':\n"
             "        send({'jsonrpc':'2.0','id':message['id'],'method':'workspace/configuration','params':{}})\n"
             "        for index in range(150): send({'jsonrpc':'2.0','method':'window/logMessage','params':{'message':str(index)}})\n"
-            "        send({'jsonrpc':'2.0','id':message['id'],'result':{'capabilities': {}}})\n"
+            "        send({'jsonrpc':'2.0','id':message['id'],'result':{'capabilities': {'received': message.get('params', {}).get('capabilities', {})}}})\n"
             "    elif 'id' in message:\n"
             "        send({'jsonrpc':'2.0','id':message['id'],'result':[]})\n"
             "    if message.get('method') == 'exit': break\n",
@@ -350,7 +350,15 @@ class LiveCodeIntelligenceRuntimeTests(unittest.TestCase):
             runtime_root=runtime_root,
         )
         try:
-            session.start(root_uri=self.source.as_uri())
+            capabilities = {"workspace": {"configuration": True}}
+            response = session.start(
+                root_uri=self.source.as_uri(),
+                capabilities=capabilities,
+            )
+            self.assertEqual(
+                capabilities,
+                response["result"]["capabilities"]["received"],
+            )
             response = session.document_symbols(uri=(self.source / "demo.ts").as_uri())
             self.assertEqual([], response["result"])
             with self.assertRaisesRegex(LiveCodeIntelligenceError, "inside the admitted source root"):
@@ -367,9 +375,13 @@ class LiveCodeIntelligenceRuntimeTests(unittest.TestCase):
                     )
                 )
             self.assertEqual(len({item["id"] for item in responses}), 16)
-            session.restart(root_uri=self.source.as_uri())
+            restarted = session.restart(root_uri=self.source.as_uri())
             self.assertEqual(1, session.snapshot()["restart_count"])
             self.assertEqual("observed", session.snapshot()["state"])
+            self.assertEqual(
+                capabilities,
+                restarted["result"]["capabilities"]["received"],
+            )
         finally:
             session.close()
 
@@ -2083,6 +2095,30 @@ class LiveCodeIntelligenceRuntimeTests(unittest.TestCase):
         self.assertEqual(payload["operation"], "last_good")
         self.assertEqual(payload["result"]["state"], "available")
 
+    def test_rollback_without_last_good_records_failed_operation_receipt(self) -> None:
+        self.write_source("module.py", "VALUE = 1\n")
+        first = self.runtime.refresh()
+
+        with self.assertRaisesRegex(
+            LiveCodeIntelligenceError,
+            "identity-valid last-good",
+        ):
+            self.runtime.rollback()
+
+        failed_receipt = self.read_json(
+            self.runtime.operation_receipts_path / "rollback.json"
+        )
+        self.assertEqual("failed", failed_receipt["state"])
+        self.assertEqual(
+            first["source"]["source_epoch"],
+            failed_receipt["source_epoch"],
+        )
+        self.assertEqual(
+            first["source"]["source_epoch"],
+            failed_receipt["previous_source_epoch"],
+        )
+        self.assertIsNone(failed_receipt["target_source_epoch"])
+
     def test_executable_boundary_rejects_unsigned_machine_evidence(self) -> None:
         self.write_source("module.py", "def stable():\n    return 1\n")
         config_path = PART_ROOT / "config" / "python-ast-live-provider.json"
@@ -2305,6 +2341,28 @@ class LiveCodeIntelligenceRuntimeTests(unittest.TestCase):
             [],
             self.runtime.definitions("forged")["results"],
         )
+
+    def test_historical_persisted_observation_requires_epoch_receipt(self) -> None:
+        self.write_source("module.py", "def stable(value):\n    return value\n")
+        state = self.runtime.refresh()
+        self.write_source("module.py", "def stable(value):\n    return value + 1\n")
+
+        self.assertEqual("current", self.runtime.status()["state"])
+        tampered = json.loads(json.dumps(state))
+        reference = next(
+            occurrence
+            for occurrence in tampered["files"]["module.py"]["observation"][
+                "occurrences"
+            ]
+            if occurrence["kind"] == "reference"
+        )
+        reference["name"] = "forged"
+        tampered["files"]["module.py"]["observation"]["occurrences"].sort(
+            key=lambda item: (item["location"], item["kind"], item["name"])
+        )
+        self.runtime.current_path.write_text(json.dumps(tampered), encoding="utf-8")
+
+        self.assertEqual(self.runtime.status()["state"], "unavailable")
 
     def test_persisted_authenticated_summary_must_match_capture(self) -> None:
         self.write_source("module.py", "def stable(): return 1\n")

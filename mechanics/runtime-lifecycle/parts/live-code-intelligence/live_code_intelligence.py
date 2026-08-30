@@ -2758,6 +2758,7 @@ class ManagedLspSession:
         self._restart_count = 0
         self._started_at: str | None = None
         self._last_good_at: str | None = None
+        self._client_capabilities: dict[str, Any] = {}
         self._last_error: str | None = None
         self._closing = False
         self._lifecycle_lock = threading.RLock()
@@ -3527,6 +3528,10 @@ class ManagedLspSession:
     def start(self, *, root_uri: str, capabilities: Mapping[str, Any] | None = None) -> dict[str, Any]:
         with self._lifecycle_lock:
             self._validate_launch_binding(root_uri)
+            if capabilities is not None and not isinstance(capabilities, Mapping):
+                raise LiveCodeIntelligenceError(
+                    "LSP client capabilities must be an object"
+                )
             if self._process is not None and self._process.poll() is None:
                 return self.snapshot()
             if self._process is not None:
@@ -3537,6 +3542,12 @@ class ManagedLspSession:
             # Health is generation-specific.  Clear the previous generation's
             # success before exposing a newly running child to observers.
             self._last_good_at = None
+            launch_capabilities = (
+                copy.deepcopy(self._client_capabilities)
+                if capabilities is None
+                else copy.deepcopy(dict(capabilities))
+            )
+            self._client_capabilities = launch_capabilities
             self._generation += 1
             binding = self._prepare_launch_binding()
             try:
@@ -3571,7 +3582,7 @@ class ManagedLspSession:
                 result = self.request("initialize", {
                     "processId": os.getpid(),
                     "rootUri": root_uri,
-                    "capabilities": dict(capabilities or {}),
+                    "capabilities": launch_capabilities,
                 })
                 self.notify("initialized", {})
                 self._last_good_at = _now()
@@ -3683,9 +3694,10 @@ class ManagedLspSession:
 
     def restart(self, *, root_uri: str) -> dict[str, Any]:
         with self._lifecycle_lock:
+            capabilities = copy.deepcopy(self._client_capabilities)
             self.close()
             self._restart_count += 1
-            return self.start(root_uri=root_uri)
+            return self.start(root_uri=root_uri, capabilities=capabilities)
 
     def close(self) -> None:
         with self._lifecycle_lock:
@@ -4700,6 +4712,7 @@ class LiveCodeIntelligenceRuntime:
         receipt = {
             "schema_version": RECEIPT_SCHEMA,
             "observed_at": state["observed_at"],
+            "observation_digest": _digest_payload(state["files"]),
             "outcome": outcome,
             "source_epoch": source_epoch,
             "previous_source_epoch": previous_epoch,
@@ -5520,12 +5533,15 @@ class LiveCodeIntelligenceRuntime:
         try:
             scanned = self._scan()
             if self._source_epoch(scanned) != source_epoch:
-                # A valid historical current/last-good snapshot is allowed to
-                # remain available while the working tree has moved on; the
-                # refresh transaction will bind the next candidate to the new
-                # epoch.  There is no same-epoch source against which to
-                # rederive this historical observation here.
-                return True
+                # A historical current/last-good snapshot has no live source
+                # bytes to rederive against.  Require the transition receipt
+                # to authenticate the complete persisted state before it can
+                # remain a fallback while the working tree moves on.
+                receipt = _read_json(
+                    self.receipts_path
+                    / f"{source_epoch.removeprefix('sha256:')}.json"
+                )
+                return receipt.get("observation_digest") == _digest_payload(files)
             parsed = self._run_provider_work_queue(set(scanned), scanned)
             expected = {
                 path: {
@@ -6145,13 +6161,26 @@ class LiveCodeIntelligenceRuntime:
             current = _read_json(self.current_path)
             last_good = _read_json(self.last_good_path)
             previous_candidate = _read_json(self.candidate_path)
+            previous_epoch = self._state_epoch(current)
             target = self._state_pointer(last_good, label="last-good")
             if target is None:
+                operation_path = self.operation_receipts_path / "rollback.json"
+                try:
+                    self._write_operation_receipt(
+                        operation="rollback",
+                        state="failed",
+                        source_epoch=previous_epoch,
+                        previous_source_epoch=previous_epoch,
+                        target_source_epoch=None,
+                    )
+                except Exception as receipt_exc:
+                    raise LiveCodeIntelligenceError(
+                        "rollback failed and failed lifecycle receipt could not be recorded"
+                    ) from receipt_exc
                 raise LiveCodeIntelligenceError(
                     "rollback requires an identity-valid last-good state"
                 )
             target_epoch = self._state_epoch(last_good)
-            previous_epoch = self._state_epoch(current)
             if previous_epoch == target_epoch and self._state_pointer(
                 current, label="current"
             ) is not None:
