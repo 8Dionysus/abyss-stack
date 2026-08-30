@@ -171,6 +171,10 @@ LSP_RUNTIME_MANIFEST_MAX_BYTES = 256 * 1024 * 1024
 # while retaining an explicit source-scan contract.
 SOURCE_SCAN_MAX_FILES = 4_096
 SOURCE_SCAN_MAX_BYTES = 256 * 1024 * 1024
+# A small source file can expand into a much larger AST observation.  Bound
+# the serialized observation bytes retained by one refresh as well as the
+# source manifest itself.
+OBSERVATION_MAX_SERIALIZED_BYTES = 16 * 1024 * 1024
 STATE_LOCK_NAME = ".refresh.lock"
 OPERATION_RECEIPTS_DIRECTORY = "operations"
 MACHINE_HEALTH_MAX_AGE_SECONDS = 15 * 60
@@ -2485,6 +2489,11 @@ class _ProviderWorkQueue:
                 "provider work queue is empty"
             ) from exc
 
+    def clear(self) -> None:
+        """Discard queued work after a bounded provider result is reached."""
+
+        self._items.clear()
+
     def __bool__(self) -> bool:
         return bool(self._items)
 
@@ -4696,23 +4705,67 @@ class LiveCodeIntelligenceRuntime:
         self,
         paths: set[str],
         scanned: Mapping[str, Mapping[str, Any]],
-    ) -> dict[str, dict[str, Any]]:
-        """Drain source parse work in bounded, deterministic batches."""
+    ) -> tuple[dict[str, dict[str, Any]], tuple[dict[str, str], ...]]:
+        """Drain parse work under a bounded serialized-observation budget."""
 
         queue = _ProviderWorkQueue()
         records: dict[str, dict[str, Any]] = {}
+        serialized_bytes = 0
+        budget_diagnostic: dict[str, str] | None = None
 
-        def drain() -> None:
+        def drain() -> bool:
+            nonlocal serialized_bytes, budget_diagnostic
             while queue:
                 item = queue.dequeue()
-                records[item.path] = self._read_and_parse(item.path, item.metadata)
+                record = self._read_and_parse(item.path, item.metadata)
+                records[item.path] = record
+                observation = record.get("observation")
+                if not isinstance(observation, Mapping):
+                    continue
+                try:
+                    record_bytes = len(
+                        _canonical_json(record).encode("utf-8")
+                    )
+                except (TypeError, ValueError) as exc:
+                    raise LiveCodeIntelligenceError(
+                        f"provider observation for {item.path} is not serializable"
+                    ) from exc
+                serialized_bytes += record_bytes
+                if serialized_bytes <= OBSERVATION_MAX_SERIALIZED_BYTES:
+                    continue
+                budget_diagnostic = {
+                    "code": "observation_output_limit",
+                    "severity": "error",
+                    "message": (
+                        "serialized provider observations exceeded the authored "
+                        f"aggregate envelope of {OBSERVATION_MAX_SERIALIZED_BYTES} "
+                        f"bytes while processing {item.path}"
+                    ),
+                }
+                # Do not retain the expanded object that crossed the boundary.
+                # The record remains as a bounded path-level degradation so the
+                # refresh can publish a degraded candidate transactionally.
+                record["observation"] = None
+                record["diagnostics"] = [
+                    *(
+                        dict(item)
+                        for item in record.get("diagnostics", [])
+                        if isinstance(item, Mapping)
+                    ),
+                    dict(budget_diagnostic),
+                ]
+                queue.clear()
+                return False
+            return True
 
         for path in sorted(paths):
             queue.enqueue(_ProviderWorkItem(path=path, metadata=scanned[path]))
             if len(queue) == queue.capacity:
-                drain()
-        drain()
-        return records
+                if not drain():
+                    break
+        if budget_diagnostic is None:
+            drain()
+        return records, ((dict(budget_diagnostic),) if budget_diagnostic else ())
 
     def _state_payload(
         self,
@@ -5430,6 +5483,7 @@ class LiveCodeIntelligenceRuntime:
         symbol_count = 0
         occurrence_count = 0
         relation_count = 0
+        serialized_observation_bytes = 0
         diagnostic_records: list[dict[str, Any]] = []
         for path, record in files.items():
             if (
@@ -5473,6 +5527,14 @@ class LiveCodeIntelligenceRuntime:
                 path=path,
                 content_digest=record["content_digest"],
             ):
+                return False
+            try:
+                serialized_observation_bytes += len(
+                    _canonical_json(record).encode("utf-8")
+                )
+            except (TypeError, ValueError):
+                return False
+            if serialized_observation_bytes > OBSERVATION_MAX_SERIALIZED_BYTES:
                 return False
             symbol_count += len(observation["symbols"])
             occurrence_count += len(observation["occurrences"])
@@ -5663,7 +5725,11 @@ class LiveCodeIntelligenceRuntime:
                 return self._trusted_observation_digests.get(source_epoch) == (
                     _digest_payload(files)
                 )
-            parsed = self._run_provider_work_queue(set(scanned), scanned)
+            parsed, parse_diagnostics = self._run_provider_work_queue(
+                set(scanned), scanned
+            )
+            if parse_diagnostics:
+                return False
             expected = {
                 path: {
                     key: copy.deepcopy(value)
@@ -5860,10 +5926,25 @@ class LiveCodeIntelligenceRuntime:
         )
         records: dict[str, dict[str, Any]] = {}
         reused: set[str] = set()
-        parsed = self._run_provider_work_queue(parse_paths, scanned)
+        parsed, parse_diagnostics = self._run_provider_work_queue(parse_paths, scanned)
         for path, metadata in scanned.items():
             if path in parse_paths or path not in previous_files:
-                records[path] = parsed[path]
+                record = parsed.get(path)
+                if record is None:
+                    if not parse_diagnostics:
+                        raise LiveCodeIntelligenceError(
+                            f"provider did not return a record for {path}"
+                        )
+                    record = {
+                        "path": path,
+                        "content_digest": metadata["content_digest"],
+                        "size_bytes": int(metadata["size_bytes"]),
+                        "observation": None,
+                        "diagnostics": [
+                            dict(diagnostic) for diagnostic in parse_diagnostics
+                        ],
+                    }
+                records[path] = record
             else:
                 records[path] = copy.deepcopy(previous_files[path])
                 reused.add(path)
@@ -6226,7 +6307,21 @@ class LiveCodeIntelligenceRuntime:
                 scanned = self._scan()
                 source_epoch = self._source_epoch(scanned)
                 self._refresh_attempt_source_epoch = source_epoch
-                records = self._run_provider_work_queue(set(scanned), scanned)
+                records, parse_diagnostics = self._run_provider_work_queue(
+                    set(scanned), scanned
+                )
+                for path, metadata in scanned.items():
+                    if path in records:
+                        continue
+                    records[path] = {
+                        "path": path,
+                        "content_digest": metadata["content_digest"],
+                        "size_bytes": int(metadata["size_bytes"]),
+                        "observation": None,
+                        "diagnostics": [
+                            dict(diagnostic) for diagnostic in parse_diagnostics
+                        ],
+                    }
                 diagnostics = [
                     diagnostic | {"path": path}
                     for path, record in records.items()

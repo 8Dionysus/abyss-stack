@@ -1189,6 +1189,23 @@ class LiveCodeIntelligenceRuntimeTests(unittest.TestCase):
         self.assertEqual(state["degradation"][0]["code"], "source_scan_limit")
         self.assertTrue(self.runtime.candidate_path.exists())
 
+    def test_observation_output_limit_degrades_before_state_retains_expansion(self) -> None:
+        self.write_source("expanded.py", "VALUE = 1\n")
+
+        with mock.patch.object(
+            live_code_intelligence,
+            "OBSERVATION_MAX_SERIALIZED_BYTES",
+            1,
+        ):
+            state = self.runtime.refresh()
+
+        self.assertEqual(state["status"], "degraded")
+        self.assertIsNone(state["files"]["expanded.py"]["observation"])
+        self.assertEqual(
+            state["degradation"][0]["code"],
+            "observation_output_limit",
+        )
+
     def test_concurrent_lsp_starts_launch_one_process(self) -> None:
         runtime_root = self.root / "machine-runtime"
         runtime_root.mkdir()
