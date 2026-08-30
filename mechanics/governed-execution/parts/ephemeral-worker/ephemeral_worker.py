@@ -459,7 +459,7 @@ def _validate_request(request: Mapping[str, object]) -> tuple[
 
 
 def _read_verified(path: str, expected_digest: str, max_bytes: int, label: str) -> bytes:
-    bounded_max_bytes = _require_positive_int(max_bytes, f"{label}.max_bytes")
+    bounded_max_bytes = _require_nonnegative_int(max_bytes, f"{label}.max_bytes")
     _require_filesystem_encodable(path, label)
     candidate = Path(path)
     if (
@@ -581,6 +581,37 @@ def _projected_result_base_bytes(
     return projected
 
 
+def _max_raw_bytes_for_transport(
+    *,
+    projected_result_bytes: int,
+    max_transport_bytes: int,
+    input_bytes: int,
+    output_bytes: int,
+    projected_input_digits: int,
+    projected_output_digits: int,
+    hard_ceiling: int,
+) -> int:
+    """Return the largest next record body that fits the canonical result."""
+
+    def fits(candidate: int) -> bool:
+        projected = projected_result_bytes
+        projected += len(str(input_bytes + candidate)) - projected_input_digits
+        projected += len(str(output_bytes + candidate)) - projected_output_digits
+        projected += len(str(candidate)) - 1
+        projected += ((candidate + 2) // 3) * 4
+        return projected <= max_transport_bytes
+
+    lower = 0
+    upper = hard_ceiling
+    while lower < upper:
+        candidate = (lower + upper + 1) // 2
+        if fits(candidate):
+            lower = candidate
+        else:
+            upper = candidate - 1
+    return lower
+
+
 def run_ephemeral_read_worker(request: Mapping[str, object]) -> dict[str, object]:
     """Execute one explicit, bounded, read-only request without writing state."""
 
@@ -615,6 +646,15 @@ def run_ephemeral_read_worker(request: Mapping[str, object]) -> dict[str, object
             _require_positive_int(item["max_bytes"], f"inputs[{index}].max_bytes"),
             remaining_input_bytes,
             remaining_output_bytes,
+        )
+        read_ceiling = _max_raw_bytes_for_transport(
+            projected_result_bytes=projected_result_bytes,
+            max_transport_bytes=max_transport_bytes,
+            input_bytes=input_bytes,
+            output_bytes=output_bytes,
+            projected_input_digits=projected_input_digits,
+            projected_output_digits=projected_output_digits,
+            hard_ceiling=read_ceiling,
         )
         content = _read_verified(
             str(item["path"]),
