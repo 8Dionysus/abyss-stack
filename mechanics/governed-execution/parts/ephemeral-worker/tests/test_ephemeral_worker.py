@@ -607,6 +607,16 @@ def test_adapter_profiles_share_abi_and_keep_builtin_transport_disabled() -> Non
     with pytest.raises(AdapterProfileError, match="identity"):
         assert_external_adapter_pair(malformed_identity, local)
 
+    trailing_newline_identity = dict(codex)
+    trailing_newline_identity["adapter_id"] = f"{codex['adapter_id']}\n"
+    assert list(
+        jsonschema.Draft202012Validator(
+            json.loads(ADAPTER_SCHEMA.read_text(encoding="utf-8"))
+        ).iter_errors(trailing_newline_identity)
+    )
+    with pytest.raises(AdapterProfileError, match="identity"):
+        assert_external_adapter_pair(trailing_newline_identity, local)
+
     unexpected = dict(codex)
     unexpected["unknown_execution_option"] = True
     with pytest.raises(AdapterProfileError, match="unexpected shape"):

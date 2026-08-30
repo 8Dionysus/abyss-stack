@@ -17,7 +17,7 @@
   ],
   "properties": {
     "schema_version": {"const": "aoa_delegation_adapter_v1"},
-    "adapter_id": {"type": "string", "minLength": 1, "maxLength": 4096, "pattern": "^[a-z0-9._-]+$"},
+    "adapter_id": {"type": "string", "minLength": 1, "maxLength": 4096, "pattern": "^[a-z0-9._-]+(?![\\s\\S])"},
     "adapter_kind": {"enum": ["codex_cli", "local_provider"]},
     "delegation_class": {"enum": ["ephemeral_read_worker_v1", "external_incarnation_v1"]},
     "abi_version": {"const": "aoa_delegation_class_v1"},
