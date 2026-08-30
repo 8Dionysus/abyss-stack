@@ -175,6 +175,7 @@
         "mcp/services/abyss-stack-mcp/tests/test_admission_revision.py",
         "mcp/services/abyss-stack-mcp/tests/test_canary.py",
         "mcp/services/abyss-stack-mcp/tests/test_effect.py",
+        "mcp/services/abyss-stack-mcp/tests/test_exposure.py",
         "mcp/services/abyss-stack-mcp/tests/test_observation_producer.py",
         "mcp/services/abyss-stack-mcp/tests/test_overlay.py",
     "mcp/services/abyss-stack-mcp/tests/test_orchestration_host.py",

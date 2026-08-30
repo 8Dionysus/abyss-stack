@@ -70,6 +70,12 @@ Codex organ-fabric projection, read
 [`docs/CODEX_CONSUMER_HANDOFF.md`](docs/CODEX_CONSUMER_HANDOFF.md). Service
 presence cannot register, reload, or remove a Codex consumer.
 
+The source-only, default-off progressive exposure adapter is documented in
+[`docs/PROGRESSIVE_EXPOSURE.md`](docs/PROGRESSIVE_EXPOSURE.md). It normalizes
+the SDK's candidate snapshot and emits materialization/invocation receipts;
+the normal MCP server does not register this contour before baseline and
+owner admission.
+
 ## Process contours
 
 The owner-authored capability identities are intentionally narrower than a
