@@ -3691,6 +3691,7 @@ esac
                 "ABYSS_MACHINE_MCP_READ_BEARER_TOKEN",
                 "TOS_CORPUS_MCP_READ_BEARER_TOKEN",
                 "ABYSS_STACK_MCP_READ_BEARER_TOKEN",
+                "AOA_CODEX_CLIENT_MODE",
             ):
                 env.pop(environment_name, None)
 
@@ -3713,6 +3714,36 @@ esac
                 ["--enable", "mcp_2026_07_28", "resume", "test-thread"],
             )
             self.assertNotIn(MCP_HTTP_AUTH_TOKEN, result.stdout + result.stderr)
+
+            env["AOA_CODEX_CLIENT_MODE"] = "desktop"
+            desktop = subprocess.run(
+                [str(MCP_HTTP_CODEX_CLIENT), "codex://open-test"],
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(desktop.returncode, 0, desktop.stderr)
+            self.assertEqual(
+                capture_args.read_text(encoding="utf-8").splitlines(),
+                ["codex://open-test"],
+            )
+            self.assertNotIn(MCP_HTTP_AUTH_TOKEN, desktop.stdout + desktop.stderr)
+
+            env["AOA_CODEX_CLIENT_MODE"] = "unsupported"
+            unsupported = subprocess.run(
+                [str(MCP_HTTP_CODEX_CLIENT), "--version"],
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(unsupported.returncode, 0)
+            self.assertIn("must be codex or desktop", unsupported.stderr)
+            self.assertNotIn(MCP_HTTP_AUTH_TOKEN, unsupported.stdout + unsupported.stderr)
+            env.pop("AOA_CODEX_CLIENT_MODE")
 
             env["AOA_MEMO_MCP_READ_BEARER_TOKEN"] = "different-" + ("b" * 54)
             conflict = subprocess.run(
@@ -3904,12 +3935,22 @@ esac
             zshrc.chmod(0o640)
             fake_codex = root / "codex"
             capture_token = root / "captured-token"
+            capture_args = root / "captured-args"
             fake_codex.write_text(
                 "#!/usr/bin/env bash\n"
-                'printf \'%s\' "$ABYSS_STACK_MCP_READ_BEARER_TOKEN" > "$CAPTURE_TOKEN"\n',
+                'printf \'%s\' "$ABYSS_STACK_MCP_READ_BEARER_TOKEN" > "$CAPTURE_TOKEN"\n'
+                'printf \'%s\\n\' "$@" > "$CAPTURE_ARGS"\n',
                 encoding="utf-8",
             )
             fake_codex.chmod(0o755)
+            desktop_source = root / "chatgpt.desktop"
+            desktop_source.write_text(
+                "[Desktop Entry]\n"
+                "Name=ChatGPT\n"
+                "Exec=chatgpt %U\n"
+                "Type=Application\n",
+                encoding="utf-8",
+            )
             env = mcp_environment()
             env.update(
                 {
@@ -3919,6 +3960,10 @@ esac
                     "AOA_CODEX_EXECUTABLE": str(fake_codex),
                     "AOA_MCP_READINESS_SKIP": "1",
                     "CAPTURE_TOKEN": str(capture_token),
+                    "CAPTURE_ARGS": str(capture_args),
+                    "AOA_CHATGPT_DESKTOP_EXECUTABLE": str(fake_codex),
+                    "AOA_CHATGPT_DESKTOP_ENTRY": str(desktop_source),
+                    "XDG_DATA_HOME": str(home / ".local" / "share"),
                 }
             )
             env.pop("ZDOTDIR", None)
@@ -3950,6 +3995,31 @@ esac
                 MCP_HTTP_AUTH_TOKEN, first_zshrc + first.stdout + first.stderr
             )
             self.assertEqual(zshrc.stat().st_mode & 0o777, 0o640)
+            chatgpt_wrapper = home / ".local" / "bin" / "chatgpt"
+            chatgpt_desktop = home / ".local" / "share" / "applications" / "chatgpt.desktop"
+            self.assertTrue(chatgpt_wrapper.is_file())
+            self.assertEqual(chatgpt_wrapper.stat().st_mode & 0o777, 0o755)
+            self.assertIn(str(deployed_launcher), chatgpt_wrapper.read_text(encoding="utf-8"))
+            self.assertNotIn(MCP_HTTP_AUTH_TOKEN, chatgpt_wrapper.read_text(encoding="utf-8"))
+            self.assertTrue(chatgpt_desktop.is_file())
+            self.assertEqual(chatgpt_desktop.stat().st_mode & 0o777, 0o644)
+            self.assertIn(f"Exec={chatgpt_wrapper} %U", chatgpt_desktop.read_text(encoding="utf-8"))
+            self.assertIn("X-AbyssStackMcpHttpClient=true", chatgpt_desktop.read_text(encoding="utf-8"))
+
+            desktop_launch = subprocess.run(
+                [str(chatgpt_wrapper), "codex://desktop-test"],
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(desktop_launch.returncode, 0, desktop_launch.stderr)
+            self.assertEqual(capture_token.read_text(encoding="utf-8"), "s" * 64)
+            self.assertEqual(
+                capture_args.read_text(encoding="utf-8").splitlines(),
+                ["codex://desktop-test"],
+            )
 
             second = subprocess.run(
                 ["bash", str(INSTALL_SYSTEMD), "--install-mcp-http-codex-client"],
@@ -3999,6 +4069,41 @@ esac
             self.assertEqual(removed_zshrc, "export KEEP_EXISTING=1\n")
             self.assertNotIn("MCP HTTP Codex client", removed_zshrc)
             self.assertEqual(zshrc.stat().st_mode & 0o777, 0o640)
+            self.assertFalse(chatgpt_wrapper.exists())
+            self.assertFalse(chatgpt_desktop.exists())
+
+            chatgpt_wrapper.write_text("#!/usr/bin/env bash\nexit 7\n", encoding="utf-8")
+            chatgpt_wrapper.chmod(0o755)
+            chatgpt_desktop.write_text(
+                "[Desktop Entry]\nName=Local ChatGPT\nExec=/usr/bin/false\nType=Application\n",
+                encoding="utf-8",
+            )
+            unmanaged_install = subprocess.run(
+                ["bash", str(INSTALL_SYSTEMD), "--install-mcp-http-codex-client"],
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(unmanaged_install.returncode, 0)
+            self.assertIn("unmanaged ChatGPT client wrapper", unmanaged_install.stderr)
+            self.assertEqual(zshrc.read_text(encoding="utf-8"), "export KEEP_EXISTING=1\n")
+            self.assertEqual(
+                chatgpt_wrapper.read_text(encoding="utf-8"),
+                "#!/usr/bin/env bash\nexit 7\n",
+            )
+            unmanaged_remove = subprocess.run(
+                ["bash", str(INSTALL_SYSTEMD), "--remove-mcp-http-codex-client"],
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(unmanaged_remove.returncode, 0, unmanaged_remove.stderr)
+            self.assertTrue(chatgpt_wrapper.exists())
+            self.assertTrue(chatgpt_desktop.exists())
 
     def test_loopback_mcp_units_keep_owner_processes_and_deployed_paths(self) -> None:
         installer = INSTALL_SYSTEMD.read_text(encoding="utf-8")

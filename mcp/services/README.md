@@ -163,16 +163,20 @@ Connector registrations likewise use exact owner variables; Course,
 StackOverflow, and XDA occupy `5436`, `5437`, and `5438` so the stack MCP
 ports and PostgreSQL reservation remain intact.
 
-The client install adds one bounded function to the target user's `.zshrc`.
-For each new interactive `codex` launch, that function delegates to the
-deployed source-owned launcher, which validates the credential, waits for the
-exact eleven-member modern read fleet, and places the credential only in the
-Codex process environment before `exec`. When the fleet is incomplete, the
-launcher synchronously invokes the bounded admission recovery oneshot instead
-of allowing Codex to retain eleven failed startup handshakes for the session.
-Metadata-only Codex commands do not cause recovery. The launcher does not replace the
-Codex installer symlink, export the bearer into the parent shell, or alter
-already running shells and sessions. Remove only this managed route with
+The client install adds one bounded function to the target user's `.zshrc` and
+one managed user-scoped ChatGPT wrapper plus desktop entry. Interactive Codex
+and future Desktop launches delegate to the same deployed source-owned
+launcher, which validates the exact eleven read credentials, checks the
+eleven-member modern read fleet, and places each credential only in the
+selected child-process environment before `exec`. When the fleet is
+incomplete, the launcher requests the bounded admission recovery oneshot
+without waiting and starts the client immediately; MCP authority remains fail
+closed without turning the operator client into a lifecycle lock.
+Metadata-only Codex commands do not cause recovery. The launcher does not
+replace the Codex installer symlink or packaged ChatGPT files, export a bearer
+into the parent shell, persist bearer values in the desktop entry, or alter
+already running shells and sessions. Remove only these managed user-scoped
+routes with
 `scripts/aoa-install-systemd --remove-mcp-http-codex-client`.
 
 The systemd owner receives the same value via `LoadCredential`, so neither the

@@ -9,6 +9,14 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Pass the eleven admitted read-contour bearer variables to future
+  ChatGPT/Codex Desktop launches through a managed user wrapper and desktop
+  entry, while leaving the running GUI, packaged files, and credential values
+  untouched on disk.
+- Restore bounded foreign KAG family observation when an older owner facade
+  lacks the current receipt-identity keywords, while keeping self-owned reads
+  strict and refusing to promote compatibility observation into admission,
+  proof, or acceptance.
 - Move the stack-owned MCP source/test baseline to the native SDK v2 runtime
   with a centrally declared Python `2.1.1`/`mcp-types==2.1.1` pair, generated
   package projections, and explicit stale-evidence detection so a source

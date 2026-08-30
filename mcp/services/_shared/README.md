@@ -54,3 +54,11 @@ owner/contour boundaries, or imply that a shadow contour is admitted. The
 launcher takes its feature flag and recovery unit from the same catalog; no
 second list of ports, units, or credential names is maintained in the shell
 route.
+
+`AOA_CODEX_CLIENT_MODE=desktop` reuses the same credential and readiness
+boundary for ChatGPT/Codex Desktop, but execs the selected desktop executable
+without adding Codex CLI arguments. The user-unit installer binds that mode to
+a managed `~/.local/bin/chatgpt` wrapper and a user-scoped copy of the official
+desktop entry. The entry stores only paths and mode selection; bearer values
+exist only in the launched Desktop process environment. The ordinary Codex
+mode remains the default and still adds the catalog-owned MCP feature flag.

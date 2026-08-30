@@ -11,6 +11,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 DRAFT_2020_12 = "https://json-schema.org/draft/2020-12/schema"
 
 EXPECTED_ACTIVE_SCHEMA_PATHS = {
+    Path("mcp/services/_shared/runtime-config.schema.json"),
     Path("mcp/protocol-lab/schemas/codex-tasks-production-pair.schema.json"),
     Path("mcp/protocol-lab/schemas/codex-kag-next-lab-observation.schema.json"),
     Path("mcp/protocol-lab/schemas/codex-kag-next-stable-observation.schema.json"),

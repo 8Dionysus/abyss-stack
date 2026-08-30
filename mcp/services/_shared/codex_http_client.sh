@@ -6,6 +6,7 @@ managed_codex_default="${HOME}/.codex/packages/standalone/current/bin/codex"
 launcher_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 runtime_catalog_script="${ABYSS_MCP_RUNTIME_CATALOG:-${launcher_dir}/../../protocol-lab/scripts/runtime_catalog.py}"
 runtime_config="${ABYSS_MCP_RUNTIME_CONFIG:-${launcher_dir}/runtime-config.v1.json}"
+client_mode="${AOA_CODEX_CLIENT_MODE:-codex}"
 codex_mcp_feature=""
 readiness_service=""
 credentials_root=""
@@ -216,6 +217,14 @@ request_modern_fleet_recovery() {
 
 load_runtime_catalog
 
+case "$client_mode" in
+  codex|desktop)
+    ;;
+  *)
+    fail "AOA_CODEX_CLIENT_MODE must be codex or desktop"
+    ;;
+esac
+
 for index in "${!readiness_credentials[@]}"; do
   load_credential \
     "${credentials_root}/${readiness_credentials[$index]}" \
@@ -225,7 +234,9 @@ done
 
 codex_executable="${AOA_CODEX_EXECUTABLE:-}"
 if [[ -z "$codex_executable" ]]; then
-  if [[ -x "$managed_codex_default" && ! -d "$managed_codex_default" ]]; then
+  if [[ "$client_mode" == "desktop" ]]; then
+    codex_executable="/usr/bin/chatgpt"
+  elif [[ -x "$managed_codex_default" && ! -d "$managed_codex_default" ]]; then
     codex_executable="$managed_codex_default"
   else
     codex_executable="$(command -v codex || true)"
@@ -241,5 +252,9 @@ codex_real="$(readlink -f "$codex_executable")"
 request_modern_fleet_recovery "$@"
 
 unset AOA_CODEX_EXECUTABLE
+unset AOA_CODEX_CLIENT_MODE
 unset AOA_MCP_READINESS_SKIP
+if [[ "$client_mode" == "desktop" ]]; then
+  exec "$codex_executable" "$@"
+fi
 exec "$codex_executable" --enable "$codex_mcp_feature" "$@"

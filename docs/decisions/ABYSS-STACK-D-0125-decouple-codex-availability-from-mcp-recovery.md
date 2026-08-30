@@ -3,7 +3,7 @@
 - Decision ID: ABYSS-STACK-D-0125
 - Status: accepted
 - Date: 2026-08-19
-- Amended: 2026-08-20
+- Amended: 2026-08-20, 2026-08-30
 - Owner surface: `mcp/services/_shared/codex_http_client.sh`
 
 ## Index Metadata
@@ -72,6 +72,20 @@ fork is no longer the interactive default. MCP readiness remains fail closed for
 authority; Codex availability is fail open because the operator client is not
 itself an MCP admission contour.
 
+The 2026-08-30 amendment applies the same boundary to ChatGPT/Codex Desktop.
+The Desktop package reads the shared Codex MCP configuration, but a graphical
+launch does not pass through the interactive Zsh function and therefore does
+not inherit the named bearer variables loaded by the existing launcher.
+Persisting bearer values in the desktop entry or Codex config would collapse
+the private credential-file boundary.
+
+The user-scoped installer now projects a managed `chatgpt` wrapper and desktop
+entry that select an explicit desktop mode in the same client launcher. That
+mode performs the same credential validation and non-blocking readiness
+request, then execs the packaged official ChatGPT launcher without adding
+Codex CLI arguments. Existing Desktop processes remain untouched and acquire
+the environment only on a later operator launch.
+
 ## Rationale
 
 Security and availability are separate boundaries. Starting Codex does not
@@ -104,9 +118,15 @@ locks or participates in the final reader quiescence.
 - Positive: failure after successful activation but before admission commit
   preserves the prior endpoint set through exact repair-fallback counterparts.
 - Positive: Codex starts even when MCP recovery fails or is still running.
+- Positive: future Desktop launches inherit the exact read-contour bearers
+  without writing bearer values into shell or desktop configuration and
+  without modifying packaged ChatGPT files.
 - Tradeoff: a Codex session opened during genuine MCP downtime may retain
   unavailable MCP clients until a later session, but the operator is not locked
   out and recovery continues independently.
+- Tradeoff: an already-running Desktop process keeps its original environment;
+  activating the repaired credential path requires a later operator-controlled
+  Desktop restart.
 - Tradeoff: guarded runtime repair may use outbound package retrieval for the
   exact hash-locked closure when local artifacts are absent; automatic use is
   denied until the host opt-in marker is explicitly installed.
