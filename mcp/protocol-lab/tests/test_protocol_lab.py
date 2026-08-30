@@ -116,6 +116,7 @@ def test_current_status_is_deterministic_and_keeps_deployment_cutover_blocked(
     assert first == second
     assert first["evidence_expires_at"] == "2026-08-15T08:33:46.547214Z"
     assert first["candidate_evidence_expires_at"] == "2026-09-06T01:51:50.099097Z"
+    assert first["candidate_evidence_current"] is True
     assert first["deployment_evidence_expires_at"] == "2026-08-15T08:33:46.547214Z"
     assert first["deployment_evidence_current"] is False
     assert first["gate_counts"] == {"passed": 14, "blocked": 0, "pending": 0}
@@ -159,6 +160,23 @@ def test_render_binds_status_to_the_recorded_evaluation_time(builder: Any) -> No
 
     assert rendered == expected
     assert rendered["evaluated_at"] == evaluated_at
+
+
+def test_expired_candidate_evidence_blocks_lab_pair_and_migration(
+    builder: Any,
+    matrix: dict[str, Any],
+    observation: dict[str, Any],
+) -> None:
+    status = builder.build_status(
+        copy.deepcopy(matrix),
+        copy.deepcopy(observation),
+        evaluated_at="2026-09-06T01:51:50.099097Z",
+    )
+
+    assert status["candidate_evidence_current"] is False
+    assert status["read_only_pilot_allowed"] is False
+    assert status["core_read_migration_allowed"] is False
+    assert "candidate_evidence_expired" in status["production_cutover_blockers"]
 
 
 def test_final_spec_and_stable_sdks_are_part_of_admitted_migration(
@@ -458,6 +476,55 @@ def test_candidate_deployment_receipt_requires_per_unit_identity_summary(tmp_pat
         runner._deployment_sdk_identity(candidate_path)
 
 
+def test_candidate_stable_canary_requires_raw_aoa_kag_fleet_binding(tmp_path: Path) -> None:
+    runner = _load_kag_next_runner()
+    historical = _load(LAB_ROOT / "fixtures" / "live-modern-fleet-20260809.json")
+    candidate = copy.deepcopy(historical)
+    candidate.update(
+        {
+            "mcp_sdk": "2.1.1",
+            "mcp_sdk_source_revision": runner.MCP_SDK_SOURCE_REVISIONS["2.1.1"],
+            "mcp_sdk_artifact_digest": runner.EXPECTED_PYTHON_MCP_ARTIFACT_DIGEST,
+        }
+    )
+    candidate["read_fleet"] = {
+        **candidate["read_fleet"],
+        "sdk_identity_attested": True,
+        "sdk_identity_count": 11,
+        "sdk_identity_unique_count": 1,
+    }
+    receipt_path = tmp_path / "candidate.json"
+    receipt_path.write_text(json.dumps(candidate), encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match="raw per-unit live-fleet"):
+        runner._deployment_fleet_unit(receipt_path, "2.1.1", "aoa-kag")
+
+    candidate["servers"] = [
+        {
+            "organ_id": "aoa-kag",
+            "unit": "aoa-organ-mcp-read@aoa-kag.service",
+            "endpoint_ref": "http://127.0.0.1:5425/mcp",
+            "main_pid": 1234,
+            "process_identity": "systemd-user:aoa-kag:pid:1234:start:1",
+            "python_executable": "/srv/abyss-machine/runtimes/python/bin/python",
+            "python_executable_realpath": "/srv/abyss-machine/runtimes/python/bin/python",
+            "mcp_sdk": "2.1.1",
+            "mcp_sdk_source_revision": runner.MCP_SDK_SOURCE_REVISIONS["2.1.1"],
+            "mcp_sdk_artifact_digest": runner.EXPECTED_PYTHON_MCP_ARTIFACT_DIGEST,
+            "mcp_sdk_distribution_digests": {
+                "mcp": "sha256:" + ("a" * 64),
+                "mcp-types": "sha256:" + ("b" * 64),
+            },
+            "sdk_attestation": {
+                "state": "passed",
+                "checked_before_and_after_probe": True,
+            },
+        }
+    ]
+    receipt_path.write_text(json.dumps(candidate), encoding="utf-8")
+    assert runner._deployment_fleet_unit(receipt_path, "2.1.1", "aoa-kag")["organ_id"] == "aoa-kag"
+
+
 def test_kag_next_cancellable_pair_is_adapter_scoped(builder: Any) -> None:
     pair_path = LAB_ROOT / "fixtures" / "kag-next-cancellable-pair-observation.json"
     pair_schema_path = (
@@ -680,6 +747,32 @@ def test_deployment_receipts_must_match_candidate_sdk_for_migration(
     assert still_stale["core_read_migration_allowed"] is False
 
     candidate_commit = "0921d94a74db900dccd2d534842aa7b6160542d2"
+    stable_rollback["server_binding"] = {
+        "binding_method": "configured_codex_endpoint_to_per_unit_fleet_identity",
+        "organ_id": "aoa-kag",
+        "unit": "aoa-organ-mcp-read@aoa-kag.service",
+        "fleet_endpoint_ref": "http://127.0.0.1:5425/mcp",
+        "configured_endpoint_ref": "http://127.0.0.1:5425/mcp",
+        "status_endpoint_ref": None,
+        "status_entry_observed": True,
+        "endpoint_matches": True,
+        "fleet_process_identity": "systemd-user:aoa-kag:pid:1234:start:1",
+        "process_identity_before": "systemd-user:aoa-kag:pid:1234:start:1",
+        "process_identity_after": "systemd-user:aoa-kag:pid:1234:start:1",
+        "process_identity_matches_fleet": True,
+        "process_identity_stable": True,
+        "python_executable_realpath": "/srv/abyss-machine/runtimes/python/bin/python",
+        "sdk_identity": {
+            "version": "2.1.1",
+            "commit": candidate_commit,
+            "artifact_digest": builder.EXPECTED_CANDIDATE_MCP_ARTIFACT_DIGEST,
+            "mcp_distribution_digest": "sha256:" + ("a" * 64),
+            "mcp_types_distribution_digest": "sha256:" + ("b" * 64),
+        },
+        "sdk_identity_matches_fleet": True,
+        "sdk_identity_stable": True,
+        "checked_before_and_after_tool_call": True,
+    }
     for payload in (deployment, tasks_pair, stable_rollback, tasks_matrix):
         payload["mcp_sdk"] = "2.1.1"
         payload["mcp_sdk_source_revision"] = candidate_commit

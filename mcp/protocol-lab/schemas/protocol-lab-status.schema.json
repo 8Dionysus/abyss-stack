@@ -7,6 +7,7 @@
     "evaluated_at": {"type": "string", "format": "date-time"},
     "evidence_expires_at": {"type": "string", "format": "date-time"},
     "candidate_evidence_expires_at": {"type": "string", "format": "date-time"},
+    "candidate_evidence_current": {"type": "boolean"},
     "deployment_evidence_expires_at": {"type": "string", "format": "date-time"},
     "deployment_evidence_current": {"type": "boolean"},
     "matrix_digest": {"$ref": "#/$defs/digest"},
@@ -79,7 +80,8 @@
   },
   "required": [
     "schema_version", "evaluated_at", "evidence_expires_at",
-    "candidate_evidence_expires_at", "deployment_evidence_expires_at",
+    "candidate_evidence_expires_at", "candidate_evidence_current",
+    "deployment_evidence_expires_at",
     "deployment_evidence_current", "matrix_digest",
     "observation_digest", "codex_lab_observation_digest",
     "stable_rollback_observation_digest", "tasks_matrix_digest",

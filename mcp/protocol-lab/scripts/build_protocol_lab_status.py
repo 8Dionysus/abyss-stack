@@ -85,6 +85,34 @@ def _live_fleet_identity_attested(payload: dict[str, Any]) -> bool:
     )
 
 
+def _stable_rollback_identity_bound(payload: dict[str, Any]) -> bool:
+    """Require candidate rollback evidence to name its contacted serving unit."""
+
+    if payload.get("mcp_sdk") != "2.1.1":
+        return True
+    binding = payload.get("server_binding")
+    if not isinstance(binding, dict):
+        return False
+    sdk_identity = binding.get("sdk_identity")
+    return bool(
+        binding.get("binding_method")
+        == "configured_codex_endpoint_to_per_unit_fleet_identity"
+        and binding.get("organ_id") == "aoa-kag"
+        and binding.get("status_entry_observed") is True
+        and binding.get("endpoint_matches") is True
+        and binding.get("process_identity_matches_fleet") is True
+        and binding.get("process_identity_stable") is True
+        and binding.get("sdk_identity_matches_fleet") is True
+        and binding.get("sdk_identity_stable") is True
+        and binding.get("checked_before_and_after_tool_call") is True
+        and isinstance(sdk_identity, dict)
+        and sdk_identity.get("version") == "2.1.1"
+        and sdk_identity.get("commit") == "0921d94a74db900dccd2d534842aa7b6160542d2"
+        and sdk_identity.get("artifact_digest")
+        == EXPECTED_CANDIDATE_MCP_ARTIFACT_DIGEST
+    )
+
+
 def validate_payload(payload: dict[str, Any], schema_path: Path) -> None:
     validator = Draft202012Validator(
         load_json(schema_path),
@@ -183,6 +211,11 @@ def build_status(
     )
     production_consumer = _consumer(matrix, "codex-cli-os-abyss")
     lab_consumer = _consumer(matrix, "codex-cli-stable-modern-lab")
+    candidate_evidence = (matrix, codex_lab_observation)
+    candidate_evidence_expires_at = _earliest_expiry(*candidate_evidence)
+    candidate_evidence_current = all(
+        _evidence_is_current(payload, evaluated_at) for payload in candidate_evidence
+    )
     lab_canary_completed = all(
         (
             matrix["next_spec"]["final_published"],
@@ -201,11 +234,11 @@ def build_status(
     )
     lab_pair_ready = bool(
         lab_canary_completed
+        and candidate_evidence_current
         and observation["official_conformance"]["status"] == "passed"
         and _passed(observation, "abyss_pair_conformance")
         and matrix["pilot"]["state"] == "passed"
     )
-    candidate_evidence = (matrix, codex_lab_observation)
     deployment_evidence = (
         stable_rollback_observation,
         tasks_matrix,
@@ -213,15 +246,21 @@ def build_status(
         codex_tasks_production_pair,
     )
     live_fleet_identity_current = _live_fleet_identity_attested(live_modern_fleet)
-    candidate_evidence_expires_at = _earliest_expiry(*candidate_evidence)
+    stable_rollback_identity_current = _stable_rollback_identity_bound(
+        stable_rollback_observation
+    )
     deployment_evidence_expires_at = _earliest_expiry(*deployment_evidence)
-    deployment_evidence_current = live_fleet_identity_current and all(
-        (
-            payload.get("mcp_sdk") == candidate_sdk_identity["mcp_sdk"]
-            and payload.get("mcp_sdk_source_revision")
-            == candidate_sdk_identity["mcp_sdk_source_revision"]
-            and _evidence_is_current(payload, evaluated_at)
-            for payload in deployment_evidence
+    deployment_evidence_current = (
+        live_fleet_identity_current
+        and stable_rollback_identity_current
+        and all(
+            (
+                payload.get("mcp_sdk") == candidate_sdk_identity["mcp_sdk"]
+                and payload.get("mcp_sdk_source_revision")
+                == candidate_sdk_identity["mcp_sdk_source_revision"]
+                and _evidence_is_current(payload, evaluated_at)
+                for payload in deployment_evidence
+            )
         )
     )
     production_pair_ready = all(
@@ -236,6 +275,7 @@ def build_status(
             _passed(observation, "rollback"),
             matrix["pilot"]["state"] == "passed",
             not remaining_core_gate_ids,
+            candidate_evidence_current,
             live_modern_fleet["verdict"] == "production_modern_only_passed",
             live_modern_fleet["read_fleet"]["production_units"] == 11,
             live_modern_fleet["read_fleet"]["admitted_units"] == 11,
@@ -262,11 +302,14 @@ def build_status(
         production_cutover_blockers.append(
             "deployment_bound_evidence_not_refreshed_for_mcp_2_1_1"
         )
+    if not candidate_evidence_current:
+        production_cutover_blockers.append("candidate_evidence_expired")
 
     unsigned = {
         "schema_version": "abyss_mcp_protocol_lab_status_v2",
         "evaluated_at": evaluated_at,
         "candidate_evidence_expires_at": candidate_evidence_expires_at,
+        "candidate_evidence_current": candidate_evidence_current,
         "deployment_evidence_expires_at": deployment_evidence_expires_at,
         "deployment_evidence_current": deployment_evidence_current,
         "evidence_expires_at": min(

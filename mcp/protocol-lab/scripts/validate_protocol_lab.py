@@ -213,6 +213,7 @@ def validate(checked_at: datetime | None = None) -> list[str]:
     if not builder.OUTPUT_PATH.is_file() or builder.OUTPUT_PATH.read_text() != expected_render:
         errors.append("generated protocol-lab status is missing or stale")
     for field in (
+        "candidate_evidence_current",
         "deployment_evidence_current",
         "core_read_migration_allowed",
         "tasks_extension_allowed",
@@ -395,6 +396,7 @@ def validate(checked_at: datetime | None = None) -> list[str]:
         not in {candidate_identity, historical_identity}
         or stable_rollback["canary"]["is_error"]
         or not stable_rollback["stable_registration"]["unchanged"]
+        or not builder._stable_rollback_identity_bound(stable_rollback)
         or stable_rollback["secrets_included"]
     ):
         errors.append("stable post-rollback canary proof drifted")
@@ -620,6 +622,7 @@ def validate(checked_at: datetime | None = None) -> list[str]:
             live_modern_fleet["read_fleet"]["bootstrap_identities"] == 0,
             live_modern_fleet["rollback"]["active_legacy_units"] == 0,
             _live_fleet_identity_attested(live_modern_fleet),
+            status["candidate_evidence_current"],
             status["deployment_evidence_current"],
         )
     )
@@ -655,6 +658,8 @@ def validate(checked_at: datetime | None = None) -> list[str]:
         expected_production_cutover_blockers.append(
             "deployment_bound_evidence_not_refreshed_for_mcp_2_1_1"
         )
+    if not status["candidate_evidence_current"]:
+        expected_production_cutover_blockers.append("candidate_evidence_expired")
     if status["production_cutover_blockers"] != expected_production_cutover_blockers:
         errors.append("production cutover blockers no longer match exact evidence")
 

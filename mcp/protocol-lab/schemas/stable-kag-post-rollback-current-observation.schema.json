@@ -25,6 +25,72 @@
       },
       "required": ["config_sha256_before", "config_sha256_after", "unchanged"]
     },
+    "server_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "binding_method": {"const": "configured_codex_endpoint_to_per_unit_fleet_identity"},
+        "organ_id": {"const": "aoa-kag"},
+        "unit": {"type": "string", "pattern": "^[A-Za-z0-9_.@:-]+$"},
+        "fleet_endpoint_ref": {"type": "string", "pattern": "^https?://[^\\s]+$"},
+        "configured_endpoint_ref": {"type": "string", "pattern": "^https?://[^\\s]+$"},
+        "status_endpoint_ref": {
+          "anyOf": [
+            {"type": "string", "pattern": "^https?://[^\\s]+$"},
+            {"type": "null"}
+          ]
+        },
+        "status_entry_observed": {"const": true},
+        "endpoint_matches": {"const": true},
+        "fleet_process_identity": {"type": "string", "minLength": 3},
+        "process_identity_before": {"type": "string", "minLength": 3},
+        "process_identity_after": {"type": "string", "minLength": 3},
+        "process_identity_matches_fleet": {"const": true},
+        "process_identity_stable": {"const": true},
+        "python_executable_realpath": {"type": "string", "pattern": "^/[^\\s]+$"},
+        "sdk_identity": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "version": {"const": "2.1.1"},
+            "commit": {"const": "0921d94a74db900dccd2d534842aa7b6160542d2"},
+            "artifact_digest": {"const": "sha256:1ef71b1a3cfb3daba29b61d9f280896b35bdc1038474285cc8295071418b01e5"},
+            "mcp_distribution_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+            "mcp_types_distribution_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+          },
+          "required": [
+            "version",
+            "commit",
+            "artifact_digest",
+            "mcp_distribution_digest",
+            "mcp_types_distribution_digest"
+          ]
+        },
+        "sdk_identity_matches_fleet": {"const": true},
+        "sdk_identity_stable": {"const": true},
+        "checked_before_and_after_tool_call": {"const": true}
+      },
+      "required": [
+        "binding_method",
+        "organ_id",
+        "unit",
+        "fleet_endpoint_ref",
+        "configured_endpoint_ref",
+        "status_endpoint_ref",
+        "status_entry_observed",
+        "endpoint_matches",
+        "fleet_process_identity",
+        "process_identity_before",
+        "process_identity_after",
+        "process_identity_matches_fleet",
+        "process_identity_stable",
+        "python_executable_realpath",
+        "sdk_identity",
+        "sdk_identity_matches_fleet",
+        "sdk_identity_stable",
+        "checked_before_and_after_tool_call"
+      ]
+    },
     "process_stopped": {"const": true},
     "private_receipt": {
       "type": "object",
@@ -38,5 +104,14 @@
     "secrets_included": {"const": false},
     "claim_limits": {"type": "array", "items": {"type": "string", "minLength": 3}, "minItems": 3}
   },
-  "required": ["schema_version", "observation_id", "observed_at", "finished_at", "expires_at", "verdict", "mcp_sdk", "mcp_sdk_source_revision", "consumer", "canary", "stable_registration", "process_stopped", "private_receipt", "secrets_included", "claim_limits"]
+  "required": ["schema_version", "observation_id", "observed_at", "finished_at", "expires_at", "verdict", "mcp_sdk", "mcp_sdk_source_revision", "consumer", "canary", "stable_registration", "process_stopped", "private_receipt", "secrets_included", "claim_limits"],
+  "allOf": [
+    {
+      "if": {
+        "required": ["mcp_sdk"],
+        "properties": {"mcp_sdk": {"const": "2.1.1"}}
+      },
+      "then": {"required": ["server_binding"]}
+    }
+  ]
 }
