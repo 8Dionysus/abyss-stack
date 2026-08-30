@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 26340006,
+  "allowed_tracked_bytes": 39098571,
+  "approved_by": "repository-owner",
+  "base_ref": "acee6d7684959ceaace27464c81f1ba23a4f03ea",
+  "changed_generated_bytes": 26340006,
+  "changed_generated_files": 307,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "9a6eca16200dc2ab8dea8d083c5f6573917e77e7ab6c3d243f73c9f9e79a26c5",
+  "reason": "MCP 2.1.1 rollback endpoint and candidate evidence freshness repair",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 39098571,
+  "tracked_bytes_max": 24117248
+}
