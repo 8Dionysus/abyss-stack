@@ -202,6 +202,40 @@ def test_result_intake_binds_records_to_exact_admitted_snapshot(tmp_path: Path) 
         )
 
 
+def test_result_intake_enforces_output_ceiling_before_decode(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    content = b"x" * 4096
+    path = tmp_path / "alternate-output.bin"
+    path.write_bytes(content)
+    producer_request = _request(path, content, max_transport_bytes=8192)
+    producer_result = run_ephemeral_read_worker(producer_request)
+    admitted_request = _request(path, content, max_transport_bytes=8192)
+    admitted_request["max_output_bytes"] = 1
+    admitted_request["input_snapshot_digest"] = snapshot_digest_for_request(
+        admitted_request["inputs"],  # type: ignore[arg-type]
+        max_input_bytes=admitted_request["max_input_bytes"],
+        max_output_bytes=admitted_request["max_output_bytes"],
+        max_transport_bytes=admitted_request["max_transport_bytes"],
+    )
+    producer_result["input_snapshot_digest"] = admitted_request[
+        "input_snapshot_digest"
+    ]
+    _resign_result(producer_result)
+
+    def unexpected_decode(*_args: object, **_kwargs: object) -> bytes:
+        raise AssertionError("output overflow must reject before base64 decoding")
+
+    worker_base64 = validate_ephemeral_read_result.__globals__["base64"]
+    monkeypatch.setattr(worker_base64, "b64decode", unexpected_decode)
+
+    with pytest.raises(EphemeralWorkerError, match="before decode"):
+        validate_ephemeral_read_result(
+            producer_result,
+            admitted_request=admitted_request,
+        )
+
+
 def test_result_intake_bounds_serialized_packet_before_parse() -> None:
     with pytest.raises(EphemeralWorkerError, match="before parse"):
         validate_ephemeral_read_result(b" " * 65, max_transport_bytes=64)
@@ -633,6 +667,37 @@ def test_worker_caps_reads_by_remaining_output_budget(
     with pytest.raises(EphemeralWorkerError, match="byte ceiling"):
         run_ephemeral_read_worker(request)
     assert observed_ceilings == [1]
+
+
+def test_worker_verifies_empty_input_after_output_budget_exhaustion(
+    tmp_path: Path,
+) -> None:
+    first_content = b"x"
+    first_path = tmp_path / "first.txt"
+    first_path.write_bytes(first_content)
+    empty_path = tmp_path / "empty.txt"
+    empty_path.write_bytes(b"")
+    request = _request(first_path, first_content)
+    request["inputs"].append(  # type: ignore[union-attr]
+        {
+            "artifact_ref": "fixture/empty.txt",
+            "path": str(empty_path),
+            "digest": _digest(b""),
+            "max_bytes": 1,
+        }
+    )
+    request["max_input_bytes"] = 2
+    request["max_output_bytes"] = 1
+    request["input_snapshot_digest"] = snapshot_digest_for_request(
+        request["inputs"],  # type: ignore[arg-type]
+        max_input_bytes=request["max_input_bytes"],
+        max_output_bytes=request["max_output_bytes"],
+        max_transport_bytes=request["max_transport_bytes"],
+    )
+
+    result = run_ephemeral_read_worker(request)
+
+    assert [record["bytes"] for record in result["records"]] == [1, 0]  # type: ignore[union-attr]
 
 
 def test_worker_caps_reads_by_remaining_transport_budget(

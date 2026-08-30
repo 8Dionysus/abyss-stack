@@ -640,8 +640,6 @@ def run_ephemeral_read_worker(request: Mapping[str, object]) -> dict[str, object
     for index, item in enumerate(inputs):
         remaining_input_bytes = max_input_bytes - input_bytes
         remaining_output_bytes = max_output_bytes - output_bytes
-        if remaining_input_bytes <= 0 or remaining_output_bytes <= 0:
-            raise EphemeralWorkerError("no aggregate byte budget remains for input")
         read_ceiling = min(
             _require_positive_int(item["max_bytes"], f"inputs[{index}].max_bytes"),
             remaining_input_bytes,
@@ -888,6 +886,19 @@ def validate_ephemeral_read_result(
             )
         if byte_count > int(admitted_input["max_bytes"]):
             raise EphemeralWorkerError(f"{label}.bytes exceeds its admitted ceiling")
+        projected_decoded_bytes = decoded_bytes + byte_count
+        if projected_decoded_bytes > admitted_max_input_bytes:
+            raise EphemeralWorkerError(
+                "input_bytes exceeds the admitted request ceiling before decode"
+            )
+        if projected_decoded_bytes > admitted_max_output_bytes:
+            raise EphemeralWorkerError(
+                "output_bytes exceeds the admitted request ceiling before decode"
+            )
+        if projected_decoded_bytes > MAX_BYTE_CEILING:
+            raise EphemeralWorkerError(
+                "result decoded content exceeds its ceiling before decode"
+            )
         encoded_content = record["content_base64"]
         if not isinstance(encoded_content, str):
             raise EphemeralWorkerError(f"{label}.content_base64 must be a string")
@@ -918,9 +929,7 @@ def validate_ephemeral_read_result(
             raise EphemeralWorkerError(f"{label}.bytes does not match decoded content")
         if _digest_bytes(content) != digest:
             raise EphemeralWorkerError(f"{label}.digest does not match decoded content")
-        decoded_bytes += byte_count
-        if decoded_bytes > MAX_BYTE_CEILING:
-            raise EphemeralWorkerError("result decoded content exceeds its ceiling")
+        decoded_bytes = projected_decoded_bytes
 
     observation = result["economy_observation"]
     if not isinstance(observation, Mapping) or set(observation) != {
