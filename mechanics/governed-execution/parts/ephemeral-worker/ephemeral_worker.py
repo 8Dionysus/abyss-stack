@@ -59,10 +59,21 @@ def _canonical_bytes(value: Any) -> bytes:
     return rendered.encode("utf-8")
 
 
-def _consume_json_string_budget(
-    value: str,
+def _consume_transport_budget(
+    byte_count: int,
     label: str,
     remaining_bytes: list[int],
+) -> None:
+    if byte_count > remaining_bytes[0]:
+        raise EphemeralWorkerError(
+            f"{label} exceeds max_transport_bytes before validation "
+            "and before serialization"
+        )
+    remaining_bytes[0] -= byte_count
+
+
+def _consume_json_string_budget(
+    value: str, label: str, remaining_bytes: list[int]
 ) -> None:
     """Account for ensure_ascii JSON string bytes without materializing them."""
 
@@ -87,7 +98,7 @@ def _consume_json_string_budget(
                 f"{label} strings exceed max_transport_bytes before validation "
                 "and before serialization"
             )
-    remaining_bytes[0] -= encoded_bytes
+    _consume_transport_budget(encoded_bytes, label, remaining_bytes)
 
 
 def _normalize_json_value(
@@ -97,7 +108,7 @@ def _normalize_json_value(
     _depth: int = 0,
     _active_containers: set[int] | None = None,
     _remaining_nodes: list[int] | None = None,
-    _remaining_string_bytes: list[int] | None = None,
+    _remaining_transport_bytes: list[int] | None = None,
 ) -> object:
     """Copy a JSON-like value through bounded, cycle-safe traversal."""
 
@@ -107,8 +118,8 @@ def _normalize_json_value(
         _active_containers = set()
     if _remaining_nodes is None:
         _remaining_nodes = [MAX_JSON_NODES]
-    if _remaining_string_bytes is None:
-        _remaining_string_bytes = [MAX_BYTE_CEILING]
+    if _remaining_transport_bytes is None:
+        _remaining_transport_bytes = [MAX_BYTE_CEILING]
     _remaining_nodes[0] -= 1
     if _remaining_nodes[0] < 0:
         raise EphemeralWorkerError("result exceeds the supported JSON node count")
@@ -127,6 +138,11 @@ def _normalize_json_value(
                     raise EphemeralWorkerError(
                         f"{label} exceeds the supported object cardinality"
                     )
+                _consume_transport_budget(
+                    2 + len(value) + max(0, len(value) - 1),
+                    f"{label} object structure",
+                    _remaining_transport_bytes,
+                )
                 normalized: dict[str, object] = {}
                 for key, item in value.items():
                     if not isinstance(key, str):
@@ -136,7 +152,7 @@ def _normalize_json_value(
                     _consume_json_string_budget(
                         key,
                         f"{label} object key",
-                        _remaining_string_bytes,
+                        _remaining_transport_bytes,
                     )
                     normalized[key] = _normalize_json_value(
                         item,
@@ -144,7 +160,7 @@ def _normalize_json_value(
                         _depth=_depth + 1,
                         _active_containers=_active_containers,
                         _remaining_nodes=_remaining_nodes,
-                        _remaining_string_bytes=_remaining_string_bytes,
+                        _remaining_transport_bytes=_remaining_transport_bytes,
                     )
                 return normalized
             sequence_value = cast(Sequence[object], value)
@@ -152,6 +168,11 @@ def _normalize_json_value(
                 raise EphemeralWorkerError(
                     f"{label} exceeds the supported array cardinality"
                 )
+            _consume_transport_budget(
+                2 + max(0, len(sequence_value) - 1),
+                f"{label} array structure",
+                _remaining_transport_bytes,
+            )
             return [
                 _normalize_json_value(
                     item,
@@ -159,14 +180,46 @@ def _normalize_json_value(
                     _depth=_depth + 1,
                     _active_containers=_active_containers,
                     _remaining_nodes=_remaining_nodes,
-                    _remaining_string_bytes=_remaining_string_bytes,
+                    _remaining_transport_bytes=_remaining_transport_bytes,
                 )
                 for index, item in enumerate(sequence_value)
             ]
         finally:
             _active_containers.remove(container_id)
     if isinstance(value, str):
-        _consume_json_string_budget(value, label, _remaining_string_bytes)
+        _consume_json_string_budget(value, label, _remaining_transport_bytes)
+    elif value is None:
+        _consume_transport_budget(4, f"{label} null scalar", _remaining_transport_bytes)
+    elif isinstance(value, bool):
+        _consume_transport_budget(
+            4 if value else 5,
+            f"{label} boolean scalar",
+            _remaining_transport_bytes,
+        )
+    elif isinstance(value, int):
+        try:
+            byte_count = len(str(value))
+        except ValueError as exc:
+            raise EphemeralWorkerError(
+                f"{label} integer is too large for canonical JSON"
+            ) from exc
+        _consume_transport_budget(
+            byte_count,
+            f"{label} numeric scalar",
+            _remaining_transport_bytes,
+        )
+    elif isinstance(value, float):
+        try:
+            byte_count = len(json.dumps(value, allow_nan=False))
+        except ValueError as exc:
+            raise EphemeralWorkerError(
+                f"{label} float is not canonical JSON"
+            ) from exc
+        _consume_transport_budget(
+            byte_count,
+            f"{label} numeric scalar",
+            _remaining_transport_bytes,
+        )
     if value is None or isinstance(value, (str, int, float, bool)):
         return value
     raise EphemeralWorkerError(f"{label} contains a non-JSON value")
@@ -593,7 +646,7 @@ def validate_ephemeral_read_result(
         candidate = _normalize_json_value(
             payload,
             "result",
-            _remaining_string_bytes=[transport_ceiling],
+            _remaining_transport_bytes=[transport_ceiling],
         )
         if len(_canonical_bytes(candidate)) > transport_ceiling:
             raise EphemeralWorkerError(

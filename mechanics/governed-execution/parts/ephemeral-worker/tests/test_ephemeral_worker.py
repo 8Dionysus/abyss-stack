@@ -28,6 +28,7 @@ from ephemeral_worker import (
     run_ephemeral_read_worker,
     snapshot_digest_for_request,
     validate_ephemeral_read_result,
+    _normalize_json_value,
 )
 
 REQUEST_SCHEMA = PART_ROOT / "schemas/ephemeral-read-worker-request.schema.json"
@@ -286,6 +287,13 @@ def test_result_intake_bounds_mapping_normalization(tmp_path: Path) -> None:
     repeated_strings["records"] = [result["records"][0]] * 32  # type: ignore[index]
     with pytest.raises(EphemeralWorkerError, match="before serialization"):
         validate_ephemeral_read_result(repeated_strings, max_transport_bytes=512)
+
+    with pytest.raises(EphemeralWorkerError, match="numeric scalar"):
+        _normalize_json_value(
+            {"numbers": [10**400] * 32},
+            "result",
+            _remaining_transport_bytes=[128],
+        )
 
 
 def test_result_intake_normalizes_oversized_json_integer_parse_failure() -> None:
