@@ -54,6 +54,7 @@ python -m py_compile \
   scripts/aoa-external-codex-stasis \
   mechanics/governed-execution/parts/external-codex-agent/bind_external_actor_launch.py \
   mechanics/governed-execution/parts/external-codex-agent/external_codex_agent.py \
+  mechanics/governed-execution/parts/external-codex-agent/external_codex_continuity_capsule.py \
   mechanics/governed-execution/parts/external-codex-agent/external_codex_landing_effect.py \
   mechanics/governed-execution/parts/external-codex-agent/external_codex_nested_evidence.py \
   mechanics/governed-execution/parts/external-codex-agent/external_codex_projection.py \

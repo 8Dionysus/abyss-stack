@@ -315,6 +315,14 @@ and replay only through their matching legacy wake reservation. A retry after a 
   controller bytes, gives the actor only a sanitized immutable envelope, and
   expands only the session-local evidence schema. It does not widen role,
   workspace, tools, effects, or external authority;
+- accepts an optional exact portable/private `continuity_capsule_v1` pair from
+  `aoa-session-memory` on that resume boundary. The controller verifies both
+  view digests, canonical capsule identity, owner ceilings, source watermark,
+  compaction event, and protected-tail bytes; the model sees one compact
+  private reinjection projection rather than duplicate portable/private
+  content, while the durable event records only refs, digests, posture, and
+  byte counts. This is source admission and transport evidence, not proof that
+  a live provider compacted correctly or preserved task semantics;
 - emits result v2 with mandatory actor/source provenance for successful returns,
   while continuing to read legacy result v1 and durable state v1/v2 for status and
   terminal-result recovery, while refusing a new inference attempt unless a
