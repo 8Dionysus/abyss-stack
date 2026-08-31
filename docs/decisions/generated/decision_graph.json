@@ -1,17 +1,17 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
-  "decision_count": 140,
-  "edge_count": 3154,
+  "decision_count": 141,
+  "edge_count": 3185,
   "edge_type_counts": {
-    "CITES_SOURCE_SURFACE": 1146,
-    "DATED": 140,
-    "GUARDED_BY": 433,
-    "HAS_STATUS": 140,
-    "HAS_SURFACE_CLASS": 383,
-    "IN_STACK_LANE": 336,
-    "NEXT_DECISION": 139,
-    "OWNED_BY_SURFACE": 148,
-    "OWNS_DECISION": 140,
+    "CITES_SOURCE_SURFACE": 1157,
+    "DATED": 141,
+    "GUARDED_BY": 437,
+    "HAS_STATUS": 141,
+    "HAS_SURFACE_CLASS": 387,
+    "IN_STACK_LANE": 340,
+    "NEXT_DECISION": 140,
+    "OWNED_BY_SURFACE": 152,
+    "OWNS_DECISION": 141,
     "SUPERSEDED_BY": 4,
     "UNDER_MECHANIC_PARENT": 145
   },
@@ -14993,22 +14993,37 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0140",
-      "target": "source_surface:docs/validation/VALIDATOR_TOPOLOGY.md",
+      "target": "source_surface:README.md",
       "type": "CITES_SOURCE_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0140",
-      "target": "source_surface:mcp/AGENTS.md",
+      "target": "source_surface:VALIDATION.md",
       "type": "CITES_SOURCE_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0140",
-      "target": "source_surface:mcp/services/AGENTS.md",
+      "target": "source_surface:docs/governance/RELEASING.md",
       "type": "CITES_SOURCE_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0140",
-      "target": "source_surface:mcp/services/README.md",
+      "target": "source_surface:docs/routes/START_HERE_ROUTE_CONTRACT.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0140",
+      "target": "source_surface:docs/validation/COMMAND_AUTHORITY.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0140",
+      "target": "source_surface:docs/validation/validation_lanes.json",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0140",
+      "target": "source_surface:scripts/ci_gate.py",
       "type": "CITES_SOURCE_SURFACE"
     },
     {
@@ -15018,7 +15033,12 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0140",
-      "target": "date:2026-08-30",
+      "target": "source_surface:scripts/validation_lanes.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0140",
+      "target": "date:2026-08-31",
       "type": "DATED"
     },
     {
@@ -15038,13 +15058,13 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0140",
-      "target": "status:accepted",
-      "type": "HAS_STATUS"
+      "target": "guard_family:validation%20lane",
+      "type": "GUARDED_BY"
     },
     {
       "source": "decision:ABYSS-STACK-D-0140",
-      "target": "surface_class:MCP%20access%20plane",
-      "type": "HAS_SURFACE_CLASS"
+      "target": "status:accepted",
+      "type": "HAS_STATUS"
     },
     {
       "source": "decision:ABYSS-STACK-D-0140",
@@ -15053,12 +15073,27 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0140",
-      "target": "surface_class:validation%20contract",
+      "target": "surface_class:docs%20route",
       "type": "HAS_SURFACE_CLASS"
     },
     {
       "source": "decision:ABYSS-STACK-D-0140",
-      "target": "stack_lane:MCP%20services",
+      "target": "surface_class:public%20contract",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0140",
+      "target": "surface_class:validation%20guard",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0140",
+      "target": "stack_lane:docs%20and%20routes",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0140",
+      "target": "stack_lane:release/tooling",
       "type": "IN_STACK_LANE"
     },
     {
@@ -15073,6 +15108,11 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0140",
+      "target": "decision:ABYSS-STACK-D-0141",
+      "type": "NEXT_DECISION"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0140",
       "target": "owner_surface:AGENTS.md",
       "type": "OWNED_BY_SURFACE"
     },
@@ -15083,6 +15123,116 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0140",
+      "target": "owner_surface:VALIDATION.md",
+      "type": "OWNED_BY_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0140",
+      "target": "owner_surface:docs/validation/validation_lanes.json",
+      "type": "OWNED_BY_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0141",
+      "target": "source_surface:AGENTS.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0141",
+      "target": "source_surface:DESIGN.AGENTS.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0141",
+      "target": "source_surface:docs/validation/VALIDATOR_TOPOLOGY.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0141",
+      "target": "source_surface:mcp/AGENTS.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0141",
+      "target": "source_surface:mcp/services/AGENTS.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0141",
+      "target": "source_surface:mcp/services/README.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0141",
+      "target": "source_surface:scripts/validate_nested_agents.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0141",
+      "target": "date:2026-08-30",
+      "type": "DATED"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0141",
+      "target": "guard_family:inherited%20context",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0141",
+      "target": "guard_family:nested%20AGENTS",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0141",
+      "target": "guard_family:route%20locality",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0141",
+      "target": "status:accepted",
+      "type": "HAS_STATUS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0141",
+      "target": "surface_class:MCP%20access%20plane",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0141",
+      "target": "surface_class:agent%20guidance",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0141",
+      "target": "surface_class:validation%20contract",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0141",
+      "target": "stack_lane:MCP%20services",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0141",
+      "target": "stack_lane:source",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0141",
+      "target": "stack_lane:validation",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0141",
+      "target": "owner_surface:AGENTS.md",
+      "type": "OWNED_BY_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0141",
+      "target": "owner_surface:DESIGN.AGENTS.md",
+      "type": "OWNED_BY_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0141",
       "target": "owner_surface:scripts/validate_nested_agents.py",
       "type": "OWNED_BY_SURFACE"
     },
@@ -15785,18 +15935,23 @@
       "source": "repo:abyss-stack",
       "target": "decision:ABYSS-STACK-D-0140",
       "type": "OWNS_DECISION"
+    },
+    {
+      "source": "repo:abyss-stack",
+      "target": "decision:ABYSS-STACK-D-0141",
+      "type": "OWNS_DECISION"
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 1376,
+  "node_count": 1381,
   "node_type_counts": {
-    "date": 49,
-    "decision": 140,
+    "date": 50,
+    "decision": 141,
     "guard_family": 239,
     "mechanic_parent": 13,
-    "owner_surface": 73,
+    "owner_surface": 74,
     "repo": 1,
-    "source_surface": 645,
+    "source_surface": 647,
     "stack_lane": 58,
     "status": 4,
     "surface_class": 154
@@ -16045,6 +16200,11 @@
     {
       "id": "date:2026-08-30",
       "label": "2026-08-30",
+      "type": "date"
+    },
+    {
+      "id": "date:2026-08-31",
+      "label": "2026-08-31",
       "type": "date"
     },
     {
@@ -17438,13 +17598,23 @@
       "type": "decision"
     },
     {
-      "date": "2026-08-30",
+      "date": "2026-08-31",
       "id": "decision:ABYSS-STACK-D-0140",
       "label": "ABYSS-STACK-D-0140",
-      "path": "docs/decisions/ABYSS-STACK-D-0140-budget-inherited-agent-context.md",
+      "path": "docs/decisions/ABYSS-STACK-D-0140-prompt-light-agent-routes-and-on-demand-validation.md",
+      "posture": "accepted source-route rationale; no runtime admission, deployment, or exposure change",
+      "status": "accepted",
+      "title": "ABYSS-STACK-D-0140 Prompt-Light Agent Routes And On-Demand Validation",
+      "type": "decision"
+    },
+    {
+      "date": "2026-08-30",
+      "id": "decision:ABYSS-STACK-D-0141",
+      "label": "ABYSS-STACK-D-0141",
+      "path": "docs/decisions/ABYSS-STACK-D-0141-budget-inherited-agent-context.md",
       "posture": "accepted source-route rationale; no runtime admission or exposure change",
       "status": "accepted",
-      "title": "ABYSS-STACK-D-0140 Budget Inherited Agent Context",
+      "title": "ABYSS-STACK-D-0141 Budget Inherited Agent Context",
       "type": "decision"
     },
     {
@@ -18718,6 +18888,11 @@
       "type": "owner_surface"
     },
     {
+      "id": "owner_surface:VALIDATION.md",
+      "label": "VALIDATION.md",
+      "type": "owner_surface"
+    },
+    {
       "id": "owner_surface:abyss-stack",
       "label": "abyss-stack",
       "type": "owner_surface"
@@ -19249,6 +19424,11 @@
       "type": "source_surface"
     },
     {
+      "id": "source_surface:VALIDATION.md",
+      "label": "VALIDATION.md",
+      "type": "source_surface"
+    },
+    {
       "id": "source_surface:aoa-4pda-connector%3Adocs/MCP_ROLLOUT.md",
       "label": "aoa-4pda-connector:docs/MCP_ROLLOUT.md",
       "type": "source_surface"
@@ -19771,6 +19951,11 @@
     {
       "id": "source_surface:docs/governance/BRANCH_POLICY.md",
       "label": "docs/governance/BRANCH_POLICY.md",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:docs/governance/RELEASING.md",
+      "label": "docs/governance/RELEASING.md",
       "type": "source_surface"
     },
     {

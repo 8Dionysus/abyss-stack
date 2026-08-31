@@ -1,6 +1,6 @@
 # Budget Inherited Agent Context
 
-- Decision ID: ABYSS-STACK-D-0140
+- Decision ID: ABYSS-STACK-D-0141
 - Status: accepted
 - Date: 2026-08-30
 - Owner surface: `AGENTS.md`, `DESIGN.AGENTS.md`, and `scripts/validate_nested_agents.py`

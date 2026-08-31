@@ -287,4 +287,8 @@
 
 ## 2026-08-30
 
-- [ABYSS-STACK-D-0140 Budget Inherited Agent Context](../ABYSS-STACK-D-0140-budget-inherited-agent-context.md) (`docs/decisions/ABYSS-STACK-D-0140-budget-inherited-agent-context.md`)
+- [ABYSS-STACK-D-0141 Budget Inherited Agent Context](../ABYSS-STACK-D-0141-budget-inherited-agent-context.md) (`docs/decisions/ABYSS-STACK-D-0141-budget-inherited-agent-context.md`)
+
+## 2026-08-31
+
+- [ABYSS-STACK-D-0140 Prompt-Light Agent Routes And On-Demand Validation](../ABYSS-STACK-D-0140-prompt-light-agent-routes-and-on-demand-validation.md) (`docs/decisions/ABYSS-STACK-D-0140-prompt-light-agent-routes-and-on-demand-validation.md`)

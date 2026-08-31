@@ -173,6 +173,7 @@
 - [ABYSS-STACK-D-0062 Agent Skill Projection Validator Module](../ABYSS-STACK-D-0062-agent-skill-projection-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0062-agent-skill-projection-validator-module.md`)
 - [ABYSS-STACK-D-0063 Root Validator Wrapper Tail Removal](../ABYSS-STACK-D-0063-root-validator-wrapper-tail-removal.md) (`docs/decisions/ABYSS-STACK-D-0063-root-validator-wrapper-tail-removal.md`)
 - [ABYSS-STACK-D-0068 Decision Graph Contract And Impact Packets](../ABYSS-STACK-D-0068-decision-graph-contract-and-impact-packets.md) (`docs/decisions/ABYSS-STACK-D-0068-decision-graph-contract-and-impact-packets.md`)
+- [ABYSS-STACK-D-0140 Prompt-Light Agent Routes And On-Demand Validation](../ABYSS-STACK-D-0140-prompt-light-agent-routes-and-on-demand-validation.md) (`docs/decisions/ABYSS-STACK-D-0140-prompt-light-agent-routes-and-on-demand-validation.md`)
 
 ## A/B/C freeze
 
@@ -661,7 +662,8 @@
 
 ## inherited context
 
-- [ABYSS-STACK-D-0140 Budget Inherited Agent Context](../ABYSS-STACK-D-0140-budget-inherited-agent-context.md) (`docs/decisions/ABYSS-STACK-D-0140-budget-inherited-agent-context.md`)
+- [ABYSS-STACK-D-0140 Prompt-Light Agent Routes And On-Demand Validation](../ABYSS-STACK-D-0140-prompt-light-agent-routes-and-on-demand-validation.md) (`docs/decisions/ABYSS-STACK-D-0140-prompt-light-agent-routes-and-on-demand-validation.md`)
+- [ABYSS-STACK-D-0141 Budget Inherited Agent Context](../ABYSS-STACK-D-0141-budget-inherited-agent-context.md) (`docs/decisions/ABYSS-STACK-D-0141-budget-inherited-agent-context.md`)
 
 ## language competence
 
@@ -731,7 +733,8 @@
 
 ## nested AGENTS
 
-- [ABYSS-STACK-D-0140 Budget Inherited Agent Context](../ABYSS-STACK-D-0140-budget-inherited-agent-context.md) (`docs/decisions/ABYSS-STACK-D-0140-budget-inherited-agent-context.md`)
+- [ABYSS-STACK-D-0140 Prompt-Light Agent Routes And On-Demand Validation](../ABYSS-STACK-D-0140-prompt-light-agent-routes-and-on-demand-validation.md) (`docs/decisions/ABYSS-STACK-D-0140-prompt-light-agent-routes-and-on-demand-validation.md`)
+- [ABYSS-STACK-D-0141 Budget Inherited Agent Context](../ABYSS-STACK-D-0141-budget-inherited-agent-context.md) (`docs/decisions/ABYSS-STACK-D-0141-budget-inherited-agent-context.md`)
 
 ## network denial
 
@@ -973,7 +976,8 @@
 
 ## route locality
 
-- [ABYSS-STACK-D-0140 Budget Inherited Agent Context](../ABYSS-STACK-D-0140-budget-inherited-agent-context.md) (`docs/decisions/ABYSS-STACK-D-0140-budget-inherited-agent-context.md`)
+- [ABYSS-STACK-D-0140 Prompt-Light Agent Routes And On-Demand Validation](../ABYSS-STACK-D-0140-prompt-light-agent-routes-and-on-demand-validation.md) (`docs/decisions/ABYSS-STACK-D-0140-prompt-light-agent-routes-and-on-demand-validation.md`)
+- [ABYSS-STACK-D-0141 Budget Inherited Agent Context](../ABYSS-STACK-D-0141-budget-inherited-agent-context.md) (`docs/decisions/ABYSS-STACK-D-0141-budget-inherited-agent-context.md`)
 
 ## route-api closure
 
