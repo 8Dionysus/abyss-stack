@@ -103,16 +103,22 @@ def test_agent_cards_route_exact_procedure_to_on_demand_validation() -> None:
 def test_nested_agent_hygiene_rejects_extraction_residue_classes() -> None:
     orphan = "# AGENTS.md\n\n## Validation\nRun:\n\nUse the route.\n"
     empty = "# AGENTS.md\n\n## Smoke\n\n## Closeout\nDone.\n"
+    dangling = "# AGENTS.md\n\nProcedure:\n\n## Closeout\nDone.\n"
+    fenced_design = "# AGENTS.md\n\n```markdown\nProcedure:\n## Closeout\n```\n"
     inline = "# AGENTS.md\n\nUse python scripts/check.py --strict.\n"
     fenced = "# AGENTS.md\n\n```bash\npython scripts/check.py\n```\n"
 
     orphan_issues = validate_nested_agents._validate_card_hygiene("fixture", orphan)
     empty_issues = validate_nested_agents._validate_card_hygiene("fixture", empty)
+    dangling_issues = validate_nested_agents._validate_card_hygiene("fixture", dangling)
+    fenced_design_issues = validate_nested_agents._validate_card_hygiene("fixture", fenced_design)
     inline_issues = validate_nested_agents._validate_card_hygiene("fixture", inline)
     fenced_issues = validate_nested_agents._validate_card_hygiene("fixture", fenced)
 
     assert any("orphan procedural lead-in" in issue for issue in orphan_issues)
     assert any("empty procedural heading" in issue for issue in empty_issues)
+    assert any("dangling colon lead-in" in issue for issue in dangling_issues)
+    assert not any("dangling colon lead-in" in issue for issue in fenced_design_issues)
     assert any("imperative command sequence" in issue for issue in inline_issues)
     assert any("runnable command fence" in issue for issue in fenced_issues)
 

@@ -102,7 +102,7 @@ The first command defaults to the read contour. Candidate writes additionally
 require `AOA_EVALS_MCP_CANDIDATE_ROOTS`; managed lifecycle supplies the exact
 root and systemd write allowlists.
 
-If the package is installed, the server entry point is:
+If the package is installed, use the installed server entry-point procedure in `VALIDATION.md`.
 
 
 ## Report

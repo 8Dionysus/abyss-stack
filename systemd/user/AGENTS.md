@@ -44,13 +44,13 @@ Prefer the installer when a durable runtime selection should be recorded:
 
 
 To link every user unit named in `managed-units.txt` without starting or
-enabling services:
+enabling services, use the link-only procedure in `VALIDATION.md`.
 
 
 ## Verify
 When the host supports systemd user tooling:
 
-If you are explicitly testing enablement, use:
+If you are explicitly testing enablement, use the enablement procedure in `VALIDATION.md`.
 
 ## Hard no
 - do not point units at the source checkout

@@ -36,4 +36,4 @@ Read only the source, README, and owner contract needed for the current touched 
 
 For route-only edits, use [VALIDATION.md](../VALIDATION.md).
 
-For unit edits, also use:
+For unit edits, also use the unit-validation procedure in `VALIDATION.md`.

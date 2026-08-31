@@ -68,7 +68,7 @@ The first command defaults to the read contour. Candidate writes additionally
 require `AOA_MEMO_MCP_CANDIDATE_ROOTS`; managed lifecycle supplies that exact
 allowlist and the distinct candidate bearer.
 
-If the package is installed, the server entry point is:
+If the package is installed, use the installed server entry-point procedure in `VALIDATION.md`.
 
 
 ## Report

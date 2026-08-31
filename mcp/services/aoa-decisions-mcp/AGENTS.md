@@ -81,7 +81,7 @@ process and credential:
 The owner-local CLI remains the non-MCP cache preparation route:
 
 
-If the package is installed, the server entry point is:
+If the package is installed, use the installed server entry-point procedure in `VALIDATION.md`.
 
 
 ## Verify

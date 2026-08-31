@@ -22,7 +22,7 @@ Refresh the public-safe memo mirror through the focused procedure in [VALIDATION
 Inspect the memo seam after the `federation` profile is up:
 
 
-Emit a bounded memo export candidate:
+Emit a bounded memo export candidate through the candidate-export procedure in `VALIDATION.md`.
 
 
 ## Validation

@@ -431,6 +431,7 @@ INLINE_COMMAND_RE = re.compile(
     r"|(?:scripts/aoa[-\w./]+|aoa-[\w./-]+)\s+[-./\w$=|;&])",
     re.IGNORECASE,
 )
+DANGLING_COLON_LINE_RE = re.compile(r"^\s*(?!#{1,6}\s).+?:\s*$")
 ROOT_VALIDATION_SOURCE_RE = re.compile(r"^## `([^`]+/AGENTS\.md)`\s*$")
 COMMAND_SNIPPET_MARKERS = (
     "python ",
@@ -539,6 +540,12 @@ def _validate_card_hygiene(rel_path: str, text: str) -> list[str]:
             if not next_lines or not COMMAND_LINE_RE.match(next_lines[0]):
                 issues.append(
                     f"{rel_path}:{line_number}: orphan procedural lead-in remains in AGENTS.md"
+                )
+        if DANGLING_COLON_LINE_RE.match(line):
+            next_lines = [candidate for number, candidate in active if number > line_number and candidate.strip()]
+            if not next_lines or re.match(r"^#{1,6}\s+", next_lines[0]):
+                issues.append(
+                    f"{rel_path}:{line_number}: dangling colon lead-in remains in AGENTS.md"
                 )
     for index, (line_number, line) in enumerate(active):
         heading_match = re.match(r"^#{2,6}\s+(.+?)\s*$", line)

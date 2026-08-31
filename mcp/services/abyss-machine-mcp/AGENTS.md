@@ -67,7 +67,7 @@ For source-local service execution from the `abyss-stack` repo root, use the on-
 
 Validation is on-demand: use [VALIDATION.md](../../../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.
 
-If the package is installed, the server entry point is:
+If the package is installed, use the installed server entry-point procedure in `VALIDATION.md`.
 
 
 ## Verify

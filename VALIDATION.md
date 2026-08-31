@@ -287,7 +287,7 @@ python mcp/services/abyss-machine-mcp/scripts/abyss_machine_mcp_server.py
 
 This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-### Run (procedure 2)
+### Installed server entry point
 
 ```bash
 abyss-machine-mcp-server
@@ -430,7 +430,7 @@ PYTHONPATH=mcp/services/aoa-decisions-mcp/src \
 
 This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-### Run (procedure 4)
+### Installed server entry point
 
 ```bash
 aoa-decisions-mcp-server
@@ -506,7 +506,7 @@ This is on-demand human procedure only; it does not prove deployed runtime healt
 
 Each procedure below preserves the original command order and exact command body. Read the source card for its unique warnings and stop-lines before execution.
 
-### Run
+### Shared workspace launcher
 
 ```bash
 /srv/AbyssOS/.codex/bin/aoa-evals-mcp-server.py
@@ -514,7 +514,7 @@ Each procedure below preserves the original command order and exact command body
 
 This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-### Run (procedure 2)
+### Source-local server contours
 
 ```bash
 python mcp/services/aoa-evals-mcp/scripts/aoa_evals_mcp_server.py
@@ -523,7 +523,7 @@ AOA_MCP_POLICY_FAMILY=candidate python mcp/services/aoa-evals-mcp/scripts/aoa_ev
 
 This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-### Run (procedure 3)
+### Installed server entry point
 
 ```bash
 aoa-evals-mcp-server
@@ -588,7 +588,7 @@ This is on-demand human procedure only; it does not prove deployed runtime healt
 
 Each procedure below preserves the original command order and exact command body. Read the source card for its unique warnings and stop-lines before execution.
 
-### Run
+### Shared workspace launcher
 
 ```bash
 /srv/AbyssOS/.codex/bin/aoa-memo-mcp-server.py
@@ -596,7 +596,7 @@ Each procedure below preserves the original command order and exact command body
 
 This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-### Run (procedure 2)
+### Source-local server contours
 
 ```bash
 python mcp/services/aoa-memo-mcp/scripts/aoa_memo_mcp_server.py
@@ -605,7 +605,7 @@ AOA_MCP_POLICY_FAMILY=candidate python mcp/services/aoa-memo-mcp/scripts/aoa_mem
 
 This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-### Run (procedure 3)
+### Installed server entry point
 
 ```bash
 aoa-memo-mcp-server
@@ -937,7 +937,7 @@ This is on-demand human procedure only; it does not prove deployed runtime healt
 
 Each procedure below preserves the original command order and exact command body. Read the source card for its unique warnings and stop-lines before execution.
 
-### Runtime Routes
+### Refresh public-safe memo mirror
 
 ```bash
 scripts/aoa-sync-federation-surfaces --layer aoa-memo
@@ -945,7 +945,7 @@ scripts/aoa-sync-federation-surfaces --layer aoa-memo
 
 This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-### Runtime Routes (procedure 2)
+### Inspect memo seam route API
 
 ```bash
 curl http://127.0.0.1:5402/memo/registry
@@ -956,7 +956,7 @@ curl -X POST http://127.0.0.1:5402/memo/capsule -H 'content-type: application/js
 
 This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-### Runtime Routes (procedure 3)
+### Emit bounded memo export candidate
 
 ```bash
 scripts/aoa-export-memo-candidate \
@@ -1212,7 +1212,7 @@ This is on-demand human procedure only; it does not prove deployed runtime healt
 
 Each procedure below preserves the original command order and exact command body. Read the source card for its unique warnings and stop-lines before execution.
 
-### Verify
+### Route-only validation
 
 ```bash
 python scripts/validate_stack.py
@@ -1269,7 +1269,7 @@ python scripts/validate_stack.py
 
 This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-### Verify (procedure 2)
+### Unit validation
 
 ```bash
 systemd-analyze --user verify systemd/user/podman-compose-abyss.service
@@ -1306,7 +1306,7 @@ This is on-demand human procedure only; it does not prove deployed runtime healt
 
 Each procedure below preserves the original command order and exact command body. Read the source card for its unique warnings and stop-lines before execution.
 
-### Install routes
+### Manual user-unit reload and enablement
 
 ```bash
 systemctl --user daemon-reload
@@ -1315,7 +1315,7 @@ systemctl --user enable --now podman-compose-abyss.service
 
 This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-### Install routes (procedure 2)
+### Durable runtime selection installer
 
 ```bash
 scripts/aoa-install-systemd --preset intel-full --profile federation --enable-now --restart-now
@@ -1323,7 +1323,7 @@ scripts/aoa-install-systemd --preset intel-full --profile federation --enable-no
 
 This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-### Install routes (procedure 3)
+### Link managed user units without starting
 
 ```bash
 scripts/aoa-install-systemd --all-user-units
@@ -1331,7 +1331,7 @@ scripts/aoa-install-systemd --all-user-units
 
 This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-### Verify
+### User-unit syntax validation
 
 ```bash
 systemd-analyze --user verify systemd/user/podman-compose-abyss.service
@@ -1341,7 +1341,7 @@ scripts/aoa-install-systemd
 
 This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-### Verify (procedure 2)
+### Explicit enablement test
 
 ```bash
 scripts/aoa-install-systemd --enable-now
