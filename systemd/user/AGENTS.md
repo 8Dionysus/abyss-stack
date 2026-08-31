@@ -3,13 +3,9 @@
 ## Scope
 This directory stores rootless `systemd --user` unit skeletons for the deployed runtime.
 
-## Read before editing
-1. `systemd/user/README.md`
-2. `docs/install/DEPLOYMENT.md`
-3. `docs/runtime/PATHS.md`
-4. `docs/operations/LIFECYCLE.md`
-5. `scripts/aoa-install-systemd`
+## Conditional source route
 
+Read only the source, README, and owner contract needed for the current touched surface; entering this subtree does not require an unconditional inventory.
 ## Directory contract
 - Units here are user units, not system-wide units.
 - They target the deployed runtime tree under `${AOA_CONFIGS_ROOT}` and the canonical runtime root `/srv/AbyssOS/abyss-stack`, not the source checkout.
@@ -43,36 +39,19 @@ This directory stores rootless `systemd --user` unit skeletons for the deployed 
 
 For a direct manual user-unit reload and enablement test:
 
-```bash
-systemctl --user daemon-reload
-systemctl --user enable --now podman-compose-abyss.service
-```
+Validation is on-demand: use [VALIDATION.md](../../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.
 
 Prefer the installer when a durable runtime selection should be recorded:
 
-```bash
-scripts/aoa-install-systemd --preset intel-full --profile federation --enable-now --restart-now
-```
 
 To link every user unit named in `managed-units.txt` without starting or
 enabling services:
 
-```bash
-scripts/aoa-install-systemd --all-user-units
-```
 
 ## Verify
 When the host supports systemd user tooling:
-```bash
-systemd-analyze --user verify systemd/user/podman-compose-abyss.service
-systemd-analyze --user verify systemd/user/*.service systemd/user/*.timer systemd/user/*.path
-scripts/aoa-install-systemd
-```
 
 If you are explicitly testing enablement, use:
-```bash
-scripts/aoa-install-systemd --enable-now
-```
 
 ## Hard no
 - do not point units at the source checkout

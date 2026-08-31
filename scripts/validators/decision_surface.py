@@ -26,6 +26,7 @@ def validate_decision_record_surface(
     docs_agents = read_text_func(root / "docs" / "AGENTS.md") or ""
     scripts_readme = read_text_func(root / "scripts" / "README.md") or ""
     tests_readme = read_text_func(root / "tests" / "README.md") or ""
+    validation = read_text_func(root / "VALIDATION.md") or ""
 
     for snippet in (
         "Decision records explain why; current source surfaces define what.",
@@ -48,7 +49,8 @@ def validate_decision_record_surface(
         "Decision records must follow [TEMPLATE](TEMPLATE.md)",
         "python scripts/validate_decision_records.py",
     ):
-        if snippet not in decisions_agents:
+        haystack = f"{decisions_agents}\n{validation}" if snippet.startswith(("python ", "pytest ")) else decisions_agents
+        if snippet not in haystack:
             errors.append(f"docs/decisions/AGENTS.md must define `{snippet}`")
 
     for snippet in (
@@ -63,9 +65,9 @@ def validate_decision_record_surface(
         if snippet not in decisions_template:
             errors.append(f"docs/decisions/TEMPLATE.md must include `{snippet}`")
 
-    if "python scripts/validate_decision_records.py" not in docs_agents:
+    if "python scripts/validate_decision_records.py" not in f"{docs_agents}\n{validation}":
         errors.append("docs/AGENTS.md must include the decision-record validator")
-    if "python scripts/generate_decision_indexes.py --check" not in docs_agents:
+    if "python scripts/generate_decision_indexes.py --check" not in f"{docs_agents}\n{validation}":
         errors.append("docs/AGENTS.md must include the decision-index generator check")
     if "validate_decision_records.py" not in scripts_readme:
         errors.append("scripts/README.md must route validate_decision_records.py")

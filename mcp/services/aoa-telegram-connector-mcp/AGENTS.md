@@ -19,7 +19,7 @@ policy, parser logic, index construction, graph construction, or generated data.
 | output | MCP packets for status, source-route, graph query, and answer |
 | owner | this card owns MCP wrapping; `aoa-telegram-connector` owns connector truth |
 | storage | heavy connector state lives under connector storage roots, not in abyss-stack |
-| checks | `python mcp/services/aoa-telegram-connector-mcp/scripts/validate_telegram_connector_mcp.py`, `python -m pytest mcp/services/aoa-telegram-connector-mcp/tests -q` |
+| checks | on-demand package validation route in `VALIDATION.md` |
 
 ## Hard Boundaries
 
@@ -40,24 +40,9 @@ policy, parser logic, index construction, graph construction, or generated data.
 
 Run package-local checks after changes:
 
-```bash
-python mcp/services/aoa-telegram-connector-mcp/scripts/validate_telegram_connector_mcp.py
-python -m pytest mcp/services/aoa-telegram-connector-mcp/tests -q
-```
+Validation is on-demand: use [VALIDATION.md](../../../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.
 
-For source-route changes, also run:
+For source-route changes, alsouse the on-demand validation route in `VALIDATION.md`.
 
-```bash
-python scripts/validate_stack.py
-python scripts/validate_nested_agents.py
-python scripts/ci_gate.py --mode source-fast
-python scripts/ci_gate.py --mode mcp-services
-```
 
 ## Local Smoke
-
-```bash
-PYTHONPATH=mcp/services/aoa-telegram-connector-mcp/src \
-AOA_TELEGRAM_CONNECTOR_REPO=/srv/AbyssOS/connectors/aoa-telegram-connector \
-python -m aoa_telegram_connector_mcp.cli source-route
-```

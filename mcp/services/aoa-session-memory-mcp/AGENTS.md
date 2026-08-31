@@ -32,18 +32,9 @@ It does not own:
 - maintenance, reindex, repair, distillation, naming, relabel, export, or
   promotion authority.
 
-## Start Here
+## Conditional source route
 
-1. `README.md`
-2. `DESIGN.md`
-3. `docs/BOUNDARIES.md`
-4. `docs/THREAT_MODEL.md`
-5. `.aoa/AGENTS.md`, `.aoa/DESIGN.md`, and `.aoa/DESIGN.AGENTS.md` when route
-   semantics may move
-6. `src/aoa_session_memory_mcp/core.py`
-7. `src/aoa_session_memory_mcp/server.py`
-8. `tests/`
-
+Read only the source, README, and owner contract needed for the current touched surface; entering this subtree does not require an unconditional inventory.
 ## Route Modes
 
 | Need | First route |
@@ -74,17 +65,12 @@ It does not own:
 
 ## Run
 
-For source-local service execution from the `abyss-stack` repo root, run:
+For source-local service execution from the `abyss-stack` repo root,use the on-demand validation route in `VALIDATION.md`.
 
-```bash
-python mcp/services/aoa-session-memory-mcp/scripts/aoa_session_memory_mcp_server.py
-```
+Validation is on-demand: use [VALIDATION.md](../../../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.
 
 If the package is installed, the server entry point is:
 
-```bash
-aoa-session-memory-mcp-server
-```
 
 Codex may either start the portable stdio server once per Codex process or
 attach to the source-owned authenticated loopback shared HTTP owner. Existing
@@ -97,58 +83,12 @@ that an already-running Codex client reloaded changed tool schemas.
 
 ## Smoke
 
-```bash
-PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_mcp.cli status
-PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_mcp.cli transport-preflight
-PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_mcp.cli agent-responses --session latest --limit 5
-PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_mcp.cli agent-closeouts --session latest --limit 3
-PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_mcp.cli agent-progress-updates --session latest --limit 3
-PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_mcp.cli agent-reasoning-windows --session latest --limit 2
-PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_mcp.cli task-episodes latest --limit 5
-PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_mcp.cli goal-lifecycles latest --limit 5
-PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_mcp.cli answer-neighborhood --session latest --limit 2
-PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_mcp.cli trace aoa-session-memory-mcp
-PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_mcp.cli usage-chain aoa-session-memory-mcp --kind mcp
-PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_mcp.cli entity-dossier aoa-session-memory-mcp --kind mcp --usage-limit 2 --neighborhood-limit 1 --graph-limit 6 --graph-edge-limit 6
-PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_mcp.cli usage-audit aoa-session-memory-mcp --kind mcp
-PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_mcp.cli usage-neighborhood view_image --kind tool --limit 2
-PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_mcp.cli usage-scenario-audit --seed smoke --sample-size 4
-PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_mcp.cli live-scenario-audit --profile entity_registry_lookup --seed smoke --sample-size 5 --limit 5
-PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_mcp.cli live-scenario-corpus-list
-PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_mcp.cli live-scenario-corpus-check --case-limit 1
-PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_mcp.cli search aoa-session-memory --limit 5
-PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_mcp.cli search --filter route_signal=tool:view_image --filter doc_type=event --limit 5
-PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_mcp.cli entity-inventory --layer skill --limit 10
-PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_mcp.cli entity-inventory --layer git --limit 10
-PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_mcp.cli hook-receipts --event-name UserPromptSubmit --only-errors --limit 5
-PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_mcp.cli projection-status
-PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_mcp.cli route-rollup-query exec_command --layer tool --limit 3
-PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_mcp.cli direct-event-rollup-query --usage-role result --limit 3
-PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_mcp.cli route by-mcp aoa-session-memory-mcp
-PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_mcp.cli brief latest
-PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_mcp.cli evidence-packet --intent "debug aoa-session-memory-mcp" --anchor aoa-session-memory-mcp
-PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_mcp.cli freshness-check raw:line:1 --session latest
-PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_mcp.cli graph-neighborhood aoa-session-memory-mcp --kind mcp --limit 20
-PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_mcp.cli graph-bridge aoa-session-memory-mcp exec_command --source-kind mcp --target-kind tool --limit 4
-PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_mcp.cli graph-cooccurrence aoa-session-memory-mcp --kind mcp_service --limit 6
-PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_mcp.cli graphrag-packet aoa-session-memory-mcp --anchor aoa-session-memory-mcp --limit 5
-PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_mcp.cli graph-quality-audit --limit 4
-```
 
 ## Verify
 
-```bash
-python mcp/services/aoa-session-memory-mcp/scripts/validate_session_memory_mcp.py
-python -m pytest mcp/services/aoa-session-memory-mcp/tests -q
-python mcp/services/aoa-session-memory-mcp/scripts/release_check.py
-```
 
-When parent MCP routing changes, also run:
+When parent MCP routing changes, alsouse the on-demand validation route in `VALIDATION.md`.
 
-```bash
-python scripts/validate_stack.py
-python scripts/validate_nested_agents.py
-```
 
 ## Report
 

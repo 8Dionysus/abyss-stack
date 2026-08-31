@@ -11,12 +11,9 @@ card narrows the lane.
 source-linked records and generated repository indexes over the runtime source
 home, mechanics, and MCP access plane.
 
-## Read before editing
+## Conditional source route
 
-Read the root `AGENTS.md`, this card, `kag/README.md`, `kag/manifest.json`,
-`README.md`, `DESIGN.md`, `mechanics/README.md`, and `mcp/README.md` before
-changing provider records.
-
+Read only the source, README, and owner contract needed for the current touched surface; `kag/manifest.json` is the provider contract when needed, and entering this subtree does not require an unconditional inventory.
 ## Boundaries
 
 Runtime source meaning belongs to `abyss-stack`. Shared KAG schema, registry,

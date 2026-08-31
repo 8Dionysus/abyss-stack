@@ -22,8 +22,4 @@ Do not:
 
 Validation:
 
-```bash
-python mechanics/agon-runtime/parts/runtime-kernels/build_duel_runtime_kernel_registry.py --check
-python mechanics/agon-runtime/parts/runtime-kernels/build_mechanical_trial_run_registry.py --check
-python -m pytest mechanics/agon-runtime/parts/runtime-kernels/tests
-```
+Validation is on-demand: use [VALIDATION.md](../../../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.

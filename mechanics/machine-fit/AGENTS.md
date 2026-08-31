@@ -6,8 +6,7 @@ This package owns the route shape for reference platform facts, host facts,
 machine-fit capture, platform adaptation, and read-only machine bridge
 integration.
 
-Read `mechanics/AGENTS.md`, this package `README.md`, `DIRECTION.md`,
-`PARTS.md`, and `parts/README.md` before editing.
+Read only the source and owner contract needed for the current touched surface; entering this subtree does not require an unconditional README or documentation inventory.
 
 Stable operator wrappers such as `scripts/aoa-host-facts`,
 `scripts/aoa-machine-bridge`, and `scripts/aoa-machine-fit` stay at the root
@@ -19,7 +18,4 @@ accelerator settings from package docs.
 
 Validation:
 
-```bash
-python scripts/validate_stack.py
-python -m py_compile mechanics/machine-fit/parts/host-facts/aoa_host_facts.py mechanics/machine-fit/parts/machine-bridge/aoa_machine_bridge.py mechanics/machine-fit/parts/fit-record/aoa_machine_fit.py mechanics/machine-fit/parts/platform-adaptations/aoa_platform_adaptation.py
-```
+Validation is on-demand: use [VALIDATION.md](../../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.

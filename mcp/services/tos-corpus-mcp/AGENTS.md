@@ -21,7 +21,7 @@ ToS meaning into `abyss-stack`.
 | owner | `mcp/services/tos-corpus-mcp/AGENTS.md` for access-plane behavior; Tree of Sophia owns the derived resources |
 | next route | ToS resource -> MCP packet -> runtime graph/UI/review route |
 | tools | `tos_corpus_mcp.core`, `tos_corpus_mcp.server`, `scripts/validate_tos_corpus_mcp.py` |
-| check | `python mcp/services/tos-corpus-mcp/scripts/validate_tos_corpus_mcp.py`, `python -m pytest mcp/services/tos-corpus-mcp/tests -q` |
+| check | on-demand package validation route in `VALIDATION.md` |
 
 ## Boundaries
 
@@ -45,13 +45,6 @@ ToS meaning into `abyss-stack`.
 
 Run:
 
-```bash
-python mcp/services/tos-corpus-mcp/scripts/validate_tos_corpus_mcp.py
-python -m pytest mcp/services/tos-corpus-mcp/tests -q
-```
+Validation is on-demand: use [VALIDATION.md](../../../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.
 
-For parent MCP route changes, also run:
-
-```bash
-python scripts/validate_nested_agents.py
-```
+For parent MCP route changes, alsouse the on-demand validation route in `VALIDATION.md`.

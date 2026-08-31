@@ -10,14 +10,9 @@ This card applies to `skills/` and its descendants.
 belongs to `abyss-stack`. It does not own the shared Agent Skills format,
 cross-repository skill doctrine, or another repository's procedure.
 
-## Read before editing
+## Conditional source route
 
-1. Root `AGENTS.md`, `CHARTER.md`, `BOUNDARIES.md`, and `DESIGN.md`
-2. `skills/port.manifest.json`
-3. The mechanic card and owner contract used by the affected bundle
-4. The bundle `SKILL.md` and only the conditional references needed for the
-   change
-
+Read only the source, README, and owner contract needed for the current touched surface; entering this subtree does not require an unconditional inventory.
 ## Boundaries
 
 - Keep the owner package authoritative for applicability, procedure, ABI,
@@ -36,13 +31,9 @@ cross-repository skill doctrine, or another repository's procedure.
 
 Start with a manual positive, negative, owner-return, and coexistence pass.
 After the behavior is understood, run the host skill package validator and the
-narrow owner checks named by the bundle. For the diagnostic bundle, also run:
+narrow owner checks named by the bundle. For the diagnostic bundle, alsouse the on-demand validation route in `VALIDATION.md`.
 
-```bash
-python scripts/build_diagnostic_surface_catalog.py --check
-python scripts/validate_diagnostic_surface_catalog.py
-python scripts/validate_stack.py
-```
+Validation is on-demand: use [VALIDATION.md](../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.
 
 ## Closeout
 

@@ -12,14 +12,9 @@ This directory owns stack-local statistical questions and their measurement
 contracts. Shared statistical grammar and cross-owner composition remain owned
 by `aoa-stats`.
 
-## Read before editing
+## Conditional source route
 
-1. Root `AGENTS.md`, `DESIGN.md`, and `BOUNDARIES.md`.
-2. `stats/README.md` and `stats/port.manifest.json`.
-3. `docs/runtime/service-selection-policy.v1.json` and the service-selection
-   readout under `mechanics/runtime-lifecycle/parts/logs-status/`.
-4. The central measurement and local-port contracts under `aoa-stats/stats/`.
-
+Read only the source, README, and owner contract needed for the current touched surface; entering this subtree does not require an unconditional inventory.
 ## Boundaries
 
 - `port.manifest.json` owns the stack-local question and measurement meaning.
@@ -35,11 +30,9 @@ by `aoa-stats`.
 
 Manually exercise complete, partial, zero, empty-population, and unavailable-
 observation cases against the service-selection read model before changing its
-invariants. Then run:
+invariants. Thenuse the on-demand validation route in `VALIDATION.md`.
 
-```bash
-python scripts/validate_local_stats_port.py
-```
+Validation is on-demand: use [VALIDATION.md](../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.
 
 Use the root validation route for the implementation and source checkout.
 

@@ -18,13 +18,9 @@ Use `stats_owner_port_read` for canonical inventory and owner-local definition
 inspection; its output is discovery evidence, not an attestation of owner
 truth or freshness.
 
-## Read before editing
+## Conditional source route
 
-Read root `AGENTS.md`, `mcp/AGENTS.md`, `mcp/services/AGENTS.md`, this card,
-`README.md`, `DESIGN.md`, `docs/BOUNDARIES.md`, `docs/THREAT_MODEL.md`, source,
-tests, and the central measurement/federation contracts under
-`aoa-stats/stats/`.
-
+Read only the source, README, and owner contract needed for the current touched surface; entering this subtree does not require an unconditional inventory.
 ## Boundaries
 
 - `aoa-stats` owns statistical grammar, compatibility, semantic identity,
@@ -39,14 +35,9 @@ tests, and the central measurement/federation contracts under
 
 ## Validation
 
-After manual positive and negative journeys establish the behavior, run:
+After manual positive and negative journeys establish the behavior,use the on-demand validation route in `VALIDATION.md`.
 
-```bash
-python mcp/services/aoa-stats-mcp/scripts/validate_stats_mcp.py
-python -m pytest mcp/services/aoa-stats-mcp/tests -q
-python scripts/validate_stack.py
-python scripts/validate_nested_agents.py
-```
+Validation is on-demand: use [VALIDATION.md](../../../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.
 
 ## Closeout
 

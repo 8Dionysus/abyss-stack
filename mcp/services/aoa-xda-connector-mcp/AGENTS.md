@@ -13,7 +13,4 @@ This package is the stack-owned, read-only MCP access plane over
 
 Validate with:
 
-```bash
-python mcp/services/aoa-xda-connector-mcp/scripts/validate_xda_connector_mcp.py
-python -m pytest mcp/services/aoa-xda-connector-mcp/tests -q
-```
+Validation is on-demand: use [VALIDATION.md](../../../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.

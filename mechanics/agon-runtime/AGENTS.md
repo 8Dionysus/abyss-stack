@@ -5,8 +5,9 @@ Applies to `mechanics/agon-runtime/`.
 This package owns the runtime-side Agon dry-run kernel and trial artifact route
 inside `abyss-stack`.
 
-Read `mechanics/AGENTS.md`, this package `README.md`, `DIRECTION.md`,
-`PARTS.md`, `parts/README.md`, and `PROVENANCE.md` before editing.
+Read only the source and owner contract needed for the current touched surface;
+`PROVENANCE.md` is consulted when provenance or legacy lineage is in scope, and
+entering this subtree does not require an unconditional README inventory.
 
 `parts/runtime-kernels/` owns the active dry-run definitions, generated
 registries, examples, schemas, validators, simulations, tests, and recurrence
@@ -25,13 +26,4 @@ Do not:
 
 Validation:
 
-```bash
-python mechanics/agon-runtime/parts/runtime-kernels/build_duel_runtime_kernel_registry.py --check
-python mechanics/agon-runtime/parts/runtime-kernels/validate_duel_runtime_kernels.py
-python mechanics/agon-runtime/parts/runtime-kernels/build_mechanical_trial_run_registry.py --check
-python mechanics/agon-runtime/parts/runtime-kernels/validate_mechanical_trial_runs.py
-python mechanics/agon-runtime/parts/runtime-kernels/simulate_mechanical_duel_kernel.py --check
-python mechanics/agon-runtime/parts/runtime-kernels/simulate_mechanical_trials.py --check
-python -m pytest mechanics/agon-runtime/parts/runtime-kernels/tests
-python scripts/validate_stack.py
-```
+Validation is on-demand: use [VALIDATION.md](../../VALIDATION.md) for the `validate_mechanical_trial_runs.py` route and exact focused checks; retain the named lane and source-owned stop-lines.

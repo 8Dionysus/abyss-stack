@@ -11,7 +11,4 @@ Require query and answer packets to prove `network_touched=false` and
 `read_only=true`. Do not publish `query-hybrid` until that command exists in
 the current owner CLI.
 
-```bash
-python mcp/services/aoa-stackoverflow-connector-mcp/scripts/validate_stackoverflow_connector_mcp.py
-python -m pytest mcp/services/aoa-stackoverflow-connector-mcp/tests -q
-```
+Validation is on-demand: use [VALIDATION.md](../../../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.

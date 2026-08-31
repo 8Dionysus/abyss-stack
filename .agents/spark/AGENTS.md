@@ -13,8 +13,9 @@ If `SWARM.md` exists in this directory, treat it as queue / swarm context. This 
 
 ## Default Spark posture
 
-- Read `.agents/spark/README.md` and `.agents/spark/SWARM.md` before changing
-  this subtree.
+- Consult `.agents/spark/README.md` and `.agents/spark/SWARM.md` when the task
+  needs their lane semantics; changing this subtree does not require an
+  unconditional README inventory.
 - Use Spark for short-loop work where a small diff is enough.
 - Start with a map: task, files, risks, and validation path.
 - Prefer one bounded patch per loop.

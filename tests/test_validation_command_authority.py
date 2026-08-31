@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import re
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -78,6 +80,18 @@ def test_release_check_has_no_inline_command_authority() -> None:
 
     assert "COMMANDS =" not in text
     assert "command_sequence(\"release_check\")" in text
+
+
+def test_agent_cards_route_exact_procedure_to_on_demand_validation() -> None:
+    agent_paths = subprocess.check_output(
+        ["git", "ls-files", "*AGENTS.md"], cwd=REPO_ROOT, text=True
+    ).splitlines()
+    for relative in agent_paths:
+        card = (REPO_ROOT / relative).read_text(encoding="utf-8")
+        assert not re.search(r"^```(?:bash|sh|shell|console)\s*$", card, re.MULTILINE)
+    route = (REPO_ROOT / "VALIDATION.md").read_text(encoding="utf-8")
+    assert "docs/validation/validation_lanes.json" in route
+    assert "AGENTS.md" in route
 
 
 def test_ci_gate_dispatches_manifest_lane(monkeypatch) -> None:

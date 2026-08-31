@@ -5,11 +5,11 @@ Applies to `mechanics/experience-runtime/`.
 This package owns the `abyss-stack` runtime-side experience contract family
 after the mechanics archive refactor.
 
-Read `mechanics/AGENTS.md`, this package `README.md`, `DIRECTION.md`,
-`PARTS.md`, `parts/README.md`, `PROVENANCE.md`,
-`legacy/ARCHIVE_CLASSIFICATION.md`, and
-`parts/experience-records/docs/EXPERIENCE_RECORDS_DISTILLATION.md` before
-editing.
+Read only the source and owner contract needed for the current touched surface;
+`legacy/ARCHIVE_CLASSIFICATION.md`, `PROVENANCE.md`, and
+`EXPERIENCE_RECORDS_DISTILLATION.md` are consulted when archive or distillation
+meaning is in scope, and entering this subtree does not require an
+unconditional README inventory.
 
 Archive files under `legacy/` preserve old flat named surfaces. They are not a
 claim that `abyss-stack` owns experience doctrine, and they are not active
@@ -26,10 +26,7 @@ Do not:
 
 Validation:
 
-```bash
-python -m pytest mechanics/experience-runtime/legacy/artifacts/tests
-python scripts/validate_stack.py
-```
+Validation is on-demand: use [VALIDATION.md](../../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.
 
 The archived test files keep their `test_experience_wave*_seed_contracts.py`
 names until a future distillation pass creates quieter active contract tests.

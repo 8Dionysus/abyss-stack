@@ -6,17 +6,11 @@ This package owns the route shape for degradation receipts, archived chaos runti
 recovery, repair-safe closeout, A2A return closeout dry-run, and bounded
 antifragility runtime posture.
 
-Read `mechanics/AGENTS.md`, this package `README.md`, `DIRECTION.md`,
-`PARTS.md`, and `parts/README.md` before editing. Use `PROVENANCE.md` and
-`legacy/INDEX.md` before editing moved receipt artifacts.
+Read only the source and owner contract needed for the current touched surface; entering this subtree does not require an unconditional README or documentation inventory.
 
 Do not perform repair, delete data, or claim recovery from a receipt. This
 package shapes runtime evidence and handoff only.
 
 Validation:
 
-```bash
-python scripts/validate_stack.py
-python -m pytest mechanics/runtime-repair/parts/degradation-receipts/tests/test_degradation_receipts.py mechanics/runtime-repair/parts/repair-safe-closeout/tests/test_repair_safe_closeout_receipts.py mechanics/runtime-repair/parts/a2a-return-dry-run/tests/test_a2a_return_closeout_dry_run.py mechanics/runtime-repair/parts/memo-contradiction-sidecar/tests/test_memo_contradiction_integrity_runner.py
-python -m py_compile mechanics/runtime-repair/parts/a2a-return-dry-run/aoa_a2a_return_closeout_dry_run.py mechanics/runtime-repair/parts/memo-contradiction-sidecar/aoa_memo_contradiction_integrity.py
-```
+Validation is on-demand: use [VALIDATION.md](../../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.

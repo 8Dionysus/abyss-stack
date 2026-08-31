@@ -8,6 +8,7 @@ guidance, without making those future files blocking before they land.
 from __future__ import annotations
 
 import argparse
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -408,6 +409,18 @@ ADVISORY_AGENT_DIRS: tuple[str, ...] = ('config', 'manifests/recurrence')
 HEADING_PREFIXES = ("# AGENTS.md", "# AGENTS")
 IGNORED_DIRS = {".git", ".venv", "__pycache__", ".pytest_cache", ".mypy_cache"}
 AGENTS_CHAIN_BUDGET_BYTES = 32 * 1024
+RUNNABLE_FENCE_RE = re.compile(r"^```(?:bash|sh|shell|console)\s*$", re.IGNORECASE | re.MULTILINE)
+COMMAND_SNIPPET_MARKERS = (
+    "python ",
+    "pytest ",
+    "bash -n",
+    "shellcheck ",
+    "systemctl ",
+    "systemd-analyze",
+    "scripts/aoa-",
+    "aoa-",
+    "AOA_",
+)
 
 
 @dataclass(frozen=True)
@@ -438,6 +451,36 @@ def _is_ignored(path: Path, repo_root: Path) -> bool:
     except ValueError:
         return False
     return any(part in IGNORED_DIRS for part in parts)
+
+
+def _is_command_snippet(snippet: str) -> bool:
+    normalized = _normalize(snippet)
+    return any(marker.lower() in normalized for marker in COMMAND_SNIPPET_MARKERS)
+
+
+def _validation_route_text(path: Path, repo_root: Path) -> str:
+    """Return on-demand validation prose for a card and its nearest route."""
+    candidates: list[Path] = []
+    current = path.parent
+    while True:
+        candidate = current / "VALIDATION.md"
+        if candidate.is_file():
+            candidates.append(candidate)
+            break
+        if current == repo_root:
+            break
+        current = current.parent
+    root_validation = repo_root / "VALIDATION.md"
+    if root_validation.is_file() and root_validation not in candidates:
+        candidates.append(root_validation)
+    return "\n".join(candidate.read_text(encoding="utf-8") for candidate in candidates)
+
+
+def _validate_card_hygiene(rel_path: str, text: str) -> list[str]:
+    issues: list[str] = []
+    if RUNNABLE_FENCE_RE.search(text):
+        issues.append(f"{rel_path}: runnable command fence remains in AGENTS.md; move it to VALIDATION.md")
+    return issues
 
 
 def discover_nested_agents(repo_root: Path) -> set[str]:
@@ -488,8 +531,14 @@ def validate(
         if not _has_agents_heading(text):
             issues.append(f"{rel_path}: missing AGENTS heading")
         normalized = _normalize(text)
+        validation_text = _normalize(_validation_route_text(path, repo_root))
+        issues.extend(_validate_card_hygiene(rel_path, text))
         for snippet in snippets:
-            if _normalize(snippet) not in normalized:
+            needle = _normalize(snippet)
+            haystack = normalized
+            if _is_command_snippet(snippet):
+                haystack = f"{normalized} {validation_text}"
+            if needle not in haystack:
                 issues.append(f"{rel_path}: missing required snippet {snippet!r}")
 
     required = set(REQUIRED_AGENTS_DOCS)

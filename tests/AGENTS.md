@@ -28,8 +28,4 @@ They should prove the source checkout contract without requiring a live deployed
 
 Use targeted tests first, then broaden only when needed:
 
-```bash
-python scripts/ci_gate.py --mode tests
-ABYSS_STACK_TEST_SCHEDULER=serial python scripts/ci_gate.py --mode tests
-python scripts/validate_stack.py
-```
+Validation is on-demand: use [VALIDATION.md](../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.

@@ -30,7 +30,4 @@ targets are historical drift, not an active route.
 
 Use the root nested guidance check after touching skill surfaces:
 
-```bash
-python scripts/validate_nested_agents.py
-python scripts/validate_stack.py
-```
+Validation is on-demand: use [VALIDATION.md](../../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.

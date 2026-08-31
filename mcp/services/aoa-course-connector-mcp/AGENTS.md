@@ -9,7 +9,4 @@ surfaces. It must force source refs off and never expose token or browser state.
 
 Validate with:
 
-```bash
-python mcp/services/aoa-course-connector-mcp/scripts/validate_course_connector_mcp.py
-python -m pytest mcp/services/aoa-course-connector-mcp/tests -q
-```
+Validation is on-demand: use [VALIDATION.md](../../../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.

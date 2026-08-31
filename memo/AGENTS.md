@@ -10,14 +10,9 @@ This card applies to `memo/`.
 candidates, receipts, exports, and local notes before any reviewed landing in
 `aoa-memo`.
 
-## Read before editing
+## Conditional source route
 
-1. Root `AGENTS.md`
-2. `BOUNDARIES.md`
-3. `mechanics/federation-seams/parts/memo-seam/docs/MEMO_RUNTIME_SEAM.md`
-4. This `README.md`
-5. `mcp/services/aoa-memo-mcp/AGENTS.md`
-
+Read only the source, README, and owner contract needed for the current touched surface; entering this subtree does not require an unconditional inventory.
 ## Boundaries
 
 Write locally as `write_candidate_only` unless a stronger reviewed route is
@@ -32,28 +27,16 @@ for review or handoff traces, `exports/` for packets meant for `aoa-memo`, and
 
 Create candidates through the MCP helper from the `abyss-stack` repo root:
 
-```bash
-PYTHONPATH=mcp/services/aoa-memo-mcp/src python -m aoa_memo_mcp.cli create-candidate \
-  --repo abyss-stack \
-  --evidence-ref mechanics/federation-seams/parts/memo-seam/docs/MEMO_RUNTIME_SEAM.md \
-  --claim "Runtime memory access should route through reviewed local candidates."
-```
+Validation is on-demand: use [VALIDATION.md](../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.
 
 Then validate the emitted candidate path:
 
-```bash
-PYTHONPATH=mcp/services/aoa-memo-mcp/src python -m aoa_memo_mcp.cli validate-candidate path/to/candidate.json
-```
 
 ## Reviewed Landing Route
 
 Use this route when a local export is meant to become reviewed `aoa-memo`
 memory:
 
-```bash
-PYTHONPATH=mcp/services/aoa-memo-mcp/src python -m aoa_memo_mcp.cli pending-exports --repo abyss-stack
-PYTHONPATH=mcp/services/aoa-memo-mcp/src python -m aoa_memo_mcp.cli landing-plan --repo abyss-stack --export-ref exports/path.reviewed-intake.json --run-dry-run
-```
 
 `landing-plan` is still an access-plane check. The durable write happens in
 `aoa-memo` through `scripts/memory/land_reviewed_memo_intake.py`, generated
@@ -61,13 +44,6 @@ read-model refresh, validators, and review.
 
 ## Validation
 
-```bash
-python mcp/services/aoa-memo-mcp/scripts/validate_memo_mcp.py
-AOA_MEMO_ROOT="${AOA_MEMO_ROOT:-/srv/AbyssOS/aoa-memo}"
-python "$AOA_MEMO_ROOT/scripts/memory/validate_local_memo_port.py" --path memo
-python "$AOA_MEMO_ROOT/scripts/memory/build_local_memo_port_index.py" --path memo --check
-python -m pytest mcp/services/aoa-memo-mcp/tests -q
-```
 
 ## Closeout
 

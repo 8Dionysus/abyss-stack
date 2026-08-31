@@ -25,7 +25,4 @@ mechanic-local command meaning.
 
 ## Validate
 
-```bash
-python -m pytest -q tests/test_validation_command_authority.py tests/test_validation_topology.py tests/test_script_topology.py
-python scripts/ci_gate.py --mode source-fast
-```
+Validation is on-demand: use [VALIDATION.md](../../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.

@@ -10,13 +10,9 @@ This card applies to `mcp/services/` and every MCP service package below it.
 Protocol servers. It keeps runnable MCP access planes below one route instead
 of leaving service packages directly in the root-adjacent `mcp/` district.
 
-## Read before editing
+## Conditional source route
 
-1. Root `AGENTS.md`
-2. `mcp/AGENTS.md`
-3. This card
-4. The service-local `AGENTS.md`, README, design notes, source, and tests
-
+Read only the source, README, and owner contract needed for the current touched surface; `mcp/services/README.md` and the service-local `AGENTS.md` are semantic routes when needed, and entering this subtree does not require an unconditional inventory.
 ## Boundaries
 
 Service packages may own MCP server code, service-local docs, tests, prompts,
@@ -26,19 +22,14 @@ named by the service-local route card.
 ## Validation
 
 The runnable package map lives in `mcp/services/README.md`. For one package,
-run the exact commands in its service-local `AGENTS.md`; do not inherit or run
-unrelated package matrices. For a district-wide change, run:
+use its service-local `VALIDATION.md` route; do not inherit or run unrelated
+package matrices. For a district-wide change, use the named `mcp-services`
+lane in the on-demand validation map.
 
-```bash
-python scripts/ci_gate.py --mode mcp-services
-```
+Validation is on-demand: use [VALIDATION.md](../../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.
 
-When a service path, local route card, or root district route changes, also run:
+When a service path, local route card, or root district route changes, alsouse the on-demand validation route in `VALIDATION.md`.
 
-```bash
-python scripts/validate_stack.py
-python scripts/validate_nested_agents.py
-```
 
 ## Closeout
 

@@ -36,16 +36,9 @@ It does not own:
   doctrine in sibling repositories;
 - hook, timer, or daemon installation.
 
-## Start Here
+## Conditional source route
 
-1. `README.md`
-2. `DESIGN.md`
-3. `docs/BOUNDARIES.md`
-4. `docs/THREAT_MODEL.md`
-5. `src/aoa_decisions_mcp/core.py`
-6. `src/aoa_decisions_mcp/server.py`
-7. `tests/`
-
+Read only the source, README, and owner contract needed for the current touched surface; entering this subtree does not require an unconditional inventory.
 ## Route Modes
 
 | Need | First route |
@@ -76,56 +69,28 @@ It does not own:
 
 ## Run
 
-For source-local service execution from the `abyss-stack` repo root, run:
+For source-local service execution from the `abyss-stack` repo root,use the on-demand validation route in `VALIDATION.md`.
 
-```bash
-python mcp/services/aoa-decisions-mcp/scripts/aoa_decisions_mcp_server.py
-```
+Validation is on-demand: use [VALIDATION.md](../../../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.
 
 This starts the read contour. An internal-effect server must be a separate
 process and credential:
 
-```bash
-AOA_DECISIONS_MCP_CONTOUR=internal_effect \
-  python mcp/services/aoa-decisions-mcp/scripts/aoa_decisions_mcp_server.py
-```
 
 The owner-local CLI remains the non-MCP cache preparation route:
 
-```bash
-PYTHONPATH=mcp/services/aoa-decisions-mcp/src \
-  python -m aoa_decisions_mcp.cli refresh
-```
 
 If the package is installed, the server entry point is:
 
-```bash
-aoa-decisions-mcp-server
-```
 
 ## Smoke
 
-```bash
-PYTHONPATH=mcp/services/aoa-decisions-mcp/src python -m aoa_decisions_mcp.cli status
-PYTHONPATH=mcp/services/aoa-decisions-mcp/src python -m aoa_decisions_mcp.cli summary
-PYTHONPATH=mcp/services/aoa-decisions-mcp/src python -m aoa_decisions_mcp.cli search "decision graph"
-PYTHONPATH=mcp/services/aoa-decisions-mcp/src python -m aoa_decisions_mcp.cli packet --query "decision graph"
-```
 
 ## Verify
 
-```bash
-python mcp/services/aoa-decisions-mcp/scripts/validate_decisions_mcp.py
-python -m pytest mcp/services/aoa-decisions-mcp/tests -q
-python mcp/services/aoa-decisions-mcp/scripts/release_check.py
-```
 
-When parent MCP routing changes, also run:
+When parent MCP routing changes, alsouse the on-demand validation route in `VALIDATION.md`.
 
-```bash
-python scripts/validate_stack.py
-python scripts/validate_nested_agents.py
-```
 
 ## Report
 

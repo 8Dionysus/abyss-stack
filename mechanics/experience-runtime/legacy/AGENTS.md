@@ -20,6 +20,4 @@ Do not:
 
 Validation:
 
-```bash
-python -m pytest mechanics/experience-runtime/legacy/artifacts/tests
-```
+Validation is on-demand: use [VALIDATION.md](../../../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.

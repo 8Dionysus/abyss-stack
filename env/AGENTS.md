@@ -3,12 +3,9 @@
 ## Scope
 This directory contains public-safe env examples only. It does not contain live runtime secrets.
 
-## Read before editing
-1. `env/README.md`
-2. `mechanics/config-projection/parts/bootstrap/docs/SECRETS_BOOTSTRAP.md`
-3. `docs/runtime/PATHS.md`
-4. `docs/runtime/STORAGE_LAYOUT.md`
+## Conditional source route
 
+Read only the source, README, and owner contract needed for the current touched surface; entering this subtree does not require an unconditional inventory.
 ## Directory contract
 - Files here are examples and must stay public-safe.
 - Real secret-bearing files belong under `/srv/AbyssOS/abyss-stack/Secrets/Configs`, except `stack.env`, which is expected at `/srv/AbyssOS/abyss-stack/Configs/stack.env` and is recommended to be a symlink to `/srv/AbyssOS/abyss-stack/Secrets/Configs/stack.env`.
@@ -31,11 +28,7 @@ This directory contains public-safe env examples only. It does not contain live 
 - Update `scripts/validate_stack.py` if the file should be treated as required project structure.
 
 ## Verify
-```bash
-python scripts/validate_stack.py
-scripts/aoa-first-run --strict
-scripts/aoa-check-layout --ignore-secrets
-```
+Validation is on-demand: use [VALIDATION.md](../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.
 
 If the example set changed, re-read `mechanics/config-projection/parts/bootstrap/docs/SECRETS_BOOTSTRAP.md` and confirm the bootstrap instructions still match.
 

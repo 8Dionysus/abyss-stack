@@ -8,15 +8,9 @@ first.
 This directory owns transitional repo-local agent projections and model lanes
 that need to ship with the `abyss-stack` source checkout.
 
-## Read Before Editing
+## Conditional source route
 
-1. `.agents/README.md`
-2. `.agents/skills/AGENTS.md`
-3. `.agents/spark/AGENTS.md` when editing the Spark fast-loop lane
-4. `mechanics/README.md`
-5. `docs/runtime/MECHANICS.md`
-6. `scripts/validate_nested_agents.py`
-
+Read only the source, README, and owner contract needed for the current touched surface; `.agents/README.md` is the semantic route when needed, and entering this subtree does not require an unconditional inventory.
 ## Directory Contract
 
 - Keep canonical skill law in the owning skill repository.
@@ -30,7 +24,4 @@ that need to ship with the `abyss-stack` source checkout.
 
 ## Verify
 
-```bash
-python scripts/validate_nested_agents.py
-python scripts/validate_stack.py
-```
+Validation is on-demand: use [VALIDATION.md](../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.

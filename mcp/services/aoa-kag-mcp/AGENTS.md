@@ -14,12 +14,9 @@ Its public behavior is the compact `discover`, `search`, `read`, `traverse`,
 and `explain` application protocol. Results preserve owner identity, source
 anchors, provenance, freshness, access, projection state, and evidence routes.
 
-## Read before editing
+## Conditional source route
 
-Read root `AGENTS.md`, `mcp/AGENTS.md`, `mcp/services/AGENTS.md`, this card,
-`README.md`, `DESIGN.md`, `docs/BOUNDARIES.md`, `docs/THREAT_MODEL.md`, source,
-tests, and `aoa-kag/kag/LOCAL_SUBTREE_PROTOCOL.md` before changing behavior.
-
+Read only the source, README, and owner contract needed for the current touched surface; entering this subtree does not require an unconditional inventory.
 ## Boundaries
 
 Repo-local `kag/` homes own canonical repository records. `aoa-kag` owns the
@@ -31,19 +28,12 @@ contract tests.
 
 ## Validation
 
-For this service, run:
+For this service,use the on-demand validation route in `VALIDATION.md`.
 
-```bash
-python mcp/services/aoa-kag-mcp/scripts/validate_kag_mcp.py
-python -m pytest mcp/services/aoa-kag-mcp/tests -q
-```
+Validation is on-demand: use [VALIDATION.md](../../../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.
 
-For service-route changes, also run:
+For service-route changes, alsouse the on-demand validation route in `VALIDATION.md`.
 
-```bash
-python scripts/validate_stack.py
-python scripts/validate_nested_agents.py
-```
 
 ## Closeout
 

@@ -20,9 +20,4 @@ Do not:
 
 Validation:
 
-```bash
-scripts/aoa-long-horizon-pilot --help
-scripts/aoa-bounded-autonomy-pilot --help
-bash -n scripts/aoa-long-horizon-pilot scripts/aoa-bounded-autonomy-pilot
-python -m py_compile mechanics/inference-pilots/legacy/trials/artifacts/scripts/aoa-local-ai-trials mechanics/inference-pilots/legacy/trials/artifacts/scripts/aoa-w5-pilot mechanics/inference-pilots/legacy/trials/artifacts/scripts/aoa-w6-pilot
-```
+Validation is on-demand: use [VALIDATION.md](../../../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.

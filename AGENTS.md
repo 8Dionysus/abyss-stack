@@ -18,23 +18,7 @@ It is not the system design. Read `DESIGN.md` for the intended runtime form and
 
 ## Read before editing
 
-1. `README.md`
-2. `CHARTER.md`
-3. `BOUNDARIES.md`
-4. `DESIGN.md`
-5. `DESIGN.AGENTS.md` when editing `AGENTS.md`, local route cards, or agent
-   overlays
-6. `docs/routes/START_HERE_ROUTE_CONTRACT.md`
-7. `ROADMAP.md`
-8. `docs/runtime/ARCHITECTURE.md`
-9. `mechanics/README.md`
-10. The nearest local `AGENTS.md`, README, and validation notes for every touched
-    path
-11. `skills/AGENTS.md` and `skills/port.manifest.json` when changing an owner
-    skill package
-
-Use `docs/legacy/AGENTS_ROOT_REFERENCE.md` only when the short card is not enough.
-
+Read only the source, README, and owner contract needed for the current touched surface; entering this subtree does not require an unconditional inventory.
 ## Boundaries
 
 `abyss-stack` owns runtime, deployment, storage layout, lifecycle, security
@@ -61,29 +45,12 @@ Use the narrowest public-safe validation for the changed surface.
 For root docs, topology, validators, mechanics, or sync-managed source surfaces,
 start with:
 
-```bash
-python scripts/ci_gate.py --mode source-fast
-python scripts/validate_stack.py
-python scripts/validate_nested_agents.py
-python scripts/ci_gate.py --mode tests
-```
+Validation is on-demand: use [VALIDATION.md](VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.
 
-If `stats/` or its service-selection derivation changes, also run:
-
-```bash
-python scripts/validate_local_stats_port.py
-```
-
-If the diagnostic spine changes, also run:
-
-```bash
-python scripts/build_diagnostic_surface_catalog.py --check
-python scripts/validate_diagnostic_surface_catalog.py
-```
-
-If source/runtime parity changes, run `python scripts/validate_stack.py
---parity-check` from the canonical source checkout, never from the deployed
-`Configs` mirror.
+If `stats/` or its service-selection derivation changes, use the `stats` route
+in `VALIDATION.md`. If the diagnostic spine changes, use the generated catalog
+route there. Source/runtime parity remains an explicit on-demand route from
+the canonical source checkout, never from the deployed `Configs` mirror.
 
 ## Closeout
 
@@ -122,23 +89,9 @@ It does not own:
 - AoA center doctrine, ToS corpus meaning, sibling repo doctrine, private live
   machine state, or semantic proof claims outside runtime-owned evidence
 
-## Start Here
+## Conditional source route
 
-1. `README.md`
-2. `CHARTER.md`
-3. `BOUNDARIES.md`
-4. `DESIGN.md`
-5. `DESIGN.AGENTS.md`
-6. `ROADMAP.md`
-7. `docs/runtime/ARCHITECTURE.md`
-8. `mechanics/README.md`
-9. `docs/runtime/SERVICE_CATALOG.md`
-10. `docs/profiles/PROFILES.md`, `docs/profiles/PRESETS.md`, `docs/runtime/PATHS.md`,
-    `docs/install/DEPLOYMENT.md`, `docs/install/FIRST_RUN.md`, `docs/operations/RUNBOOK.md`, and
-    `docs/operations/SECURITY.md`
-11. Host, recurrence, seam, diagnostic, repair, or mechanics docs relevant to
-    the changed surface
-
+Read only the source, README, and owner contract needed for the current touched surface; entering this subtree does not require an unconditional inventory.
 ## Route Modes
 
 Entry routing is governed by `docs/routes/START_HERE_ROUTE_CONTRACT.md`. This card
@@ -192,7 +145,8 @@ memo state, or route runtime evidence toward reviewed memory.
   checks.
 - Keep every applicable inherited AGENTS chain within the 32-KiB budget enforced
   by `scripts/validate_nested_agents.py`. Parent cards route broad lanes;
-  package-local cards own exact commands and stop-lines.
+  on-demand `VALIDATION.md` surfaces own exact commands while package-local
+  cards retain stop-lines.
 - Authored source surfaces own meaning. Generated, exported, compact, derived,
   runtime, and adapter surfaces summarize, transport, or support meaning.
 - Self-agency, recurrence, quest, progression, checkpoint, or growth language
@@ -222,27 +176,10 @@ is needed, say so in closeout.
 
 ## GitHub Landing Workflow
 
-Root `AGENTS.md` owns the repository-wide branch, PR, CI, and merge route.
-`.github/AGENTS.md` owns the GitHub-native files that support it.
-
-When the user asks to commit, push, and merge in this repository, use this
-route:
-
-1. Start from a clean branch based on current `origin/main`.
-2. Commit only the intended diff with a message that names the changed surface.
-3. Push the branch and open a pull request with changed surfaces, validation,
-   skipped checks, and remaining risk.
-4. Wait for GitHub `Repo Validation` to finish. If it fails, fix the branch and
-   wait for the new result.
-5. Merge through GitHub after green validation. Current repository settings
-   reject merge commits; use squash unless settings change. If GitHub reports a
-   different allowed method for a future PR, use the allowed method and report
-   which method landed.
-6. Return to `main`, fast-forward from `origin/main`, and confirm the worktree
-   is clean before closeout.
-
-If GitHub status or merge permissions cannot be observed, stop the landing
-route and report the exact blocker instead of guessing.
+Use `docs/governance/RELEASING.md` for the branch, PR, CI, merge, and
+post-merge procedure. Keep this card limited to the release/landing route,
+required evidence class, and the stop-line: if CI status or merge authority
+cannot be observed, stop and report the exact blocker rather than guessing.
 
 ## Post-change Route Review
 

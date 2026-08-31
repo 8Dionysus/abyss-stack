@@ -21,7 +21,8 @@ stabilizer, but it reads the release command sequence from the lane manifest.
 | `scripts/run_pytest_lane.py` | bounded scheduler for the unchanged complete pytest selection |
 | `scripts/release_check.py` | release entrypoint plus synthetic/live Configs parity selection |
 | `.github/workflows/validate-stack.yml` | GitHub platform runner that calls lane entrypoints and owns platform-only rehearsal steps |
-| `AGENTS.md` and local route cards | focused validation guidance and lane IDs |
+| `AGENTS.md` and local route cards | inherited semantic guidance, conditional routes, and lane IDs |
+| `VALIDATION.md` and nearest package validation surfaces | on-demand human procedure and focused commands |
 | inventories under `docs/validation/` and `docs/testing/` | descriptive coverage maps, not command execution authority |
 
 ## Rules
