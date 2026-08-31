@@ -88,6 +88,7 @@ Update only the owner surfaces whose contract actually moved:
 - entry route meaning -> `docs/routes/START_HERE_ROUTE_CONTRACT.md` and its
   declared entry projections
 - durable rationale -> `docs/decisions/`
+- repository-wide direction or a future trigger -> `ROADMAP.md`
 - release-visible behavior -> `CHANGELOG.md`
 - generated catalogs or indexes -> their source builder and validator
 
