@@ -15,28 +15,35 @@ Machine-executed reusable lanes remain authoritative in `docs/validation/validat
 
 ## `.agents/AGENTS.md`
 
-Run from the repository root when the command paths are repository-relative.
+Each procedure below preserves the original command order and exact command body. Read the source card for its unique warnings and stop-lines before execution.
+
+### Verify
 
 ```bash
 python scripts/validate_nested_agents.py
 python scripts/validate_stack.py
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+
 ## `.agents/skills/AGENTS.md`
 
-Run from the repository root when the command paths are repository-relative.
+Each procedure below preserves the original command order and exact command body. Read the source card for its unique warnings and stop-lines before execution.
+
+### Validate
 
 ```bash
 python scripts/validate_nested_agents.py
 python scripts/validate_stack.py
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
 ## `AGENTS.md`
 
-Run from the repository root when the command paths are repository-relative.
+Each procedure below preserves the original command order and exact command body. Read the source card for its unique warnings and stop-lines before execution.
+
+### Root source-fast and focused topology checks
 
 ```bash
 python scripts/ci_gate.py --mode source-fast
@@ -45,32 +52,30 @@ python scripts/validate_nested_agents.py
 python scripts/ci_gate.py --mode tests
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-## `AGENTS.md`
-
-Run from the repository root when the command paths are repository-relative.
+### If `stats/` or its service-selection derivation changes, also run:
 
 ```bash
 python scripts/validate_local_stats_port.py
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-## `AGENTS.md`
-
-Run from the repository root when the command paths are repository-relative.
+### If the diagnostic spine changes, also run:
 
 ```bash
 python scripts/build_diagnostic_surface_catalog.py --check
 python scripts/validate_diagnostic_surface_catalog.py
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
 ## `compose/AGENTS.md`
 
-Run from the repository root when the command paths are repository-relative.
+Each procedure below preserves the original command order and exact command body. Read the source card for its unique warnings and stop-lines before execution.
+
+### Verify
 
 ```bash
 python scripts/validate_stack.py
@@ -96,21 +101,21 @@ scripts/aoa-preset-profiles --preset intel-full --paths
 scripts/aoa-profile-modules --preset intel-full --paths
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
 ## `config-templates/AGENTS.md`
 
-Run from the repository root when the command paths are repository-relative.
+Each procedure below preserves the original command order and exact command body. Read the source card for its unique warnings and stop-lines before execution.
+
+### Bootstrap route
 
 ```bash
 scripts/aoa-bootstrap-configs
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-## `config-templates/AGENTS.md`
-
-Run from the repository root when the command paths are repository-relative.
+### Verify
 
 ```bash
 export AOA_STACK_ROOT=/tmp/abyss-stack-test
@@ -121,11 +126,13 @@ scripts/aoa-check-layout --ignore-secrets
 python scripts/validate_stack.py
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
 ## `docs/AGENTS.md`
 
-Run from the repository root when the command paths are repository-relative.
+Each procedure below preserves the original command order and exact command body. Read the source card for its unique warnings and stop-lines before execution.
+
+### Validate
 
 ```bash
 python scripts/validate_decision_records.py
@@ -136,11 +143,13 @@ python scripts/validate_nested_agents.py
 python -m pytest tests/test_roadmap_parity.py tests/test_decision_records.py tests/test_source_topology_validator_modules.py tests/test_validation_topology.py tests/test_script_topology.py tests/test_test_topology.py
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
 ## `docs/decisions/AGENTS.md`
 
-Run from the repository root when the command paths are repository-relative.
+Each procedure below preserves the original command order and exact command body. Read the source card for its unique warnings and stop-lines before execution.
+
+### Validation
 
 ```bash
 python scripts/generate_decision_indexes.py --check
@@ -150,43 +159,47 @@ python scripts/validate_nested_agents.py
 python -m pytest tests/test_decision_records.py
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-## `docs/decisions/AGENTS.md`
-
-Run from the repository root when the command paths are repository-relative.
+### Validation (procedure 2)
 
 ```bash
 python -m pytest tests/test_roadmap_parity.py
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
 ## `docs/testing/AGENTS.md`
 
-Run from the repository root when the command paths are repository-relative.
+Each procedure below preserves the original command order and exact command body. Read the source card for its unique warnings and stop-lines before execution.
+
+### Validate
 
 ```bash
 python -m pytest -q tests/test_test_topology.py
 python scripts/ci_gate.py --mode tests
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
 ## `docs/validation/AGENTS.md`
 
-Run from the repository root when the command paths are repository-relative.
+Each procedure below preserves the original command order and exact command body. Read the source card for its unique warnings and stop-lines before execution.
+
+### Validate
 
 ```bash
 python -m pytest -q tests/test_validation_command_authority.py tests/test_validation_topology.py tests/test_script_topology.py
 python scripts/ci_gate.py --mode source-fast
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
 ## `env/AGENTS.md`
 
-Run from the repository root when the command paths are repository-relative.
+Each procedure below preserves the original command order and exact command body. Read the source card for its unique warnings and stop-lines before execution.
+
+### Verify
 
 ```bash
 python scripts/validate_stack.py
@@ -194,11 +207,13 @@ scripts/aoa-first-run --strict
 scripts/aoa-check-layout --ignore-secrets
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
 ## `mcp/AGENTS.md`
 
-Run from the repository root when the command paths are repository-relative.
+Each procedure below preserves the original command order and exact command body. Read the source card for its unique warnings and stop-lines before execution.
+
+### Validation
 
 ```bash
 python mcp/protocol-lab/scripts/build_protocol_lab_status.py --check
@@ -206,32 +221,30 @@ python mcp/protocol-lab/scripts/validate_protocol_lab.py
 python -m pytest mcp/protocol-lab/tests -q
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-## `mcp/AGENTS.md`
-
-Run from the repository root when the command paths are repository-relative.
+### Validation (procedure 2)
 
 ```bash
 python scripts/ci_gate.py --mode mcp-services
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-## `mcp/AGENTS.md`
-
-Run from the repository root when the command paths are repository-relative.
+### Validation (procedure 3)
 
 ```bash
 python scripts/validate_stack.py
 python scripts/validate_nested_agents.py
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
 ## `mcp/protocol-lab/AGENTS.md`
 
-Run from the repository root when the command paths are repository-relative.
+Each procedure below preserves the original command order and exact command body. Read the source card for its unique warnings and stop-lines before execution.
+
+### Validation
 
 ```bash
 python mcp/protocol-lab/scripts/build_protocol_lab_status.py --check
@@ -239,52 +252,50 @@ python mcp/protocol-lab/scripts/validate_protocol_lab.py
 python -m pytest -q mcp/protocol-lab/tests
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
 ## `mcp/services/AGENTS.md`
 
-Run from the repository root when the command paths are repository-relative.
+Each procedure below preserves the original command order and exact command body. Read the source card for its unique warnings and stop-lines before execution.
+
+### Validation
 
 ```bash
 python scripts/ci_gate.py --mode mcp-services
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-## `mcp/services/AGENTS.md`
-
-Run from the repository root when the command paths are repository-relative.
+### Validation (procedure 2)
 
 ```bash
 python scripts/validate_stack.py
 python scripts/validate_nested_agents.py
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
 ## `mcp/services/abyss-machine-mcp/AGENTS.md`
 
-Run from the repository root when the command paths are repository-relative.
+Each procedure below preserves the original command order and exact command body. Read the source card for its unique warnings and stop-lines before execution.
+
+### Run
 
 ```bash
 python mcp/services/abyss-machine-mcp/scripts/abyss_machine_mcp_server.py
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-## `mcp/services/abyss-machine-mcp/AGENTS.md`
-
-Run from the repository root when the command paths are repository-relative.
+### Run (procedure 2)
 
 ```bash
 abyss-machine-mcp-server
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-## `mcp/services/abyss-machine-mcp/AGENTS.md`
-
-Run from the repository root when the command paths are repository-relative.
+### Smoke
 
 ```bash
 PYTHONPATH=mcp/services/abyss-machine-mcp/src python -m abyss_machine_mcp.cli brief
@@ -299,11 +310,9 @@ PYTHONPATH=mcp/services/abyss-machine-mcp/src python -m abyss_machine_mcp.cli ro
 PYTHONPATH=mcp/services/abyss-machine-mcp/src python -m abyss_machine_mcp.cli read-resource abyss-machine://brief
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-## `mcp/services/abyss-machine-mcp/AGENTS.md`
-
-Run from the repository root when the command paths are repository-relative.
+### Verify
 
 ```bash
 python mcp/services/abyss-machine-mcp/scripts/validate_machine_mcp.py
@@ -311,11 +320,9 @@ python -m pytest mcp/services/abyss-machine-mcp/tests -q
 python mcp/services/abyss-machine-mcp/scripts/release_check.py
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-## `mcp/services/abyss-machine-mcp/AGENTS.md`
-
-Run from the repository root when the command paths are repository-relative.
+### Verify (procedure 2)
 
 ```bash
 python scripts/validate_decision_records.py
@@ -323,11 +330,13 @@ python scripts/validate_stack.py
 python scripts/validate_nested_agents.py
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
 ## `mcp/services/abyss-stack-mcp/AGENTS.md`
 
-Run from the repository root when the command paths are repository-relative.
+Each procedure below preserves the original command order and exact command body. Read the source card for its unique warnings and stop-lines before execution.
+
+### Validation
 
 ```bash
 python mcp/services/abyss-stack-mcp/scripts/generate_stack_mcp_contracts.py --check
@@ -338,33 +347,31 @@ python scripts/validate_stack.py
 python scripts/validate_nested_agents.py
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
 ## `mcp/services/aoa-4pda-connector-mcp/AGENTS.md`
 
-Run from the repository root when the command paths are repository-relative.
+Each procedure below preserves the original command order and exact command body. Read the source card for its unique warnings and stop-lines before execution.
+
+### Validation
 
 ```bash
 python mcp/services/aoa-4pda-connector-mcp/scripts/validate_4pda_connector_mcp.py
 python -m pytest mcp/services/aoa-4pda-connector-mcp/tests -q
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-## `mcp/services/aoa-4pda-connector-mcp/AGENTS.md`
-
-Run from the repository root when the command paths are repository-relative.
+### Validation (procedure 2)
 
 ```bash
 python scripts/validate_stack.py
 python scripts/validate_nested_agents.py
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-## `mcp/services/aoa-4pda-connector-mcp/AGENTS.md`
-
-Run from the repository root when the command paths are repository-relative.
+### Validation (procedure 3)
 
 ```bash
 AOA_4PDA_CONNECTOR_REPO=/srv/AbyssOS/connectors/aoa-4pda-connector \
@@ -378,64 +385,60 @@ python -m aoa_4pda_connector_mcp.cli answer \
   --limit 5
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
 ## `mcp/services/aoa-course-connector-mcp/AGENTS.md`
 
-Run from the repository root when the command paths are repository-relative.
+Each procedure below preserves the original command order and exact command body. Read the source card for its unique warnings and stop-lines before execution.
+
+### On-demand validation procedure
 
 ```bash
 python mcp/services/aoa-course-connector-mcp/scripts/validate_course_connector_mcp.py
 python -m pytest mcp/services/aoa-course-connector-mcp/tests -q
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
 ## `mcp/services/aoa-decisions-mcp/AGENTS.md`
 
-Run from the repository root when the command paths are repository-relative.
+Each procedure below preserves the original command order and exact command body. Read the source card for its unique warnings and stop-lines before execution.
+
+### Run
 
 ```bash
 python mcp/services/aoa-decisions-mcp/scripts/aoa_decisions_mcp_server.py
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-## `mcp/services/aoa-decisions-mcp/AGENTS.md`
-
-Run from the repository root when the command paths are repository-relative.
+### Run (procedure 2)
 
 ```bash
 AOA_DECISIONS_MCP_CONTOUR=internal_effect \
   python mcp/services/aoa-decisions-mcp/scripts/aoa_decisions_mcp_server.py
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-## `mcp/services/aoa-decisions-mcp/AGENTS.md`
-
-Run from the repository root when the command paths are repository-relative.
+### Run (procedure 3)
 
 ```bash
 PYTHONPATH=mcp/services/aoa-decisions-mcp/src \
   python -m aoa_decisions_mcp.cli refresh
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-## `mcp/services/aoa-decisions-mcp/AGENTS.md`
-
-Run from the repository root when the command paths are repository-relative.
+### Run (procedure 4)
 
 ```bash
 aoa-decisions-mcp-server
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-## `mcp/services/aoa-decisions-mcp/AGENTS.md`
-
-Run from the repository root when the command paths are repository-relative.
+### Smoke
 
 ```bash
 PYTHONPATH=mcp/services/aoa-decisions-mcp/src python -m aoa_decisions_mcp.cli status
@@ -444,11 +447,9 @@ PYTHONPATH=mcp/services/aoa-decisions-mcp/src python -m aoa_decisions_mcp.cli se
 PYTHONPATH=mcp/services/aoa-decisions-mcp/src python -m aoa_decisions_mcp.cli packet --query "decision graph"
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-## `mcp/services/aoa-decisions-mcp/AGENTS.md`
-
-Run from the repository root when the command paths are repository-relative.
+### Verify
 
 ```bash
 python mcp/services/aoa-decisions-mcp/scripts/validate_decisions_mcp.py
@@ -456,33 +457,31 @@ python -m pytest mcp/services/aoa-decisions-mcp/tests -q
 python mcp/services/aoa-decisions-mcp/scripts/release_check.py
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-## `mcp/services/aoa-decisions-mcp/AGENTS.md`
-
-Run from the repository root when the command paths are repository-relative.
+### Verify (procedure 2)
 
 ```bash
 python scripts/validate_stack.py
 python scripts/validate_nested_agents.py
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
 ## `mcp/services/aoa-discord-connector-mcp/AGENTS.md`
 
-Run from the repository root when the command paths are repository-relative.
+Each procedure below preserves the original command order and exact command body. Read the source card for its unique warnings and stop-lines before execution.
+
+### Validation
 
 ```bash
 python mcp/services/aoa-discord-connector-mcp/scripts/validate_discord_connector_mcp.py
 python -m pytest mcp/services/aoa-discord-connector-mcp/tests -q
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-## `mcp/services/aoa-discord-connector-mcp/AGENTS.md`
-
-Run from the repository root when the command paths are repository-relative.
+### Validation (procedure 2)
 
 ```bash
 python scripts/validate_stack.py
@@ -491,11 +490,9 @@ python scripts/ci_gate.py --mode source-fast
 python scripts/ci_gate.py --mode mcp-services
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-## `mcp/services/aoa-discord-connector-mcp/AGENTS.md`
-
-Run from the repository root when the command paths are repository-relative.
+### Local Smoke
 
 ```bash
 PYTHONPATH=mcp/services/aoa-discord-connector-mcp/src \
@@ -503,42 +500,38 @@ AOA_DISCORD_CONNECTOR_REPO=/srv/AbyssOS/connectors/aoa-discord-connector \
 python -m aoa_discord_connector_mcp.cli source-route
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
 ## `mcp/services/aoa-evals-mcp/AGENTS.md`
 
-Run from the repository root when the command paths are repository-relative.
+Each procedure below preserves the original command order and exact command body. Read the source card for its unique warnings and stop-lines before execution.
+
+### Run
 
 ```bash
 /srv/AbyssOS/.codex/bin/aoa-evals-mcp-server.py
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-## `mcp/services/aoa-evals-mcp/AGENTS.md`
-
-Run from the repository root when the command paths are repository-relative.
+### Run (procedure 2)
 
 ```bash
 python mcp/services/aoa-evals-mcp/scripts/aoa_evals_mcp_server.py
 AOA_MCP_POLICY_FAMILY=candidate python mcp/services/aoa-evals-mcp/scripts/aoa_evals_mcp_server.py
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-## `mcp/services/aoa-evals-mcp/AGENTS.md`
-
-Run from the repository root when the command paths are repository-relative.
+### Run (procedure 3)
 
 ```bash
 aoa-evals-mcp-server
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-## `mcp/services/aoa-evals-mcp/AGENTS.md`
-
-Run from the repository root when the command paths are repository-relative.
+### Smoke
 
 ```bash
 PYTHONPATH=mcp/services/aoa-evals-mcp/src python -m aoa_evals_mcp.cli catalog
@@ -557,11 +550,9 @@ PYTHONPATH=mcp/services/aoa-evals-mcp/src python -m aoa_evals_mcp.cli find-or-pr
 PYTHONPATH=mcp/services/aoa-evals-mcp/src python -m aoa_evals_mcp.cli report-skeleton aoa-bounded-change-quality --evidence-ref artifact:example
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-## `mcp/services/aoa-evals-mcp/AGENTS.md`
-
-Run from the repository root when the command paths are repository-relative.
+### Verify
 
 ```bash
 python mcp/services/aoa-evals-mcp/scripts/validate_evals_mcp.py
@@ -569,64 +560,60 @@ python -m pytest mcp/services/aoa-evals-mcp/tests -q
 python mcp/services/aoa-evals-mcp/scripts/release_check.py
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
 ## `mcp/services/aoa-kag-mcp/AGENTS.md`
 
-Run from the repository root when the command paths are repository-relative.
+Each procedure below preserves the original command order and exact command body. Read the source card for its unique warnings and stop-lines before execution.
+
+### Validation
 
 ```bash
 python mcp/services/aoa-kag-mcp/scripts/validate_kag_mcp.py
 python -m pytest mcp/services/aoa-kag-mcp/tests -q
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-## `mcp/services/aoa-kag-mcp/AGENTS.md`
-
-Run from the repository root when the command paths are repository-relative.
+### Validation (procedure 2)
 
 ```bash
 python scripts/validate_stack.py
 python scripts/validate_nested_agents.py
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
 ## `mcp/services/aoa-memo-mcp/AGENTS.md`
 
-Run from the repository root when the command paths are repository-relative.
+Each procedure below preserves the original command order and exact command body. Read the source card for its unique warnings and stop-lines before execution.
+
+### Run
 
 ```bash
 /srv/AbyssOS/.codex/bin/aoa-memo-mcp-server.py
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-## `mcp/services/aoa-memo-mcp/AGENTS.md`
-
-Run from the repository root when the command paths are repository-relative.
+### Run (procedure 2)
 
 ```bash
 python mcp/services/aoa-memo-mcp/scripts/aoa_memo_mcp_server.py
 AOA_MCP_POLICY_FAMILY=candidate python mcp/services/aoa-memo-mcp/scripts/aoa_memo_mcp_server.py
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-## `mcp/services/aoa-memo-mcp/AGENTS.md`
-
-Run from the repository root when the command paths are repository-relative.
+### Run (procedure 3)
 
 ```bash
 aoa-memo-mcp-server
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-## `mcp/services/aoa-memo-mcp/AGENTS.md`
-
-Run from the repository root when the command paths are repository-relative.
+### Smoke
 
 ```bash
 PYTHONPATH=mcp/services/aoa-memo-mcp/src python -m aoa_memo_mcp.cli brief --repo Agents-of-Abyss --intent "route memory"
@@ -637,11 +624,9 @@ PYTHONPATH=mcp/services/aoa-memo-mcp/src python -m aoa_memo_mcp.cli pending-expo
 PYTHONPATH=mcp/services/aoa-memo-mcp/src python -m aoa_memo_mcp.cli landing-plan --repo abyss-stack --export-ref exports/example.reviewed-intake.json --run-dry-run
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-## `mcp/services/aoa-memo-mcp/AGENTS.md`
-
-Run from the repository root when the command paths are repository-relative.
+### Verify
 
 ```bash
 python mcp/services/aoa-memo-mcp/scripts/validate_memo_mcp.py
@@ -649,31 +634,29 @@ python -m pytest mcp/services/aoa-memo-mcp/tests -q
 python mcp/services/aoa-memo-mcp/scripts/release_check.py
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
 ## `mcp/services/aoa-session-memory-mcp/AGENTS.md`
 
-Run from the repository root when the command paths are repository-relative.
+Each procedure below preserves the original command order and exact command body. Read the source card for its unique warnings and stop-lines before execution.
+
+### Run
 
 ```bash
 python mcp/services/aoa-session-memory-mcp/scripts/aoa_session_memory_mcp_server.py
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-## `mcp/services/aoa-session-memory-mcp/AGENTS.md`
-
-Run from the repository root when the command paths are repository-relative.
+### Run (procedure 2)
 
 ```bash
 aoa-session-memory-mcp-server
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-## `mcp/services/aoa-session-memory-mcp/AGENTS.md`
-
-Run from the repository root when the command paths are repository-relative.
+### Smoke
 
 ```bash
 PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_mcp.cli status
@@ -713,11 +696,9 @@ PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_
 PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_mcp.cli graph-quality-audit --limit 4
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-## `mcp/services/aoa-session-memory-mcp/AGENTS.md`
-
-Run from the repository root when the command paths are repository-relative.
+### Verify
 
 ```bash
 python mcp/services/aoa-session-memory-mcp/scripts/validate_session_memory_mcp.py
@@ -725,33 +706,35 @@ python -m pytest mcp/services/aoa-session-memory-mcp/tests -q
 python mcp/services/aoa-session-memory-mcp/scripts/release_check.py
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-## `mcp/services/aoa-session-memory-mcp/AGENTS.md`
-
-Run from the repository root when the command paths are repository-relative.
+### Verify (procedure 2)
 
 ```bash
 python scripts/validate_stack.py
 python scripts/validate_nested_agents.py
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
 ## `mcp/services/aoa-stackoverflow-connector-mcp/AGENTS.md`
 
-Run from the repository root when the command paths are repository-relative.
+Each procedure below preserves the original command order and exact command body. Read the source card for its unique warnings and stop-lines before execution.
+
+### On-demand validation procedure
 
 ```bash
 python mcp/services/aoa-stackoverflow-connector-mcp/scripts/validate_stackoverflow_connector_mcp.py
 python -m pytest mcp/services/aoa-stackoverflow-connector-mcp/tests -q
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
 ## `mcp/services/aoa-stats-mcp/AGENTS.md`
 
-Run from the repository root when the command paths are repository-relative.
+Each procedure below preserves the original command order and exact command body. Read the source card for its unique warnings and stop-lines before execution.
+
+### Validation
 
 ```bash
 python mcp/services/aoa-stats-mcp/scripts/validate_stats_mcp.py
@@ -760,22 +743,22 @@ python scripts/validate_stack.py
 python scripts/validate_nested_agents.py
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
 ## `mcp/services/aoa-telegram-connector-mcp/AGENTS.md`
 
-Run from the repository root when the command paths are repository-relative.
+Each procedure below preserves the original command order and exact command body. Read the source card for its unique warnings and stop-lines before execution.
+
+### Validation
 
 ```bash
 python mcp/services/aoa-telegram-connector-mcp/scripts/validate_telegram_connector_mcp.py
 python -m pytest mcp/services/aoa-telegram-connector-mcp/tests -q
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-## `mcp/services/aoa-telegram-connector-mcp/AGENTS.md`
-
-Run from the repository root when the command paths are repository-relative.
+### Validation (procedure 2)
 
 ```bash
 python scripts/validate_stack.py
@@ -784,11 +767,9 @@ python scripts/ci_gate.py --mode source-fast
 python scripts/ci_gate.py --mode mcp-services
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-## `mcp/services/aoa-telegram-connector-mcp/AGENTS.md`
-
-Run from the repository root when the command paths are repository-relative.
+### Local Smoke
 
 ```bash
 PYTHONPATH=mcp/services/aoa-telegram-connector-mcp/src \
@@ -796,54 +777,60 @@ AOA_TELEGRAM_CONNECTOR_REPO=/srv/AbyssOS/connectors/aoa-telegram-connector \
 python -m aoa_telegram_connector_mcp.cli source-route
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
 ## `mcp/services/aoa-xda-connector-mcp/AGENTS.md`
 
-Run from the repository root when the command paths are repository-relative.
+Each procedure below preserves the original command order and exact command body. Read the source card for its unique warnings and stop-lines before execution.
+
+### On-demand validation procedure
 
 ```bash
 python mcp/services/aoa-xda-connector-mcp/scripts/validate_xda_connector_mcp.py
 python -m pytest mcp/services/aoa-xda-connector-mcp/tests -q
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
 ## `mcp/services/tos-corpus-mcp/AGENTS.md`
 
-Run from the repository root when the command paths are repository-relative.
+Each procedure below preserves the original command order and exact command body. Read the source card for its unique warnings and stop-lines before execution.
+
+### Validation
 
 ```bash
 python mcp/services/tos-corpus-mcp/scripts/validate_tos_corpus_mcp.py
 python -m pytest mcp/services/tos-corpus-mcp/tests -q
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-## `mcp/services/tos-corpus-mcp/AGENTS.md`
-
-Run from the repository root when the command paths are repository-relative.
+### Validation (procedure 2)
 
 ```bash
 python scripts/validate_nested_agents.py
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
 ## `mechanics/AGENTS.md`
 
-Run from the repository root when the command paths are repository-relative.
+Each procedure below preserves the original command order and exact command body. Read the source card for its unique warnings and stop-lines before execution.
+
+### Validation
 
 ```bash
 python scripts/validate_nested_agents.py
 python scripts/validate_stack.py
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
 ## `mechanics/agon-runtime/AGENTS.md`
 
-Run from the repository root when the command paths are repository-relative.
+Each procedure below preserves the original command order and exact command body. Read the source card for its unique warnings and stop-lines before execution.
+
+### On-demand validation procedure
 
 ```bash
 python mechanics/agon-runtime/parts/runtime-kernels/build_duel_runtime_kernel_registry.py --check
@@ -856,11 +843,13 @@ python -m pytest mechanics/agon-runtime/parts/runtime-kernels/tests
 python scripts/validate_stack.py
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
 ## `mechanics/agon-runtime/legacy/AGENTS.md`
 
-Run from the repository root when the command paths are repository-relative.
+Each procedure below preserves the original command order and exact command body. Read the source card for its unique warnings and stop-lines before execution.
+
+### On-demand validation procedure
 
 ```bash
 python mechanics/agon-runtime/parts/runtime-kernels/build_duel_runtime_kernel_registry.py --check
@@ -868,11 +857,13 @@ python mechanics/agon-runtime/parts/runtime-kernels/build_mechanical_trial_run_r
 python -m pytest mechanics/agon-runtime/parts/runtime-kernels/tests
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
 ## `mechanics/config-projection/AGENTS.md`
 
-Run from the repository root when the command paths are repository-relative.
+Each procedure below preserves the original command order and exact command body. Read the source card for its unique warnings and stop-lines before execution.
+
+### On-demand validation procedure
 
 ```bash
 python scripts/validate_stack.py
@@ -880,11 +871,13 @@ bash -n scripts/aoa-bootstrap-configs scripts/aoa-sync-configs scripts/aoa-rende
 bash -n mechanics/config-projection/parts/bootstrap/aoa_bootstrap_configs.sh mechanics/config-projection/parts/sync/aoa_sync_configs.sh mechanics/config-projection/parts/rendering/aoa_*.sh
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
 ## `mechanics/diagnostic-spine/AGENTS.md`
 
-Run from the repository root when the command paths are repository-relative.
+Each procedure below preserves the original command order and exact command body. Read the source card for its unique warnings and stop-lines before execution.
+
+### On-demand validation procedure
 
 ```bash
 python scripts/validate_stack.py
@@ -895,32 +888,38 @@ bash -n scripts/aoa-doctor scripts/aoa-diagnose
 bash -n mechanics/diagnostic-spine/parts/doctor-readiness/aoa_doctor.sh mechanics/diagnostic-spine/parts/diagnose-wrapper/aoa_diagnose.sh
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
 ## `mechanics/experience-runtime/AGENTS.md`
 
-Run from the repository root when the command paths are repository-relative.
+Each procedure below preserves the original command order and exact command body. Read the source card for its unique warnings and stop-lines before execution.
+
+### On-demand validation procedure
 
 ```bash
 python -m pytest mechanics/experience-runtime/legacy/artifacts/tests
 python scripts/validate_stack.py
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
 ## `mechanics/experience-runtime/legacy/AGENTS.md`
 
-Run from the repository root when the command paths are repository-relative.
+Each procedure below preserves the original command order and exact command body. Read the source card for its unique warnings and stop-lines before execution.
+
+### On-demand validation procedure
 
 ```bash
 python -m pytest mechanics/experience-runtime/legacy/artifacts/tests
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
 ## `mechanics/federation-seams/AGENTS.md`
 
-Run from the repository root when the command paths are repository-relative.
+Each procedure below preserves the original command order and exact command body. Read the source card for its unique warnings and stop-lines before execution.
+
+### On-demand validation procedure
 
 ```bash
 python scripts/validate_stack.py
@@ -932,21 +931,21 @@ python -m py_compile mechanics/federation-seams/parts/federation-checks/aoa_fede
 bash -n scripts/aoa-sync-federation-surfaces mechanics/federation-seams/parts/sync-wrapper/aoa_sync_federation_surfaces.sh
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
 ## `mechanics/federation-seams/parts/memo-seam/AGENTS.md`
 
-Run from the repository root when the command paths are repository-relative.
+Each procedure below preserves the original command order and exact command body. Read the source card for its unique warnings and stop-lines before execution.
+
+### Runtime Routes
 
 ```bash
 scripts/aoa-sync-federation-surfaces --layer aoa-memo
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-## `mechanics/federation-seams/parts/memo-seam/AGENTS.md`
-
-Run from the repository root when the command paths are repository-relative.
+### Runtime Routes (procedure 2)
 
 ```bash
 curl http://127.0.0.1:5402/memo/registry
@@ -955,11 +954,9 @@ curl http://127.0.0.1:5402/memo/object-catalog
 curl -X POST http://127.0.0.1:5402/memo/capsule -H 'content-type: application/json' -d '{"family":"doctrine","id":"AOA-M-0002"}'
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-## `mechanics/federation-seams/parts/memo-seam/AGENTS.md`
-
-Run from the repository root when the command paths are repository-relative.
+### Runtime Routes (procedure 3)
 
 ```bash
 scripts/aoa-export-memo-candidate \
@@ -968,11 +965,9 @@ scripts/aoa-export-memo-candidate \
   --write
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-## `mechanics/federation-seams/parts/memo-seam/AGENTS.md`
-
-Run from the repository root when the command paths are repository-relative.
+### Validation
 
 ```bash
 python scripts/validate_stack.py
@@ -983,11 +978,13 @@ python -m pytest -q mechanics/federation-seams/parts/memo-seam/tests/test_active
 python -m pytest -q mechanics/federation-seams/parts/memo-seam/tests/test_active_organ_agent_local_runtime_namespace.py
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
 ## `mechanics/governed-execution/AGENTS.md`
 
-Run from the repository root when the command paths are repository-relative.
+Each procedure below preserves the original command order and exact command body. Read the source card for its unique warnings and stop-lines before execution.
+
+### On-demand validation procedure
 
 ```bash
 python scripts/validate_stack.py
@@ -996,11 +993,13 @@ python -m py_compile mechanics/governed-execution/parts/governed-runner/aoa_gove
 bash -n scripts/aoa-status
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
 ## `mechanics/governed-execution/parts/ephemeral-worker/AGENTS.md`
 
-Run from the repository root when the command paths are repository-relative.
+Each procedure below preserves the original command order and exact command body. Read the source card for its unique warnings and stop-lines before execution.
+
+### Validation
 
 ```bash
 python -m pytest -q mechanics/governed-execution/parts/ephemeral-worker/tests
@@ -1009,11 +1008,13 @@ python scripts/validate_nested_agents.py
 python scripts/validate_stack.py
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
 ## `mechanics/governed-execution/parts/external-codex-agent/AGENTS.md`
 
-Run from the repository root when the command paths are repository-relative.
+Each procedure below preserves the original command order and exact command body. Read the source card for its unique warnings and stop-lines before execution.
+
+### Validation
 
 ```bash
 AOA_SDK_SOURCE_ROOT=/absolute/path/to/aoa-sdk \
@@ -1043,11 +1044,13 @@ python scripts/validate_nested_agents.py
 python scripts/validate_stack.py
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
 ## `mechanics/inference-pilots/AGENTS.md`
 
-Run from the repository root when the command paths are repository-relative.
+Each procedure below preserves the original command order and exact command body. Read the source card for its unique warnings and stop-lines before execution.
+
+### On-demand validation procedure
 
 ```bash
 python scripts/validate_stack.py
@@ -1059,11 +1062,13 @@ bash -n mechanics/inference-pilots/parts/qwen-routes/aoa_qwen_bench.sh mechanics
 python -m py_compile mechanics/inference-pilots/parts/local-trials/compatibility-runners/aoa-local-ai-trials mechanics/inference-pilots/parts/quiet-bridge-commands/runners/aoa-w5-pilot mechanics/inference-pilots/parts/quiet-bridge-commands/runners/aoa-w6-pilot
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
 ## `mechanics/inference-pilots/legacy/AGENTS.md`
 
-Run from the repository root when the command paths are repository-relative.
+Each procedure below preserves the original command order and exact command body. Read the source card for its unique warnings and stop-lines before execution.
+
+### On-demand validation procedure
 
 ```bash
 scripts/aoa-long-horizon-pilot --help
@@ -1072,11 +1077,13 @@ bash -n scripts/aoa-long-horizon-pilot scripts/aoa-bounded-autonomy-pilot
 python -m py_compile mechanics/inference-pilots/legacy/trials/artifacts/scripts/aoa-local-ai-trials mechanics/inference-pilots/legacy/trials/artifacts/scripts/aoa-w5-pilot mechanics/inference-pilots/legacy/trials/artifacts/scripts/aoa-w6-pilot
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
 ## `mechanics/inference-pilots/parts/tos-foundation-lab/AGENTS.md`
 
-Run from the repository root when the command paths are repository-relative.
+Each procedure below preserves the original command order and exact command body. Read the source card for its unique warnings and stop-lines before execution.
+
+### Validation
 
 ```bash
 python mechanics/inference-pilots/parts/tos-foundation-lab/tos_foundation_lab.py validate
@@ -1084,22 +1091,26 @@ python -m pytest mechanics/inference-pilots/parts/tos-foundation-lab/tests -q
 python scripts/validate_stack.py
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
 ## `mechanics/machine-fit/AGENTS.md`
 
-Run from the repository root when the command paths are repository-relative.
+Each procedure below preserves the original command order and exact command body. Read the source card for its unique warnings and stop-lines before execution.
+
+### On-demand validation procedure
 
 ```bash
 python scripts/validate_stack.py
 python -m py_compile mechanics/machine-fit/parts/host-facts/aoa_host_facts.py mechanics/machine-fit/parts/machine-bridge/aoa_machine_bridge.py mechanics/machine-fit/parts/fit-record/aoa_machine_fit.py mechanics/machine-fit/parts/platform-adaptations/aoa_platform_adaptation.py
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
 ## `mechanics/runtime-lifecycle/AGENTS.md`
 
-Run from the repository root when the command paths are repository-relative.
+Each procedure below preserves the original command order and exact command body. Read the source card for its unique warnings and stop-lines before execution.
+
+### On-demand validation procedure
 
 ```bash
 python scripts/validate_stack.py
@@ -1110,11 +1121,13 @@ bash -n mechanics/runtime-lifecycle/parts/first-run-bootstrap/aoa_*.sh mechanics
 systemd-analyze --user verify systemd/user/podman-compose-abyss.service
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
 ## `mechanics/runtime-repair/AGENTS.md`
 
-Run from the repository root when the command paths are repository-relative.
+Each procedure below preserves the original command order and exact command body. Read the source card for its unique warnings and stop-lines before execution.
+
+### On-demand validation procedure
 
 ```bash
 python scripts/validate_stack.py
@@ -1122,21 +1135,25 @@ python -m pytest mechanics/runtime-repair/parts/degradation-receipts/tests/test_
 python -m py_compile mechanics/runtime-repair/parts/a2a-return-dry-run/aoa_a2a_return_closeout_dry_run.py mechanics/runtime-repair/parts/memo-contradiction-sidecar/aoa_memo_contradiction_integrity.py
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
 ## `mechanics/runtime-repair/legacy/AGENTS.md`
 
-Run from the repository root when the command paths are repository-relative.
+Each procedure below preserves the original command order and exact command body. Read the source card for its unique warnings and stop-lines before execution.
+
+### On-demand validation procedure
 
 ```bash
 python -m pytest mechanics/runtime-repair/parts/degradation-receipts/tests/test_degradation_receipts.py mechanics/runtime-repair/parts/repair-safe-closeout/tests/test_repair_safe_closeout_receipts.py
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
 ## `memo/AGENTS.md`
 
-Run from the repository root when the command paths are repository-relative.
+Each procedure below preserves the original command order and exact command body. Read the source card for its unique warnings and stop-lines before execution.
+
+### Candidate Route
 
 ```bash
 PYTHONPATH=mcp/services/aoa-memo-mcp/src python -m aoa_memo_mcp.cli create-candidate \
@@ -1145,32 +1162,26 @@ PYTHONPATH=mcp/services/aoa-memo-mcp/src python -m aoa_memo_mcp.cli create-candi
   --claim "Runtime memory access should route through reviewed local candidates."
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-## `memo/AGENTS.md`
-
-Run from the repository root when the command paths are repository-relative.
+### Candidate Route (procedure 2)
 
 ```bash
 PYTHONPATH=mcp/services/aoa-memo-mcp/src python -m aoa_memo_mcp.cli validate-candidate path/to/candidate.json
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-## `memo/AGENTS.md`
-
-Run from the repository root when the command paths are repository-relative.
+### Reviewed Landing Route
 
 ```bash
 PYTHONPATH=mcp/services/aoa-memo-mcp/src python -m aoa_memo_mcp.cli pending-exports --repo abyss-stack
 PYTHONPATH=mcp/services/aoa-memo-mcp/src python -m aoa_memo_mcp.cli landing-plan --repo abyss-stack --export-ref exports/path.reviewed-intake.json --run-dry-run
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-## `memo/AGENTS.md`
-
-Run from the repository root when the command paths are repository-relative.
+### Validation
 
 ```bash
 python mcp/services/aoa-memo-mcp/scripts/validate_memo_mcp.py
@@ -1180,11 +1191,13 @@ python "$AOA_MEMO_ROOT/scripts/memory/build_local_memo_port_index.py" --path mem
 python -m pytest mcp/services/aoa-memo-mcp/tests -q
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
 ## `quests/AGENTS.md`
 
-Run from the repository root when the command paths are repository-relative.
+Each procedure below preserves the original command order and exact command body. Read the source card for its unique warnings and stop-lines before execution.
+
+### Validate
 
 ```bash
 python scripts/validate_stack.py
@@ -1193,11 +1206,13 @@ python -m py_compile quests/scripts/quest_surface.py quests/scripts/build_quest_
 python -m pytest tests/test_questbook_surface_contracts.py
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
 ## `scripts/AGENTS.md`
 
-Run from the repository root when the command paths are repository-relative.
+Each procedure below preserves the original command order and exact command body. Read the source card for its unique warnings and stop-lines before execution.
+
+### Verify
 
 ```bash
 python scripts/validate_stack.py
@@ -1213,11 +1228,13 @@ scripts/aoa-machine-bridge --mode public --write /tmp/machine-bridge.public.revi
 scripts/aoa-machine-fit --mode public
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
 ## `skills/AGENTS.md`
 
-Run from the repository root when the command paths are repository-relative.
+Each procedure below preserves the original command order and exact command body. Read the source card for its unique warnings and stop-lines before execution.
+
+### Validation
 
 ```bash
 python scripts/build_diagnostic_surface_catalog.py --check
@@ -1225,32 +1242,34 @@ python scripts/validate_diagnostic_surface_catalog.py
 python scripts/validate_stack.py
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
 ## `stats/AGENTS.md`
 
-Run from the repository root when the command paths are repository-relative.
+Each procedure below preserves the original command order and exact command body. Read the source card for its unique warnings and stop-lines before execution.
+
+### Validation
 
 ```bash
 python scripts/validate_local_stats_port.py
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
 ## `systemd/AGENTS.md`
 
-Run from the repository root when the command paths are repository-relative.
+Each procedure below preserves the original command order and exact command body. Read the source card for its unique warnings and stop-lines before execution.
+
+### Verify
 
 ```bash
 python scripts/validate_nested_agents.py
 python scripts/validate_stack.py
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-## `systemd/AGENTS.md`
-
-Run from the repository root when the command paths are repository-relative.
+### Verify (procedure 2)
 
 ```bash
 systemd-analyze --user verify systemd/user/podman-compose-abyss.service
@@ -1259,21 +1278,21 @@ systemd-analyze verify systemd/system/*.service systemd/system/*.timer
 bash -n scripts/aoa-install-systemd
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
 ## `systemd/system/AGENTS.md`
 
-Run from the repository root when the command paths are repository-relative.
+Each procedure below preserves the original command order and exact command body. Read the source card for its unique warnings and stop-lines before execution.
+
+### Privileged install route
 
 ```bash
 pkexec /srv/AbyssOS/abyss-stack/Configs/scripts/aoa-install-systemd --system-units
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-## `systemd/system/AGENTS.md`
-
-Run from the repository root when the command paths are repository-relative.
+### Verify
 
 ```bash
 systemd-analyze verify systemd/system/*.service systemd/system/*.timer
@@ -1281,42 +1300,38 @@ bash -n scripts/aoa-install-systemd
 python scripts/validate_stack.py
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
 ## `systemd/user/AGENTS.md`
 
-Run from the repository root when the command paths are repository-relative.
+Each procedure below preserves the original command order and exact command body. Read the source card for its unique warnings and stop-lines before execution.
+
+### Install routes
 
 ```bash
 systemctl --user daemon-reload
 systemctl --user enable --now podman-compose-abyss.service
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-## `systemd/user/AGENTS.md`
-
-Run from the repository root when the command paths are repository-relative.
+### Install routes (procedure 2)
 
 ```bash
 scripts/aoa-install-systemd --preset intel-full --profile federation --enable-now --restart-now
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-## `systemd/user/AGENTS.md`
-
-Run from the repository root when the command paths are repository-relative.
+### Install routes (procedure 3)
 
 ```bash
 scripts/aoa-install-systemd --all-user-units
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-## `systemd/user/AGENTS.md`
-
-Run from the repository root when the command paths are repository-relative.
+### Verify
 
 ```bash
 systemd-analyze --user verify systemd/user/podman-compose-abyss.service
@@ -1324,21 +1339,21 @@ systemd-analyze --user verify systemd/user/*.service systemd/user/*.timer system
 scripts/aoa-install-systemd
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
-## `systemd/user/AGENTS.md`
-
-Run from the repository root when the command paths are repository-relative.
+### Verify (procedure 2)
 
 ```bash
 scripts/aoa-install-systemd --enable-now
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
 
 ## `tests/AGENTS.md`
 
-Run from the repository root when the command paths are repository-relative.
+Each procedure below preserves the original command order and exact command body. Read the source card for its unique warnings and stop-lines before execution.
+
+### Validate
 
 ```bash
 python scripts/ci_gate.py --mode tests
@@ -1346,4 +1361,4 @@ ABYSS_STACK_TEST_SCHEDULER=serial python scripts/ci_gate.py --mode tests
 python scripts/validate_stack.py
 ```
 
-The exact sequence above is on-demand procedure for this source surface. It does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.
+This is on-demand human procedure only; it does not prove deployed runtime health, external CI/review/merge, artifact admission, sibling-owner acceptance, or Goal completion unless those separate boundaries are explicitly exercised and evidenced.

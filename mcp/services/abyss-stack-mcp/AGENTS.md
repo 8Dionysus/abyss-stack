@@ -13,6 +13,7 @@ approved restart-and-rollback contract for `abyss-stack-mcp-read.service`.
 ## Conditional source route
 
 Read only the source, README, and owner contract needed for the current touched surface; entering this subtree does not require an unconditional inventory.
+
 ## Boundaries
 
 - Keep read, candidate, and internal-effect processes, tools, ports,

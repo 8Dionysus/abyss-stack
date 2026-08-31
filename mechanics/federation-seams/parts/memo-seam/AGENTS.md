@@ -14,11 +14,10 @@ route.
 ## Conditional source route
 
 Read only the source, README, and owner contract needed for the current touched surface; entering this subtree does not require an unconditional inventory.
+
 ## Runtime Routes
 
-Refresh the public-safe memo mirror:
-
-Validation is on-demand: use [VALIDATION.md](../../../../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.
+Refresh the public-safe memo mirror through the focused procedure in [VALIDATION.md](../../../../VALIDATION.md).
 
 Inspect the memo seam after the `federation` profile is up:
 
@@ -28,6 +27,9 @@ Emit a bounded memo export candidate:
 
 ## Validation
 
+Use the on-demand validation route in `VALIDATION.md` for the exact seam
+checks and preserve its live-read, candidate-export, and destructive-action
+warnings.
 
 ## Closeout
 

@@ -6,6 +6,7 @@ This directory contains public-safe env examples only. It does not contain live 
 ## Conditional source route
 
 Read only the source, README, and owner contract needed for the current touched surface; entering this subtree does not require an unconditional inventory.
+
 ## Directory contract
 - Files here are examples and must stay public-safe.
 - Real secret-bearing files belong under `/srv/AbyssOS/abyss-stack/Secrets/Configs`, except `stack.env`, which is expected at `/srv/AbyssOS/abyss-stack/Configs/stack.env` and is recommended to be a symlink to `/srv/AbyssOS/abyss-stack/Secrets/Configs/stack.env`.

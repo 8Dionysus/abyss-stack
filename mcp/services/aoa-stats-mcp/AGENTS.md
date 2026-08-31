@@ -21,6 +21,7 @@ truth or freshness.
 ## Conditional source route
 
 Read only the source, README, and owner contract needed for the current touched surface; entering this subtree does not require an unconditional inventory.
+
 ## Boundaries
 
 - `aoa-stats` owns statistical grammar, compatibility, semantic identity,
@@ -35,7 +36,7 @@ Read only the source, README, and owner contract needed for the current touched 
 
 ## Validation
 
-After manual positive and negative journeys establish the behavior,use the on-demand validation route in `VALIDATION.md`.
+After manual positive and negative journeys establish the behavior, use the on-demand validation route in `VALIDATION.md`.
 
 Validation is on-demand: use [VALIDATION.md](../../../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.
 

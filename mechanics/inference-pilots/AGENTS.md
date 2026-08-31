@@ -17,9 +17,7 @@ should be reached through thin part-local bridges.
 Do not promote a model, tuning overlay, or worker path without recorded evidence
 and a runtime check.
 
-Validation:
-
-Validation is on-demand: use [VALIDATION.md](../../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.
+Use [VALIDATION.md](../../VALIDATION.md) for exact commands and focused checks.
 
 Agon dry-run kernels now route through `mechanics/agon-runtime/`.
 Archived pilot surfaces route through `mechanics/inference-pilots/legacy/`

@@ -24,6 +24,4 @@ Do not:
 - move artifacts back into flat root folders to make a validator easy
 - mutate `Agents-of-Abyss`, `aoa-sdk`, or `Tree-of-Sophia` from this package
 
-Validation:
-
-Validation is on-demand: use [VALIDATION.md](../../VALIDATION.md) for the `validate_mechanical_trial_runs.py` route and exact focused checks; retain the named lane and source-owned stop-lines.
+Use [VALIDATION.md](../../VALIDATION.md) for the exact `validate_mechanical_trial_runs.py` procedure.

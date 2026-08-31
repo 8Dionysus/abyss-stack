@@ -6,6 +6,7 @@ This directory owns the runtime bridge, bootstrap helpers, introspection helpers
 ## Conditional source route
 
 Read only the source, README, and owner contract needed for the current touched surface; `scripts/README.md` is the semantic route when needed, and entering this subtree does not require an unconditional inventory.
+
 ## Directory contract
 - Root operator scripts are stable wrappers and should be safe by default.
 - Operator implementation bodies live under the owning mechanic parts.
@@ -73,8 +74,7 @@ Read only the source, README, and owner contract needed for the current touched 
 - If the runtime wrapper consumes a return-policy file or writes return-event bundles, keep those contracts explicit in docs, layout checks, and render-truth guidance.
 
 ## Verify
-For shell work, run the smallest useful set:
-Validation is on-demand: use [VALIDATION.md](../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.
+For shell work, use the smallest useful set from [VALIDATION.md](../VALIDATION.md).
 
 For bootstrap or lifecycle changes, rehearse the flow encoded in `.github/workflows/validate-stack.yml` with a temporary runtime root.
 

@@ -6,6 +6,7 @@ This directory stores public-safe runtime config templates that are bootstrapped
 ## Conditional source route
 
 Read only the source, README, and owner contract needed for the current touched surface; entering this subtree does not require an unconditional inventory.
+
 ## Directory contract
 - `Configs/` mirrors `${AOA_STACK_ROOT}/Configs`.
 - `Services/` mirrors `${AOA_STACK_ROOT}/Services`.
@@ -15,9 +16,7 @@ Read only the source, README, and owner contract needed for the current touched 
 ## Bootstrap route
 
 When an operator explicitly wants to copy public-safe templates into the
-deployed runtime tree, use:
-
-Validation is on-demand: use [VALIDATION.md](../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.
+deployed runtime tree, use the focused procedure in [VALIDATION.md](../VALIDATION.md).
 
 For verification or rehearsals, prefer the temporary-root route below before
 touching the deployed runtime.
@@ -39,7 +38,7 @@ touching the deployed runtime.
 `Configs/agent-api/return-policy.yaml` is public-safe runtime policy, not a secret-bearing env file.
 
 ## Verify
-Use a temporary runtime root you control:
+Use the temporary runtime-root procedure in [VALIDATION.md](../VALIDATION.md).
 
 ## Hard no
 - do not treat bootstrapped runtime copies as source-managed truth

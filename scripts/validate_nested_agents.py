@@ -409,7 +409,29 @@ ADVISORY_AGENT_DIRS: tuple[str, ...] = ('config', 'manifests/recurrence')
 HEADING_PREFIXES = ("# AGENTS.md", "# AGENTS")
 IGNORED_DIRS = {".git", ".venv", "__pycache__", ".pytest_cache", ".mypy_cache"}
 AGENTS_CHAIN_BUDGET_BYTES = 32 * 1024
-RUNNABLE_FENCE_RE = re.compile(r"^```(?:bash|sh|shell|console)\s*$", re.IGNORECASE | re.MULTILINE)
+RUNNABLE_FENCE_RE = re.compile(r"^\s*```(?:bash|sh|shell|console)\s*$", re.IGNORECASE | re.MULTILINE)
+PROCEDURAL_HEADING_RE = re.compile(
+    r"^(?:Validation|Verify|Validate|Smoke|Local Smoke|Run|Check)$", re.IGNORECASE
+)
+ORPHAN_LEADIN_RE = re.compile(
+    r"^\s*(?:Run:|Validate with:|Then validate[^:]*:|start with:|use:)\s*$",
+    re.IGNORECASE,
+)
+COMMAND_LINE_RE = re.compile(
+    r"^\s*(?:[-*]\s+)?(?:"
+    r"(?:python3?|pytest|bash|sh|shellcheck|systemctl|systemd-analyze)\s+"
+    r"[-./\w$=|;&]"
+    r"|(?:scripts/aoa[-\w./]+|aoa-[\w./-]+)\s+[-./\w$=|;&])",
+    re.IGNORECASE,
+)
+INLINE_COMMAND_RE = re.compile(
+    r"\b(?:run|execute|invoke|start|validate with|then validate|use)\s*:?[ \t]+"
+    r"`?(?:"
+    r"(?:python3?|pytest|bash|sh|shellcheck|systemctl|systemd-analyze)\s+[-./\w$=|;&]"
+    r"|(?:scripts/aoa[-\w./]+|aoa-[\w./-]+)\s+[-./\w$=|;&])",
+    re.IGNORECASE,
+)
+ROOT_VALIDATION_SOURCE_RE = re.compile(r"^## `([^`]+/AGENTS\.md)`\s*$")
 COMMAND_SNIPPET_MARKERS = (
     "python ",
     "pytest ",
@@ -455,7 +477,9 @@ def _is_ignored(path: Path, repo_root: Path) -> bool:
 
 def _is_command_snippet(snippet: str) -> bool:
     normalized = _normalize(snippet)
-    return any(marker.lower() in normalized for marker in COMMAND_SNIPPET_MARKERS)
+    return normalized.startswith("-") or any(
+        marker.lower() in normalized for marker in COMMAND_SNIPPET_MARKERS
+    )
 
 
 def _validation_route_text(path: Path, repo_root: Path) -> str:
@@ -476,10 +500,59 @@ def _validation_route_text(path: Path, repo_root: Path) -> str:
     return "\n".join(candidate.read_text(encoding="utf-8") for candidate in candidates)
 
 
+def _active_lines(text: str) -> list[tuple[int, str]]:
+    """Return source lines outside any Markdown fenced block."""
+    active: list[tuple[int, str]] = []
+    in_fence = False
+    for line_number, line in enumerate(text.splitlines(), start=1):
+        if line.lstrip().startswith("```"):
+            in_fence = not in_fence
+            continue
+        if not in_fence:
+            active.append((line_number, line))
+    return active
+
+
+def _validate_root_validation_routes(text: str) -> list[str]:
+    """Reject repeated source routes that make the human map ambiguous."""
+    headings = [match.group(1) for match in map(ROOT_VALIDATION_SOURCE_RE.match, text.splitlines()) if match]
+    duplicates = sorted({path for path in headings if headings.count(path) > 1})
+    return [
+        f"VALIDATION.md: duplicate source route heading {path!r}"
+        for path in duplicates
+    ]
+
+
 def _validate_card_hygiene(rel_path: str, text: str) -> list[str]:
     issues: list[str] = []
     if RUNNABLE_FENCE_RE.search(text):
         issues.append(f"{rel_path}: runnable command fence remains in AGENTS.md; move it to VALIDATION.md")
+    active = _active_lines(text)
+    for line_number, line in active:
+        if COMMAND_LINE_RE.match(line) or INLINE_COMMAND_RE.search(line):
+            issues.append(
+                f"{rel_path}:{line_number}: imperative command sequence remains in AGENTS.md; "
+                "move it to VALIDATION.md"
+            )
+        if ORPHAN_LEADIN_RE.match(line):
+            next_lines = [candidate for number, candidate in active if number > line_number and candidate.strip()]
+            if not next_lines or not COMMAND_LINE_RE.match(next_lines[0]):
+                issues.append(
+                    f"{rel_path}:{line_number}: orphan procedural lead-in remains in AGENTS.md"
+                )
+    for index, (line_number, line) in enumerate(active):
+        heading_match = re.match(r"^#{2,6}\s+(.+?)\s*$", line)
+        if not heading_match or not PROCEDURAL_HEADING_RE.match(heading_match.group(1).strip()):
+            continue
+        body: list[str] = []
+        for _, candidate in active[index + 1 :]:
+            if re.match(r"^#{1,6}\s+", candidate):
+                break
+            body.append(candidate)
+        if not any(candidate.strip() and not candidate.strip().startswith("<!--") for candidate in body):
+            issues.append(
+                f"{rel_path}:{line_number}: empty procedural heading {heading_match.group(1)!r}"
+            )
     return issues
 
 
@@ -521,6 +594,9 @@ def validate(
         root_text = root_agents.read_text(encoding="utf-8")
         if not _has_agents_heading(root_text):
             issues.append("AGENTS.md: missing AGENTS heading")
+    root_validation = repo_root / "VALIDATION.md"
+    if root_validation.is_file():
+        issues.extend(_validate_root_validation_routes(root_validation.read_text(encoding="utf-8")))
 
     for rel_path, snippets in REQUIRED_AGENTS_DOCS.items():
         path = repo_root / rel_path

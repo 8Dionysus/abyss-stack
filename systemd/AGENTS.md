@@ -12,6 +12,7 @@ and a small privileged support allowlist under `systemd/system/`.
 ## Conditional source route
 
 Read only the source, README, and owner contract needed for the current touched surface; entering this subtree does not require an unconditional inventory.
+
 ## Directory Contract
 
 - Keep this directory as source-managed unit skeletons, not live host state.
@@ -33,8 +34,6 @@ Read only the source, README, and owner contract needed for the current touched 
 
 ## Verify
 
-For route-only edits:
-
-Validation is on-demand: use [VALIDATION.md](../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.
+For route-only edits, use [VALIDATION.md](../VALIDATION.md).
 
 For unit edits, also use:

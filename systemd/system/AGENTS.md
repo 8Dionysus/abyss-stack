@@ -23,13 +23,9 @@ before rootless user services can work correctly on this host.
 ## Privileged install route
 
 Only when an operator explicitly intends to install the allowlisted system
-units, use the deployed Configs mirror route:
-
-Validation is on-demand: use [VALIDATION.md](../../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.
+units, use the deployed Configs mirror procedure in [VALIDATION.md](../../VALIDATION.md).
 
 That route backs up existing regular files under `/etc/systemd/system`,
 installs root-owned copies of the allowlisted units, and runs
 the systemd daemon-reload operation. It does not start, stop, restart, enable, disable,
 or mask services.
-
-## Verify

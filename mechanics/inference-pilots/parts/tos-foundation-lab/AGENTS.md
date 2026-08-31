@@ -14,6 +14,7 @@ semantic promotion, rights clearance, model storage, or host policy.
 ## Conditional source route
 
 Read only the source, README, and owner contract needed for the current touched surface; `/etc/abyss-machine/storage-policy.json` remains the host storage authority when the task needs it, and entering this subtree does not require an unconditional inventory.
+
 ## Non-negotiable boundaries
 
 - Keep source payloads read-only and refer to them by stable ToS item/file IDs.

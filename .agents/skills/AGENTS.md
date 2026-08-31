@@ -28,6 +28,4 @@ targets are historical drift, not an active route.
 
 ## Validate
 
-Use the root nested guidance check after touching skill surfaces:
-
-Validation is on-demand: use [VALIDATION.md](../../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.
+After touching skill surfaces, use the root nested guidance check from [VALIDATION.md](../../VALIDATION.md).

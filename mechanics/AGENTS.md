@@ -8,6 +8,7 @@ This card applies to `mechanics/` and every nested path under it until a nearer
 ## Conditional source route
 
 Read only the source, README, and owner contract needed for the current touched surface; entering this subtree does not require an unconditional inventory.
+
 ## Role
 
 `mechanics/` is the source-owned runtime mechanics tree for abyss-stack.
@@ -82,7 +83,7 @@ example, generated capsule, or focused part-local test.
 
 ## Validation
 
-For mechanics-only route work,use the on-demand validation route in `VALIDATION.md`.
+For mechanics-only route work, use the on-demand validation route in `VALIDATION.md`.
 
 Validation is on-demand: use [VALIDATION.md](../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.
 

@@ -6,6 +6,7 @@ This directory stores rootless `systemd --user` unit skeletons for the deployed 
 ## Conditional source route
 
 Read only the source, README, and owner contract needed for the current touched surface; entering this subtree does not require an unconditional inventory.
+
 ## Directory contract
 - Units here are user units, not system-wide units.
 - They target the deployed runtime tree under `${AOA_CONFIGS_ROOT}` and the canonical runtime root `/srv/AbyssOS/abyss-stack`, not the source checkout.
@@ -37,9 +38,7 @@ Read only the source, README, and owner contract needed for the current touched 
 
 ## Install routes
 
-For a direct manual user-unit reload and enablement test:
-
-Validation is on-demand: use [VALIDATION.md](../../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.
+For direct manual user-unit reload and enablement tests, use [VALIDATION.md](../../VALIDATION.md).
 
 Prefer the installer when a durable runtime selection should be recorded:
 

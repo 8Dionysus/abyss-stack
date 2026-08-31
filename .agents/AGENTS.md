@@ -11,6 +11,7 @@ that need to ship with the `abyss-stack` source checkout.
 ## Conditional source route
 
 Read only the source, README, and owner contract needed for the current touched surface; `.agents/README.md` is the semantic route when needed, and entering this subtree does not require an unconditional inventory.
+
 ## Directory Contract
 
 - Keep canonical skill law in the owning skill repository.

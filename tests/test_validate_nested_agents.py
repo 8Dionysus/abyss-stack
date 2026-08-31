@@ -22,7 +22,12 @@ def _write(path: Path, text: str) -> None:
 def _write_minimal_required_tree(repo_root: Path) -> None:
     _write(repo_root / "AGENTS.md", "# AGENTS.md\nRoot guidance.\n")
     for rel_path, snippets in validator.REQUIRED_AGENTS_DOCS.items():
-        _write(repo_root / rel_path, "# AGENTS.md\n" + "\n".join(snippets) + "\n")
+        _write(
+            repo_root / rel_path,
+            "# AGENTS.md\n"
+            + "\n".join(f"Reference: {snippet}" for snippet in snippets)
+            + "\n",
+        )
 
 
 class ValidateNestedAgentsTests(unittest.TestCase):

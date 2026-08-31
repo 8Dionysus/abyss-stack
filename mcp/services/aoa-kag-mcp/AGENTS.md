@@ -17,6 +17,7 @@ anchors, provenance, freshness, access, projection state, and evidence routes.
 ## Conditional source route
 
 Read only the source, README, and owner contract needed for the current touched surface; entering this subtree does not require an unconditional inventory.
+
 ## Boundaries
 
 Repo-local `kag/` homes own canonical repository records. `aoa-kag` owns the
@@ -28,11 +29,11 @@ contract tests.
 
 ## Validation
 
-For this service,use the on-demand validation route in `VALIDATION.md`.
+For this service, use the on-demand validation route in `VALIDATION.md`.
 
 Validation is on-demand: use [VALIDATION.md](../../../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.
 
-For service-route changes, alsouse the on-demand validation route in `VALIDATION.md`.
+For service-route changes, also use the on-demand validation route in `VALIDATION.md`.
 
 
 ## Closeout

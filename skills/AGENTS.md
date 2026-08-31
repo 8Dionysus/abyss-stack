@@ -13,6 +13,7 @@ cross-repository skill doctrine, or another repository's procedure.
 ## Conditional source route
 
 Read only the source, README, and owner contract needed for the current touched surface; entering this subtree does not require an unconditional inventory.
+
 ## Boundaries
 
 - Keep the owner package authoritative for applicability, procedure, ABI,
@@ -31,7 +32,7 @@ Read only the source, README, and owner contract needed for the current touched 
 
 Start with a manual positive, negative, owner-return, and coexistence pass.
 After the behavior is understood, run the host skill package validator and the
-narrow owner checks named by the bundle. For the diagnostic bundle, alsouse the on-demand validation route in `VALIDATION.md`.
+narrow owner checks named by the bundle. For the diagnostic bundle, also use the on-demand validation route in `VALIDATION.md`.
 
 Validation is on-demand: use [VALIDATION.md](../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.
 

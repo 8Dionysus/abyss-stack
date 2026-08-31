@@ -14,6 +14,7 @@ authority.
 ## Conditional source route
 
 Read only the source, README, and owner contract needed for the current touched surface; entering this subtree does not require an unconditional inventory.
+
 ## Boundaries
 
 - Keep built-in Codex multi-agent transport disabled.
@@ -35,7 +36,7 @@ Read only the source, README, and owner contract needed for the current touched 
 
 ## Validation
 
-Run:
+Use the on-demand validation route in `VALIDATION.md` for the exact focused procedure.
 
 Validation is on-demand: use [mechanics/governed-execution/parts/external-codex-agent/VALIDATION.md](VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.
 

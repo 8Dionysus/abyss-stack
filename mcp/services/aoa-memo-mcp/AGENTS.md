@@ -33,6 +33,7 @@ It does not own:
 ## Conditional source route
 
 Read only the source, README, and owner contract needed for the current touched surface; entering this subtree does not require an unconditional inventory.
+
 ## Route Modes
 
 | Need | First route |
@@ -58,11 +59,9 @@ Read only the source, README, and owner contract needed for the current touched 
 
 In the shared AoA Codex plane this service is registered as `aoa_memo` through
 `8Dionysus:config/codex_plane/runtime_manifest.v1.json`. Use the workspace
-launcher from the shared root when testing the registered route:
+launcher from the shared root when testing the registered route; use [VALIDATION.md](../../../VALIDATION.md).
 
-Validation is on-demand: use [VALIDATION.md](../../../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.
-
-For source-local service execution from the `abyss-stack` repo root,use the on-demand validation route in `VALIDATION.md`.
+For source-local service execution from the `abyss-stack` repo root, use the on-demand validation route in `VALIDATION.md`.
 
 
 The first command defaults to the read contour. Candidate writes additionally
@@ -70,12 +69,6 @@ require `AOA_MEMO_MCP_CANDIDATE_ROOTS`; managed lifecycle supplies that exact
 allowlist and the distinct candidate bearer.
 
 If the package is installed, the server entry point is:
-
-
-## Smoke
-
-
-## Verify
 
 
 ## Report

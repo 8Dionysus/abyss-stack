@@ -17,6 +17,7 @@ what the runtime contract is now.
 ## Conditional source route
 
 Read only the source, README, and owner contract needed for the current touched surface; entering this subtree does not require an unconditional inventory.
+
 ## Boundaries
 
 - Do not treat this district as stronger than its source surfaces.
@@ -57,11 +58,9 @@ date-prefixed paths are historical git/PR addresses only.
 
 ## Validation
 
-Use the docs and release validation lane:
+Use the docs and release validation lane in [VALIDATION.md](../../VALIDATION.md).
 
-Validation is on-demand: use [VALIDATION.md](../../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.
-
-For release-facing direction or history changes, alsouse the on-demand validation route in `VALIDATION.md`.
+For release-facing direction or history changes, also use the on-demand validation route in `VALIDATION.md`.
 
 
 ## Closeout

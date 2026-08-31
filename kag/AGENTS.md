@@ -14,6 +14,7 @@ home, mechanics, and MCP access plane.
 ## Conditional source route
 
 Read only the source, README, and owner contract needed for the current touched surface; `kag/manifest.json` is the provider contract when needed, and entering this subtree does not require an unconditional inventory.
+
 ## Boundaries
 
 Runtime source meaning belongs to `abyss-stack`. Shared KAG schema, registry,

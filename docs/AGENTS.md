@@ -44,6 +44,4 @@ more specific `mechanics/<package>/parts/<part>/docs/` surface.
 
 ## Validate
 
-Use the root validation path after documentation topology changes:
-
-Validation is on-demand: use [VALIDATION.md](../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.
+For documentation topology changes, use the root validation path in [VALIDATION.md](../VALIDATION.md).

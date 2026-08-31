@@ -15,6 +15,7 @@ by `aoa-stats`.
 ## Conditional source route
 
 Read only the source, README, and owner contract needed for the current touched surface; entering this subtree does not require an unconditional inventory.
+
 ## Boundaries
 
 - `port.manifest.json` owns the stack-local question and measurement meaning.
@@ -30,7 +31,7 @@ Read only the source, README, and owner contract needed for the current touched 
 
 Manually exercise complete, partial, zero, empty-population, and unavailable-
 observation cases against the service-selection read model before changing its
-invariants. Thenuse the on-demand validation route in `VALIDATION.md`.
+invariants. Then use the on-demand validation route in `VALIDATION.md`.
 
 Validation is on-demand: use [VALIDATION.md](../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.
 

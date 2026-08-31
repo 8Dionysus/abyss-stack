@@ -45,11 +45,11 @@ Answer packets must preserve `agent_answer`, evidence-chain fields, and
 
 ## Validation
 
-Run:
+Use the on-demand validation route in `VALIDATION.md` for the exact focused procedure.
 
 Validation is on-demand: use [VALIDATION.md](../../../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.
 
-For parent MCP route changes, alsouse the on-demand validation route in `VALIDATION.md`.
+For parent MCP route changes, also use the on-demand validation route in `VALIDATION.md`.
 
 
-For a local OS Abyss smoke with a materialized connectoruse the on-demand validation route in `VALIDATION.md`.
+For a local OS Abyss smoke with a materialized connector, use the on-demand validation route in `VALIDATION.md`.

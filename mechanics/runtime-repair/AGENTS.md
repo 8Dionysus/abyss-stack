@@ -11,6 +11,4 @@ Read only the source and owner contract needed for the current touched surface; 
 Do not perform repair, delete data, or claim recovery from a receipt. This
 package shapes runtime evidence and handoff only.
 
-Validation:
-
-Validation is on-demand: use [VALIDATION.md](../../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.
+Use [VALIDATION.md](../../VALIDATION.md) for exact commands and focused checks.

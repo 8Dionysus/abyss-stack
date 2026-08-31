@@ -10,6 +10,4 @@ Read only the source and owner contract needed for the current touched surface; 
 Do not commit live secrets, rendered private config, or machine-local values.
 Do not hand-edit deployed `Configs` as source truth.
 
-Validation:
-
-Validation is on-demand: use [VALIDATION.md](../../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.
+Use [VALIDATION.md](../../VALIDATION.md) for exact commands and focused checks.

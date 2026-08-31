@@ -13,6 +13,4 @@ Upstream names that must remain for route-api or mirror compatibility belong in
 `parts/federation-checks/docs/UPSTREAM_COMPATIBILITY.md`; active local docs
 should use the clean runtime aliases.
 
-Validation:
-
-Validation is on-demand: use [VALIDATION.md](../../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.
+Use [VALIDATION.md](../../VALIDATION.md) for exact commands and focused checks.

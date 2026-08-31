@@ -39,6 +39,7 @@ It does not own:
 ## Conditional source route
 
 Read only the source, README, and owner contract needed for the current touched surface; entering this subtree does not require an unconditional inventory.
+
 ## Route Modes
 
 | Need | First route |
@@ -69,7 +70,7 @@ Read only the source, README, and owner contract needed for the current touched 
 
 ## Run
 
-For source-local service execution from the `abyss-stack` repo root,use the on-demand validation route in `VALIDATION.md`.
+For source-local service execution from the `abyss-stack` repo root, use the on-demand validation route in `VALIDATION.md`.
 
 Validation is on-demand: use [VALIDATION.md](../../../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.
 
@@ -83,13 +84,10 @@ The owner-local CLI remains the non-MCP cache preparation route:
 If the package is installed, the server entry point is:
 
 
-## Smoke
-
-
 ## Verify
 
 
-When parent MCP routing changes, alsouse the on-demand validation route in `VALIDATION.md`.
+When parent MCP routing changes, also use the on-demand validation route in `VALIDATION.md`.
 
 
 ## Report

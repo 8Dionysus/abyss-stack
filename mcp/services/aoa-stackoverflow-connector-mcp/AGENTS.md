@@ -5,7 +5,9 @@ This package is the stack-owned read-only access plane over
 meaning; this package owns only authenticated local MCP wrapping.
 
 Never expose crawl/build/write/account/ask/answer/comment/edit/vote/delete or
-internal-search routes. Validate with:
+internal-search routes.
+
+Use the on-demand validation route in `VALIDATION.md` for the exact focused procedure.
 
 Require query and answer packets to prove `network_touched=false` and
 `read_only=true`. Do not publish `query-hybrid` until that command exists in

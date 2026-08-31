@@ -33,6 +33,4 @@ route, not in this root store.
 
 ## Validate
 
-Use the narrowest checks that cover the touched quest surface:
-
-Validation is on-demand: use [VALIDATION.md](../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.
+Use the narrowest checks that cover the touched quest surface from [VALIDATION.md](../VALIDATION.md).

@@ -26,6 +26,4 @@ They should prove the source checkout contract without requiring a live deployed
 
 ## Validate
 
-Use targeted tests first, then broaden only when needed:
-
-Validation is on-demand: use [VALIDATION.md](../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.
+Use targeted tests first, then broaden only when needed, following [VALIDATION.md](../VALIDATION.md).

@@ -43,7 +43,7 @@ Do not edit `/srv/AbyssOS/abyss-stack` as if it were the source repository.
 Use the narrowest public-safe validation for the changed surface.
 
 For root docs, topology, validators, mechanics, or sync-managed source surfaces,
-start with:
+Use the on-demand validation route in `VALIDATION.md` for the exact focused procedure.
 
 Validation is on-demand: use [VALIDATION.md](VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.
 
@@ -89,9 +89,6 @@ It does not own:
 - AoA center doctrine, ToS corpus meaning, sibling repo doctrine, private live
   machine state, or semantic proof claims outside runtime-owned evidence
 
-## Conditional source route
-
-Read only the source, README, and owner contract needed for the current touched surface; entering this subtree does not require an unconditional inventory.
 ## Route Modes
 
 Entry routing is governed by `docs/routes/START_HERE_ROUTE_CONTRACT.md`. This card

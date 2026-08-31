@@ -17,6 +17,4 @@ Do not:
 - claim that a receipt proves repair or root cause
 - hand-edit active receipt examples without running the package tests
 
-Validation:
-
-Validation is on-demand: use [VALIDATION.md](../../../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.
+Use [VALIDATION.md](../../../VALIDATION.md) for exact commands and focused checks.

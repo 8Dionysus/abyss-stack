@@ -13,6 +13,7 @@ candidates, receipts, exports, and local notes before any reviewed landing in
 ## Conditional source route
 
 Read only the source, README, and owner contract needed for the current touched surface; entering this subtree does not require an unconditional inventory.
+
 ## Boundaries
 
 Write locally as `write_candidate_only` unless a stronger reviewed route is
@@ -25,11 +26,9 @@ for review or handoff traces, `exports/` for packets meant for `aoa-memo`, and
 
 ## Candidate Route
 
-Create candidates through the MCP helper from the `abyss-stack` repo root:
+For candidate creation through the MCP helper from the `abyss-stack` repo root, use [VALIDATION.md](../VALIDATION.md).
 
-Validation is on-demand: use [VALIDATION.md](../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.
-
-Then validate the emitted candidate path:
+Use the on-demand validation route in `VALIDATION.md` for the exact focused procedure.
 
 
 ## Reviewed Landing Route
@@ -44,6 +43,8 @@ read-model refresh, validators, and review.
 
 ## Validation
 
+Use the on-demand validation route in `VALIDATION.md` for the exact local-port
+checks and retain candidate-only and reviewed-landing stop-lines.
 
 ## Closeout
 

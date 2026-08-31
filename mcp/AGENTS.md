@@ -17,6 +17,7 @@ owner layers.
 ## Conditional source route
 
 Read only the source, README, and owner contract needed for the current touched surface; entering this subtree does not require an unconditional inventory.
+
 ## Boundaries
 
 MCP packages may expose resources, tools, prompts, smoke tests, and access
@@ -34,15 +35,15 @@ that package catalog or its command matrix into this inherited district card.
 
 ## Validation
 
-For protocol compatibility changes,use the on-demand validation route in `VALIDATION.md`.
+For protocol compatibility changes, use the on-demand validation route in `VALIDATION.md`.
 
 Validation is on-demand: use [VALIDATION.md](../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.
 
 For one service package, run the exact `Run`, `Smoke`, and `Verify` route in
-its nearest `AGENTS.md`. For a change spanning the service district,use the on-demand validation route in `VALIDATION.md`.
+its nearest `AGENTS.md`. For a change spanning the service district, use the on-demand validation route in `VALIDATION.md`.
 
 
-For release-facing stack changes, alsouse the on-demand validation route in `VALIDATION.md`.
+For release-facing stack changes, also use the on-demand validation route in `VALIDATION.md`.
 
 
 ## Closeout

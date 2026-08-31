@@ -18,6 +18,4 @@ Do not:
 - promote seed docs into active runtime law without a distillation note
 - blur stack runtime contracts with AoA or ToS meaning authority
 
-Validation:
-
-Validation is on-demand: use [VALIDATION.md](../../../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.
+Use [VALIDATION.md](../../../VALIDATION.md) for exact commands and focused checks.

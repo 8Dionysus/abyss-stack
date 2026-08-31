@@ -38,11 +38,6 @@ policy, parser logic, index construction, graph construction, or generated data.
 
 ## Validation
 
-Run package-local checks after changes:
+For package-local checks after changes, use [VALIDATION.md](../../../VALIDATION.md).
 
-Validation is on-demand: use [VALIDATION.md](../../../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.
-
-For source-route changes, alsouse the on-demand validation route in `VALIDATION.md`.
-
-
-## Local Smoke
+For source-route changes, also use the on-demand validation route in `VALIDATION.md`.

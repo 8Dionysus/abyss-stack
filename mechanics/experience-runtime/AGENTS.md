@@ -24,9 +24,7 @@ Do not:
 - let tests read root `schemas/` or `examples/` for this preserved family
 - mutate stronger owner repos from this package
 
-Validation:
-
-Validation is on-demand: use [VALIDATION.md](../../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.
+Use [VALIDATION.md](../../VALIDATION.md) for exact commands and focused checks.
 
 The archived test files keep their `test_experience_wave*_seed_contracts.py`
 names until a future distillation pass creates quieter active contract tests.

@@ -6,6 +6,7 @@ This directory owns compose-time runtime shape: atomic modules, profile expansio
 ## Conditional source route
 
 Read only the source, README, and owner contract needed for the current touched surface; entering this subtree does not require an unconditional inventory.
+
 ## Directory contract
 - `modules/*.yml` are the atomic runtime pieces.
 - `profiles/*.txt` list module filenames in activation order.
@@ -49,8 +50,7 @@ Read only the source, README, and owner contract needed for the current touched 
 - If a new preset becomes first-class, add or adjust rehearsal coverage in `.github/workflows/validate-stack.yml`.
 
 ## Verify
-Run the smallest set that proves the change:
-Validation is on-demand: use [VALIDATION.md](../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.
+For the smallest validation set that proves the change, use [VALIDATION.md](../VALIDATION.md).
 
 For preset work, use the matching preset form instead of only testing profiles. Treat rendered config as potentially secret-bearing.
 

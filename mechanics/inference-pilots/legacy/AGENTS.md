@@ -18,6 +18,4 @@ Do not:
 - claim trial-proven evidence as live availability
 - widen pilot scripts into autonomous mutation authority
 
-Validation:
-
-Validation is on-demand: use [VALIDATION.md](../../../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.
+Use [VALIDATION.md](../../../VALIDATION.md) for exact commands and focused checks.
