@@ -27,6 +27,9 @@ for review or handoff traces, `exports/` for packets meant for `aoa-memo`, and
 ## Candidate Route
 
 For candidate creation through the MCP helper from the `abyss-stack` repo root, use [VALIDATION.md](../VALIDATION.md).
+When that helper or its landing-plan route is involved, also consult
+[`mcp/services/aoa-memo-mcp/AGENTS.md`](../mcp/services/aoa-memo-mcp/AGENTS.md)
+for the access-plane boundary.
 
 Use the on-demand validation route in `VALIDATION.md` for the exact focused procedure.
 

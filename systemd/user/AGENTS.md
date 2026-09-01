@@ -40,17 +40,20 @@ Read only the source, README, and owner contract needed for the current touched 
 
 For direct manual user-unit reload and enablement tests, use [VALIDATION.md](../../VALIDATION.md).
 
-Prefer the installer when a durable runtime selection should be recorded:
-
+For a durable runtime selection, use the **Durable runtime selection installer**
+procedure in [VALIDATION.md](../../VALIDATION.md#systemduseragentsmd).
 
 To link every user unit named in `managed-units.txt` without starting or
-enabling services, use the link-only procedure in `VALIDATION.md`.
+enabling services, use the **Link managed user units without starting**
+procedure in [VALIDATION.md](../../VALIDATION.md#systemduseragentsmd).
 
 
 ## Verify
-When the host supports systemd user tooling:
 
-If you are explicitly testing enablement, use the enablement procedure in `VALIDATION.md`.
+When the host supports systemd user tooling, use the **User-unit syntax
+validation** procedure in
+[VALIDATION.md](../../VALIDATION.md#systemduseragentsmd). If you are explicitly
+testing enablement, use the **Explicit enablement test** in the same route.
 
 ## Hard no
 - do not point units at the source checkout

@@ -498,7 +498,30 @@ def _validation_route_text(path: Path, repo_root: Path) -> str:
     root_validation = repo_root / "VALIDATION.md"
     if root_validation.is_file() and root_validation not in candidates:
         candidates.append(root_validation)
-    return "\n".join(candidate.read_text(encoding="utf-8") for candidate in candidates)
+
+    rel_path = _relative(path, repo_root)
+    route_texts: list[str] = []
+    for candidate in candidates:
+        text = candidate.read_text(encoding="utf-8")
+        if candidate == root_validation:
+            text = _root_validation_route_section(text, rel_path)
+        route_texts.append(text)
+    return "\n".join(route_texts)
+
+
+def _root_validation_route_section(text: str, rel_path: str) -> str:
+    """Return only the root VALIDATION section owned by one nested card."""
+    section: list[str] = []
+    collecting = False
+    for line in text.splitlines():
+        heading = ROOT_VALIDATION_SOURCE_RE.match(line)
+        if heading:
+            if collecting:
+                break
+            collecting = heading.group(1) == rel_path
+        if collecting:
+            section.append(line)
+    return "\n".join(section)
 
 
 def _active_lines(text: str) -> list[tuple[int, str]]:

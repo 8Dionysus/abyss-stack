@@ -131,6 +131,37 @@ def test_root_validation_rejects_duplicate_source_route_headings() -> None:
     assert issues == ["VALIDATION.md: duplicate source route heading 'pkg/AGENTS.md'"]
 
 
+def test_card_validation_route_is_bounded_to_matching_root_section(tmp_path) -> None:
+    card = tmp_path / "pkg" / "AGENTS.md"
+    card.parent.mkdir()
+    card.write_text("# AGENTS.md\n", encoding="utf-8")
+    (tmp_path / "VALIDATION.md").write_text(
+        "# Routes\n\n"
+        "## `pkg/AGENTS.md`\n\n"
+        "```bash\npython scripts/check_pkg.py\n```\n\n"
+        "## `other/AGENTS.md`\n\n"
+        "```bash\npython scripts/check_elsewhere.py\n```\n",
+        encoding="utf-8",
+    )
+
+    route = validate_nested_agents._validation_route_text(card, tmp_path)
+
+    assert "python scripts/check_pkg.py" in route
+    assert "python scripts/check_elsewhere.py" not in route
+
+    (tmp_path / "VALIDATION.md").write_text(
+        "# Routes\n\n"
+        "## `pkg/AGENTS.md`\n\nNo local command.\n\n"
+        "## `other/AGENTS.md`\n\n"
+        "```bash\npython scripts/check_pkg.py\n```\n",
+        encoding="utf-8",
+    )
+
+    missing_local_route = validate_nested_agents._validation_route_text(card, tmp_path)
+
+    assert "python scripts/check_pkg.py" not in missing_local_route
+
+
 def test_current_nested_agent_hygiene_is_clean() -> None:
     result = validate_nested_agents.validate(REPO_ROOT)
 
