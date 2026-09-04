@@ -7,19 +7,19 @@
     "algorithm": "sha256:canonical-json-file-inventory-v2",
     "base_ref": "3e11beaff640682b702f530fdef6f9c34fd76561",
     "contract_version": "aoa-kag:budget-receipt-candidate-identity-v2",
-    "excluded_path": "kag/receipts/index_family_budget/f3156b5f27d6a788121672f587cbea778c5221cadaf91ebd7d6bb67633f7a892.json",
-    "family_digest": "f3156b5f27d6a788121672f587cbea778c5221cadaf91ebd7d6bb67633f7a892",
-    "file_count": 3459,
-    "seal": "bbb1276018805ccfe1c91c53cd44a8fe53c0337fb0fad9c3f778e4e0aa2559d6",
-    "source_epoch": "sha256:8a7073a87b165f8e64217f8661d3285e77bdcda0673899e9b930400e5c09067e",
-    "source_snapshot": "sha256:e726596e0d2b0db124724db71a6b493e6db74afd905bcdd9036bea5a112c5c06"
+    "excluded_path": "kag/receipts/index_family_budget/4bc409ff9b57dddc88f87b4b3a32a50115dd87b84b058b41005d28a280bfba23.json",
+    "family_digest": "4bc409ff9b57dddc88f87b4b3a32a50115dd87b84b058b41005d28a280bfba23",
+    "file_count": 3460,
+    "seal": "ede2fef0851561bf78cb749d5fd9d960e2a7034b96ff78986e98773e27c82b99",
+    "source_epoch": "sha256:34f5ae25ca0ca66664ecbc8343a172e9ce4740ccd8372ffb5c9ab1dcbfbc5806",
+    "source_snapshot": "sha256:495c4c469064d6500454d70f2005155459bb15e20d59832b86fd05e9079605dc"
   },
   "changed_generated_bytes": 308607,
   "changed_generated_files": 6,
   "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
   "default_limit_bytes": 1048576,
-  "head_family_digest": "f3156b5f27d6a788121672f587cbea778c5221cadaf91ebd7d6bb67633f7a892",
-  "head_source_snapshot": "sha256:e726596e0d2b0db124724db71a6b493e6db74afd905bcdd9036bea5a112c5c06",
+  "head_family_digest": "4bc409ff9b57dddc88f87b4b3a32a50115dd87b84b058b41005d28a280bfba23",
+  "head_source_snapshot": "sha256:495c4c469064d6500454d70f2005155459bb15e20d59832b86fd05e9079605dc",
   "producer_identity": {
     "action": {
       "bytes": 5200,
@@ -565,9 +565,9 @@
         "state": "present"
       },
       {
-        "bytes": 148835,
-        "content_digest": "23765ed0a67a676f3b80607b61a9f58dea1f4d0e926f6ad119d57202cd8cf66e",
-        "git_blob": "sha1:bec8f3e49ef13196cfb3b3903d350c1fad2a582e",
+        "bytes": 148553,
+        "content_digest": "be1eb5b6ba5d8133a4ded51e71e48ebcb61bd5ec82109859270c376190b95eb0",
+        "git_blob": "sha1:c9f724f02838bd9e903495b02bf4f5641f113a6f",
         "path": "scripts/repo_local/portable_family.py",
         "state": "present"
       },
@@ -1160,7 +1160,7 @@
         "state": "present"
       }
     ],
-    "identity_digest": "d529532e5b64d4fcfe14cce71dcc5e6527ddf6269541b0e632a5c15d47fe1d5c",
+    "identity_digest": "9216b343222f794cc5b84bb10de019b69a7125776ed56aef04b011512bb9c83d",
     "owner": "aoa-kag",
     "procedure_manifest": {
       "action_inputs": [
@@ -1360,9 +1360,9 @@
       "schema_path": "schemas/repo-local-kag-budget-producer-manifest.schema.json"
     },
     "revision_binding": "content-addressed-procedure-import-closure-portable-runtime-contract-and-descriptor-io-v1",
-    "source_digest": "33a045fadeb39fd981761d3ebfaa4312af06e1dc6fb9478f143e9cec272a585c"
+    "source_digest": "14bd8ea5abf9d997d32ebdab040e93f4f69759e2696d2b77f1c5aa4ca76f9566"
   },
-  "reason": "Repair the merged atlas KAG family with the current identity-bound owner generator and restore Repo Validation.",
+  "reason": "Repair the merged atlas KAG family with the landed packaged-action owner and restore Repo Validation without bypass.",
   "repo": "abyss-stack",
   "schema_version": "aoa-repo-local-kag-budget-receipt-v2",
   "scope": "tracked_size",
