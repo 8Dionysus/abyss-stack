@@ -49,7 +49,9 @@ stabilizer, but it reads the release command sequence from the lane manifest.
   keeps targeted arguments on the serial path; an explicit process scheduler
   may use the same proof for a targeted selection. Timing hints may change
   order, never selection or failure semantics. Failed shard logs repeat after
-  the aggregate so bounded log tails retain the actionable traceback.
+  the aggregate so bounded log tails retain the actionable traceback. Live
+  output is tailed from each durable shard log, so a descendant inheriting a
+  shard descriptor cannot hold the scheduler past the pytest process exit.
 
 ## Active Lanes
 

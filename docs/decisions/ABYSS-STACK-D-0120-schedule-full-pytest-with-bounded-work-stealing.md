@@ -202,6 +202,9 @@ exactly. The aggregate is green only when every child is green and every
 selection proof is exact. Failed shard logs are replayed after the aggregate so
 bounded CI and resource-launch log tails retain the actionable traceback even
 when an early shard fails and later shards continue to completion.
+Child output is written to a durable file and tailed by the parent; completion
+uses the pytest process exit status rather than waiting for pipe EOF from
+descendants that may inherit a descriptor.
 
 Targeted pytest arguments use the unchanged serial path automatically. An
 explicit process scheduler may opt into the same exact partition contract for

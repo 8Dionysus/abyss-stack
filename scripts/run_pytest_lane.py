@@ -7,11 +7,9 @@ import hashlib
 import json
 import os
 from pathlib import Path
-from queue import Empty, Queue
 import subprocess
 import sys
 import tempfile
-from threading import Thread
 import time
 from typing import Any
 
@@ -334,25 +332,6 @@ def _plugin_command(
     return command
 
 
-def _pump_process_output(
-    *,
-    shard_index: int,
-    stream: Any,
-    output: Any,
-    events: Queue[tuple[int, str | None]],
-) -> None:
-    """Copy one child stream to its durable log and the parent's live queue."""
-
-    try:
-        for line in iter(stream.readline, ""):
-            output.write(line)
-            output.flush()
-            events.put((shard_index, line))
-    finally:
-        stream.close()
-        events.put((shard_index, None))
-
-
 def _read_result(path: Path) -> dict[str, Any]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if payload.get("schema_version") != PARTITION_RESULT_SCHEMA:
@@ -448,30 +427,27 @@ def run_process_worksteal(*, extra_args: list[str]) -> int:
         )
 
         pending: deque[int] = deque(range(len(assignments)))
-        active: dict[int, tuple[subprocess.Popen[str], Any, Thread, float]] = {}
+        active: dict[int, tuple[subprocess.Popen[str], Any, Any, float]] = {}
         records: dict[int, dict[str, Any]] = {}
-        output_events: Queue[tuple[int, str | None]] = Queue()
-        output_finished: set[int] = set()
 
-        def drain_output_events() -> None:
-            while True:
-                try:
-                    shard_index, line = output_events.get_nowait()
-                except Empty:
-                    return
-                if line is None:
-                    output_finished.add(shard_index)
-                    continue
-                for chunk in line.splitlines(keepends=True) or [line]:
-                    print(
-                        f"[pytest-shard-live {shard_index + 1}/{len(assignments)}] {chunk}",
-                        end="",
-                        flush=True,
-                    )
+        def drain_output_logs() -> None:
+            """Stream durable shard logs without waiting for descriptor EOF."""
+
+            for shard_index, (_process, _output, tail, _started) in list(active.items()):
+                while True:
+                    line = tail.readline()
+                    if not line:
+                        break
+                    for chunk in line.splitlines(keepends=True) or [line]:
+                        print(
+                            f"[pytest-shard-live {shard_index + 1}/{len(assignments)}] {chunk}",
+                            end="",
+                            flush=True,
+                        )
 
         try:
             while pending or active:
-                drain_output_events()
+                drain_output_logs()
                 while pending and len(active) < PROCESS_WORKER_LIMIT:
                     shard_index = pending.popleft()
                     assignment_path = temporary / f"assignment-{shard_index}.json"
@@ -492,29 +468,12 @@ def run_process_worksteal(*, extra_args: list[str]) -> int:
                             observed_path=observed_path,
                             result_path=result_path,
                         ),
-                        stdout=subprocess.PIPE,
+                        stdout=output,
                         stderr=subprocess.STDOUT,
                         text=True,
-                        bufsize=1,
                     )
-                    stream = process.stdout
-                    if stream is None:
-                        output.close()
-                        process.terminate()
-                        process.wait()
-                        raise RuntimeError("pytest shard did not expose stdout")
-                    reader = Thread(
-                        target=_pump_process_output,
-                        kwargs={
-                            "shard_index": shard_index,
-                            "stream": stream,
-                            "output": output,
-                            "events": output_events,
-                        },
-                        daemon=True,
-                    )
-                    reader.start()
-                    active[shard_index] = (process, output, reader, time.monotonic())
+                    tail = log_path.open("r", encoding="utf-8")
+                    active[shard_index] = (process, output, tail, time.monotonic())
                     records[shard_index] = {
                         "assignment": assignment_path,
                         "observed": observed_path,
@@ -524,11 +483,12 @@ def run_process_worksteal(*, extra_args: list[str]) -> int:
                     }
 
                 completed_any = False
-                for shard_index, (process, output, reader, started) in list(active.items()):
+                for shard_index, (process, output, tail, started) in list(active.items()):
                     returncode = process.poll()
-                    if returncode is None or shard_index not in output_finished:
+                    if returncode is None:
                         continue
-                    reader.join()
+                    drain_output_logs()
+                    tail.close()
                     output.close()
                     records[shard_index]["returncode"] = returncode
                     records[shard_index]["elapsed"] = time.monotonic() - started
@@ -537,15 +497,15 @@ def run_process_worksteal(*, extra_args: list[str]) -> int:
                 if not completed_any and active:
                     time.sleep(0.05)
         except BaseException:
-            for process, _output, _reader, _started in active.values():
+            for process, _output, _tail, _started in active.values():
                 process.terminate()
-            for process, _output, _reader, _started in active.values():
+            for process, _output, _tail, _started in active.values():
                 process.wait()
-            for _process, output, reader, _started in active.values():
-                reader.join(timeout=1)
+            for _process, output, tail, _started in active.values():
+                tail.close()
                 output.close()
             raise
-        drain_output_events()
+        drain_output_logs()
 
         failed = False
         failed_shards: list[int] = []

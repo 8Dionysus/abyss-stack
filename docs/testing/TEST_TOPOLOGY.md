@@ -52,6 +52,9 @@ as the exact rollback and independent sequential oracle. The scheduler may
 change execution order only. Duration hints cannot change membership. It does
 not skip, lose, retry, or reinterpret failures. It replays failed shard logs
 after the aggregate so an early traceback remains visible in bounded log tails.
+The parent tails each durable shard log while the child runs and decides
+completion from child process status, not pipe EOF that a descendant could keep
+open.
 
 Expensive transport setup may be stratified from semantic assertions only
 inside the owning test harness. The external Codex suite keeps named exact

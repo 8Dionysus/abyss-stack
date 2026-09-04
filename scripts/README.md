@@ -76,8 +76,9 @@ still synced into deployed `Configs/` with the wrappers.
   targeted arguments on the serial path; an explicit
   `--scheduler process-4x32-file-aware` may process a targeted selection using
   the same exact partition proof.
-  Failed shard logs are replayed at aggregate closeout for bounded-log
-  diagnostics; tests are not retried.
+  Shard output is written to a durable log and tailed without waiting for
+  descendant-owned descriptor EOF; failed shard logs are replayed at aggregate
+  closeout for bounded-log diagnostics, and tests are not retried.
 - Keep `validate_local_stats_port.py` as a thin delegation to the `aoa-stats`
   contract owner; do not copy the central schemas or validator into this repo.
 - Keep `validate_nested_agents.py` responsible for every discovered inherited

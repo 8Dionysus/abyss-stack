@@ -326,6 +326,50 @@ def test_pytest_process_partitions_queue_measured_slow_units_first() -> None:
     assert all(nodeid.startswith(f"{slow_path}::") for nodeid in partitions[0])
 
 
+def test_pytest_process_shards_use_durable_logs_without_pipe_eof(monkeypatch) -> None:
+    nodeid = "tests/test_example.py::test_example"
+    popen_stdout: list[object] = []
+
+    def fake_collect(*_args, **kwargs):
+        run_pytest_lane.write_manifest(
+            Path(kwargs["env"][run_pytest_lane.PARTITION_BASELINE_ENV]),
+            [nodeid],
+        )
+        return subprocess.CompletedProcess([], 0)
+
+    class FakeProcess:
+        def poll(self):
+            return 0
+
+    def fake_popen(_command, **kwargs):
+        popen_stdout.append(kwargs["stdout"])
+        kwargs["stdout"].write("fake shard output\n")
+        kwargs["stdout"].flush()
+        environment = kwargs["env"]
+        run_pytest_lane.write_manifest(
+            Path(environment[run_pytest_lane.PARTITION_OBSERVED_ENV]),
+            [nodeid],
+        )
+        Path(environment[run_pytest_lane.PARTITION_RESULT_ENV]).write_text(
+            json.dumps(
+                {
+                    "schema_version": run_pytest_lane.PARTITION_RESULT_SCHEMA,
+                    "exitstatus": 0,
+                    "stats": {"passed": 1},
+                }
+            ),
+            encoding="utf-8",
+        )
+        return FakeProcess()
+
+    monkeypatch.setattr(run_pytest_lane.subprocess, "run", fake_collect)
+    monkeypatch.setattr(run_pytest_lane.subprocess, "Popen", fake_popen)
+
+    assert run_pytest_lane.run_process_worksteal(extra_args=[nodeid]) == 0
+    assert popen_stdout
+    assert popen_stdout[0] is not subprocess.PIPE
+
+
 def test_pytest_scheduler_keeps_an_exact_serial_rollback() -> None:
     rollback = run_pytest_lane.scheduler_plan("serial")
     command = run_pytest_lane.build_pytest_command(
