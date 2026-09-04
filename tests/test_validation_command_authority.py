@@ -465,6 +465,21 @@ def test_pytest_child_command_is_unbuffered_for_live_diagnostics() -> None:
     command = run_pytest_lane._plugin_command(selection_args=[])
 
     assert command[1:4] == ["-u", "-m", "pytest"]
+    plugin_index = command.index("-p")
+    assert command[plugin_index : plugin_index + 2] == [
+        "-p",
+        "scripts.run_pytest_lane",
+    ]
+
+
+def test_explicit_pytest_plugins_are_carried_into_process_children() -> None:
+    assert run_pytest_lane._explicit_plugin_args(
+        ["tests", "-p", "custom_plugin", "-pno:cacheprovider", "--", "-p", "literal"]
+    ) == ["-p", "custom_plugin", "-pno:cacheprovider"]
+    assert run_pytest_lane._plugin_command(
+        selection_args=["tests/test_example.py::test_example"],
+        explicit_plugin_args=["-p", "custom_plugin"],
+    )[-3:] == ["-p", "custom_plugin", "tests/test_example.py::test_example"]
 
 
 def test_pytest_children_disable_plugin_autoload_by_default_but_allow_opt_out(

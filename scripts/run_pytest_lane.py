@@ -322,6 +322,7 @@ def _partition_environment(
 def _plugin_command(
     *,
     selection_args: list[str],
+    explicit_plugin_args: list[str] | None = None,
     collect_only: bool = False,
 ) -> list[str]:
     command = [
@@ -335,8 +336,29 @@ def _plugin_command(
     ]
     if collect_only:
         command.append("--collect-only")
+    if explicit_plugin_args:
+        command.extend(explicit_plugin_args)
     command.extend(selection_args)
     return command
+
+
+def _explicit_plugin_args(selection_args: list[str]) -> list[str]:
+    """Keep caller-selected pytest plugins in every process-isolated child."""
+
+    plugins: list[str] = []
+    index = 0
+    while index < len(selection_args):
+        argument = selection_args[index]
+        if argument == "--":
+            break
+        if argument == "-p" and index + 1 < len(selection_args):
+            plugins.extend((argument, selection_args[index + 1]))
+            index += 2
+            continue
+        if argument.startswith("-p") and argument != "-p":
+            plugins.append(argument)
+        index += 1
+    return plugins
 
 
 def _read_result(path: Path) -> dict[str, Any]:
@@ -395,6 +417,7 @@ def run_process_worksteal(*, extra_args: list[str]) -> int:
         baseline_path = temporary / "baseline.json"
         collect_log = temporary / "collect.log"
         collect_command = _plugin_command(selection_args=extra_args, collect_only=True)
+        explicit_plugin_args = _explicit_plugin_args(extra_args)
         collect_started = time.monotonic()
         with collect_log.open("w", encoding="utf-8") as output:
             collected = subprocess.run(
@@ -472,6 +495,7 @@ def run_process_worksteal(*, extra_args: list[str]) -> int:
                     output = log_path.open("w", encoding="utf-8")
                     command = _plugin_command(
                         selection_args=assignments[shard_index],
+                        explicit_plugin_args=explicit_plugin_args,
                     )
                     process = subprocess.Popen(
                         command,

@@ -207,7 +207,8 @@ uses the pytest process exit status rather than waiting for pipe EOF from
 descendants that may inherit a descriptor.
 The lane defaults `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1` so every child does not
 repeat unrelated third-party plugin imports; callers can set it to `0` when an
-external plugin is an explicit part of the run.
+external plugin is an explicit part of the run. Caller-supplied `-p NAME`
+arguments remain explicit and are carried into each process-isolated child.
 
 Targeted pytest arguments use the unchanged serial path automatically. An
 explicit process scheduler may opt into the same exact partition contract for

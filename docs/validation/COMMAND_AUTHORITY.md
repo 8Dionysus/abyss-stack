@@ -54,6 +54,8 @@ stabilizer, but it reads the release command sequence from the lane manifest.
   shard descriptor cannot hold the scheduler past the pytest process exit. The
   runner disables third-party pytest plugin autoload by default; set
   `PYTEST_DISABLE_PLUGIN_AUTOLOAD=0` for an explicit external-plugin run.
+  Caller-supplied `-p NAME` arguments remain explicit and are carried into each
+  process-isolated child.
 
 ## Active Lanes
 
