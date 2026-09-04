@@ -19,6 +19,8 @@ class HealthResponse(BaseModel):
     corpus_index_exists: bool
     philosophy_graph_projection_path: str
     philosophy_graph_projection_exists: bool
+    material_planting_projection_path: str
+    material_planting_projection_exists: bool
     philosophy_post_planting_audit_path: str
     philosophy_post_planting_audit_exists: bool
     default_view: str

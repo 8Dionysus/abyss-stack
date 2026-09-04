@@ -283,12 +283,17 @@ class Neo4jProjectionStore:
             for endpoint in (edge.get("from_id"), edge.get("to_id"))
             if isinstance(endpoint, str)
         }
+        restrict_to_edge_endpoints = bool(predicates)
         filtered_nodes = [
             node
             for node in nodes
-            if _layer_allowed(node, layers) and (not endpoint_ids or node.get("node_id") in endpoint_ids)
+            if _layer_allowed(node, layers)
+            and (
+                node.get("node_id") in endpoint_ids
+                or (not restrict_to_edge_endpoints and not endpoint_ids)
+            )
         ][:limit]
-        if not filtered_nodes and not predicates:
+        if not filtered_nodes and not restrict_to_edge_endpoints:
             filtered_nodes = [node for node in nodes if _layer_allowed(node, layers)][:limit]
         node_ids = {str(node.get("node_id")) for node in filtered_nodes if isinstance(node.get("node_id"), str)}
         filtered_clusters = [
@@ -296,7 +301,7 @@ class Neo4jProjectionStore:
             for cluster in clusters
             if _layer_allowed(cluster, layers)
             and (
-                not node_ids
+                (not restrict_to_edge_endpoints and not node_ids)
                 or bool(set(_string_list(cluster.get("member_node_ids"))) & node_ids)
             )
         ][:limit]
@@ -503,7 +508,14 @@ class Neo4jProjectionStore:
         max_depth = self._bounded_depth(max_depth, default=6, maximum=8)
         layer_filter = layers or set()
         predicate_filter = predicates or set()
-        packet = self._execute_philosophy_read(self._query_philosophy_path_tx, from_id, to_id, max_depth)
+        packet = self._execute_philosophy_read(
+            self._query_philosophy_path_tx,
+            from_id,
+            to_id,
+            max_depth,
+            layer_filter,
+            predicate_filter,
+        )
         nodes, edges, _clusters = self._filter_query_surfaces(
             packet["nodes"],
             packet["edges"],
@@ -531,19 +543,37 @@ class Neo4jProjectionStore:
         }
 
     @classmethod
-    def _query_philosophy_path_tx(cls, tx: Any, from_id: str, to_id: str, max_depth: int) -> dict[str, Any]:
+    def _query_philosophy_path_tx(
+        cls,
+        tx: Any,
+        from_id: str,
+        to_id: str,
+        max_depth: int,
+        layers: set[str],
+        predicates: set[str],
+    ) -> dict[str, Any]:
         record = tx.run(
             f"""
             MATCH (source:TosPhilosophyNodeProjection {{projection_id: $from_id}})
             MATCH (target:TosPhilosophyNodeProjection {{projection_id: $to_id}})
-            OPTIONAL MATCH path=shortestPath((source)-[:TOS_PHILOSOPHY_RELATION*..{max_depth}]-(target))
+            MATCH path=(source)-[:TOS_PHILOSOPHY_RELATION*1..{max_depth}]-(target)
+            WHERE all(rel IN relationships(path) WHERE
+              (size($predicates) = 0 OR rel.predicate_id IN $predicates)
+              AND (
+                size($layers) = 0
+                OR any(layer IN coalesce(rel.graph_layers, []) WHERE layer IN $layers)
+              )
+            )
             RETURN
               CASE WHEN path IS NULL THEN [] ELSE [node IN nodes(path) | node.payload_json] END AS node_payload_jsons,
               CASE WHEN path IS NULL THEN [] ELSE [rel IN relationships(path) | rel.edge_id] END AS edge_ids
+            ORDER BY length(path)
             LIMIT 1
             """,
             from_id=from_id,
             to_id=to_id,
+            layers=sorted(layers),
+            predicates=sorted(predicates),
         ).single()
         node_payloads = cls._record_value(record, "node_payload_jsons") or []
         nodes = []
@@ -552,12 +582,20 @@ class Neo4jProjectionStore:
             if isinstance(payload, dict):
                 nodes.append(payload)
         edge_ids = [str(edge_id) for edge_id in (cls._record_value(record, "edge_ids") or []) if edge_id]
+        if not edge_ids:
+            return {
+                "nodes": nodes,
+                "edges": [],
+                "runtime_projection_boundary": cls._runtime_boundary_from_tx(tx),
+            }
         edges = cls._payloads_from_result(
             tx.run(
                 """
-                UNWIND $edge_ids AS edge_id
+                UNWIND range(0, size($edge_ids) - 1) AS position
+                WITH $edge_ids[position] AS edge_id, position
                 MATCH (edge:TosPhilosophyEdgeProjection {projection_id: edge_id})
                 RETURN edge.payload_json AS payload_json
+                ORDER BY position
                 """,
                 edge_ids=edge_ids,
             )
@@ -960,9 +998,27 @@ class Neo4jProjectionStore:
     def _delete_stale_philosophy_projection(tx: Any, refresh_id: str) -> dict[str, int]:
         record = tx.run(
             """
-            MATCH ()-[rel]-()
+            MATCH (start)-[rel]-(end)
             WHERE type(rel) IN $relation_types
               AND coalesce(rel.refresh_id, '') <> $refresh_id
+              AND (
+                start:TosPhilosophyProjection
+                OR start:TosPhilosophyViewProjection
+                OR start:TosPhilosophyNodeProjection
+                OR start:TosPhilosophyEdgeProjection
+                OR start:TosPhilosophySourceRefProjection
+                OR start:TosPhilosophyLayerProjection
+                OR start:TosPhilosophyClusterProjection
+                OR start:TosPhilosophyReviewPacketProjection
+                OR end:TosPhilosophyProjection
+                OR end:TosPhilosophyViewProjection
+                OR end:TosPhilosophyNodeProjection
+                OR end:TosPhilosophyEdgeProjection
+                OR end:TosPhilosophySourceRefProjection
+                OR end:TosPhilosophyLayerProjection
+                OR end:TosPhilosophyClusterProjection
+                OR end:TosPhilosophyReviewPacketProjection
+              )
             WITH collect(DISTINCT rel) AS rels
             FOREACH (rel IN rels | DELETE rel)
             WITH size(rels) AS deleted_edge_count
@@ -1184,6 +1240,7 @@ class Neo4jProjectionStore:
               MERGE (source)-[rel:TOS_PHILOSOPHY_RELATION {edge_id: edge.id}]->(target)
               SET rel.predicate_id = edge.predicate_id,
                   rel.source_ref = edge.source_ref,
+                  rel.graph_layers = edge.graph_layers,
                   rel.refresh_id = $refresh_id
             )
             """,

@@ -20,7 +20,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
 
       - name: Check repo-local KAG index family
-        uses: 8Dionysus/aoa-kag/.github/actions/repo-local-kag-index@578e4cea9a04b76a881bde240d5479efceea4926
+        uses: 8Dionysus/aoa-kag/.github/actions/repo-local-kag-index@1ab8f66d3454867f3351ff898dccccce8266ec9e
         with:
           history-ref: ${{ github.event.pull_request.base.sha || (github.ref == 'refs/heads/main' && github.event.before) || '' }}
           event-history-ref: ${{ github.event.pull_request.base.sha || (github.ref == 'refs/heads/main' && github.event.before) || '' }}
@@ -63,8 +63,12 @@ jobs:
 
       - name: Install test dependencies
         run: |
-          python -m pip install -r requirements-dev.txt
+          # The repo-local KAG action runs before setup-python and may satisfy
+          # packages from the runner user site. Reinstall into this interpreter
+          # because governed subprocesses intentionally use -s/-I.
+          python -m pip install --ignore-installed -r requirements-dev.txt
           python -m pip install "$RUNNER_TEMP/aoa-sdk-source"
+          python -I -c "import aoa_sdk, jsonschema, pydantic, yaml"
 
       - name: Install bubblewrap, ripgrep, shellcheck, rsync, zsh, podman and podman-compose
         run: |

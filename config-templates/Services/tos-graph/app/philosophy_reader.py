@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
 from .config import TosGraphSettings
+from .material_reader import MaterialProjectionAdapter, MaterialProjectionError, merge_material_overlay
 
 
 SCALE_EXPORT_COLUMNS = {
@@ -73,6 +75,18 @@ class ToSPhilosophyReaderError(RuntimeError):
     """Raised when the ToS philosophy graph projection cannot be read honestly."""
 
 
+SUPPORTED_PHILOSOPHY_PROJECTION_SCHEMA_VERSIONS = {
+    "tos_philosophy_graph_projection_v1",
+    "tos_philosophy_graph_projection_v2",
+}
+
+# The source projection deliberately contains one workflow lens alongside the
+# public atlas lenses.  Public presentation is a runtime concern; the workflow
+# view must never become public merely because a newer compact projection omits
+# the legacy ``public_visibility`` field.
+INTERNAL_PHILOSOPHY_VIEW_IDS = {"canon-promotion"}
+
+
 def _contains(value: Any, needle: str) -> bool:
     if isinstance(value, str):
         return needle in value.lower()
@@ -138,9 +152,122 @@ def _unique_values(items: list[dict[str, Any]], key: str) -> list[str]:
     return sorted({str(item[key]) for item in items if isinstance(item.get(key), str) and item.get(key)})
 
 
+def _public_view_card(view: dict[str, Any], **counts: int) -> dict[str, Any]:
+    presentation = view.get("public_presentation")
+    presentation = presentation if isinstance(presentation, dict) else {}
+    labels = presentation.get("label") if isinstance(presentation.get("label"), dict) else {}
+    descriptions = (
+        presentation.get("description") if isinstance(presentation.get("description"), dict) else {}
+    )
+    source_title = str(view.get("title") or view.get("view_id") or "").strip()
+    label_ru = str(labels.get("ru") or source_title).strip()
+    label_en = str(labels.get("en") or source_title).strip()
+    description_ru = str(descriptions.get("ru") or "").strip()
+    description_en = str(descriptions.get("en") or "").strip()
+    featured_route = presentation.get("featured_route")
+    properties: dict[str, Any] = {}
+    if description_ru:
+        properties["public_summary_ru"] = description_ru
+    if description_en:
+        properties["public_summary_en"] = description_en
+    if isinstance(featured_route, dict):
+        properties["featured_route"] = featured_route
+    return {
+        "view_id": view.get("view_id"),
+        "title": label_en,
+        "layout_hint": view.get("layout_hint"),
+        "graph_layers": view.get("graph_layers", []),
+        "public_visibility": "public",
+        "multilingual": {
+            "label": {
+                "original": None,
+                "ru": label_ru,
+                "en": label_en,
+            }
+        },
+        "properties": properties,
+        **counts,
+    }
+
+
+def _adapt_compact_v2_projection(payload: dict[str, Any]) -> dict[str, Any]:
+    """Materialize v2 ID lists and apply the public-atlas runtime boundary.
+
+    Projection v2 deduplicates view payloads by storing ``node_ids`` and
+    ``edge_ids``.  Reader methods retain their v1-shaped internal contract, so
+    this adapter joins the compact references without changing ToS authority or
+    copying domain data into the site.
+    """
+    if payload.get("schema_version") != "tos_philosophy_graph_projection_v2":
+        return payload
+
+    nodes_by_id = {
+        str(node.get("node_id")): node
+        for node in payload.get("nodes", [])
+        if isinstance(node, dict) and isinstance(node.get("node_id"), str)
+    }
+    edges_by_id = {
+        str(edge.get("edge_id")): edge
+        for edge in payload.get("edges", [])
+        if isinstance(edge, dict) and isinstance(edge.get("edge_id"), str)
+    }
+    adapted_views: list[dict[str, Any]] = []
+    for source_view in payload.get("views", []):
+        if not isinstance(source_view, dict):
+            continue
+        view = dict(source_view)
+        view_id = str(view.get("view_id") or "")
+        if "public_visibility" not in view:
+            view["public_visibility"] = "internal" if view_id in INTERNAL_PHILOSOPHY_VIEW_IDS else "public"
+        if not isinstance(view.get("nodes"), list):
+            view["nodes"] = [
+                nodes_by_id[node_id]
+                for node_id in _string_list(view.get("node_ids"))
+                if node_id in nodes_by_id
+            ]
+        if not isinstance(view.get("edges"), list):
+            view["edges"] = [
+                edges_by_id[edge_id]
+                for edge_id in _string_list(view.get("edge_ids"))
+                if edge_id in edges_by_id
+            ]
+        adapted_views.append(view)
+    payload["views"] = adapted_views
+    return payload
+
+
+def _public_view_ids(payload: dict[str, Any]) -> set[str]:
+    return {
+        str(view.get("view_id"))
+        for view in payload.get("views", [])
+        if isinstance(view, dict)
+        and view.get("public_visibility") == "public"
+        and isinstance(view.get("view_id"), str)
+    }
+
+
+def _belongs_to_public_view(item: dict[str, Any], public_view_ids: set[str]) -> bool:
+    return bool(set(_string_list(item.get("view_ids"))) & public_view_ids)
+
+
+def _public_atlas_item(item: dict[str, Any], public_view_ids: set[str]) -> dict[str, Any]:
+    public_item = dict(item)
+    if "view_ids" in public_item:
+        public_item["view_ids"] = [
+            view_id for view_id in _string_list(public_item.get("view_ids")) if view_id in public_view_ids
+        ]
+    return public_item
+
+
 class ToSPhilosophyProjectionReader:
     def __init__(self, settings: TosGraphSettings) -> None:
         self.settings = settings
+        self._projection_cache_key: tuple[int, int, int, int] | None = None
+        self._projection_cache: dict[str, Any] | None = None
+        self.material_projection = MaterialProjectionAdapter(
+            settings.material_planting_projection_path,
+            source_root=settings.tos_root,
+        )
 
     @property
     def projection_path(self) -> Path:
@@ -159,15 +286,36 @@ class ToSPhilosophyProjectionReader:
     def load_projection(self) -> dict[str, Any]:
         if not self.projection_exists():
             raise ToSPhilosophyReaderError(f"missing ToS philosophy graph projection: {self.projection_path.as_posix()}")
+        projection_stat = self.projection_path.stat()
+        material_stat = self.settings.material_planting_projection_path.stat() if self.material_projection.exists() else None
+        cache_key = (
+            projection_stat.st_mtime_ns,
+            projection_stat.st_size,
+            material_stat.st_mtime_ns if material_stat else 0,
+            material_stat.st_size if material_stat else 0,
+        )
+        if self._projection_cache_key == cache_key and self._projection_cache is not None:
+            return self._projection_cache
+
         payload = json.loads(self.projection_path.read_text(encoding="utf-8"))
         if not isinstance(payload, dict):
             raise ToSPhilosophyReaderError(
                 f"ToS philosophy graph projection must be a JSON object: {self.projection_path.as_posix()}"
             )
-        if payload.get("schema_version") != "tos_philosophy_graph_projection_v1":
+        schema_version = payload.get("schema_version")
+        if schema_version not in SUPPORTED_PHILOSOPHY_PROJECTION_SCHEMA_VERSIONS:
             raise ToSPhilosophyReaderError(
-                "ToS philosophy graph projection schema_version must be tos_philosophy_graph_projection_v1"
+                "unsupported ToS philosophy graph projection schema_version: "
+                f"{schema_version!r}; expected one of "
+                f"{sorted(SUPPORTED_PHILOSOPHY_PROJECTION_SCHEMA_VERSIONS)}"
             )
+        try:
+            payload = _adapt_compact_v2_projection(payload)
+            payload = merge_material_overlay(payload, self.material_projection.overlay())
+        except MaterialProjectionError as exc:
+            raise ToSPhilosophyReaderError(str(exc)) from exc
+        self._projection_cache_key = cache_key
+        self._projection_cache = payload
         return payload
 
     def load_audit(self) -> dict[str, Any]:
@@ -192,6 +340,7 @@ class ToSPhilosophyProjectionReader:
                 "projection_path": self.projection_path.as_posix(),
                 "atlas_projection_path": self.settings.philosophy_atlas_projection_path.as_posix(),
                 "graph_views_path": self.settings.philosophy_graph_views_path.as_posix(),
+                "material_projection_path": self.settings.material_planting_projection_path.as_posix(),
                 "counts": {},
                 "views": [],
                 "graph_layers": [],
@@ -207,8 +356,13 @@ class ToSPhilosophyProjectionReader:
             "projection_path": self.projection_path.as_posix(),
             "atlas_projection_path": self.settings.philosophy_atlas_projection_path.as_posix(),
             "graph_views_path": self.settings.philosophy_graph_views_path.as_posix(),
+            "material_projection_path": self.settings.material_planting_projection_path.as_posix(),
             "counts": payload.get("counts", {}),
-            "views": [view.get("view_id") for view in payload.get("views", []) if isinstance(view, dict)],
+            "views": [
+                view.get("view_id")
+                for view in payload.get("views", [])
+                if isinstance(view, dict) and view.get("public_visibility") == "public"
+            ],
             "graph_layers": [
                 layer.get("layer_id")
                 for layer in payload.get("graph_layers", [])
@@ -231,20 +385,15 @@ class ToSPhilosophyProjectionReader:
         for view in payload.get("views", []):
             if not isinstance(view, dict):
                 continue
+            if view.get("public_visibility") != "public":
+                continue
             views.append(
-                {
-                    "view_id": view.get("view_id"),
-                    "title": view.get("title"),
-                    "layout_hint": view.get("layout_hint"),
-                    "graph_layers": view.get("graph_layers", []),
-                    "node_count": len(view.get("nodes", [])) if isinstance(view.get("nodes"), list) else 0,
-                    "edge_count": len(view.get("edges", [])) if isinstance(view.get("edges"), list) else 0,
-                    "cluster_count": clusters_by_view.get(str(view.get("view_id")), 0),
-                    "review_intent": view.get("review_intent"),
-                    "collapse_rule": view.get("collapse_rule", {}),
-                    "source_ref": view.get("source_ref"),
-                    "route_card": view.get("route_card"),
-                }
+                _public_view_card(
+                    view,
+                    node_count=len(view.get("nodes", [])) if isinstance(view.get("nodes"), list) else 0,
+                    edge_count=len(view.get("edges", [])) if isinstance(view.get("edges"), list) else 0,
+                    cluster_count=clusters_by_view.get(str(view.get("view_id")), 0),
+                )
             )
         return {
             "schema": "tos_graph_philosophy_views_v1",
@@ -258,23 +407,45 @@ class ToSPhilosophyProjectionReader:
 
     def view(self, view_id: str) -> dict[str, Any]:
         payload = self.load_projection()
+        public_view_ids = _public_view_ids(payload)
         view = next(
             (item for item in payload.get("views", []) if isinstance(item, dict) and item.get("view_id") == view_id),
             None,
         )
         if view is None:
             raise ToSPhilosophyReaderError(f"unknown ToS philosophy graph view: {view_id}")
-        nodes = [node for node in view.get("nodes", []) if isinstance(node, dict)]
-        edges = [edge for edge in view.get("edges", []) if isinstance(edge, dict)]
-        clusters = self._clusters_for_payload(payload, view_id=view_id, limit=40)
+        if view.get("public_visibility") != "public":
+            raise ToSPhilosophyReaderError(f"graph view is not part of the public atlas: {view_id}")
+        nodes = [
+            _public_atlas_item(node, public_view_ids)
+            for node in view.get("nodes", [])
+            if isinstance(node, dict)
+        ]
+        edges = [
+            _public_atlas_item(edge, public_view_ids)
+            for edge in view.get("edges", [])
+            if isinstance(edge, dict)
+        ]
+        clusters = [
+            _public_atlas_item(cluster, public_view_ids)
+            for cluster in self._clusters_for_payload(payload, view_id=view_id, limit=40)
+        ]
         return {
             "schema": "tos_graph_philosophy_view_v1",
-            "view": view,
+            "view": _public_view_card(
+                view,
+                node_count=len(nodes),
+                edge_count=len(edges),
+                cluster_count=len(clusters),
+            ),
             "subgraph_contract": self._view_subgraph_contract(payload, view, nodes, edges, clusters),
             "nodes": nodes,
             "edges": edges,
             "clusters": clusters,
-            "review_packet": self.review_packet(view_id),
+            # Review and canonization are internal ToS workflows.  The public
+            # atlas view exposes their accepted projection, never their work
+            # packet or temporary state.
+            "review_packet": None,
             "node_count": len(nodes),
             "edge_count": len(edges),
             "source_refs": sorted(set(view.get("source_refs", []) + _source_refs(nodes + edges))),
@@ -412,12 +583,17 @@ class ToSPhilosophyProjectionReader:
             for endpoint in (edge.get("from_id"), edge.get("to_id"))
             if isinstance(endpoint, str)
         }
+        restrict_to_edge_endpoints = bool(predicates)
         filtered_nodes = [
             node
             for node in nodes
-            if _layer_allowed(node, layers) and (not endpoint_ids or node.get("node_id") in endpoint_ids)
+            if _layer_allowed(node, layers)
+            and (
+                node.get("node_id") in endpoint_ids
+                or (not restrict_to_edge_endpoints and not endpoint_ids)
+            )
         ][: max(limit, 0)]
-        if not filtered_nodes and not predicates:
+        if not filtered_nodes and not restrict_to_edge_endpoints:
             filtered_nodes = [node for node in nodes if _layer_allowed(node, layers)][: max(limit, 0)]
         node_ids = {str(node.get("node_id")) for node in filtered_nodes if isinstance(node.get("node_id"), str)}
         filtered_clusters = [
@@ -425,7 +601,7 @@ class ToSPhilosophyProjectionReader:
             for cluster in clusters
             if _layer_allowed(cluster, layers)
             and (
-                not node_ids
+                (not restrict_to_edge_endpoints and not node_ids)
                 or bool(set(_string_list(cluster.get("member_node_ids"))) & node_ids)
             )
         ][: max(limit, 0)]
@@ -448,11 +624,25 @@ class ToSPhilosophyProjectionReader:
         )
         if view is None:
             raise ToSPhilosophyReaderError(f"unknown ToS philosophy graph view: {view_id}")
+        if view.get("public_visibility") != "public":
+            raise ToSPhilosophyReaderError(f"graph view is not part of the public atlas: {view_id}")
         layer_filter = layers or set()
         predicate_filter = predicates or set()
-        nodes = [node for node in view.get("nodes", []) if isinstance(node, dict)]
-        edges = [edge for edge in view.get("edges", []) if isinstance(edge, dict)]
-        clusters = self._clusters_for_payload(payload, view_id=view_id, limit=1_000_000)
+        public_view_ids = _public_view_ids(payload)
+        nodes = [
+            _public_atlas_item(node, public_view_ids)
+            for node in view.get("nodes", [])
+            if isinstance(node, dict)
+        ]
+        edges = [
+            _public_atlas_item(edge, public_view_ids)
+            for edge in view.get("edges", [])
+            if isinstance(edge, dict)
+        ]
+        clusters = [
+            _public_atlas_item(cluster, public_view_ids)
+            for cluster in self._clusters_for_payload(payload, view_id=view_id, limit=1_000_000)
+        ]
         nodes, edges, clusters = self._filter_query_surfaces(
             nodes,
             edges,
@@ -466,11 +656,12 @@ class ToSPhilosophyProjectionReader:
             "query_backend": query_backend,
             "fallback_reason": fallback_reason,
             "view_id": view_id,
-            "view": {
-                key: value
-                for key, value in view.items()
-                if key not in {"nodes", "edges"}
-            },
+            "view": _public_view_card(
+                view,
+                node_count=len(nodes),
+                edge_count=len(edges),
+                cluster_count=len(clusters),
+            ),
             "query_contract": self._query_contract(
                 query_kind="view-subgraph",
                 layers=layer_filter,
@@ -524,7 +715,15 @@ class ToSPhilosophyProjectionReader:
 
     def clusters(self, view_id: str | None = None, cluster_kind: str | None = None, limit: int = 80) -> dict[str, Any]:
         payload = self.load_projection()
+        public_view_ids = _public_view_ids(payload)
+        if view_id and view_id not in public_view_ids:
+            raise ToSPhilosophyReaderError(f"graph view is not part of the public atlas: {view_id}")
         clusters = self._clusters_for_payload(payload, view_id=view_id, cluster_kind=cluster_kind, limit=limit)
+        clusters = [
+            _public_atlas_item(cluster, public_view_ids)
+            for cluster in clusters
+            if _belongs_to_public_view(cluster, public_view_ids)
+        ]
         return {
             "schema": "tos_graph_philosophy_clusters_v1",
             "view_id": view_id,
@@ -541,7 +740,7 @@ class ToSPhilosophyProjectionReader:
         tables = {
             table_name: {
                 "columns": SCALE_EXPORT_COLUMNS[table_name],
-                "row_count": len(self.scale_export_table(table_name, view_id=view_id, layers=layer_filter)),
+                "row_count": sum(1 for _ in self.iter_scale_export_table(table_name, view_id=view_id, layers=layer_filter)),
                 "formats": ["csv", "jsonl"],
             }
             for table_name in SCALE_EXPORT_COLUMNS
@@ -579,29 +778,55 @@ class ToSPhilosophyProjectionReader:
         view_id: str | None = None,
         layers: set[str] | None = None,
     ) -> list[dict[str, Any]]:
+        return list(self.iter_scale_export_table(table_name, view_id=view_id, layers=layers))
+
+    def iter_scale_export_table(
+        self,
+        table_name: str,
+        *,
+        view_id: str | None = None,
+        layers: set[str] | None = None,
+    ) -> Iterator[dict[str, Any]]:
         if table_name not in SCALE_EXPORT_COLUMNS:
             raise ToSPhilosophyReaderError(f"unknown ToS philosophy scale export table: {table_name}")
         payload = self.load_projection()
         layer_filter = layers or set()
         nodes, edges, clusters = self._scale_export_surfaces(payload, view_id=view_id, layers=layer_filter)
+        return self._iter_scale_export_rows(table_name, nodes, edges, clusters)
+
+    def _iter_scale_export_rows(
+        self,
+        table_name: str,
+        nodes: list[dict[str, Any]],
+        edges: list[dict[str, Any]],
+        clusters: list[dict[str, Any]],
+    ) -> Iterator[dict[str, Any]]:
         if table_name == "nodes":
-            return [self._scale_node_row(node) for node in nodes]
+            for node in nodes:
+                yield self._scale_node_row(node)
+            return
         if table_name == "edges":
-            return [self._scale_edge_row(edge) for edge in edges]
+            for edge in edges:
+                yield self._scale_edge_row(edge)
+            return
         if table_name == "clusters":
-            return [self._scale_cluster_row(cluster) for cluster in clusters]
+            for cluster in clusters:
+                yield self._scale_cluster_row(cluster)
+            return
+        node_ids = {str(node.get("node_id")) for node in nodes if isinstance(node.get("node_id"), str)}
+        edge_ids = {str(edge.get("edge_id")) for edge in edges if isinstance(edge.get("edge_id"), str)}
         if table_name == "cluster-node-memberships":
-            return [
-                self._scale_cluster_membership_row(cluster, node_id=node_id)
-                for cluster in clusters
-                for node_id in _string_list(cluster.get("member_node_ids"))
-            ]
+            for cluster in clusters:
+                for node_id in _string_list(cluster.get("member_node_ids")):
+                    if node_id in node_ids:
+                        yield self._scale_cluster_membership_row(cluster, node_id=node_id)
+            return
         if table_name == "cluster-edge-memberships":
-            return [
-                self._scale_cluster_membership_row(cluster, edge_id=edge_id)
-                for cluster in clusters
-                for edge_id in _string_list(cluster.get("member_edge_ids"))
-            ]
+            for cluster in clusters:
+                for edge_id in _string_list(cluster.get("member_edge_ids")):
+                    if edge_id in edge_ids:
+                        yield self._scale_cluster_membership_row(cluster, edge_id=edge_id)
+            return
         raise ToSPhilosophyReaderError(f"unknown ToS philosophy scale export table: {table_name}")
 
     def _scale_export_surfaces(
@@ -763,26 +988,34 @@ class ToSPhilosophyProjectionReader:
 
     def node(self, node_id: str) -> dict[str, Any]:
         payload = self.load_projection()
-        node = next(
+        public_view_ids = _public_view_ids(payload)
+        source_node = next(
             (item for item in payload.get("nodes", []) if isinstance(item, dict) and item.get("node_id") == node_id),
             None,
         )
-        if node is None:
+        if source_node is None:
             raise ToSPhilosophyReaderError(f"unknown ToS philosophy node: {node_id}")
+        if not _belongs_to_public_view(source_node, public_view_ids):
+            raise ToSPhilosophyReaderError(f"node is not part of the public atlas: {node_id}")
+        node = _public_atlas_item(source_node, public_view_ids)
         related_edges = [
-            edge
+            _public_atlas_item(edge, public_view_ids)
             for edge in payload.get("edges", [])
-            if isinstance(edge, dict) and (edge.get("from_id") == node_id or edge.get("to_id") == node_id)
+            if isinstance(edge, dict)
+            and _belongs_to_public_view(edge, public_view_ids)
+            and (edge.get("from_id") == node_id or edge.get("to_id") == node_id)
         ]
         views = [
             {
                 "view_id": view.get("view_id"),
-                "title": view.get("title"),
+                "title": _public_view_card(view)["title"],
                 "layout_hint": view.get("layout_hint"),
                 "graph_layers": view.get("graph_layers", []),
             }
             for view in payload.get("views", [])
-            if isinstance(view, dict) and view.get("view_id") in set(node.get("view_ids", []))
+            if isinstance(view, dict)
+            and view.get("public_visibility") == "public"
+            and view.get("view_id") in set(node.get("view_ids", []))
         ]
         return {
             "schema": "tos_graph_philosophy_node_v1",
@@ -796,27 +1029,33 @@ class ToSPhilosophyProjectionReader:
 
     def edge(self, edge_id: str) -> dict[str, Any]:
         payload = self.load_projection()
-        edge = next(
+        public_view_ids = _public_view_ids(payload)
+        source_edge = next(
             (item for item in payload.get("edges", []) if isinstance(item, dict) and item.get("edge_id") == edge_id),
             None,
         )
-        if edge is None:
+        if source_edge is None:
             raise ToSPhilosophyReaderError(f"unknown ToS philosophy edge: {edge_id}")
+        if not _belongs_to_public_view(source_edge, public_view_ids):
+            raise ToSPhilosophyReaderError(f"edge is not part of the public atlas: {edge_id}")
+        edge = _public_atlas_item(source_edge, public_view_ids)
         endpoint_ids = {str(edge.get("from_id") or ""), str(edge.get("to_id") or "")}
         endpoints = [
-            node
+            _public_atlas_item(node, public_view_ids)
             for node in payload.get("nodes", [])
             if isinstance(node, dict) and str(node.get("node_id") or "") in endpoint_ids
         ]
         views = [
             {
                 "view_id": view.get("view_id"),
-                "title": view.get("title"),
+                "title": _public_view_card(view)["title"],
                 "layout_hint": view.get("layout_hint"),
                 "graph_layers": view.get("graph_layers", []),
             }
             for view in payload.get("views", [])
-            if isinstance(view, dict) and view.get("view_id") in set(edge.get("view_ids", []))
+            if isinstance(view, dict)
+            and view.get("public_visibility") == "public"
+            and view.get("view_id") in set(edge.get("view_ids", []))
         ]
         return {
             "schema": "tos_graph_philosophy_edge_v1",
@@ -840,18 +1079,21 @@ class ToSPhilosophyProjectionReader:
     ) -> dict[str, Any]:
         node_packet = self.node(node_id)
         payload = self.load_projection()
+        public_view_ids = _public_view_ids(payload)
         layer_filter = layers or set()
         predicate_filter = predicates or set()
         all_edges = [
-            edge
+            _public_atlas_item(edge, public_view_ids)
             for edge in payload.get("edges", [])
             if isinstance(edge, dict)
+            and _belongs_to_public_view(edge, public_view_ids)
             and _layer_allowed(edge, layer_filter)
             and _predicate_allowed(edge, predicate_filter)
         ]
         selected_ids = {node_id}
         frontier = {node_id}
         selected_edges: list[dict[str, Any]] = []
+        selected_edge_ids: set[str] = set()
         for _ in range(max(depth, 1)):
             next_frontier: set[str] = set()
             for edge in all_edges:
@@ -859,6 +1101,10 @@ class ToSPhilosophyProjectionReader:
                 to_id = str(edge.get("to_id") or "")
                 if from_id not in frontier and to_id not in frontier:
                     continue
+                edge_identity = str(edge.get("edge_id") or f"{from_id}->{to_id}:{edge.get('predicate_id')}")
+                if edge_identity in selected_edge_ids:
+                    continue
+                selected_edge_ids.add(edge_identity)
                 selected_edges.append(edge)
                 if from_id not in selected_ids:
                     next_frontier.add(from_id)
@@ -871,9 +1117,10 @@ class ToSPhilosophyProjectionReader:
         selected_edges = selected_edges[:limit]
         neighbor_ids = selected_ids - {node_id}
         neighbors = [
-            node
+            _public_atlas_item(node, public_view_ids)
             for node in payload.get("nodes", [])
             if isinstance(node, dict) and node.get("node_id") in neighbor_ids and _layer_allowed(node, layer_filter)
+            and _belongs_to_public_view(node, public_view_ids)
         ][:limit]
         return {
             "schema": "tos_graph_philosophy_neighborhood_v1",
@@ -904,10 +1151,13 @@ class ToSPhilosophyProjectionReader:
         fallback_reason: str | None = None,
     ) -> dict[str, Any]:
         payload = self.load_projection()
+        public_view_ids = _public_view_ids(payload)
         nodes_by_id = {
-            str(node.get("node_id")): node
+            str(node.get("node_id")): _public_atlas_item(node, public_view_ids)
             for node in payload.get("nodes", [])
-            if isinstance(node, dict) and isinstance(node.get("node_id"), str)
+            if isinstance(node, dict)
+            and isinstance(node.get("node_id"), str)
+            and _belongs_to_public_view(node, public_view_ids)
         }
         if from_id not in nodes_by_id:
             raise ToSPhilosophyReaderError(f"unknown ToS philosophy node: {from_id}")
@@ -919,14 +1169,16 @@ class ToSPhilosophyProjectionReader:
         for edge in payload.get("edges", []):
             if (
                 not isinstance(edge, dict)
+                or not _belongs_to_public_view(edge, public_view_ids)
                 or not _layer_allowed(edge, layer_filter)
                 or not _predicate_allowed(edge, predicate_filter)
             ):
                 continue
             left = str(edge.get("from_id") or "")
             right = str(edge.get("to_id") or "")
-            adjacency.setdefault(left, []).append((right, edge))
-            adjacency.setdefault(right, []).append((left, edge))
+            public_edge = _public_atlas_item(edge, public_view_ids)
+            adjacency.setdefault(left, []).append((right, public_edge))
+            adjacency.setdefault(right, []).append((left, public_edge))
 
         queue: list[tuple[str, list[str], list[dict[str, Any]]]] = [(from_id, [from_id], [])]
         seen = {from_id}
@@ -966,15 +1218,24 @@ class ToSPhilosophyProjectionReader:
 
     def search(self, query: str, limit: int = 40) -> dict[str, Any]:
         payload = self.load_projection()
+        public_view_ids = _public_view_ids(payload)
         needle = query.lower().strip()
         results: list[dict[str, Any]] = []
-        for collection_name in ("views", "nodes", "edges", "clusters", "review_packets", "graph_layers"):
+        for collection_name in ("views", "nodes", "edges", "clusters"):
             for item in payload.get(collection_name, []):
                 if not isinstance(item, dict):
                     continue
-                if needle and not _contains(item, needle):
+                if collection_name == "views":
+                    if item.get("public_visibility") != "public":
+                        continue
+                    public_item = _public_view_card(item)
+                else:
+                    if not _belongs_to_public_view(item, public_view_ids):
+                        continue
+                    public_item = _public_atlas_item(item, public_view_ids)
+                if needle and not _contains(public_item, needle):
                     continue
-                results.append({"collection": collection_name, "item": item})
+                results.append({"collection": collection_name, "item": public_item})
                 if len(results) >= limit:
                     return self._search_payload(query, results)
         return self._search_payload(query, results)
