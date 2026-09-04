@@ -762,8 +762,9 @@ See [Shared repository checks](VALIDATION.md#shared-repository-checks) for this 
 scripts/aoa-long-horizon-pilot --help
 scripts/aoa-bounded-autonomy-pilot --help
 bash -n scripts/aoa-long-horizon-pilot scripts/aoa-bounded-autonomy-pilot
-python -m py_compile mechanics/inference-pilots/parts/local-trials/compatibility-runners/aoa-local-ai-trials mechanics/inference-pilots/parts/quiet-bridge-commands/runners/aoa-w5-pilot mechanics/inference-pilots/parts/quiet-bridge-commands/runners/aoa-w6-pilot
 ```
+
+Compilation of these runners is owned by the preceding inference-pilots procedure.
 
 ## `mechanics/inference-pilots/parts/tos-foundation-lab/AGENTS.md`
 
