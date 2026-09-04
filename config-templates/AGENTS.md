@@ -3,12 +3,9 @@
 ## Scope
 This directory stores public-safe runtime config templates that are bootstrapped into the deployed runtime tree. These are not the live runtime files themselves.
 
-## Read before editing
-1. `config-templates/README.md`
-2. `docs/install/DEPLOYMENT.md`
-3. `docs/runtime/STORAGE_LAYOUT.md`
-4. `mechanics/config-projection/parts/bootstrap/docs/SECRETS_BOOTSTRAP.md`
-5. `mechanics/config-projection/parts/rendering/docs/RENDER_TRUTH.md`
+## Conditional source route
+
+Read only the source, README, and owner contract needed for the current touched surface; entering this subtree does not require an unconditional inventory.
 
 ## Directory contract
 - `Configs/` mirrors `${AOA_STACK_ROOT}/Configs`.
@@ -19,11 +16,7 @@ This directory stores public-safe runtime config templates that are bootstrapped
 ## Bootstrap route
 
 When an operator explicitly wants to copy public-safe templates into the
-deployed runtime tree, use:
-
-```bash
-scripts/aoa-bootstrap-configs
-```
+deployed runtime tree, use the focused procedure in [VALIDATION.md](../VALIDATION.md).
 
 For verification or rehearsals, prefer the temporary-root route below before
 touching the deployed runtime.
@@ -45,15 +38,7 @@ touching the deployed runtime.
 `Configs/agent-api/return-policy.yaml` is public-safe runtime policy, not a secret-bearing env file.
 
 ## Verify
-Use a temporary runtime root you control:
-```bash
-export AOA_STACK_ROOT=/tmp/abyss-stack-test
-export AOA_CONFIGS_ROOT=/tmp/abyss-stack-test/Configs
-scripts/aoa-install-layout
-scripts/aoa-bootstrap-configs --force
-scripts/aoa-check-layout --ignore-secrets
-python scripts/validate_stack.py
-```
+Use the temporary runtime-root procedure in [VALIDATION.md](../VALIDATION.md).
 
 ## Hard no
 - do not treat bootstrapped runtime copies as source-managed truth

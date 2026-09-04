@@ -11,9 +11,6 @@ This package is the stack-owned, read-only MCP access plane over
 - Require query and answer packets to prove `network_touched=false` and
   `read_only=true`; do not publish `query-hybrid` until the owner CLI has it.
 
-Validate with:
+Use the on-demand validation route in `VALIDATION.md` for the exact focused procedure.
 
-```bash
-python mcp/services/aoa-xda-connector-mcp/scripts/validate_xda_connector_mcp.py
-python -m pytest mcp/services/aoa-xda-connector-mcp/tests -q
-```
+Validation is on-demand: use [VALIDATION.md](../../../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.

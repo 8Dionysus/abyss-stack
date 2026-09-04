@@ -26,12 +26,7 @@ proof, eval, closeout, or acceptance.
 
 ## Validation
 
-```bash
-python -m pytest -q mechanics/governed-execution/parts/ephemeral-worker/tests
-python -m py_compile mechanics/governed-execution/parts/ephemeral-worker/ephemeral_worker.py
-python scripts/validate_nested_agents.py
-python scripts/validate_stack.py
-```
+Validation is on-demand: use [mechanics/governed-execution/parts/ephemeral-worker/VALIDATION.md](VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.
 
 Real baseline, activation, pilot, promotion, and economy measurements are
 separate owner-gated evidence. Focused tests do not establish them.

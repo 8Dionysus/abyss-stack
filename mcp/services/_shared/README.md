@@ -20,14 +20,7 @@ python mcp/services/_shared/build_runtime_config_vendors.py
 python mcp/services/_shared/build_mcp_bundle_unit.py
 ```
 
-Validate without writing:
-
-```bash
-python mcp/services/_shared/build_http_auth_vendors.py --check
-python mcp/services/_shared/build_modern_runtime_vendors.py --check
-python mcp/services/_shared/build_runtime_config_vendors.py --check
-python mcp/services/_shared/build_mcp_bundle_unit.py --check
-```
+Validate without writing using the [Shared MCP vendor projection checks](../../../VALIDATION.md#shared-mcp-vendor-projection-checks) route.
 
 The helper never owns MCP tools, resources, prompts, or sibling data. It owns
 only the common transport parse, loopback guard, credential load, and static

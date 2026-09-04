@@ -49,9 +49,7 @@ If `AOA_TELEGRAM_CONNECTOR_REPO` contains `src/aoa_telegram_connector/cli.py`,
 the wrapper uses `python -m aoa_telegram_connector.cli` with `PYTHONPATH` set to
 that checkout. Otherwise it calls `aoa-telegram` from `PATH`.
 
-## Validate
+## Validation
 
-```bash
-python mcp/services/aoa-telegram-connector-mcp/scripts/validate_telegram_connector_mcp.py
-python -m pytest mcp/services/aoa-telegram-connector-mcp/tests -q
-```
+Use the `mcp/services/aoa-telegram-connector-mcp/AGENTS.md` route in the
+repository [`VALIDATION.md`](../../../VALIDATION.md).

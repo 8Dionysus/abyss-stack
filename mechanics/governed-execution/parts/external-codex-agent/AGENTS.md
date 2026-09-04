@@ -11,11 +11,9 @@ incarnation running as a separate operating-system process. It does not own
 model fit, role meaning, eval verdicts, repository acceptance, or landing
 authority.
 
-## Read before editing
+## Conditional source route
 
-Read the repository, `mechanics/`, and `mechanics/governed-execution/` route
-cards, then this part's `README.md`, `CONTRACT.md`, `DIRECTION.md`,
-`PROVENANCE.md`, `SUSPENSION.md`, and `VALIDATION.md`.
+Read only the source, README, and owner contract needed for the current touched surface; entering this subtree does not require an unconditional inventory.
 
 ## Boundaries
 
@@ -38,35 +36,9 @@ cards, then this part's `README.md`, `CONTRACT.md`, `DIRECTION.md`,
 
 ## Validation
 
-Run:
+Use the on-demand validation route in `VALIDATION.md` for the exact focused procedure.
 
-```bash
-AOA_SDK_SOURCE_ROOT=/absolute/path/to/aoa-sdk \
-AOA_AGENTS_SOURCE_ROOT=/absolute/path/to/aoa-agents \
-AOA_SKILLS_SOURCE_ROOT=/absolute/path/to/aoa-skills \
-PYTHONPATH=/absolute/path/to/aoa-sdk/src \
-python -m pytest -q \
-  mechanics/governed-execution/parts/external-codex-agent/tests
-python -m py_compile \
-  scripts/aoa-external-codex-agent \
-  scripts/aoa-external-actor-bind \
-  scripts/aoa-external-codex-incarnation \
-  scripts/aoa-external-codex-stasis \
-  mechanics/governed-execution/parts/external-codex-agent/bind_external_actor_launch.py \
-  mechanics/governed-execution/parts/external-codex-agent/external_codex_agent.py \
-  mechanics/governed-execution/parts/external-codex-agent/external_codex_landing_effect.py \
-  mechanics/governed-execution/parts/external-codex-agent/external_codex_nested_evidence.py \
-  mechanics/governed-execution/parts/external-codex-agent/external_codex_projection.py \
-  mechanics/governed-execution/parts/external-codex-agent/external_codex_mount_launcher.py \
-  mechanics/governed-execution/parts/external-codex-agent/external_codex_supervisor.py \
-  mechanics/governed-execution/parts/external-codex-agent/install_external_codex_runtime.py \
-  mechanics/governed-execution/parts/external-codex-agent/external_codex_return.py \
-  mechanics/governed-execution/parts/external-codex-agent/external_codex_responsibility_movement.py \
-  mechanics/governed-execution/parts/external-codex-agent/prepare_landing_study.py \
-  mechanics/governed-execution/parts/external-codex-agent/visible_incarnation_home.py
-python scripts/validate_nested_agents.py
-python scripts/validate_stack.py
-```
+Validation is on-demand: use [mechanics/governed-execution/parts/external-codex-agent/VALIDATION.md](VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.
 
 Real-model trials are separate evidence runs. Do not substitute them for the
 focused deterministic suite or start them implicitly during validation.

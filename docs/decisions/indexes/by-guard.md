@@ -173,6 +173,7 @@
 - [ABYSS-STACK-D-0062 Agent Skill Projection Validator Module](../ABYSS-STACK-D-0062-agent-skill-projection-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0062-agent-skill-projection-validator-module.md`)
 - [ABYSS-STACK-D-0063 Root Validator Wrapper Tail Removal](../ABYSS-STACK-D-0063-root-validator-wrapper-tail-removal.md) (`docs/decisions/ABYSS-STACK-D-0063-root-validator-wrapper-tail-removal.md`)
 - [ABYSS-STACK-D-0068 Decision Graph Contract And Impact Packets](../ABYSS-STACK-D-0068-decision-graph-contract-and-impact-packets.md) (`docs/decisions/ABYSS-STACK-D-0068-decision-graph-contract-and-impact-packets.md`)
+- [ABYSS-STACK-D-0140 Prompt-Light Agent Routes And On-Demand Validation](../ABYSS-STACK-D-0140-prompt-light-agent-routes-and-on-demand-validation.md) (`docs/decisions/ABYSS-STACK-D-0140-prompt-light-agent-routes-and-on-demand-validation.md`)
 
 ## A/B/C freeze
 
@@ -659,6 +660,11 @@
 - [ABYSS-STACK-D-0113 Carry Owner-Contour Writers Through Independent A2A Review](../ABYSS-STACK-D-0113-carry-owner-contour-writers-through-independent-a2a-review.md) (`docs/decisions/ABYSS-STACK-D-0113-carry-owner-contour-writers-through-independent-a2a-review.md`)
 - [ABYSS-STACK-D-0118 Admit Role-First Owner Reviewers to A2A Return](../ABYSS-STACK-D-0118-admit-role-first-owner-reviewers-to-a2a-return.md) (`docs/decisions/ABYSS-STACK-D-0118-admit-role-first-owner-reviewers-to-a2a-return.md`)
 
+## inherited context
+
+- [ABYSS-STACK-D-0140 Prompt-Light Agent Routes And On-Demand Validation](../ABYSS-STACK-D-0140-prompt-light-agent-routes-and-on-demand-validation.md) (`docs/decisions/ABYSS-STACK-D-0140-prompt-light-agent-routes-and-on-demand-validation.md`)
+- [ABYSS-STACK-D-0141 Budget Inherited Agent Context](../ABYSS-STACK-D-0141-budget-inherited-agent-context.md) (`docs/decisions/ABYSS-STACK-D-0141-budget-inherited-agent-context.md`)
+
 ## language competence
 
 - [ABYSS-STACK-D-0088 Tree of Sophia Human Review Workbench Boundary](../ABYSS-STACK-D-0088-tree-of-sophia-human-review-workbench-boundary.md) (`docs/decisions/ABYSS-STACK-D-0088-tree-of-sophia-human-review-workbench-boundary.md`)
@@ -724,6 +730,11 @@
 ## narrowest access form
 
 - [ABYSS-STACK-D-0094 Wave 6 Access-Form and Retirement Classification](../ABYSS-STACK-D-0094-wave6-access-form-and-retirement-classification.md) (`docs/decisions/ABYSS-STACK-D-0094-wave6-access-form-and-retirement-classification.md`)
+
+## nested AGENTS
+
+- [ABYSS-STACK-D-0140 Prompt-Light Agent Routes And On-Demand Validation](../ABYSS-STACK-D-0140-prompt-light-agent-routes-and-on-demand-validation.md) (`docs/decisions/ABYSS-STACK-D-0140-prompt-light-agent-routes-and-on-demand-validation.md`)
+- [ABYSS-STACK-D-0141 Budget Inherited Agent Context](../ABYSS-STACK-D-0141-budget-inherited-agent-context.md) (`docs/decisions/ABYSS-STACK-D-0141-budget-inherited-agent-context.md`)
 
 ## network denial
 
@@ -962,6 +973,11 @@
 ## route docs
 
 - [ABYSS-STACK-D-0048 Federation Landing Validator Split](../ABYSS-STACK-D-0048-federation-landing-validator-split.md) (`docs/decisions/ABYSS-STACK-D-0048-federation-landing-validator-split.md`)
+
+## route locality
+
+- [ABYSS-STACK-D-0140 Prompt-Light Agent Routes And On-Demand Validation](../ABYSS-STACK-D-0140-prompt-light-agent-routes-and-on-demand-validation.md) (`docs/decisions/ABYSS-STACK-D-0140-prompt-light-agent-routes-and-on-demand-validation.md`)
+- [ABYSS-STACK-D-0141 Budget Inherited Agent Context](../ABYSS-STACK-D-0141-budget-inherited-agent-context.md) (`docs/decisions/ABYSS-STACK-D-0141-budget-inherited-agent-context.md`)
 
 ## route-api closure
 

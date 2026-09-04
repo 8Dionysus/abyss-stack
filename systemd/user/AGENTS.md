@@ -3,12 +3,9 @@
 ## Scope
 This directory stores rootless `systemd --user` unit skeletons for the deployed runtime.
 
-## Read before editing
-1. `systemd/user/README.md`
-2. `docs/install/DEPLOYMENT.md`
-3. `docs/runtime/PATHS.md`
-4. `docs/operations/LIFECYCLE.md`
-5. `scripts/aoa-install-systemd`
+## Conditional source route
+
+Read only the source, README, and owner contract needed for the current touched surface; entering this subtree does not require an unconditional inventory.
 
 ## Directory contract
 - Units here are user units, not system-wide units.
@@ -41,38 +38,22 @@ This directory stores rootless `systemd --user` unit skeletons for the deployed 
 
 ## Install routes
 
-For a direct manual user-unit reload and enablement test:
+For direct manual user-unit reload and enablement tests, use [VALIDATION.md](../../VALIDATION.md).
 
-```bash
-systemctl --user daemon-reload
-systemctl --user enable --now podman-compose-abyss.service
-```
-
-Prefer the installer when a durable runtime selection should be recorded:
-
-```bash
-scripts/aoa-install-systemd --preset intel-full --profile federation --enable-now --restart-now
-```
+For a durable runtime selection, use the **Durable runtime selection installer**
+procedure in [VALIDATION.md](../../VALIDATION.md#systemduseragentsmd).
 
 To link every user unit named in `managed-units.txt` without starting or
-enabling services:
+enabling services, use the **Link managed user units without starting**
+procedure in [VALIDATION.md](../../VALIDATION.md#systemduseragentsmd).
 
-```bash
-scripts/aoa-install-systemd --all-user-units
-```
 
 ## Verify
-When the host supports systemd user tooling:
-```bash
-systemd-analyze --user verify systemd/user/podman-compose-abyss.service
-systemd-analyze --user verify systemd/user/*.service systemd/user/*.timer systemd/user/*.path
-scripts/aoa-install-systemd
-```
 
-If you are explicitly testing enablement, use:
-```bash
-scripts/aoa-install-systemd --enable-now
-```
+When the host supports systemd user tooling, use the **User-unit syntax
+validation** procedure in
+[VALIDATION.md](../../VALIDATION.md#systemduseragentsmd). If you are explicitly
+testing enablement, use the **Explicit enablement test** in the same route.
 
 ## Hard no
 - do not point units at the source checkout

@@ -3,16 +3,9 @@
 ## Scope
 This directory owns compose-time runtime shape: atomic modules, profile expansion, preset expansion, and optional tuning overlays.
 
-## Read before editing
-1. `compose/README.md`
-2. `compose/modules/README.md`
-3. `compose/profiles/README.md`
-4. `compose/presets/README.md`
-5. `docs/profiles/PRESETS.md`
-6. `docs/profiles/PROFILE_RECIPES.md`
-7. `mechanics/config-projection/parts/rendering/docs/RENDER_TRUTH.md`
-8. `mechanics/runtime-lifecycle/parts/wait-smoke/docs/INTERNAL_PROBES.md`
-9. `docs/runtime/PATHS.md`
+## Conditional source route
+
+Read only the source, README, and owner contract needed for the current touched surface; entering this subtree does not require an unconditional inventory.
 
 ## Directory contract
 - `modules/*.yml` are the atomic runtime pieces.
@@ -57,30 +50,7 @@ This directory owns compose-time runtime shape: atomic modules, profile expansio
 - If a new preset becomes first-class, add or adjust rehearsal coverage in `.github/workflows/validate-stack.yml`.
 
 ## Verify
-Run the smallest set that proves the change:
-```bash
-python scripts/validate_stack.py
-scripts/aoa-profile-modules --profile substrate --paths
-scripts/aoa-profile-endpoints --profile substrate
-scripts/aoa-render-services --profile substrate
-scripts/aoa-render-config --profile substrate >/dev/null
-scripts/aoa-profile-modules --profile workflows --paths
-scripts/aoa-profile-endpoints --profile workflows
-scripts/aoa-render-config --profile workflows >/dev/null
-scripts/aoa-profile-modules --profile local-worker --paths
-scripts/aoa-profile-endpoints --profile local-worker
-scripts/aoa-render-config --profile local-worker >/dev/null
-scripts/aoa-profile-modules --profile intel-worker --paths
-scripts/aoa-profile-endpoints --profile intel-worker
-scripts/aoa-render-config --profile intel-worker >/dev/null
-scripts/aoa-profile-modules --profile fallback-gateway --paths
-scripts/aoa-profile-endpoints --profile fallback-gateway
-scripts/aoa-render-config --profile fallback-gateway >/dev/null
-scripts/aoa-preset-profiles --preset agent-full --paths
-scripts/aoa-profile-modules --preset agent-full --paths
-scripts/aoa-preset-profiles --preset intel-full --paths
-scripts/aoa-profile-modules --preset intel-full --paths
-```
+For the smallest validation set that proves the change, use [VALIDATION.md](../VALIDATION.md).
 
 For preset work, use the matching preset form instead of only testing profiles. Treat rendered config as potentially secret-bearing.
 

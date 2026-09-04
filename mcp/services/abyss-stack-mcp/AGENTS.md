@@ -10,13 +10,9 @@ exact internal-effect access plane accepted by `ABYSS-STACK-D-0087` and
 not a gateway. Only the separately credentialed pilot process may execute the
 approved restart-and-rollback contract for `abyss-stack-mcp-read.service`.
 
-## Read before editing
+## Conditional source route
 
-1. Repository root `AGENTS.md`
-2. `mcp/AGENTS.md`
-3. `mcp/services/AGENTS.md`
-4. `docs/decisions/ABYSS-STACK-D-0087-owner-bounded-mcp-access-fabric.md`
-5. This package `README.md`, `DESIGN.md`, and `docs/`
+Read only the source, README, and owner contract needed for the current touched surface; entering this subtree does not require an unconditional inventory.
 
 ## Boundaries
 
@@ -32,14 +28,7 @@ approved restart-and-rollback contract for `abyss-stack-mcp-read.service`.
 
 ## Validation
 
-```bash
-python mcp/services/abyss-stack-mcp/scripts/generate_stack_mcp_contracts.py --check
-python mcp/services/abyss-stack-mcp/scripts/validate_stack_mcp.py
-python -m pytest mcp/services/abyss-stack-mcp/tests -q
-python mcp/services/_shared/build_http_auth_vendors.py --check
-python scripts/validate_stack.py
-python scripts/validate_nested_agents.py
-```
+Validation is on-demand: use [VALIDATION.md](../../../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.
 
 ## Closeout
 

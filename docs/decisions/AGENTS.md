@@ -14,13 +14,9 @@ workflow choices.
 Decision records explain why a route was chosen. Current source surfaces define
 what the runtime contract is now.
 
-## Read before editing
+## Conditional source route
 
-Read root `AGENTS.md`, then `docs/AGENTS.md`, then `docs/README.md`, then
-`docs/decisions/README.md`.
-
-For direction or release-history changes, also read root `ROADMAP.md` and
-`CHANGELOG.md` so the decision note does not absorb their jobs.
+Read only the source, README, and owner contract needed for the current touched surface; entering this subtree does not require an unconditional inventory.
 
 ## Boundaries
 
@@ -62,21 +58,10 @@ date-prefixed paths are historical git/PR addresses only.
 
 ## Validation
 
-Use the docs and release validation lane:
+Use the docs and release validation lane in [VALIDATION.md](../../VALIDATION.md).
 
-```bash
-python scripts/generate_decision_indexes.py --check
-python scripts/validate_decision_records.py
-python scripts/validate_stack.py
-python scripts/validate_nested_agents.py
-python -m pytest tests/test_decision_records.py
-```
+For release-facing direction or history changes, also use the on-demand validation route in `VALIDATION.md`.
 
-For release-facing direction or history changes, also run:
-
-```bash
-python -m pytest tests/test_roadmap_parity.py
-```
 
 ## Closeout
 

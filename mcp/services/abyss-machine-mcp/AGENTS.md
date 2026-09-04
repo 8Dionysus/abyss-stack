@@ -29,15 +29,9 @@ It does not own:
 - private raw capture interpretation, operator intent, or arbitrary shell
   execution.
 
-## Start Here
+## Conditional source route
 
-1. `README.md`
-2. `DESIGN.md`
-3. `docs/BOUNDARIES.md`
-4. `docs/THREAT_MODEL.md`
-5. `src/abyss_machine_mcp/core.py`
-6. `src/abyss_machine_mcp/server.py`
-7. `tests/`
+Read only the source, README, and owner contract needed for the current touched surface; entering this subtree does not require an unconditional inventory.
 
 ## Route Modes
 
@@ -69,48 +63,18 @@ It does not own:
 
 ## Run
 
-For source-local service execution from the `abyss-stack` repo root, run:
+For source-local service execution from the `abyss-stack` repo root, use the on-demand validation route in `VALIDATION.md`.
 
-```bash
-python mcp/services/abyss-machine-mcp/scripts/abyss_machine_mcp_server.py
-```
+Validation is on-demand: use [VALIDATION.md](../../../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.
 
-If the package is installed, the server entry point is:
+If the package is installed, use the installed server entry-point procedure in `VALIDATION.md`.
 
-```bash
-abyss-machine-mcp-server
-```
-
-## Smoke
-
-```bash
-PYTHONPATH=mcp/services/abyss-machine-mcp/src python -m abyss_machine_mcp.cli brief
-PYTHONPATH=mcp/services/abyss-machine-mcp/src python -m abyss_machine_mcp.cli evidence-map
-PYTHONPATH=mcp/services/abyss-machine-mcp/src python -m abyss_machine_mcp.cli maps --axis by-freshness --query semantic --limit 8
-PYTHONPATH=mcp/services/abyss-machine-mcp/src python -m abyss_machine_mcp.cli context-packet --axis by-eval-packet --reader-profile proof-context --limit 4
-PYTHONPATH=mcp/services/abyss-machine-mcp/src python -m abyss_machine_mcp.cli surface rag-latest
-PYTHONPATH=mcp/services/abyss-machine-mcp/src python -m abyss_machine_mcp.cli surfaces
-PYTHONPATH=mcp/services/abyss-machine-mcp/src python -m abyss_machine_mcp.cli surface memory-pressure
-PYTHONPATH=mcp/services/abyss-machine-mcp/src python -m abyss_machine_mcp.cli surface artifact-trust-gate --artifact-class public_source_seed --consumer-intent agent
-PYTHONPATH=mcp/services/abyss-machine-mcp/src python -m abyss_machine_mcp.cli route --intent "start bounded local AI work" --class heavy --kind ai
-PYTHONPATH=mcp/services/abyss-machine-mcp/src python -m abyss_machine_mcp.cli read-resource abyss-machine://brief
-```
 
 ## Verify
 
-```bash
-python mcp/services/abyss-machine-mcp/scripts/validate_machine_mcp.py
-python -m pytest mcp/services/abyss-machine-mcp/tests -q
-python mcp/services/abyss-machine-mcp/scripts/release_check.py
-```
 
-When parent MCP routing changes, also run:
+When parent MCP routing changes, also use the on-demand validation route in `VALIDATION.md`.
 
-```bash
-python scripts/validate_decision_records.py
-python scripts/validate_stack.py
-python scripts/validate_nested_agents.py
-```
 
 ## Report
 

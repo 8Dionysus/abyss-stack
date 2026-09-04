@@ -3,23 +3,9 @@
 ## Scope
 This directory owns the runtime bridge, bootstrap helpers, introspection helpers, lifecycle wrappers, probes, and repository validation helpers for `abyss-stack`.
 
-## Read before editing
-1. `scripts/aoa-lib.sh`
-2. `scripts/README.md`
-3. `.github/workflows/validate-stack.yml` in the source checkout only; the runtime `Configs/` mirror does not include `.github/`
-4. `docs/install/FIRST_RUN.md`
-5. `mechanics/diagnostic-spine/parts/doctor-readiness/docs/DOCTOR.md`
-6. `docs/install/DEPLOYMENT.md`
-7. `docs/profiles/PRESETS.md`
-8. `docs/profiles/PROFILE_RECIPES.md`
-9. `mechanics/config-projection/parts/rendering/docs/RENDER_TRUTH.md`
-10. `mechanics/runtime-lifecycle/parts/wait-smoke/docs/INTERNAL_PROBES.md`
-11. `mechanics/governed-execution/parts/return-policy/docs/RECURRENCE_RUNTIME_POLICY.md`
-12. `docs/runtime/PATHS.md`
-13. `mechanics/machine-fit/parts/reference-platform/docs/REFERENCE_PLATFORM.md`
-14. `mechanics/machine-fit/parts/reference-platform/docs/REFERENCE_PLATFORM_SPEC.md`
-15. `mechanics/machine-fit/parts/fit-record/docs/MACHINE_FIT_POLICY.md`
-16. `mechanics/diagnostic-spine/parts/diagnostic-surfaces/docs/DIAGNOSTIC_SPINE.md`
+## Conditional source route
+
+Read only the source, README, and owner contract needed for the current touched surface; `scripts/README.md` is the semantic route when needed, and entering this subtree does not require an unconditional inventory.
 
 ## Directory contract
 - Root operator scripts are stable wrappers and should be safe by default.
@@ -88,20 +74,7 @@ This directory owns the runtime bridge, bootstrap helpers, introspection helpers
 - If the runtime wrapper consumes a return-policy file or writes return-event bundles, keep those contracts explicit in docs, layout checks, and render-truth guidance.
 
 ## Verify
-For shell work, run the smallest useful set:
-```bash
-python scripts/validate_stack.py
-python scripts/ci_gate.py --mode source-fast
-python scripts/generate_decision_indexes.py --check
-python scripts/validate_decision_records.py
-python -m py_compile scripts/validate_stack.py mechanics/diagnostic-spine/parts/diagnose-wrapper/aoa_diagnose.py mechanics/governed-execution/parts/governed-runner/aoa_governed_execution.py mechanics/governed-execution/parts/governed-runner/aoa_governed_run.py mechanics/governed-execution/parts/agent-os-adapter/aoa_agent_os_runtime.py mechanics/governed-execution/parts/autonomy-status/aoa_status_autonomy.py mechanics/machine-fit/parts/host-facts/aoa_host_facts.py mechanics/machine-fit/parts/machine-bridge/aoa_machine_bridge.py mechanics/machine-fit/parts/fit-record/aoa_machine_fit.py mechanics/inference-pilots/parts/qwen-routes/aoa_qwen_run.py
-shellcheck scripts/aoa-lib.sh scripts/aoa-diagnose scripts/<touched-script>
-shellcheck scripts/aoa-lib.sh mechanics/<package>/parts/<part>/<touched-backend>.sh
-bash -n scripts/<touched-script> mechanics/<package>/parts/<part>/<touched-backend>.sh
-scripts/aoa-host-facts --mode public
-scripts/aoa-machine-bridge --mode public --write /tmp/machine-bridge.public.review.json
-scripts/aoa-machine-fit --mode public
-```
+For shell work, use the smallest useful set from [VALIDATION.md](../VALIDATION.md).
 
 For bootstrap or lifecycle changes, rehearse the flow encoded in `.github/workflows/validate-stack.yml` with a temporary runtime root.
 

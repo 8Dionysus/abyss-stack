@@ -9,16 +9,9 @@ This directory owns source-managed systemd route surfaces for the deployed
 runtime. Current live-stack units are rootless user units under `systemd/user/`
 and a small privileged support allowlist under `systemd/system/`.
 
-## Read Before Editing
+## Conditional source route
 
-1. `systemd/README.md`
-2. `systemd/user/AGENTS.md`
-3. `systemd/system/AGENTS.md` when privileged support units are touched
-4. `docs/install/DEPLOYMENT.md`
-5. `docs/runtime/PATHS.md`
-6. `docs/operations/LIFECYCLE.md`
-7. `mechanics/runtime-lifecycle/parts/user-unit/README.md`
-8. `scripts/aoa-install-systemd`
+Read only the source, README, and owner contract needed for the current touched surface; entering this subtree does not require an unconditional inventory.
 
 ## Directory Contract
 
@@ -41,18 +34,6 @@ and a small privileged support allowlist under `systemd/system/`.
 
 ## Verify
 
-For route-only edits:
+For route-only edits, use [VALIDATION.md](../VALIDATION.md).
 
-```bash
-python scripts/validate_nested_agents.py
-python scripts/validate_stack.py
-```
-
-For unit edits, also use:
-
-```bash
-systemd-analyze --user verify systemd/user/podman-compose-abyss.service
-systemd-analyze --user verify systemd/user/*.service systemd/user/*.timer systemd/user/*.path
-systemd-analyze verify systemd/system/*.service systemd/system/*.timer
-bash -n scripts/aoa-install-systemd
-```
+For unit edits, also use the unit-validation procedure in `VALIDATION.md`.

@@ -7,10 +7,9 @@ AOA_SDK_SOURCE_ROOT=/path/to/aoa-sdk \
 /path/to/installed-sdk-venv/bin/python \
   -m pytest -q mechanics/governed-execution/parts/agent-os-adapter/tests
 python -m py_compile mechanics/governed-execution/parts/agent-os-adapter/aoa_agent_os_runtime.py
-python scripts/validate_stack.py
-python scripts/validate_decision_records.py
-python scripts/validate_nested_agents.py
 ```
+
+See [Shared repository checks](../../../../VALIDATION.md#shared-repository-checks) for this repository-wide check.
 
 The focused suite uses a disposable Git repository, the real governed runner,
 typed A2A and owner degradation artifacts, injected safe

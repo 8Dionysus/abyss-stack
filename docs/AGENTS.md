@@ -44,13 +44,4 @@ more specific `mechanics/<package>/parts/<part>/docs/` surface.
 
 ## Validate
 
-Use the root validation path after documentation topology changes:
-
-```bash
-python scripts/validate_decision_records.py
-python scripts/generate_decision_indexes.py --check
-python scripts/ci_gate.py --mode source-fast
-python scripts/validate_stack.py
-python scripts/validate_nested_agents.py
-python -m pytest tests/test_roadmap_parity.py tests/test_decision_records.py tests/test_source_topology_validator_modules.py tests/test_validation_topology.py tests/test_script_topology.py tests/test_test_topology.py
-```
+For documentation topology changes, use the root validation path in [VALIDATION.md](../VALIDATION.md).

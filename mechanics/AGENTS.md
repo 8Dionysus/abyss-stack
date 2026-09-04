@@ -5,10 +5,9 @@
 This card applies to `mechanics/` and every nested path under it until a nearer
 `AGENTS.md` narrows the lane.
 
-## Read before editing
+## Conditional source route
 
-Read the repository root `AGENTS.md`, `mechanics/README.md`, this file, and the
-nearest package `README.md` before changing this tree.
+Read only the source, README, and owner contract needed for the current touched surface; entering this subtree does not require an unconditional inventory.
 
 ## Role
 
@@ -84,12 +83,9 @@ example, generated capsule, or focused part-local test.
 
 ## Validation
 
-For mechanics-only route work, run:
+For mechanics-only route work, use the on-demand validation route in `VALIDATION.md`.
 
-```bash
-python scripts/validate_nested_agents.py
-python scripts/validate_stack.py
-```
+Validation is on-demand: use [VALIDATION.md](../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.
 
 For release-bound or runtime-facing movement, add the narrow checks named by the
 touched package and the root `AGENTS.md`.

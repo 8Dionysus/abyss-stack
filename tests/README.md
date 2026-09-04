@@ -61,7 +61,8 @@ oracle.
   contracts for design cards and start-here route exposure.
 - `test_decision_surface_validator_module.py`: focused decision-surface
   validator contracts for route cards, template shape, and validator handoffs.
-- `test_validate_nested_agents.py`: nested AGENTS coverage.
+- `test_validate_nested_agents.py`: nested AGENTS coverage, classification, and
+  inherited-chain budget enforcement.
 - `test_decision_records.py`: canonical decision-record shape plus generated
   index and decision-graph validation.
 - `test_workspace_decision_graph.py`: local workspace decision graph builder for

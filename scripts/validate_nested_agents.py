@@ -8,6 +8,7 @@ guidance, without making those future files blocking before they land.
 from __future__ import annotations
 
 import argparse
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -21,7 +22,7 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
         'profiles/*.txt',
         'presets/*.txt',
         '127.0.0.1',
-        'python scripts/validate_stack.py',
+        'VALIDATION.md#shared-repository-checks',
     ),
     'config-templates/AGENTS.md': (
         'public-safe runtime config templates',
@@ -35,7 +36,7 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
         'Secrets/Configs',
         '.example',
         'CHANGE_ME',
-        'python scripts/validate_stack.py',
+        'VALIDATION.md#shared-repository-checks',
     ),
     'docs/AGENTS.md': (
         'repo-wide operator and source-checkout documentation',
@@ -53,43 +54,42 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
         'docs/decisions',
         'docs/validation',
         'docs/testing',
-        'python scripts/validate_decision_records.py',
-        'python scripts/validate_nested_agents.py',
+        'VALIDATION.md#shared-repository-checks',
     ),
     'docs/validation/AGENTS.md': (
         'validation topology',
         'command authority',
         'validation_lanes.json',
         'inventories descriptive',
-        'python scripts/ci_gate.py --mode source-fast',
+        'source-fast lane',
     ),
     'docs/testing/AGENTS.md': (
         'test topology',
         'test_inventory.json',
         'docs/validation/validation_lanes.json',
         'Keep legacy paths out of default pytest discovery',
-        'python scripts/ci_gate.py --mode tests',
+        'tests lane',
     ),
     'docs/decisions/AGENTS.md': (
         'decision records',
         'Decision Review Gate',
         'TEMPLATE.md',
         'current source surfaces define what',
-        'python scripts/validate_decision_records.py',
+        'VALIDATION.md#shared-repository-checks',
     ),
     '.agents/skills/AGENTS.md': (
         'transitional repo-local projection of shared skills',
         'aoa-skills',
         'Canonical',
         'root `skills/`',
-        'python scripts/validate_nested_agents.py',
+        'VALIDATION.md#shared-repository-checks',
     ),
     '.agents/AGENTS.md': (
         'transitional repo-local agent projections',
         '.agents/README.md',
         'canonical skill law',
         'stack-owned canonical packages under `skills/`',
-        'python scripts/validate_nested_agents.py',
+        'VALIDATION.md#shared-repository-checks',
     ),
     'scripts/AGENTS.md': (
         'runtime bridge, bootstrap helpers',
@@ -103,7 +103,7 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
     'systemd/user/AGENTS.md': (
         'rootless `systemd --user` unit skeletons',
         'podman-compose-abyss.service',
-        'systemd-analyze --user verify',
+        'VALIDATION.md#shared-repository-checks',
         'do not point units at the source checkout',
     ),
     'systemd/system/AGENTS.md': (
@@ -130,37 +130,11 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
         'Model Context Protocol',
         'access planes',
         'mcp/protocol-lab/',
-        'mcp/services/aoa-memo-mcp/',
-        'mcp/services/aoa-decisions-mcp/',
-        'mcp/services/aoa-evals-mcp/',
-        'mcp/services/aoa-kag-mcp/',
-        'mcp/services/aoa-stats-mcp/',
-        'mcp/services/abyss-machine-mcp/',
-        'mcp/services/aoa-session-memory-mcp/',
-        'mcp/services/tos-corpus-mcp/',
-        'mcp/services/aoa-4pda-connector-mcp/',
-        'mcp/services/aoa-telegram-connector-mcp/',
-        'mcp/services/aoa-discord-connector-mcp/',
-        'mcp/services/aoa-course-connector-mcp/',
-        'mcp/services/aoa-stackoverflow-connector-mcp/',
-        'mcp/services/aoa-xda-connector-mcp/',
-        'mcp/services/abyss-stack-mcp/',
-        'python mcp/services/abyss-stack-mcp/scripts/validate_stack_mcp.py',
-        'python mcp/services/aoa-memo-mcp/scripts/validate_memo_mcp.py',
-        'python mcp/services/aoa-decisions-mcp/scripts/validate_decisions_mcp.py',
-        'python mcp/services/aoa-evals-mcp/scripts/validate_evals_mcp.py',
-        'python mcp/services/aoa-kag-mcp/scripts/validate_kag_mcp.py',
-        'python mcp/services/aoa-stats-mcp/scripts/validate_stats_mcp.py',
-        'python mcp/services/abyss-machine-mcp/scripts/validate_machine_mcp.py',
-        'python mcp/services/aoa-session-memory-mcp/scripts/validate_session_memory_mcp.py',
-        'python mcp/services/tos-corpus-mcp/scripts/validate_tos_corpus_mcp.py',
-        'python mcp/services/aoa-4pda-connector-mcp/scripts/validate_4pda_connector_mcp.py',
-        'python mcp/services/aoa-telegram-connector-mcp/scripts/validate_telegram_connector_mcp.py',
-        'python mcp/services/aoa-discord-connector-mcp/scripts/validate_discord_connector_mcp.py',
-        'python mcp/services/aoa-course-connector-mcp/scripts/validate_course_connector_mcp.py',
-        'python mcp/services/aoa-stackoverflow-connector-mcp/scripts/validate_stackoverflow_connector_mcp.py',
-        'python mcp/services/aoa-xda-connector-mcp/scripts/validate_xda_connector_mcp.py',
-        'python mcp/protocol-lab/scripts/validate_protocol_lab.py',
+        'mcp/services/README.md',
+        'service-local `AGENTS.md`',
+        'mcp-services lane',
+        'VALIDATION.md#shared-repository-checks',
+        'mcp/protocol-lab/VALIDATION.md',
     ),
     'mcp/protocol-lab/AGENTS.md': (
         'fail-closed compatibility',
@@ -174,36 +148,10 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
     'mcp/services/AGENTS.md': (
         'service-package district',
         'Model Context Protocol',
-        'aoa-memo-mcp',
-        'aoa-decisions-mcp',
-        'aoa-evals-mcp',
-        'aoa-kag-mcp',
-        'aoa-stats-mcp',
-        'abyss-machine-mcp',
-        'aoa-session-memory-mcp',
-        'tos-corpus-mcp',
-        'aoa-4pda-connector-mcp',
-        'aoa-telegram-connector-mcp',
-        'aoa-discord-connector-mcp',
-        'aoa-course-connector-mcp',
-        'aoa-stackoverflow-connector-mcp',
-        'aoa-xda-connector-mcp',
-        'abyss-stack-mcp',
-        'python mcp/services/abyss-stack-mcp/scripts/validate_stack_mcp.py',
-        'python mcp/services/aoa-memo-mcp/scripts/validate_memo_mcp.py',
-        'python mcp/services/aoa-decisions-mcp/scripts/validate_decisions_mcp.py',
-        'python mcp/services/aoa-evals-mcp/scripts/validate_evals_mcp.py',
-        'python mcp/services/aoa-kag-mcp/scripts/validate_kag_mcp.py',
-        'python mcp/services/aoa-stats-mcp/scripts/validate_stats_mcp.py',
-        'python mcp/services/abyss-machine-mcp/scripts/validate_machine_mcp.py',
-        'python mcp/services/aoa-session-memory-mcp/scripts/validate_session_memory_mcp.py',
-        'python mcp/services/tos-corpus-mcp/scripts/validate_tos_corpus_mcp.py',
-        'python mcp/services/aoa-4pda-connector-mcp/scripts/validate_4pda_connector_mcp.py',
-        'python mcp/services/aoa-telegram-connector-mcp/scripts/validate_telegram_connector_mcp.py',
-        'python mcp/services/aoa-discord-connector-mcp/scripts/validate_discord_connector_mcp.py',
-        'python mcp/services/aoa-course-connector-mcp/scripts/validate_course_connector_mcp.py',
-        'python mcp/services/aoa-stackoverflow-connector-mcp/scripts/validate_stackoverflow_connector_mcp.py',
-        'python mcp/services/aoa-xda-connector-mcp/scripts/validate_xda_connector_mcp.py',
+        'mcp/services/README.md',
+        'service-local `AGENTS.md`',
+        'mcp-services lane',
+        'VALIDATION.md#shared-repository-checks',
     ),
     'mcp/services/aoa-4pda-connector-mcp/AGENTS.md': (
         'read-only MCP access plane',
@@ -257,7 +205,7 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
         'thin MCP access plane',
         'aoa-memo',
         'repo-local `memo/`',
-        'python mcp/services/aoa-memo-mcp/scripts/validate_memo_mcp.py',
+        'VALIDATION.md#shared-repository-checks',
     ),
     'mcp/services/aoa-decisions-mcp/AGENTS.md': (
         'thin MCP access plane',
@@ -314,7 +262,7 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
         'aoa-stats',
         'selected_now',
         'unknown, not zero',
-        'python scripts/validate_local_stats_port.py',
+        'VALIDATION.md#shared-repository-checks',
     ),
     'skills/AGENTS.md': (
         'canonical home for agent procedures',
@@ -336,7 +284,7 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
         'quests/<lane>/<state>',
         'quests/schemas',
         'quests/examples',
-        'python scripts/validate_stack.py',
+        'VALIDATION.md#shared-repository-checks',
     ),
     'kag/AGENTS.md': (
         'repository-local KAG provider home',
@@ -350,19 +298,19 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
         'Package-owned mechanics tests',
         'deterministic and public-safe',
         'no live host state',
-        'python scripts/ci_gate.py --mode tests',
+        'tests lane',
     ),
     'mechanics/AGENTS.md': (
         'runtime mechanics tree',
         'mechanics/README.md',
         'Package law',
-        'python scripts/validate_nested_agents.py',
+        'VALIDATION.md#shared-repository-checks',
     ),
     'mechanics/runtime-lifecycle/AGENTS.md': (
         'runtime-lifecycle',
         'Runtime activation remains an explicit operator action',
         'docs/install/DEPLOYMENT.md',
-        'systemd-analyze --user verify',
+        'VALIDATION.md#shared-repository-checks',
     ),
     'mechanics/config-projection/AGENTS.md': (
         'config-projection',
@@ -457,6 +405,42 @@ LEGACY_ARCHIVE_AGENTS_DOCS: tuple[str, ...] = (
 ADVISORY_AGENT_DIRS: tuple[str, ...] = ('config', 'manifests/recurrence')
 HEADING_PREFIXES = ("# AGENTS.md", "# AGENTS")
 IGNORED_DIRS = {".git", ".venv", "__pycache__", ".pytest_cache", ".mypy_cache"}
+AGENTS_CHAIN_BUDGET_BYTES = 32 * 1024
+RUNNABLE_FENCE_RE = re.compile(r"^\s*```(?:bash|sh|shell|console)\s*$", re.IGNORECASE | re.MULTILINE)
+PROCEDURAL_HEADING_RE = re.compile(
+    r"^(?:Validation|Verify|Validate|Smoke|Local Smoke|Run|Check)$", re.IGNORECASE
+)
+ORPHAN_LEADIN_RE = re.compile(
+    r"^\s*(?:Run:|Validate with:|Then validate[^:]*:|start with:|use:)\s*$",
+    re.IGNORECASE,
+)
+COMMAND_LINE_RE = re.compile(
+    r"^\s*(?:[-*]\s+)?(?:"
+    r"(?:python3?|pytest|bash|sh|shellcheck|systemctl|systemd-analyze)\s+"
+    r"[-./\w$=|;&]"
+    r"|(?:scripts/aoa[-\w./]+|aoa-[\w./-]+)\s+[-./\w$=|;&])",
+    re.IGNORECASE,
+)
+INLINE_COMMAND_RE = re.compile(
+    r"\b(?:run|execute|invoke|start|validate with|then validate|use)\s*:?[ \t]+"
+    r"`?(?:"
+    r"(?:python3?|pytest|bash|sh|shellcheck|systemctl|systemd-analyze)\s+[-./\w$=|;&]"
+    r"|(?:scripts/aoa[-\w./]+|aoa-[\w./-]+)\s+[-./\w$=|;&])",
+    re.IGNORECASE,
+)
+DANGLING_COLON_LINE_RE = re.compile(r"^\s*(?!#{1,6}\s).+?:\s*$")
+ROOT_VALIDATION_SOURCE_RE = re.compile(r"^## `([^`]+/AGENTS\.md)`\s*$")
+COMMAND_SNIPPET_MARKERS = (
+    "python ",
+    "pytest ",
+    "bash -n",
+    "shellcheck ",
+    "systemctl ",
+    "systemd-analyze",
+    "scripts/aoa-",
+    "aoa-",
+    "AOA_",
+)
 
 
 @dataclass(frozen=True)
@@ -489,6 +473,121 @@ def _is_ignored(path: Path, repo_root: Path) -> bool:
     return any(part in IGNORED_DIRS for part in parts)
 
 
+def _is_validation_route_snippet(snippet: str) -> bool:
+    normalized = _normalize(snippet)
+    return (
+        "validation.md" in normalized
+        or normalized.endswith(" lane")
+        or normalized.startswith("-")
+        or any(
+        marker.lower() in normalized for marker in COMMAND_SNIPPET_MARKERS
+        )
+    )
+
+
+def _validation_route_text(path: Path, repo_root: Path) -> str:
+    """Return on-demand validation prose for a card and its nearest route."""
+    candidates: list[Path] = []
+    current = path.parent
+    while True:
+        candidate = current / "VALIDATION.md"
+        if candidate.is_file():
+            candidates.append(candidate)
+            break
+        if current == repo_root:
+            break
+        current = current.parent
+    root_validation = repo_root / "VALIDATION.md"
+    if root_validation.is_file() and root_validation not in candidates:
+        candidates.append(root_validation)
+
+    rel_path = _relative(path, repo_root)
+    route_texts: list[str] = []
+    for candidate in candidates:
+        text = candidate.read_text(encoding="utf-8")
+        if candidate == root_validation:
+            text = _root_validation_route_section(text, rel_path)
+        route_texts.append(text)
+    return "\n".join(route_texts)
+
+
+def _root_validation_route_section(text: str, rel_path: str) -> str:
+    """Return only the root VALIDATION section owned by one nested card."""
+    section: list[str] = []
+    collecting = False
+    for line in text.splitlines():
+        heading = ROOT_VALIDATION_SOURCE_RE.match(line)
+        if heading:
+            if collecting:
+                break
+            collecting = heading.group(1) == rel_path
+        if collecting:
+            section.append(line)
+    return "\n".join(section)
+
+
+def _active_lines(text: str) -> list[tuple[int, str]]:
+    """Return source lines outside any Markdown fenced block."""
+    active: list[tuple[int, str]] = []
+    in_fence = False
+    for line_number, line in enumerate(text.splitlines(), start=1):
+        if line.lstrip().startswith("```"):
+            in_fence = not in_fence
+            continue
+        if not in_fence:
+            active.append((line_number, line))
+    return active
+
+
+def _validate_root_validation_routes(text: str) -> list[str]:
+    """Reject repeated source routes that make the human map ambiguous."""
+    headings = [match.group(1) for match in map(ROOT_VALIDATION_SOURCE_RE.match, text.splitlines()) if match]
+    duplicates = sorted({path for path in headings if headings.count(path) > 1})
+    return [
+        f"VALIDATION.md: duplicate source route heading {path!r}"
+        for path in duplicates
+    ]
+
+
+def _validate_card_hygiene(rel_path: str, text: str) -> list[str]:
+    issues: list[str] = []
+    if RUNNABLE_FENCE_RE.search(text):
+        issues.append(f"{rel_path}: runnable command fence remains in AGENTS.md; move it to VALIDATION.md")
+    active = _active_lines(text)
+    for line_number, line in active:
+        if COMMAND_LINE_RE.match(line) or INLINE_COMMAND_RE.search(line):
+            issues.append(
+                f"{rel_path}:{line_number}: imperative command sequence remains in AGENTS.md; "
+                "move it to VALIDATION.md"
+            )
+        if ORPHAN_LEADIN_RE.match(line):
+            next_lines = [candidate for number, candidate in active if number > line_number and candidate.strip()]
+            if not next_lines or not COMMAND_LINE_RE.match(next_lines[0]):
+                issues.append(
+                    f"{rel_path}:{line_number}: orphan procedural lead-in remains in AGENTS.md"
+                )
+        if DANGLING_COLON_LINE_RE.match(line):
+            next_lines = [candidate for number, candidate in active if number > line_number and candidate.strip()]
+            if not next_lines or re.match(r"^#{1,6}\s+", next_lines[0]):
+                issues.append(
+                    f"{rel_path}:{line_number}: dangling colon lead-in remains in AGENTS.md"
+                )
+    for index, (line_number, line) in enumerate(active):
+        heading_match = re.match(r"^#{2,6}\s+(.+?)\s*$", line)
+        if not heading_match or not PROCEDURAL_HEADING_RE.match(heading_match.group(1).strip()):
+            continue
+        body: list[str] = []
+        for _, candidate in active[index + 1 :]:
+            if re.match(r"^#{1,6}\s+", candidate):
+                break
+            body.append(candidate)
+        if not any(candidate.strip() and not candidate.strip().startswith("<!--") for candidate in body):
+            issues.append(
+                f"{rel_path}:{line_number}: empty procedural heading {heading_match.group(1)!r}"
+            )
+    return issues
+
+
 def discover_nested_agents(repo_root: Path) -> set[str]:
     found: set[str] = set()
     for path in repo_root.rglob("AGENTS.md"):
@@ -498,6 +597,16 @@ def discover_nested_agents(repo_root: Path) -> set[str]:
         if rel != "AGENTS.md":
             found.add(rel)
     return found
+
+
+def inherited_agents_chain(rel_path: str, available_agents: set[str]) -> tuple[str, ...]:
+    path = Path(rel_path)
+    candidates = ["AGENTS.md"]
+    current = Path()
+    for part in path.parent.parts:
+        current /= part
+        candidates.append((current / "AGENTS.md").as_posix())
+    return tuple(candidate for candidate in candidates if candidate in available_agents)
 
 
 def validate(
@@ -517,6 +626,9 @@ def validate(
         root_text = root_agents.read_text(encoding="utf-8")
         if not _has_agents_heading(root_text):
             issues.append("AGENTS.md: missing AGENTS heading")
+    root_validation = repo_root / "VALIDATION.md"
+    if root_validation.is_file():
+        issues.extend(_validate_root_validation_routes(root_validation.read_text(encoding="utf-8")))
 
     for rel_path, snippets in REQUIRED_AGENTS_DOCS.items():
         path = repo_root / rel_path
@@ -527,13 +639,31 @@ def validate(
         if not _has_agents_heading(text):
             issues.append(f"{rel_path}: missing AGENTS heading")
         normalized = _normalize(text)
+        validation_text = _normalize(_validation_route_text(path, repo_root))
+        issues.extend(_validate_card_hygiene(rel_path, text))
         for snippet in snippets:
-            if _normalize(snippet) not in normalized:
+            needle = _normalize(snippet)
+            haystack = normalized
+            if _is_validation_route_snippet(snippet):
+                haystack = f"{normalized} {validation_text}"
+            if needle not in haystack:
                 issues.append(f"{rel_path}: missing required snippet {snippet!r}")
 
     required = set(REQUIRED_AGENTS_DOCS)
     known_legacy_archive = set(LEGACY_ARCHIVE_AGENTS_DOCS)
     actual = discover_nested_agents(repo_root)
+    available_agents = set(actual)
+    if root_agents.is_file():
+        available_agents.add("AGENTS.md")
+    for rel_path in sorted(available_agents):
+        chain = inherited_agents_chain(rel_path, available_agents)
+        chain_bytes = sum((repo_root / item).stat().st_size for item in chain)
+        if chain_bytes > AGENTS_CHAIN_BUDGET_BYTES:
+            rendered_chain = " + ".join(chain)
+            issues.append(
+                f"{rel_path}: inherited AGENTS chain is {chain_bytes} bytes, "
+                f"over {AGENTS_CHAIN_BUDGET_BYTES}: {rendered_chain}"
+            )
     untracked = sorted(actual - required - known_legacy_archive)
     if untracked:
         message = "untracked nested AGENTS.md not yet in validator map: " + ", ".join(untracked)
@@ -575,7 +705,8 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     print(
         f"Nested AGENTS validation passed for {REPOSITORY_NAME}: "
-        f"{len(REQUIRED_AGENTS_DOCS)} required nested document(s)."
+        f"{len(REQUIRED_AGENTS_DOCS)} required nested document(s); "
+        f"chain budget {AGENTS_CHAIN_BUDGET_BYTES} bytes."
     )
     for warning in result.warnings:
         print(f"[advisory] {warning}")

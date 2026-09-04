@@ -11,17 +11,9 @@ translation, annotation, retrieval, graph projection, and bounded LLM trials.
 It does not own source bytes, philosophical truth, accepted translations,
 semantic promotion, rights clearance, model storage, or host policy.
 
-## Read first
+## Conditional source route
 
-1. repository and `mechanics/` route cards;
-2. `mechanics/inference-pilots/AGENTS.md` and package route docs;
-3. `mechanics/machine-fit/AGENTS.md`;
-4. this part's `README.md`, `docs/EXPERIMENT_LAW.md`, and, for human-facing
-   work, `docs/HUMAN_REVIEW_WORKBENCH.md`;
-5. `/etc/abyss-machine/AGENTS.md` and
-   `/etc/abyss-machine/storage-policy.json` before any material run;
-6. the current Tree of Sophia corpus contracts and rights records for every
-   source item in the experiment.
+Read only the source, README, and owner contract needed for the current touched surface; `/etc/abyss-machine/storage-policy.json` remains the host storage authority when the task needs it, and entering this subtree does not require an unconditional inventory.
 
 ## Non-negotiable boundaries
 
@@ -86,8 +78,4 @@ semantic promotion, rights clearance, model storage, or host policy.
 
 ## Validation
 
-```bash
-python mechanics/inference-pilots/parts/tos-foundation-lab/tos_foundation_lab.py validate
-python -m pytest mechanics/inference-pilots/parts/tos-foundation-lab/tests -q
-python scripts/validate_stack.py
-```
+Validation is on-demand: use [VALIDATION.md](../../../../VALIDATION.md) for the `tos_foundation_lab.py validate` route and exact focused checks; retain the named lane and source-owned stop-lines.

@@ -139,8 +139,9 @@ Read:
    surface for the work
 
 Mechanic-local direction, landings, provenance, legacy bridges, examples,
-schemas, tests, generated artifacts, and exact validation commands belong in
-the package or part, not in root README.
+schemas, tests, generated artifacts, and validation ownership belong in the
+package or part. Exact procedure is routed through the nearest `VALIDATION.md`,
+not inherited from an agent card or root README.
 
 ## Machine-Fit Route
 
@@ -169,8 +170,8 @@ Read:
 4. nearest diagnostic or repair part `AGENTS.md`
 
 Diagnostic and repair surfaces are evidence and handoff routes before live
-mutation authority. Exact diagnostic catalog commands belong in the diagnostic
-package and `scripts/README.md`, not in root README.
+mutation authority. Exact diagnostic catalog procedure belongs in the nearest
+`VALIDATION.md` and machine lane manifest, not in root README.
 
 ## Direction-Change Route
 
@@ -221,14 +222,12 @@ Decision records explain why. Current source surfaces define what.
 Use `scripts/release_check.py` for broad release-facing or repo-wide
 validation.
 
-Exact current command lanes live in:
-
-- `AGENTS.md` for root agent validation posture
-- nearest nested `AGENTS.md` for package, part, and district commands
-- `scripts/README.md` for root wrappers and repository validators
-- `tests/README.md` for root test-surface ownership
-- package-local `README.md`, `PARTS.md`, and `AGENTS.md` for mechanic-specific
-  checks
+Exact current command lanes live in `docs/validation/validation_lanes.json`.
+Human-executable procedure is available on demand through the nearest
+`VALIDATION.md` (with root `VALIDATION.md` as the repository-wide map). Agent
+cards retain route meaning, lane IDs, and stop-lines; they do not duplicate
+command sequences. `scripts/README.md`, `tests/README.md`, and package-local
+README/PARTS docs remain semantic ownership surfaces.
 
 Root entry surfaces should point here or to those local authority surfaces
 instead of repeating package-specific command blocks.

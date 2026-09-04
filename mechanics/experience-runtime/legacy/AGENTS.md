@@ -5,9 +5,9 @@ Applies to `mechanics/experience-runtime/legacy/`.
 This directory preserves old flat experience runtime archive surfaces after the
 mechanics topology refactor.
 
-Use `../README.md`, `../PROVENANCE.md`, `ARCHIVE_CLASSIFICATION.md`, and
-`../parts/experience-records/docs/EXPERIENCE_RECORDS_DISTILLATION.md` before
-treating any legacy file as evidence. Raw docs are historical source material.
+When a legacy file is being evaluated as evidence, consult `../README.md`,
+`../PROVENANCE.md`, `ARCHIVE_CLASSIFICATION.md`, and
+`../parts/experience-records/docs/EXPERIENCE_RECORDS_DISTILLATION.md`. Raw docs are historical source material.
 Artifact schemas/examples remain contract-tested, but they are still contained
 legacy surfaces.
 
@@ -18,8 +18,4 @@ Do not:
 - promote seed docs into active runtime law without a distillation note
 - blur stack runtime contracts with AoA or ToS meaning authority
 
-Validation:
-
-```bash
-python -m pytest mechanics/experience-runtime/legacy/artifacts/tests
-```
+Use [VALIDATION.md](../../../VALIDATION.md) for exact commands and focused checks.

@@ -33,7 +33,7 @@ The agent route mesh has these layers:
 - **mechanic package cards**: `mechanics/<package>/AGENTS.md` cards for runtime
   move families
 - **part cards**: `mechanics/<package>/parts/<part>/AGENTS.md` cards when a part
-  has its own risk, commands, schemas, examples, or validation
+  has its own risk, schemas, examples, or validation route
 - **legacy and provenance cards**: bounded route surfaces that explain preserved
   history without letting legacy names become active topology
 - **validation surfaces**: `validate_stack.py`, nested-agent checks, tests,
@@ -74,10 +74,12 @@ When an agent enters a surface:
 
 1. Read the root `AGENTS.md`.
 2. Read the nearest local `AGENTS.md` for every touched path.
-3. Read the local README, package card, or part card named by that route.
+3. Read the README, package card, or part contract only when the task needs its
+   semantic meaning.
 4. Identify whether the change is source, runtime, generated, legacy,
    diagnostic, public-share, or private-state work.
-5. Choose the narrowest validator that proves the changed contract.
+5. Choose the narrowest on-demand validation route that proves the changed
+   contract.
 6. Close with changed surfaces, verification, skipped checks, and remaining
    route risk.
 
@@ -113,6 +115,9 @@ Agent guidance may tell agents where to look and what to verify. It must not:
   mesh, but source cards own the contracts.
 - **Proximity narrows.** The deeper the path, the more concrete the guidance
   should become.
+- **Inherited context is budgeted.** Keep every applicable AGENTS chain within
+  32 KiB. Parent cards route shared lanes; `VALIDATION.md` owns on-demand exact
+  procedure and local stop-lines remain with the nearest package card.
 - **Portability through repeated shape.** A recurring card shape makes future
   passes faster without flattening local differences.
 
@@ -131,6 +136,8 @@ Agent guidance may tell agents where to look and what to verify. It must not:
 - local cards repeat doctrine without naming local files, risks, or checks
 - a package has parts but no route for part-owned docs, schemas, examples, or
   tests
+- parent cards copy every child command and make unrelated procedure part of
+  every descendant prompt
 - legacy folders are silent dumping grounds instead of provenance-preserving
   bridges
 - closeout says "validated" without naming the actual check

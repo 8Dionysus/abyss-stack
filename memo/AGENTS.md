@@ -10,13 +10,9 @@ This card applies to `memo/`.
 candidates, receipts, exports, and local notes before any reviewed landing in
 `aoa-memo`.
 
-## Read before editing
+## Conditional source route
 
-1. Root `AGENTS.md`
-2. `BOUNDARIES.md`
-3. `mechanics/federation-seams/parts/memo-seam/docs/MEMO_RUNTIME_SEAM.md`
-4. This `README.md`
-5. `mcp/services/aoa-memo-mcp/AGENTS.md`
+Read only the source, README, and owner contract needed for the current touched surface; entering this subtree does not require an unconditional inventory.
 
 ## Boundaries
 
@@ -30,30 +26,19 @@ for review or handoff traces, `exports/` for packets meant for `aoa-memo`, and
 
 ## Candidate Route
 
-Create candidates through the MCP helper from the `abyss-stack` repo root:
+For candidate creation through the MCP helper from the `abyss-stack` repo root, use [VALIDATION.md](../VALIDATION.md).
+When that helper or its landing-plan route is involved, also consult
+[`mcp/services/aoa-memo-mcp/AGENTS.md`](../mcp/services/aoa-memo-mcp/AGENTS.md)
+for the access-plane boundary.
 
-```bash
-PYTHONPATH=mcp/services/aoa-memo-mcp/src python -m aoa_memo_mcp.cli create-candidate \
-  --repo abyss-stack \
-  --evidence-ref mechanics/federation-seams/parts/memo-seam/docs/MEMO_RUNTIME_SEAM.md \
-  --claim "Runtime memory access should route through reviewed local candidates."
-```
+Use the on-demand validation route in `VALIDATION.md` for the exact focused procedure.
 
-Then validate the emitted candidate path:
-
-```bash
-PYTHONPATH=mcp/services/aoa-memo-mcp/src python -m aoa_memo_mcp.cli validate-candidate path/to/candidate.json
-```
 
 ## Reviewed Landing Route
 
 Use this route when a local export is meant to become reviewed `aoa-memo`
 memory:
 
-```bash
-PYTHONPATH=mcp/services/aoa-memo-mcp/src python -m aoa_memo_mcp.cli pending-exports --repo abyss-stack
-PYTHONPATH=mcp/services/aoa-memo-mcp/src python -m aoa_memo_mcp.cli landing-plan --repo abyss-stack --export-ref exports/path.reviewed-intake.json --run-dry-run
-```
 
 `landing-plan` is still an access-plane check. The durable write happens in
 `aoa-memo` through `scripts/memory/land_reviewed_memo_intake.py`, generated
@@ -61,13 +46,8 @@ read-model refresh, validators, and review.
 
 ## Validation
 
-```bash
-python mcp/services/aoa-memo-mcp/scripts/validate_memo_mcp.py
-AOA_MEMO_ROOT="${AOA_MEMO_ROOT:-/srv/AbyssOS/aoa-memo}"
-python "$AOA_MEMO_ROOT/scripts/memory/validate_local_memo_port.py" --path memo
-python "$AOA_MEMO_ROOT/scripts/memory/build_local_memo_port_index.py" --path memo --check
-python -m pytest mcp/services/aoa-memo-mcp/tests -q
-```
+Use the on-demand validation route in `VALIDATION.md` for the exact local-port
+checks and retain candidate-only and reviewed-landing stop-lines.
 
 ## Closeout
 

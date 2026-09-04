@@ -30,15 +30,9 @@ It does not own:
 - runtime or host truth, owned by `abyss-stack` and `abyss-machine`;
 - repo-local meaning in the pilot repositories.
 
-## Start Here
+## Conditional source route
 
-1. `README.md`
-2. `DESIGN.md`
-3. `docs/BOUNDARIES.md`
-4. `docs/THREAT_MODEL.md`
-5. `src/aoa_memo_mcp/core.py`
-6. `src/aoa_memo_mcp/server.py`
-7. `tests/`
+Read only the source, README, and owner contract needed for the current touched surface; entering this subtree does not require an unconditional inventory.
 
 ## Route Modes
 
@@ -65,47 +59,17 @@ It does not own:
 
 In the shared AoA Codex plane this service is registered as `aoa_memo` through
 `8Dionysus:config/codex_plane/runtime_manifest.v1.json`. Use the workspace
-launcher from the shared root when testing the registered route:
+launcher from the shared root when testing the registered route; use [VALIDATION.md](../../../VALIDATION.md).
 
-```bash
-/srv/AbyssOS/.codex/bin/aoa-memo-mcp-server.py
-```
+For source-local service execution from the `abyss-stack` repo root, use the on-demand validation route in `VALIDATION.md`.
 
-For source-local service execution from the `abyss-stack` repo root, run:
-
-```bash
-python mcp/services/aoa-memo-mcp/scripts/aoa_memo_mcp_server.py
-AOA_MCP_POLICY_FAMILY=candidate python mcp/services/aoa-memo-mcp/scripts/aoa_memo_mcp_server.py
-```
 
 The first command defaults to the read contour. Candidate writes additionally
 require `AOA_MEMO_MCP_CANDIDATE_ROOTS`; managed lifecycle supplies that exact
 allowlist and the distinct candidate bearer.
 
-If the package is installed, the server entry point is:
+If the package is installed, use the installed server entry-point procedure in `VALIDATION.md`.
 
-```bash
-aoa-memo-mcp-server
-```
-
-## Smoke
-
-```bash
-PYTHONPATH=mcp/services/aoa-memo-mcp/src python -m aoa_memo_mcp.cli brief --repo Agents-of-Abyss --intent "route memory"
-PYTHONPATH=mcp/services/aoa-memo-mcp/src python -m aoa_memo_mcp.cli validate-candidate path/to/candidate.json
-PYTHONPATH=mcp/services/aoa-memo-mcp/src python -m aoa_memo_mcp.cli validate-port --repo abyss-stack
-PYTHONPATH=mcp/services/aoa-memo-mcp/src python -m aoa_memo_mcp.cli build-port-index --repo abyss-stack --check
-PYTHONPATH=mcp/services/aoa-memo-mcp/src python -m aoa_memo_mcp.cli pending-exports --repo abyss-stack
-PYTHONPATH=mcp/services/aoa-memo-mcp/src python -m aoa_memo_mcp.cli landing-plan --repo abyss-stack --export-ref exports/example.reviewed-intake.json --run-dry-run
-```
-
-## Verify
-
-```bash
-python mcp/services/aoa-memo-mcp/scripts/validate_memo_mcp.py
-python -m pytest mcp/services/aoa-memo-mcp/tests -q
-python mcp/services/aoa-memo-mcp/scripts/release_check.py
-```
 
 ## Report
 

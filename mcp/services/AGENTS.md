@@ -10,12 +10,9 @@ This card applies to `mcp/services/` and every MCP service package below it.
 Protocol servers. It keeps runnable MCP access planes below one route instead
 of leaving service packages directly in the root-adjacent `mcp/` district.
 
-## Read before editing
+## Conditional source route
 
-1. Root `AGENTS.md`
-2. `mcp/AGENTS.md`
-3. This card
-4. The service-local `AGENTS.md`, README, design notes, source, and tests
+Read only the source, README, and owner contract needed for the current touched surface; `mcp/services/README.md` and the service-local `AGENTS.md` are semantic routes when needed, and entering this subtree does not require an unconditional inventory.
 
 ## Boundaries
 
@@ -25,117 +22,15 @@ named by the service-local route card.
 
 ## Validation
 
-For `abyss-stack-mcp`, run:
+The runnable package map lives in `mcp/services/README.md`. For one package,
+use its service-local `VALIDATION.md` route; do not inherit or run unrelated
+package matrices. For a district-wide change, use the named `mcp-services`
+lane in the on-demand validation map.
 
-```bash
-python mcp/services/abyss-stack-mcp/scripts/validate_stack_mcp.py
-python -m pytest mcp/services/abyss-stack-mcp/tests -q
-```
+Validation is on-demand: use [VALIDATION.md](../../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.
 
-For `aoa-memo-mcp`, run:
+When a service path, local route card, or root district route changes, also use the on-demand validation route in `VALIDATION.md`.
 
-```bash
-python mcp/services/aoa-memo-mcp/scripts/validate_memo_mcp.py
-python -m pytest mcp/services/aoa-memo-mcp/tests -q
-```
-
-For `aoa-decisions-mcp`, run:
-
-```bash
-python mcp/services/aoa-decisions-mcp/scripts/validate_decisions_mcp.py
-python -m pytest mcp/services/aoa-decisions-mcp/tests -q
-```
-
-For `aoa-evals-mcp`, run:
-
-```bash
-python mcp/services/aoa-evals-mcp/scripts/validate_evals_mcp.py
-python -m pytest mcp/services/aoa-evals-mcp/tests -q
-```
-
-For `aoa-kag-mcp`, run:
-
-```bash
-python mcp/services/aoa-kag-mcp/scripts/validate_kag_mcp.py
-python -m pytest mcp/services/aoa-kag-mcp/tests -q
-```
-
-For `aoa-stats-mcp`, run:
-
-```bash
-python mcp/services/aoa-stats-mcp/scripts/validate_stats_mcp.py
-python -m pytest mcp/services/aoa-stats-mcp/tests -q
-```
-
-For `abyss-machine-mcp`, run:
-
-```bash
-python mcp/services/abyss-machine-mcp/scripts/validate_machine_mcp.py
-python -m pytest mcp/services/abyss-machine-mcp/tests -q
-```
-
-For `aoa-session-memory-mcp`, run:
-
-```bash
-python mcp/services/aoa-session-memory-mcp/scripts/validate_session_memory_mcp.py
-python -m pytest mcp/services/aoa-session-memory-mcp/tests -q
-```
-
-For `tos-corpus-mcp`, run:
-
-```bash
-python mcp/services/tos-corpus-mcp/scripts/validate_tos_corpus_mcp.py
-python -m pytest mcp/services/tos-corpus-mcp/tests -q
-```
-
-For `aoa-4pda-connector-mcp`, run:
-
-```bash
-python mcp/services/aoa-4pda-connector-mcp/scripts/validate_4pda_connector_mcp.py
-python -m pytest mcp/services/aoa-4pda-connector-mcp/tests -q
-```
-
-For `aoa-telegram-connector-mcp`, run:
-
-```bash
-python mcp/services/aoa-telegram-connector-mcp/scripts/validate_telegram_connector_mcp.py
-python -m pytest mcp/services/aoa-telegram-connector-mcp/tests -q
-```
-
-For `aoa-discord-connector-mcp`, run:
-
-```bash
-python mcp/services/aoa-discord-connector-mcp/scripts/validate_discord_connector_mcp.py
-python -m pytest mcp/services/aoa-discord-connector-mcp/tests -q
-```
-
-For `aoa-course-connector-mcp`, run:
-
-```bash
-python mcp/services/aoa-course-connector-mcp/scripts/validate_course_connector_mcp.py
-python -m pytest mcp/services/aoa-course-connector-mcp/tests -q
-```
-
-For `aoa-stackoverflow-connector-mcp`, run:
-
-```bash
-python mcp/services/aoa-stackoverflow-connector-mcp/scripts/validate_stackoverflow_connector_mcp.py
-python -m pytest mcp/services/aoa-stackoverflow-connector-mcp/tests -q
-```
-
-For `aoa-xda-connector-mcp`, run:
-
-```bash
-python mcp/services/aoa-xda-connector-mcp/scripts/validate_xda_connector_mcp.py
-python -m pytest mcp/services/aoa-xda-connector-mcp/tests -q
-```
-
-When a service path, local route card, or root district route changes, also run:
-
-```bash
-python scripts/validate_stack.py
-python scripts/validate_nested_agents.py
-```
 
 ## Closeout
 

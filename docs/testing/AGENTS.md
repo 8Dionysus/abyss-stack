@@ -25,7 +25,4 @@ It does not own executable command sequences. Those live in
 
 ## Validate
 
-```bash
-python -m pytest -q tests/test_test_topology.py
-python scripts/ci_gate.py --mode tests
-```
+Validation is on-demand: use [VALIDATION.md](../../VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.

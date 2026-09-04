@@ -28,11 +28,7 @@ Tasks production pair without granting new owner authority.
 
 ## Validation
 
-```bash
-python mcp/protocol-lab/scripts/build_protocol_lab_status.py --check
-python mcp/protocol-lab/scripts/validate_protocol_lab.py
-python -m pytest -q mcp/protocol-lab/tests
-```
+Validation is on-demand: use [mcp/protocol-lab/VALIDATION.md](VALIDATION.md) for exact commands and focused checks; retain the named lane and source-owned stop-lines.
 
 Do not edit the generated status directly. Refresh the source matrix and pair
 observation, then run the builder.

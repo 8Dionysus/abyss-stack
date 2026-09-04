@@ -33,11 +33,4 @@ route, not in this root store.
 
 ## Validate
 
-Use the narrowest checks that cover the touched quest surface:
-
-```bash
-python scripts/validate_stack.py
-python quests/scripts/build_quest_examples.py --check
-python -m py_compile quests/scripts/quest_surface.py quests/scripts/build_quest_examples.py
-python -m pytest tests/test_questbook_surface_contracts.py
-```
+Use the narrowest checks that cover the touched quest surface from [VALIDATION.md](../VALIDATION.md).

@@ -28,9 +28,4 @@ targets are historical drift, not an active route.
 
 ## Validate
 
-Use the root nested guidance check after touching skill surfaces:
-
-```bash
-python scripts/validate_nested_agents.py
-python scripts/validate_stack.py
-```
+After touching skill surfaces, use the root nested guidance check from [VALIDATION.md](../../VALIDATION.md).
