@@ -51,7 +51,9 @@ stabilizer, but it reads the release command sequence from the lane manifest.
   order, never selection or failure semantics. Failed shard logs repeat after
   the aggregate so bounded log tails retain the actionable traceback. Live
   output is tailed from each durable shard log, so a descendant inheriting a
-  shard descriptor cannot hold the scheduler past the pytest process exit.
+  shard descriptor cannot hold the scheduler past the pytest process exit. The
+  runner disables third-party pytest plugin autoload by default; set
+  `PYTEST_DISABLE_PLUGIN_AUTOLOAD=0` for an explicit external-plugin run.
 
 ## Active Lanes
 

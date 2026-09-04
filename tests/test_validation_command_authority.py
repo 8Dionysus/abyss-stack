@@ -467,6 +467,24 @@ def test_pytest_child_command_is_unbuffered_for_live_diagnostics() -> None:
     assert command[1:4] == ["-u", "-m", "pytest"]
 
 
+def test_pytest_children_disable_plugin_autoload_by_default_but_allow_opt_out(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv(run_pytest_lane.PYTEST_DISABLE_PLUGIN_AUTOLOAD_ENV, raising=False)
+    assert run_pytest_lane._pytest_environment()[run_pytest_lane.PYTEST_DISABLE_PLUGIN_AUTOLOAD_ENV] == "1"
+    environment = run_pytest_lane._partition_environment(
+        baseline_path=Path("/tmp/baseline.json"),
+    )
+    assert environment[run_pytest_lane.PYTEST_DISABLE_PLUGIN_AUTOLOAD_ENV] == "1"
+
+    monkeypatch.setenv(run_pytest_lane.PYTEST_DISABLE_PLUGIN_AUTOLOAD_ENV, "0")
+    assert run_pytest_lane._pytest_environment()[run_pytest_lane.PYTEST_DISABLE_PLUGIN_AUTOLOAD_ENV] == "0"
+    opted_out = run_pytest_lane._partition_environment(
+        baseline_path=Path("/tmp/baseline.json"),
+    )
+    assert opted_out[run_pytest_lane.PYTEST_DISABLE_PLUGIN_AUTOLOAD_ENV] == "0"
+
+
 def test_release_dependencies_do_not_add_a_threaded_pytest_scheduler() -> None:
     requirements = (REPO_ROOT / "requirements-dev.txt").read_text(encoding="utf-8")
 

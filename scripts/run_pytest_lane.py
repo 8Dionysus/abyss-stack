@@ -21,6 +21,7 @@ SCHEDULER_ENV = "ABYSS_STACK_TEST_SCHEDULER"
 PROCESS_WORKER_LIMIT = 4
 PROCESS_SHARD_COUNT = 32
 PROCESS_SHARD_TARGET_ITEMS = 92
+PYTEST_DISABLE_PLUGIN_AUTOLOAD_ENV = "PYTEST_DISABLE_PLUGIN_AUTOLOAD"
 SCHEDULERS = ("auto", "serial", "process-4x32-file-aware")
 
 # These conservative weights came from repeated complete-suite trials. They
@@ -287,6 +288,12 @@ def shard_count_for_selection(test_count: int) -> int:
     return min(test_count, PROCESS_SHARD_COUNT, max(PROCESS_WORKER_LIMIT, sized))
 
 
+def _pytest_environment() -> dict[str, str]:
+    environment = os.environ.copy()
+    environment.setdefault(PYTEST_DISABLE_PLUGIN_AUTOLOAD_ENV, "1")
+    return environment
+
+
 def _partition_environment(
     *,
     baseline_path: Path,
@@ -294,7 +301,7 @@ def _partition_environment(
     observed_path: Path | None = None,
     result_path: Path | None = None,
 ) -> dict[str, str]:
-    environment = os.environ.copy()
+    environment = _pytest_environment()
     environment[PARTITION_BASELINE_ENV] = str(baseline_path)
     if assignment_path is None:
         environment[PARTITION_MODE_ENV] = "collect"
@@ -615,7 +622,7 @@ def main(argv: list[str] | None = None) -> int:
         completed = subprocess.run(
             command,
             cwd=REPO_ROOT,
-            env=os.environ.copy(),
+            env=_pytest_environment(),
             check=False,
         )
         return completed.returncode

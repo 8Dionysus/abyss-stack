@@ -55,6 +55,9 @@ after the aggregate so an early traceback remains visible in bounded log tails.
 The parent tails each durable shard log while the child runs and decides
 completion from child process status, not pipe EOF that a descendant could keep
 open.
+The runner also disables third-party pytest plugin autoload by default to avoid
+repeating unused plugin imports in every isolated process; an explicit
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=0` restores the host plugin set.
 
 Expensive transport setup may be stratified from semantic assertions only
 inside the owning test harness. The external Codex suite keeps named exact
