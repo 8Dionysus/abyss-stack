@@ -8,7 +8,7 @@
 
 ## Archive containment
 
-- archive old pilot docs and runners under `legacy/`
+- recover old pilot docs and runners through `PROVENANCE.md`
 - expose quiet root bridge commands for the two runnable pilot paths
 - keep validator coverage on the bridge commands and package-local archived scripts
 

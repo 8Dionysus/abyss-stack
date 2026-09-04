@@ -53,10 +53,10 @@ Run the commands in [AGENTS.md](AGENTS.md).
 
 Use [parts/runtime-kernels/docs/RUNTIME_KERNELS.md](parts/runtime-kernels/docs/RUNTIME_KERNELS.md)
 for the active substrate, [PROVENANCE.md](PROVENANCE.md) for source lineage,
-and [legacy/INDEX.md](legacy/INDEX.md) for the old flat file map.
+and [legacy/INDEX.md](https://github.com/8Dionysus/abyss-stack/blob/a4e0e0cbe7fd9c6961b733de1f06d8d62c15f02f/mechanics/agon-runtime/legacy/INDEX.md) for the old flat file map.
 
 ## Active Route
 
 Start from this file, then `DIRECTION.md`, `PARTS.md`, and `PROVENANCE.md`.
-The old raw docs live under `legacy/`; the old runnable artifact family has
+The old raw docs remain in Git through `PROVENANCE.md`; the old runnable artifact family has
 been distilled into quiet active names under `parts/runtime-kernels/`.

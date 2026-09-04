@@ -3,7 +3,7 @@
 ## Current route
 
 - keep flat experience docs, schemas, examples, and tests contained in
-  package-local `legacy/`
+  package-local `PROVENANCE.md`
 - keep provenance, archive bridges, and contract tests green
 - keep the distillation stop-line visible before any future promotion
 

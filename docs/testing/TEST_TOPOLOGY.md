@@ -10,7 +10,6 @@ deterministic, public-safe, and explicit about which owner surface failed.
 | `tests/` | root integration contracts | blocking default pytest lane |
 | `mechanics/*/parts/*/tests/` | mechanic part-local contracts | blocking default pytest lane |
 | `mcp/services/*/tests/` | MCP service package contracts | blocking default pytest lane and service-local lanes |
-| `mechanics/*/legacy/*/tests/` | archived provenance tests | not collected by default; run explicitly only for archive review |
 
 ## Families
 

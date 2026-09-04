@@ -13,7 +13,7 @@ entering this subtree does not require an unconditional README inventory.
 registries, examples, schemas, validators, simulations, tests, and recurrence
 observation manifests.
 
-Archive files under `legacy/` preserve old flat named surfaces. They are
+Historical Git sources preserve old flat named surfaces. They are
 provenance only, not the active runtime route and not a new source of AoA
 doctrine.
 

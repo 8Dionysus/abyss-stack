@@ -17,7 +17,7 @@ or Tree of Sophia promotion. Those routes stay with `Agents-of-Abyss`,
 
 The active definitions intentionally use quiet file names. Old flat artifact
 names, old landing labels, and old quest stubs are preserved only under
-`../../legacy/`.
+`PROVENANCE.md`.
 
 ## Validation
 

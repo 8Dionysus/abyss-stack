@@ -43,14 +43,6 @@ LOCAL_AI_TRIALS_PATH = (
     / "docs"
     / "LOCAL_AI_TRIALS.md"
 )
-LOCAL_AI_TRIALS_BASELINE_PATH = (
-    Path("mechanics")
-    / "inference-pilots"
-    / "legacy"
-    / "trials"
-    / "raw"
-    / "LOCAL_AI_TRIALS_W0_W4_BASELINE.md"
-)
 TRUTH_SURFACES_PATH = (
     Path("mechanics")
     / "diagnostic-spine"
@@ -67,11 +59,8 @@ GOVERNED_EXECUTION_PATH = (
     / "docs"
     / "GOVERNED_EXECUTION.md"
 )
-W5_PILOT_PATH = (
-    Path("mechanics") / "inference-pilots" / "legacy" / "trials" / "raw" / "W5_PILOT.md"
-)
-W6_PILOT_PATH = (
-    Path("mechanics") / "inference-pilots" / "legacy" / "trials" / "raw" / "W6_PILOT.md"
+QUIET_BRIDGE_CONTRACT_PATH = (
+    Path("mechanics") / "inference-pilots" / "parts" / "quiet-bridge-commands" / "CONTRACT.md"
 )
 PATHS_DOC_PATH = Path("docs") / "runtime" / "PATHS.md"
 DEPLOYMENT_DOC_PATH = Path("docs") / "install" / "DEPLOYMENT.md"
@@ -111,11 +100,9 @@ GOVERNED_CANARY_CATALOG_PATH = (
 RUNTIME_ROUTE_CONTRACT_FILES = (
     Path("README.md"),
     LOCAL_AI_TRIALS_PATH,
-    LOCAL_AI_TRIALS_BASELINE_PATH,
     TRUTH_SURFACES_PATH,
     GOVERNED_EXECUTION_PATH,
-    W5_PILOT_PATH,
-    W6_PILOT_PATH,
+    QUIET_BRIDGE_CONTRACT_PATH,
     PATHS_DOC_PATH,
     DEPLOYMENT_DOC_PATH,
     PROFILES_DOC_PATH,
@@ -339,10 +326,10 @@ def validate_inference_and_governance_route_docs(errors: list[str], *, root: Pat
         errors=errors,
     )
 
-    local_ai_trials_w0_w4_baseline = read_required(root, LOCAL_AI_TRIALS_BASELINE_PATH, errors)
+    local_ai_trials_contract = read_required(root, LOCAL_AI_TRIALS_PATH, errors)
     require_snippets(
-        local_ai_trials_w0_w4_baseline,
-        relative_path=LOCAL_AI_TRIALS_BASELINE_PATH,
+        local_ai_trials_contract,
+        relative_path=LOCAL_AI_TRIALS_PATH,
         snippets=(
             "prepare-wave W4 --lane docs",
             "apply-case W4 <case-id>",
@@ -403,42 +390,22 @@ def validate_inference_and_governance_route_docs(errors: list[str], *, root: Pat
         errors=errors,
     )
 
-    w5_doc = read_required(root, W5_PILOT_PATH, errors)
+    bridge_doc = read_required(root, QUIET_BRIDGE_CONTRACT_PATH, errors)
     require_snippets(
-        w5_doc,
-        relative_path=W5_PILOT_PATH,
+        bridge_doc,
+        relative_path=QUIET_BRIDGE_CONTRACT_PATH,
         snippets=(
             "TRUTH_SURFACES.md",
             "http://127.0.0.1:5403/run",
             "scripts/aoa-long-horizon-pilot materialize",
+            "scripts/aoa-bounded-autonomy-pilot materialize",
             "run-scenario <scenario-id> --until milestone|done",
             "resume-scenario <scenario-id>",
             "status --all",
             "plan_freeze",
             "first_mutation",
             "landing",
-            "stack-sync-federation-check-mode",
             "implementation_patch",
-            "trial_proven",
-            "live_available",
-            "aoa-status --autonomy",
-        ),
-        errors=errors,
-    )
-
-    w6_doc = read_required(root, W6_PILOT_PATH, errors)
-    require_snippets(
-        w6_doc,
-        relative_path=W6_PILOT_PATH,
-        snippets=(
-            "TRUTH_SURFACES.md",
-            "http://127.0.0.1:5403/run",
-            "scripts/aoa-bounded-autonomy-pilot materialize",
-            "run-scenario <scenario-id> --until milestone|done",
-            "resume-scenario <scenario-id>",
-            "status --all",
-            "stack-sync-federation-json-check-report",
-            "llamacpp-pilot-verify-command",
             "trial_proven",
             "live_available",
             "aoa-status --autonomy",

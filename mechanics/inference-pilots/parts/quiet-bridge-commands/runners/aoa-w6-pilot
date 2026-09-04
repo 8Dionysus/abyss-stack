@@ -597,9 +597,9 @@ def llamacpp_verify_case() -> dict[str, Any]:
                 SOURCE_CHECKOUT_ROOT
                 / "mechanics"
                 / "inference-pilots"
-                / "legacy"
-                / "raw"
-                / "W6_PILOT.md"
+                / "parts"
+                / "quiet-bridge-commands"
+                / "CONTRACT.md"
             ),
         ],
         "observed_actions": [],

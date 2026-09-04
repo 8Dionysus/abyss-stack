@@ -310,6 +310,10 @@
 - [ABYSS-STACK-D-0062 Agent Skill Projection Validator Module](../ABYSS-STACK-D-0062-agent-skill-projection-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0062-agent-skill-projection-validator-module.md`)
 - [ABYSS-STACK-D-0080 Diagnostic Skill Owner Home](../ABYSS-STACK-D-0080-diagnostic-skill-owner-home.md) (`docs/decisions/ABYSS-STACK-D-0080-diagnostic-skill-owner-home.md`)
 
+## agent/route
+
+- [ABYSS-STACK-D-0142 Retire Historical Trees Without Retiring Runtime Compatibility](../ABYSS-STACK-D-0142-retire-historical-trees.md) (`docs/decisions/ABYSS-STACK-D-0142-retire-historical-trees.md`)
+
 ## approval policy
 
 - [ABYSS-STACK-D-0100 Project Runtime Approvals into Run Plans](../ABYSS-STACK-D-0100-project-runtime-approvals-into-run-plans.md) (`docs/decisions/ABYSS-STACK-D-0100-project-runtime-approvals-into-run-plans.md`)
@@ -392,6 +396,10 @@
 ## diagnostic surface
 
 - [ABYSS-STACK-D-0050 Diagnostic Spine Validator Module](../ABYSS-STACK-D-0050-diagnostic-spine-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0050-diagnostic-spine-validator-module.md`)
+
+## docs/provenance
+
+- [ABYSS-STACK-D-0142 Retire Historical Trees Without Retiring Runtime Compatibility](../ABYSS-STACK-D-0142-retire-historical-trees.md) (`docs/decisions/ABYSS-STACK-D-0142-retire-historical-trees.md`)
 
 ## eval candidate
 
@@ -547,6 +555,10 @@
 ## mechanic topology
 
 - [ABYSS-STACK-D-0057 Mechanics Topology Validator Module](../ABYSS-STACK-D-0057-mechanics-topology-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0057-mechanics-topology-validator-module.md`)
+
+## mechanics/topology
+
+- [ABYSS-STACK-D-0142 Retire Historical Trees Without Retiring Runtime Compatibility](../ABYSS-STACK-D-0142-retire-historical-trees.md) (`docs/decisions/ABYSS-STACK-D-0142-retire-historical-trees.md`)
 
 ## memory candidate
 
@@ -781,6 +793,10 @@
 ## schema/contract
 
 - [ABYSS-STACK-D-0068 Decision Graph Contract And Impact Packets](../ABYSS-STACK-D-0068-decision-graph-contract-and-impact-packets.md) (`docs/decisions/ABYSS-STACK-D-0068-decision-graph-contract-and-impact-packets.md`)
+
+## scripts/validation
+
+- [ABYSS-STACK-D-0142 Retire Historical Trees Without Retiring Runtime Compatibility](../ABYSS-STACK-D-0142-retire-historical-trees.md) (`docs/decisions/ABYSS-STACK-D-0142-retire-historical-trees.md`)
 
 ## security
 

@@ -11,4 +11,4 @@ tests live under the owning `../parts/` route:
 - `../parts/a2a-return-dry-run/`
 - `../parts/memo-contradiction-sidecar/`
 
-Archived chaos lineage remains under `../legacy/`.
+Archived chaos lineage remains in Git via `PROVENANCE.md`.

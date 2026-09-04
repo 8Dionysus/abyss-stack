@@ -75,22 +75,6 @@ class ValidateNestedAgentsTests(unittest.TestCase):
             result = validator.validate(repo_root, strict_advisory=True)
             self.assertTrue(any("high-risk directory" in issue for issue in result.issues))
 
-    def test_known_legacy_archive_agents_are_classified_not_untracked(self) -> None:
-        if not validator.LEGACY_ARCHIVE_AGENTS_DOCS:
-            self.skipTest("repository has no legacy archive AGENTS.md docs")
-        with tempfile.TemporaryDirectory() as tmp:
-            repo_root = Path(tmp)
-            _write_minimal_required_tree(repo_root)
-            _write(
-                repo_root / validator.LEGACY_ARCHIVE_AGENTS_DOCS[0],
-                "# AGENTS.md\nLegacy archive route card.\n",
-            )
-
-            result = validator.validate(repo_root, fail_on_untracked=True)
-
-            self.assertEqual((), result.issues)
-            self.assertEqual((), result.warnings)
-
     def test_new_unmodeled_agents_still_warns_and_can_fail(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)

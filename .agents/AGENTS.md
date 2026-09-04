@@ -5,7 +5,7 @@ first.
 
 ## Scope
 
-This directory owns transitional repo-local agent projections and model lanes
+This directory owns transitional repo-local agent projections
 that need to ship with the `abyss-stack` source checkout.
 
 ## Conditional source route
@@ -17,8 +17,8 @@ Read only the source, README, and owner contract needed for the current touched 
 - Keep canonical skill law in the owning skill repository.
 - Keep stack-owned canonical packages under `skills/`, not in this projection.
 - Keep local overlays thin, portable, and explicit about the canonical upstream.
-- Keep agent model lanes under `.agents/<lane>/`, not as top-level runtime
-  districts.
+- Route bounded edits through the nearest source-owner card; do not create a
+  model-branded lane just to duplicate that card's scope and validation.
 - Do not commit private agent state, session transcripts, cache payloads, or
   generated runtime captures here.
 - Route local overlay references to current package-local mechanics paths.

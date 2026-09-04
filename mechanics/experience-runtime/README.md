@@ -49,8 +49,8 @@ Run the commands in [AGENTS.md](AGENTS.md).
 
 ### Next route
 
-Use [PROVENANCE.md](PROVENANCE.md), [legacy/INDEX.md](legacy/INDEX.md), and
-[legacy/ARCHIVE_CLASSIFICATION.md](legacy/ARCHIVE_CLASSIFICATION.md) before
+Use [PROVENANCE.md](PROVENANCE.md), [legacy/INDEX.md](https://github.com/8Dionysus/abyss-stack/blob/a4e0e0cbe7fd9c6961b733de1f06d8d62c15f02f/mechanics/experience-runtime/legacy/INDEX.md), and
+[legacy/ARCHIVE_CLASSIFICATION.md](https://github.com/8Dionysus/abyss-stack/blob/a4e0e0cbe7fd9c6961b733de1f06d8d62c15f02f/mechanics/experience-runtime/legacy/ARCHIVE_CLASSIFICATION.md) before
 editing moved archive files. Use
 [parts/experience-records/docs/EXPERIENCE_RECORDS_DISTILLATION.md](parts/experience-records/docs/EXPERIENCE_RECORDS_DISTILLATION.md)
 before promoting anything out of legacy.

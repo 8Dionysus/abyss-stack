@@ -29,7 +29,6 @@ python mcp/services/aoa-memo-mcp/scripts/validate_memo_mcp.py
 python -m pytest mechanics/agon-runtime/parts/runtime-kernels/tests
 python mechanics/agon-runtime/parts/runtime-kernels/build_duel_runtime_kernel_registry.py --check
 python mechanics/agon-runtime/parts/runtime-kernels/build_mechanical_trial_run_registry.py --check
-python -m pytest mechanics/experience-runtime/legacy/artifacts/tests
 python -m pytest mechanics/inference-pilots/parts/tos-foundation-lab/tests -q
 scripts/aoa-check-layout --ignore-secrets
 ```
@@ -631,11 +630,6 @@ python mechanics/agon-runtime/parts/runtime-kernels/simulate_mechanical_trials.p
 
 See [Shared repository checks](VALIDATION.md#shared-repository-checks) for this repository-wide check.
 
-## `mechanics/agon-runtime/legacy/AGENTS.md`
-
-### On-demand validation procedure
-
-See [Shared repository checks](VALIDATION.md#shared-repository-checks) for this repository-wide check.
 
 ## `mechanics/config-projection/AGENTS.md`
 
@@ -666,11 +660,6 @@ See [Shared repository checks](VALIDATION.md#shared-repository-checks) for this 
 
 See [Shared repository checks](VALIDATION.md#shared-repository-checks) for this repository-wide check.
 
-## `mechanics/experience-runtime/legacy/AGENTS.md`
-
-### On-demand validation procedure
-
-See [Shared repository checks](VALIDATION.md#shared-repository-checks) for this repository-wide check.
 
 ## `mechanics/federation-seams/AGENTS.md`
 
@@ -765,7 +754,7 @@ python -m py_compile mechanics/inference-pilots/parts/local-trials/compatibility
 
 See [Shared repository checks](VALIDATION.md#shared-repository-checks) for this repository-wide check.
 
-## `mechanics/inference-pilots/legacy/AGENTS.md`
+## Quiet Bridge compatibility commands
 
 ### On-demand validation procedure
 
@@ -773,7 +762,7 @@ See [Shared repository checks](VALIDATION.md#shared-repository-checks) for this 
 scripts/aoa-long-horizon-pilot --help
 scripts/aoa-bounded-autonomy-pilot --help
 bash -n scripts/aoa-long-horizon-pilot scripts/aoa-bounded-autonomy-pilot
-python -m py_compile mechanics/inference-pilots/legacy/trials/artifacts/scripts/aoa-local-ai-trials mechanics/inference-pilots/legacy/trials/artifacts/scripts/aoa-w5-pilot mechanics/inference-pilots/legacy/trials/artifacts/scripts/aoa-w6-pilot
+python -m py_compile mechanics/inference-pilots/parts/local-trials/compatibility-runners/aoa-local-ai-trials mechanics/inference-pilots/parts/quiet-bridge-commands/runners/aoa-w5-pilot mechanics/inference-pilots/parts/quiet-bridge-commands/runners/aoa-w6-pilot
 ```
 
 ## `mechanics/inference-pilots/parts/tos-foundation-lab/AGENTS.md`
@@ -820,7 +809,7 @@ python -m py_compile mechanics/runtime-repair/parts/a2a-return-dry-run/aoa_a2a_r
 
 See [Shared repository checks](VALIDATION.md#shared-repository-checks) for this repository-wide check.
 
-## `mechanics/runtime-repair/legacy/AGENTS.md`
+## Runtime repair focused receipt checks
 
 ### On-demand validation procedure
 

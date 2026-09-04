@@ -272,13 +272,6 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
         'techniques as optional provenance',
         'manual positive, negative, owner-return, and coexistence pass',
     ),
-    '.agents/spark/AGENTS.md': (
-        'fast-loop lane',
-        '.agents/spark/README.md',
-        'one bounded patch per loop',
-        'narrowest relevant validation',
-        'secret-bearing material stayed out of committed surfaces',
-    ),
     'quests/AGENTS.md': (
         'questbook district',
         'quests/<lane>/<state>',
@@ -348,9 +341,7 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
     'mechanics/experience-runtime/AGENTS.md': (
         'experience-runtime',
         'experience contract family',
-        'legacy/ARCHIVE_CLASSIFICATION.md',
         'PROVENANCE.md',
-        'EXPERIENCE_RECORDS_DISTILLATION.md',
         'not active runtime contracts',
     ),
     'mechanics/federation-seams/AGENTS.md': (
@@ -396,12 +387,6 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
         'Do not perform repair',
     ),
 }
-LEGACY_ARCHIVE_AGENTS_DOCS: tuple[str, ...] = (
-    'mechanics/agon-runtime/legacy/AGENTS.md',
-    'mechanics/experience-runtime/legacy/AGENTS.md',
-    'mechanics/inference-pilots/legacy/AGENTS.md',
-    'mechanics/runtime-repair/legacy/AGENTS.md',
-)
 ADVISORY_AGENT_DIRS: tuple[str, ...] = ('config', 'manifests/recurrence')
 HEADING_PREFIXES = ("# AGENTS.md", "# AGENTS")
 IGNORED_DIRS = {".git", ".venv", "__pycache__", ".pytest_cache", ".mypy_cache"}
@@ -650,7 +635,6 @@ def validate(
                 issues.append(f"{rel_path}: missing required snippet {snippet!r}")
 
     required = set(REQUIRED_AGENTS_DOCS)
-    known_legacy_archive = set(LEGACY_ARCHIVE_AGENTS_DOCS)
     actual = discover_nested_agents(repo_root)
     available_agents = set(actual)
     if root_agents.is_file():
@@ -664,7 +648,7 @@ def validate(
                 f"{rel_path}: inherited AGENTS chain is {chain_bytes} bytes, "
                 f"over {AGENTS_CHAIN_BUDGET_BYTES}: {rendered_chain}"
             )
-    untracked = sorted(actual - required - known_legacy_archive)
+    untracked = sorted(actual - required)
     if untracked:
         message = "untracked nested AGENTS.md not yet in validator map: " + ", ".join(untracked)
         warnings.append(message)
