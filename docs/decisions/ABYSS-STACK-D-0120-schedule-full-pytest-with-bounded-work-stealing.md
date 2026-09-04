@@ -204,9 +204,17 @@ bounded CI and resource-launch log tails retain the actionable traceback even
 when an early shard fails and later shards continue to completion.
 
 Targeted pytest arguments use the unchanged serial path automatically. An
-explicit process scheduler refuses targeted arguments rather than inventing a
-second partition contract. `ABYSS_STACK_TEST_SCHEDULER=serial` remains the exact
-full-selection rollback and independent sequential oracle.
+explicit process scheduler may opt into the same exact partition contract for
+a targeted selection, while `ABYSS_STACK_TEST_SCHEDULER=serial` remains the
+exact full-selection rollback and independent sequential oracle.
+
+The current runner keeps that full-selection bound while sizing smaller
+selections to a target of 92 tests per shard, with a minimum of four shards
+when the selection is large enough and an upper bound of 32 shards. This avoids
+paying for dozens of fresh import/fixture environments when a scoped selection
+contains only a few hundred tests; the exact baseline/assignment/observed-
+selection proof remains unchanged. The full 2,966-test CI selection still
+resolves to 32 shards.
 
 The external Codex production runtime still executes every admitted probe and
 repeats the complete preflight in the worker. Its independent probes may

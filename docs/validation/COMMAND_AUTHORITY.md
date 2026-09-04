@@ -41,11 +41,15 @@ stabilizer, but it reads the release command sequence from the lane manifest.
   so a cheap late-discovered release blocker does not force an expensive suite
   restart; no release step is skipped and Configs parity remains afterward.
 - Keep full-suite scheduling bounded and reversible. Automatic mode may use
-  four process-isolated workers over an exact file-aware partition. Baseline,
+  four process-isolated workers over an exact file-aware partition of up to 32
+  shards; smaller selections target 92 tests per shard to avoid repeating
+  process/import/fixture setup in empty or tiny shards. Baseline,
   disjoint union, observed selection, and child exit receipts must all verify;
-  `ABYSS_STACK_TEST_SCHEDULER=serial` is the explicit rollback. Timing hints may
-  change order, never selection or failure semantics. Failed shard logs repeat
-  after the aggregate so bounded log tails retain the actionable traceback.
+  `ABYSS_STACK_TEST_SCHEDULER=serial` is the explicit rollback. Automatic mode
+  keeps targeted arguments on the serial path; an explicit process scheduler
+  may use the same proof for a targeted selection. Timing hints may change
+  order, never selection or failure semantics. Failed shard logs repeat after
+  the aggregate so bounded log tails retain the actionable traceback.
 
 ## Active Lanes
 

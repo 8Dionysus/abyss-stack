@@ -4,6 +4,7 @@ import json
 import re
 import subprocess
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -279,6 +280,14 @@ def test_pytest_process_partitions_are_disjoint_and_complete() -> None:
     assert set(flattened) == set(nodeids)
 
 
+def test_pytest_shard_count_scales_small_selections_and_keeps_full_bound() -> None:
+    assert run_pytest_lane.shard_count_for_selection(0) == 0
+    assert run_pytest_lane.shard_count_for_selection(1) == 1
+    assert run_pytest_lane.shard_count_for_selection(364) == 4
+    assert run_pytest_lane.shard_count_for_selection(2853) == 32
+    assert run_pytest_lane.shard_count_for_selection(2966) == 32
+
+
 def test_pytest_process_partitions_keep_small_files_as_import_units() -> None:
     nodeids = [
         *[f"tests/test_small_a.py::test_{index}" for index in range(3)],
@@ -333,6 +342,29 @@ def test_pytest_scheduler_keeps_an_exact_serial_rollback() -> None:
     ]
 
 
+def test_explicit_process_scheduler_accepts_targeted_selection(monkeypatch) -> None:
+    calls: list[list[str]] = []
+
+    monkeypatch.setattr(
+        run_pytest_lane,
+        "run_process_worksteal",
+        lambda *, extra_args: calls.append(extra_args) or 7,
+    )
+
+    assert (
+        run_pytest_lane.main(
+            [
+                "--scheduler",
+                "process-4x32-file-aware",
+                "--",
+                "tests/test_example.py",
+            ]
+        )
+        == 7
+    )
+    assert calls == [["tests/test_example.py"]]
+
+
 def test_pytest_scheduler_replays_failed_shard_log_at_closeout(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
@@ -355,6 +387,36 @@ def test_pytest_scheduler_replays_failed_shard_log_at_closeout(
     assert "[pytest-failed-shard 2/4]" in captured.err
     assert "FAILED tests/test_example.py::test_failure" in captured.err
     assert "selected=7 returncode=1 selection_proof=exact" in captured.err
+
+
+def test_pytest_shard_emits_bounded_failure_excerpt_while_running(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setenv(run_pytest_lane.PARTITION_MODE_ENV, "shard")
+    run_pytest_lane._LIVE_FAILURES.clear()
+    report = SimpleNamespace(
+        nodeid="tests/test_example.py::test_failure",
+        when="call",
+        failed=True,
+        longreprtext="traceback\n" + ("x" * (run_pytest_lane.LIVE_FAILURE_MAX_CHARS + 50)),
+    )
+
+    run_pytest_lane.pytest_runtest_logreport(report)
+    run_pytest_lane.pytest_runtest_logreport(report)
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err.count("[pytest-live-failure]") == 1
+    assert "nodeid=tests/test_example.py::test_failure phase=call" in captured.err
+    assert "[pytest-live-failure-truncated]" in captured.err
+    assert len(captured.err) < run_pytest_lane.LIVE_FAILURE_MAX_CHARS + 250
+
+
+def test_pytest_child_command_is_unbuffered_for_live_diagnostics() -> None:
+    command = run_pytest_lane._plugin_command(selection_args=[])
+
+    assert command[1:4] == ["-u", "-m", "pytest"]
 
 
 def test_release_dependencies_do_not_add_a_threaded_pytest_scheduler() -> None:

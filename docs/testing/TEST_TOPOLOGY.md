@@ -36,9 +36,13 @@ deterministic, public-safe, and explicit about which owner surface failed.
 
 The `tests` and `release` lanes keep the complete default pytest selection and
 route only its scheduling through `scripts/run_pytest_lane.py`. Automatic mode
-uses at most four process-isolated workers over 32 deterministic file-aware
-shards. One baseline collection and each child's observed manifest prove an
-exact disjoint union before the aggregate can pass. Use:
+uses at most four process-isolated workers over up to 32 deterministic
+file-aware shards; smaller selections target 92 tests per shard so they do not
+pay for 32 fresh import/fixture environments. One baseline collection and each
+child's observed manifest prove an exact disjoint union before the aggregate
+can pass. Automatic targeted arguments stay serial; explicitly selecting the
+process scheduler enables the same exact partition proof for a scoped
+selection. Use:
 
 ```bash
 ABYSS_STACK_TEST_SCHEDULER=serial python scripts/ci_gate.py --mode tests
