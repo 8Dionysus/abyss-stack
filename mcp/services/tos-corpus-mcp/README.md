@@ -45,7 +45,5 @@ bundle until the deployed workspace wrapper and live canary required by
 
 ## Local Checks
 
-```bash
-python mcp/services/tos-corpus-mcp/scripts/validate_tos_corpus_mcp.py
-python -m pytest mcp/services/tos-corpus-mcp/tests -q
-```
+Use the `mcp/services/tos-corpus-mcp/AGENTS.md` route in the repository
+[`VALIDATION.md`](../../../VALIDATION.md).

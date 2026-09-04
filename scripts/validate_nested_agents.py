@@ -22,7 +22,7 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
         'profiles/*.txt',
         'presets/*.txt',
         '127.0.0.1',
-        'python scripts/validate_stack.py',
+        'VALIDATION.md#shared-repository-checks',
     ),
     'config-templates/AGENTS.md': (
         'public-safe runtime config templates',
@@ -36,7 +36,7 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
         'Secrets/Configs',
         '.example',
         'CHANGE_ME',
-        'python scripts/validate_stack.py',
+        'VALIDATION.md#shared-repository-checks',
     ),
     'docs/AGENTS.md': (
         'repo-wide operator and source-checkout documentation',
@@ -54,43 +54,42 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
         'docs/decisions',
         'docs/validation',
         'docs/testing',
-        'python scripts/validate_decision_records.py',
-        'python scripts/validate_nested_agents.py',
+        'VALIDATION.md#shared-repository-checks',
     ),
     'docs/validation/AGENTS.md': (
         'validation topology',
         'command authority',
         'validation_lanes.json',
         'inventories descriptive',
-        'python scripts/ci_gate.py --mode source-fast',
+        'source-fast lane',
     ),
     'docs/testing/AGENTS.md': (
         'test topology',
         'test_inventory.json',
         'docs/validation/validation_lanes.json',
         'Keep legacy paths out of default pytest discovery',
-        'python scripts/ci_gate.py --mode tests',
+        'tests lane',
     ),
     'docs/decisions/AGENTS.md': (
         'decision records',
         'Decision Review Gate',
         'TEMPLATE.md',
         'current source surfaces define what',
-        'python scripts/validate_decision_records.py',
+        'VALIDATION.md#shared-repository-checks',
     ),
     '.agents/skills/AGENTS.md': (
         'transitional repo-local projection of shared skills',
         'aoa-skills',
         'Canonical',
         'root `skills/`',
-        'python scripts/validate_nested_agents.py',
+        'VALIDATION.md#shared-repository-checks',
     ),
     '.agents/AGENTS.md': (
         'transitional repo-local agent projections',
         '.agents/README.md',
         'canonical skill law',
         'stack-owned canonical packages under `skills/`',
-        'python scripts/validate_nested_agents.py',
+        'VALIDATION.md#shared-repository-checks',
     ),
     'scripts/AGENTS.md': (
         'runtime bridge, bootstrap helpers',
@@ -104,7 +103,7 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
     'systemd/user/AGENTS.md': (
         'rootless `systemd --user` unit skeletons',
         'podman-compose-abyss.service',
-        'systemd-analyze --user verify',
+        'VALIDATION.md#shared-repository-checks',
         'do not point units at the source checkout',
     ),
     'systemd/system/AGENTS.md': (
@@ -133,10 +132,9 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
         'mcp/protocol-lab/',
         'mcp/services/README.md',
         'service-local `AGENTS.md`',
-        'python scripts/ci_gate.py --mode mcp-services',
-        'python scripts/validate_stack.py',
-        'python scripts/validate_nested_agents.py',
-        'python mcp/protocol-lab/scripts/validate_protocol_lab.py',
+        'mcp-services lane',
+        'VALIDATION.md#shared-repository-checks',
+        'mcp/protocol-lab/VALIDATION.md',
     ),
     'mcp/protocol-lab/AGENTS.md': (
         'fail-closed compatibility',
@@ -152,9 +150,8 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
         'Model Context Protocol',
         'mcp/services/README.md',
         'service-local `AGENTS.md`',
-        'python scripts/ci_gate.py --mode mcp-services',
-        'python scripts/validate_stack.py',
-        'python scripts/validate_nested_agents.py',
+        'mcp-services lane',
+        'VALIDATION.md#shared-repository-checks',
     ),
     'mcp/services/aoa-4pda-connector-mcp/AGENTS.md': (
         'read-only MCP access plane',
@@ -208,7 +205,7 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
         'thin MCP access plane',
         'aoa-memo',
         'repo-local `memo/`',
-        'python mcp/services/aoa-memo-mcp/scripts/validate_memo_mcp.py',
+        'VALIDATION.md#shared-repository-checks',
     ),
     'mcp/services/aoa-decisions-mcp/AGENTS.md': (
         'thin MCP access plane',
@@ -265,7 +262,7 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
         'aoa-stats',
         'selected_now',
         'unknown, not zero',
-        'python scripts/validate_local_stats_port.py',
+        'VALIDATION.md#shared-repository-checks',
     ),
     'skills/AGENTS.md': (
         'canonical home for agent procedures',
@@ -287,7 +284,7 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
         'quests/<lane>/<state>',
         'quests/schemas',
         'quests/examples',
-        'python scripts/validate_stack.py',
+        'VALIDATION.md#shared-repository-checks',
     ),
     'kag/AGENTS.md': (
         'repository-local KAG provider home',
@@ -301,19 +298,19 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
         'Package-owned mechanics tests',
         'deterministic and public-safe',
         'no live host state',
-        'python scripts/ci_gate.py --mode tests',
+        'tests lane',
     ),
     'mechanics/AGENTS.md': (
         'runtime mechanics tree',
         'mechanics/README.md',
         'Package law',
-        'python scripts/validate_nested_agents.py',
+        'VALIDATION.md#shared-repository-checks',
     ),
     'mechanics/runtime-lifecycle/AGENTS.md': (
         'runtime-lifecycle',
         'Runtime activation remains an explicit operator action',
         'docs/install/DEPLOYMENT.md',
-        'systemd-analyze --user verify',
+        'VALIDATION.md#shared-repository-checks',
     ),
     'mechanics/config-projection/AGENTS.md': (
         'config-projection',
@@ -476,10 +473,15 @@ def _is_ignored(path: Path, repo_root: Path) -> bool:
     return any(part in IGNORED_DIRS for part in parts)
 
 
-def _is_command_snippet(snippet: str) -> bool:
+def _is_validation_route_snippet(snippet: str) -> bool:
     normalized = _normalize(snippet)
-    return normalized.startswith("-") or any(
+    return (
+        "validation.md" in normalized
+        or normalized.endswith(" lane")
+        or normalized.startswith("-")
+        or any(
         marker.lower() in normalized for marker in COMMAND_SNIPPET_MARKERS
+        )
     )
 
 
@@ -642,7 +644,7 @@ def validate(
         for snippet in snippets:
             needle = _normalize(snippet)
             haystack = normalized
-            if _is_command_snippet(snippet):
+            if _is_validation_route_snippet(snippet):
                 haystack = f"{normalized} {validation_text}"
             if needle not in haystack:
                 issues.append(f"{rel_path}: missing required snippet {snippet!r}")

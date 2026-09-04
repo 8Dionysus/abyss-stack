@@ -4,9 +4,9 @@ Run from the repository root:
 
 ```bash
 python -m pytest -q mechanics/config-projection/parts/codex-hooks/tests
-python scripts/validate_stack.py
-python scripts/validate_nested_agents.py
 ```
+
+See [Shared repository checks](../../../../VALIDATION.md#shared-repository-checks) for this repository-wide check.
 
 Focused tests cover:
 

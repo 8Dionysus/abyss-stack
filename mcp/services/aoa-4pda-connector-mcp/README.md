@@ -50,7 +50,5 @@ Otherwise it calls `aoa-4pda` from `PATH`.
 
 ## Local Checks
 
-```bash
-python mcp/services/aoa-4pda-connector-mcp/scripts/validate_4pda_connector_mcp.py
-python -m pytest mcp/services/aoa-4pda-connector-mcp/tests -q
-```
+Use the `mcp/services/aoa-4pda-connector-mcp/AGENTS.md` route in the repository
+[`VALIDATION.md`](../../../VALIDATION.md).

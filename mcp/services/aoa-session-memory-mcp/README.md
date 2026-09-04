@@ -185,12 +185,9 @@ diagnostic pointers are available, but it does not run global search freshness.
 Use `aoa_session_freshness_check(...)` or an explicit `.aoa search-provider-status`
 operator command when freshness itself is the question.
 
-When a direct Codex tool call fails with `Transport closed`, first run the CLI
-fallback:
-
-```bash
-PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_mcp.cli transport-preflight
-```
+When a direct Codex tool call fails with `Transport closed`, use the
+`mcp/services/aoa-session-memory-mcp/AGENTS.md` transport-preflight route in
+the repository [`VALIDATION.md`](../../../VALIDATION.md).
 
 If it reports `direct_tool_transport_status=restart_required`, first follow its
 `configured_transport_check_route`. For stdio, the package validator can prove

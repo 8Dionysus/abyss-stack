@@ -32,10 +32,12 @@ python -m py_compile \
   scripts/aoa-external-codex-agent \
   scripts/aoa-external-actor-bind \
   scripts/aoa-external-codex-incarnation \
+  scripts/aoa-external-codex-stasis \
   mechanics/governed-execution/parts/external-codex-agent/bind_external_actor_launch.py \
   mechanics/governed-execution/parts/external-codex-agent/external_codex_agent.py \
   mechanics/governed-execution/parts/external-codex-agent/external_codex_landing_effect.py \
   mechanics/governed-execution/parts/external-codex-agent/external_codex_nested_evidence.py \
+  mechanics/governed-execution/parts/external-codex-agent/external_codex_projection.py \
   mechanics/governed-execution/parts/external-codex-agent/external_codex_mount_launcher.py \
   mechanics/governed-execution/parts/external-codex-agent/external_codex_supervisor.py \
   mechanics/governed-execution/parts/external-codex-agent/install_external_codex_runtime.py \
@@ -50,11 +52,9 @@ python -m ruff check --no-cache \
 python -m pytest -q \
   mechanics/governed-execution/parts/external-codex-agent/tests/test_external_codex_runtime_install.py
 
-python scripts/validate_stack.py
-python scripts/validate_decision_records.py
-python scripts/generate_decision_indexes.py --check
-python scripts/validate_nested_agents.py
 ```
+
+See [Shared repository checks](../../../../VALIDATION.md#shared-repository-checks) for this repository-wide check.
 
 ## Incarnation-home projection and visible binding
 

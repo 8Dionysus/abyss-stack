@@ -5,9 +5,9 @@ Run:
 ```bash
 python -m pytest -q mechanics/governed-execution/parts/ephemeral-worker/tests
 python -m py_compile mechanics/governed-execution/parts/ephemeral-worker/ephemeral_worker.py
-python scripts/validate_nested_agents.py
-python scripts/validate_stack.py
 ```
+
+See [Shared repository checks](../../../../VALIDATION.md#shared-repository-checks) for this repository-wide check.
 
 The focused tests cover disabled-by-default execution, explicit activation,
 snapshot and content-digest checking, canonical absolute NUL-free paths,

@@ -5,8 +5,8 @@ Applies to `mechanics/runtime-repair/legacy/`.
 This directory preserves the runtime repair archive lineage after the mechanics
 topology refactor.
 
-Use `../README.md` and `../PROVENANCE.md` before treating a legacy artifact as
-current evidence. Raw docs in `legacy/raw/` are historical source material.
+When a legacy artifact is being evaluated as current evidence, consult
+`../README.md` and `../PROVENANCE.md`. Raw docs in `legacy/raw/` are historical source material.
 `legacy/artifacts/` is a bridge to the active receipt parts, not an active
 contract home.
 

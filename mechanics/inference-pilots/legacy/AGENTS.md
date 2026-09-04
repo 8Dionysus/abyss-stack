@@ -5,8 +5,8 @@ Applies to `mechanics/inference-pilots/legacy/`.
 This directory preserves archived pilot docs, trial runner scripts, and old
 local trial baseline notes after the mechanics topology refactor.
 
-Use `../README.md` and `../PROVENANCE.md` before treating a legacy wave artifact
-as current evidence. Trial docs and runners live under `legacy/trials/`.
+When a legacy wave artifact is being evaluated as current evidence, consult
+`../README.md` and `../PROVENANCE.md`. Trial docs and runners live under `legacy/trials/`.
 Runner scripts under `legacy/trials/artifacts/scripts/` remain executable only
 through current bridge commands and tests.
 

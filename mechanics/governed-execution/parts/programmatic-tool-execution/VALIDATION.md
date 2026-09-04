@@ -2,13 +2,7 @@
 
 Run with the paired SDK source checkout selected explicitly:
 
-```bash
-PYTHONPATH=/path/to/aoa-sdk/src python -m pytest -q mechanics/governed-execution/parts/programmatic-tool-execution/tests
-PYTHONPATH=/path/to/aoa-sdk/src python -m py_compile mechanics/governed-execution/parts/programmatic-tool-execution/programmatic_tool_execution.py
-python scripts/validate_stack.py
-python scripts/validate_nested_agents.py
-python scripts/validate_decision_records.py
-```
+See [Shared repository checks](../../../../VALIDATION.md#shared-repository-checks) for this repository-wide check.
 
 The focused suite proves disabled-by-default dispatch, explicit admission,
 independent Codex and local adapter seams, observation-sink ordering,

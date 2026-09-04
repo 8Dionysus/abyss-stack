@@ -49,9 +49,7 @@ If `AOA_DISCORD_CONNECTOR_REPO` contains `src/aoa_discord_connector/cli.py`,
 the wrapper uses `python -m aoa_discord_connector.cli` with `PYTHONPATH` set to
 that checkout. Otherwise it calls `aoa-discord` from `PATH`.
 
-## Validate
+## Validation
 
-```bash
-python mcp/services/aoa-discord-connector-mcp/scripts/validate_discord_connector_mcp.py
-python -m pytest mcp/services/aoa-discord-connector-mcp/tests -q
-```
+Use the `mcp/services/aoa-discord-connector-mcp/AGENTS.md` route in the
+repository [`VALIDATION.md`](../../../VALIDATION.md).
