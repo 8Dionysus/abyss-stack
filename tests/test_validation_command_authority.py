@@ -370,6 +370,10 @@ def test_pytest_process_shards_use_durable_logs_without_pipe_eof(monkeypatch) ->
     assert popen_stdout[0] is not subprocess.PIPE
 
 
+def test_pytest_live_preview_tolerates_partial_utf8() -> None:
+    assert run_pytest_lane._decode_live_output(b"prefix \xe2\x82") == "prefix \ufffd"
+
+
 def test_pytest_scheduler_keeps_an_exact_serial_rollback() -> None:
     rollback = run_pytest_lane.scheduler_plan("serial")
     command = run_pytest_lane.build_pytest_command(

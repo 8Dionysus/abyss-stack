@@ -343,6 +343,12 @@ def _read_result(path: Path) -> dict[str, Any]:
     return payload
 
 
+def _decode_live_output(raw: bytes) -> str:
+    """Decode an in-progress log line without making preview a verdict gate."""
+
+    return raw.decode("utf-8", errors="replace")
+
+
 def _replay_failed_shards(
     records: dict[int, dict[str, Any]],
     failed_shards: list[int],
@@ -438,7 +444,8 @@ def run_process_worksteal(*, extra_args: list[str]) -> int:
                     line = tail.readline()
                     if not line:
                         break
-                    for chunk in line.splitlines(keepends=True) or [line]:
+                    decoded = _decode_live_output(line)
+                    for chunk in decoded.splitlines(keepends=True) or [decoded]:
                         print(
                             f"[pytest-shard-live {shard_index + 1}/{len(assignments)}] {chunk}",
                             end="",
@@ -472,7 +479,7 @@ def run_process_worksteal(*, extra_args: list[str]) -> int:
                         stderr=subprocess.STDOUT,
                         text=True,
                     )
-                    tail = log_path.open("r", encoding="utf-8")
+                    tail = log_path.open("rb")
                     active[shard_index] = (process, output, tail, time.monotonic())
                     records[shard_index] = {
                         "assignment": assignment_path,
