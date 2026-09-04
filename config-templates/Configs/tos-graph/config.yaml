@@ -7,6 +7,7 @@ source:
   philosophy_atlas_projection: ToS/derived-exports/philosophy_atlas_projection.min.json
   philosophy_graph_views: ToS/derived-exports/philosophy_graph_views.min.json
   philosophy_graph_projection: ToS/derived-exports/philosophy_graph_projection.min.json
+  material_planting_projection: ToS/derived-exports/material_planting_projection.min.json
   philosophy_post_planting_audit: ToS/philosophy/graph-workbench/review-packets/table-i-post-planting-audit.json
 
 projection:

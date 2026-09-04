@@ -63,6 +63,7 @@ class TosGraphSettings:
     philosophy_atlas_projection_path: Path
     philosophy_graph_views_path: Path
     philosophy_graph_projection_path: Path
+    material_planting_projection_path: Path
     philosophy_post_planting_audit_path: Path
     default_view: str
     default_philosophy_view: str
@@ -112,6 +113,11 @@ def load_settings() -> TosGraphSettings:
         "philosophy_graph_projection",
         "ToS/derived-exports/philosophy_graph_projection.min.json",
     )
+    material_planting_projection_path = source_path(
+        "TOS_GRAPH_MATERIAL_PLANTING_PROJECTION_PATH",
+        "material_planting_projection",
+        "ToS/derived-exports/material_planting_projection.min.json",
+    )
     philosophy_post_planting_audit_path = source_path(
         "TOS_GRAPH_PHILOSOPHY_POST_PLANTING_AUDIT_PATH",
         "philosophy_post_planting_audit",
@@ -129,6 +135,7 @@ def load_settings() -> TosGraphSettings:
         philosophy_atlas_projection_path=philosophy_atlas_projection_path,
         philosophy_graph_views_path=philosophy_graph_views_path,
         philosophy_graph_projection_path=philosophy_graph_projection_path,
+        material_planting_projection_path=material_planting_projection_path,
         philosophy_post_planting_audit_path=philosophy_post_planting_audit_path,
         default_view=str(os.environ.get("TOS_GRAPH_DEFAULT_VIEW", ui_cfg.get("default_view", "corpus-topology"))),
         default_philosophy_view=str(

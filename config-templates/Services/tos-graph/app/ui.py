@@ -1,25 +1,26 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 from .config import TosGraphSettings
 from .neo4j_store import Neo4jStoreStatus
 
 
 INDEX_TEMPLATE = """<!doctype html>
-<html lang="en">
+<html lang="ru">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Tree of Sophia Graph</title>
-    <link rel="stylesheet" href="/static/assets/tos-graph.css">
+    <title>Древо Софии</title>
+    <link rel="stylesheet" href="/static/assets/tos-graph.css?v=__ASSET_VERSION__">
   </head>
   <body>
     <div id="app"></div>
     <script>
       window.__TOS_GRAPH_BOOT__ = __BOOT_PAYLOAD__;
     </script>
-    <script type="module" src="/static/assets/tos-graph.js"></script>
+    <script type="module" src="/static/assets/tos-graph.js?v=__ASSET_VERSION__"></script>
   </body>
 </html>
 """
@@ -41,4 +42,17 @@ def render_index(settings: TosGraphSettings, neo4j_status: Neo4jStoreStatus) -> 
             "note": neo4j_status.note,
         },
     }
-    return INDEX_TEMPLATE.replace("__BOOT_PAYLOAD__", json.dumps(boot_payload, ensure_ascii=False))
+    service_root = Path(__file__).resolve().parents[1]
+    asset_roots = (Path(__file__).resolve().parent / "static", service_root / "frontend" / "dist")
+    asset_mtimes = [
+        asset.stat().st_mtime_ns
+        for root in asset_roots
+        for asset in (root / "assets" / "tos-graph.css", root / "assets" / "tos-graph.js")
+        if asset.is_file()
+    ]
+    asset_version = str(max(asset_mtimes, default=0))
+    return (
+        INDEX_TEMPLATE
+        .replace("__BOOT_PAYLOAD__", json.dumps(boot_payload, ensure_ascii=False))
+        .replace("__ASSET_VERSION__", asset_version)
+    )
