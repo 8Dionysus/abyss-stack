@@ -20,7 +20,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
 
       - name: Check repo-local KAG index family
-        uses: 8Dionysus/aoa-kag/.github/actions/repo-local-kag-index@36bed324e4206cb913f03a9dc3d041b9ddda3c69
+        uses: 8Dionysus/aoa-kag/.github/actions/repo-local-kag-index@1ab8f66d3454867f3351ff898dccccce8266ec9e
         with:
           history-ref: ${{ github.event.pull_request.base.sha || (github.ref == 'refs/heads/main' && github.event.before) || '' }}
           event-history-ref: ${{ github.event.pull_request.base.sha || (github.ref == 'refs/heads/main' && github.event.before) || '' }}
