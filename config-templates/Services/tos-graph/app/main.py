@@ -4,7 +4,7 @@ import csv
 import json
 from pathlib import Path
 from io import StringIO
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Query
@@ -86,7 +86,7 @@ def _predicate_set(raw_predicates: str | None) -> set[str]:
     return {predicate.strip() for predicate in raw_predicates.split(",") if predicate.strip()}
 
 
-def _csv_stream(table_name: str, rows: list[dict[str, Any]]) -> Iterator[str]:
+def _csv_stream(table_name: str, rows: Iterable[dict[str, Any]]) -> Iterator[str]:
     fieldnames = SCALE_EXPORT_COLUMNS[table_name]
     buffer = StringIO()
     writer = csv.DictWriter(buffer, fieldnames=fieldnames, extrasaction="ignore")
@@ -101,7 +101,7 @@ def _csv_stream(table_name: str, rows: list[dict[str, Any]]) -> Iterator[str]:
         buffer.truncate(0)
 
 
-def _jsonl_stream(rows: list[dict[str, Any]]) -> Iterator[str]:
+def _jsonl_stream(rows: Iterable[dict[str, Any]]) -> Iterator[str]:
     for row in rows:
         yield json.dumps(row, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n"
 
@@ -140,6 +140,8 @@ def health() -> HealthResponse:
         corpus_index_exists=settings.corpus_index_path.exists(),
         philosophy_graph_projection_path=settings.philosophy_graph_projection_path.as_posix(),
         philosophy_graph_projection_exists=settings.philosophy_graph_projection_path.exists(),
+        material_planting_projection_path=settings.material_planting_projection_path.as_posix(),
+        material_planting_projection_exists=settings.material_planting_projection_path.exists(),
         philosophy_post_planting_audit_path=settings.philosophy_post_planting_audit_path.as_posix(),
         philosophy_post_planting_audit_exists=settings.philosophy_post_planting_audit_path.exists(),
         default_view=settings.default_view,
@@ -509,7 +511,7 @@ def philosophy_scale_export_table(
     if file_format not in {"csv", "jsonl"}:
         raise HTTPException(status_code=400, detail="file_format must be csv or jsonl")
     try:
-        rows = philosophy_reader.scale_export_table(table_name, view_id=view_id, layers=_layer_set(layers))
+        rows = philosophy_reader.iter_scale_export_table(table_name, view_id=view_id, layers=_layer_set(layers))
     except ToSPhilosophyReaderError as exc:
         raise _handle_philosophy_reader_error(exc) from exc
     filename = f"tos-philosophy-{table_name}.{file_format}"

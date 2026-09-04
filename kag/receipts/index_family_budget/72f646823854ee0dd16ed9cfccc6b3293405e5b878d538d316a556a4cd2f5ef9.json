@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 20234275,
+  "allowed_tracked_bytes": 41255157,
+  "approved_by": "repository-owner",
+  "base_ref": "3dc94628ab40b59fb09748bb94e43fb1dfb7a965",
+  "changed_generated_bytes": 20234275,
+  "changed_generated_files": 210,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "72f646823854ee0dd16ed9cfccc6b3293405e5b878d538d316a556a4cd2f5ef9",
+  "reason": "Refresh the exact portable family for the bounded public ToS graph demo slice and registered test inventory without raising standing budgets.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 41255157,
+  "tracked_bytes_max": 24117248
+}

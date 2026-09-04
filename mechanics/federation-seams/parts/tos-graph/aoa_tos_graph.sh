@@ -90,7 +90,24 @@ except Exception:
 PY
 }
 
+wait_for_health() {
+  local timeout_s="${AOA_TOS_GRAPH_WAIT_TIMEOUT_S:-${AOA_WAIT_TIMEOUT_S:-120}}"
+  local interval_s="${AOA_TOS_GRAPH_WAIT_INTERVAL_S:-2}"
+  local deadline=$((SECONDS + timeout_s))
+  while ((SECONDS < deadline)); do
+    if check_health; then
+      return 0
+    fi
+    sleep "$interval_s"
+  done
+  check_health
+}
+
 wait_for_profile() {
+  if [[ "$host_port" != "5410" ]]; then
+    wait_for_health
+    return
+  fi
   AOA_STACK_PRESET="" AOA_STACK_PROFILE="" "${SCRIPTS_DIR}/aoa-wait" --profile curation >/dev/null
 }
 
@@ -147,7 +164,7 @@ fi
 printf 'Starting ToS graph review workbench through profile: curation\n'
 if ((force_start == 0)) && profile_ready; then
   printf 'ToS graph curation profile is already reachable: %s\n' "$ui_url"
-elif ((${#forward_args[@]} == 0)) && substrate_ready; then
+elif ((force_start == 0)) && ((${#forward_args[@]} == 0)) && substrate_ready; then
   printf 'Storage substrate is already reachable; starting only tos-graph\n'
   start_tos_graph_only
 else
