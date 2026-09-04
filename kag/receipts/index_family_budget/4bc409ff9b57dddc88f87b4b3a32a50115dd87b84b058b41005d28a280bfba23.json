@@ -9,8 +9,8 @@
     "contract_version": "aoa-kag:budget-receipt-candidate-identity-v2",
     "excluded_path": "kag/receipts/index_family_budget/4bc409ff9b57dddc88f87b4b3a32a50115dd87b84b058b41005d28a280bfba23.json",
     "family_digest": "4bc409ff9b57dddc88f87b4b3a32a50115dd87b84b058b41005d28a280bfba23",
-    "file_count": 3460,
-    "seal": "ede2fef0851561bf78cb749d5fd9d960e2a7034b96ff78986e98773e27c82b99",
+    "file_count": 3459,
+    "seal": "f6a8ce4176c78d0a6b25d049fbc132ea15083eacddc854f21a86979c8bf207bc",
     "source_epoch": "sha256:34f5ae25ca0ca66664ecbc8343a172e9ce4740ccd8372ffb5c9ab1dcbfbc5806",
     "source_snapshot": "sha256:495c4c469064d6500454d70f2005155459bb15e20d59832b86fd05e9079605dc"
   },
@@ -1362,7 +1362,7 @@
     "revision_binding": "content-addressed-procedure-import-closure-portable-runtime-contract-and-descriptor-io-v1",
     "source_digest": "14bd8ea5abf9d997d32ebdab040e93f4f69759e2696d2b77f1c5aa4ca76f9566"
   },
-  "reason": "Repair the merged atlas KAG family with the landed packaged-action owner and restore Repo Validation without bypass.",
+  "reason": "Seal the final merged-atlas candidate after replacing the superseded owner receipt.",
   "repo": "abyss-stack",
   "schema_version": "aoa-repo-local-kag-budget-receipt-v2",
   "scope": "tracked_size",
