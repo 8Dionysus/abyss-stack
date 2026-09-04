@@ -63,8 +63,12 @@ jobs:
 
       - name: Install test dependencies
         run: |
-          python -m pip install -r requirements-dev.txt
+          # The repo-local KAG action runs before setup-python and may satisfy
+          # packages from the runner user site. Reinstall into this interpreter
+          # because governed subprocesses intentionally use -s/-I.
+          python -m pip install --ignore-installed -r requirements-dev.txt
           python -m pip install "$RUNNER_TEMP/aoa-sdk-source"
+          python -I -c "import aoa_sdk, jsonschema, pydantic, yaml"
 
       - name: Install bubblewrap, ripgrep, shellcheck, rsync, zsh, podman and podman-compose
         run: |
