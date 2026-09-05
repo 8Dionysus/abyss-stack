@@ -25,7 +25,6 @@ MECHANIC_PACKAGE_REQUIRED_FILES = (
     "ROADMAP.md",
     "LANDING_LOG.md",
     "parts/README.md",
-    "docs/README.md",
 )
 MECHANIC_PACKAGE_PARTS = {
     "agon-runtime": ("runtime-kernels",),

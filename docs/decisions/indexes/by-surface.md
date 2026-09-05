@@ -9,6 +9,7 @@
 - [ABYSS-STACK-D-0009 Root Residual Topology Cleanup](../ABYSS-STACK-D-0009-root-residual-topology-cleanup.md) (`docs/decisions/ABYSS-STACK-D-0009-root-residual-topology-cleanup.md`)
 - [ABYSS-STACK-D-0020 Docs District Topology](../ABYSS-STACK-D-0020-docs-district-topology.md) (`docs/decisions/ABYSS-STACK-D-0020-docs-district-topology.md`)
 - [ABYSS-STACK-D-0032 MCP Services Topology](../ABYSS-STACK-D-0032-mcp-services-topology.md) (`docs/decisions/ABYSS-STACK-D-0032-mcp-services-topology.md`)
+- [ABYSS-STACK-D-0143 Package-Wide Mechanics Docs on Demand](../ABYSS-STACK-D-0143-package-wide-mechanics-docs-on-demand.md) (`docs/decisions/ABYSS-STACK-D-0143-package-wide-mechanics-docs-on-demand.md`)
 
 ## authority/boundary
 
@@ -30,6 +31,7 @@
 - [ABYSS-STACK-D-0056 Decision Surface Validator Module](../ABYSS-STACK-D-0056-decision-surface-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0056-decision-surface-validator-module.md`)
 - [ABYSS-STACK-D-0057 Mechanics Topology Validator Module](../ABYSS-STACK-D-0057-mechanics-topology-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0057-mechanics-topology-validator-module.md`)
 - [ABYSS-STACK-D-0140 Prompt-Light Agent Routes And On-Demand Validation](../ABYSS-STACK-D-0140-prompt-light-agent-routes-and-on-demand-validation.md) (`docs/decisions/ABYSS-STACK-D-0140-prompt-light-agent-routes-and-on-demand-validation.md`)
+- [ABYSS-STACK-D-0143 Package-Wide Mechanics Docs on Demand](../ABYSS-STACK-D-0143-package-wide-mechanics-docs-on-demand.md) (`docs/decisions/ABYSS-STACK-D-0143-package-wide-mechanics-docs-on-demand.md`)
 
 ## runtime topology
 
@@ -204,6 +206,7 @@
 - [ABYSS-STACK-D-0062 Agent Skill Projection Validator Module](../ABYSS-STACK-D-0062-agent-skill-projection-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0062-agent-skill-projection-validator-module.md`)
 - [ABYSS-STACK-D-0068 Decision Graph Contract And Impact Packets](../ABYSS-STACK-D-0068-decision-graph-contract-and-impact-packets.md) (`docs/decisions/ABYSS-STACK-D-0068-decision-graph-contract-and-impact-packets.md`)
 - [ABYSS-STACK-D-0140 Prompt-Light Agent Routes And On-Demand Validation](../ABYSS-STACK-D-0140-prompt-light-agent-routes-and-on-demand-validation.md) (`docs/decisions/ABYSS-STACK-D-0140-prompt-light-agent-routes-and-on-demand-validation.md`)
+- [ABYSS-STACK-D-0143 Package-Wide Mechanics Docs on Demand](../ABYSS-STACK-D-0143-package-wide-mechanics-docs-on-demand.md) (`docs/decisions/ABYSS-STACK-D-0143-package-wide-mechanics-docs-on-demand.md`)
 
 ## legacy/provenance
 

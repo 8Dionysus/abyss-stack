@@ -49,7 +49,6 @@ Every package starts with:
 - `PARTS.md`
 - `ROADMAP.md`
 - `LANDING_LOG.md`
-- `docs/README.md`
 
 Each package `README.md` is a runtime mechanic card with these sections:
 
@@ -90,7 +89,7 @@ For a package, start with the package `README.md`. Then use:
 | `PARTS.md` | active source-surface map |
 | `ROADMAP.md` | next movements and deferred moves |
 | `LANDING_LOG.md` | checked landings and validation anchors |
-| `docs/` | detailed package-owned notes in later passes |
+| `docs/` (optional) | package-wide prose detail when a real need exists; part-local docs stay with the part |
 
 ## Artifact Placement
 
@@ -103,6 +102,6 @@ root districts and mechanic homes.
 
 ## Validation
 
-Executable topology and package route checks live in
-[AGENTS](AGENTS.md#validation). This README describes the mechanics atlas; the
-route card owns the operational command list.
+Exact topology and package procedures live in [VALIDATION.md](../VALIDATION.md).
+[AGENTS](AGENTS.md#validation) selects the relevant lane and preserves local
+stop-lines; this README owns the mechanics atlas.
