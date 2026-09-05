@@ -12,7 +12,7 @@ WorkingDirectory=/srv/AbyssOS/abyss-stack/Configs/mcp/protocol-lab
 Environment=PYTHONDONTWRITEBYTECODE=1
 Environment=PYTHONHOME=
 Environment=PYTHONPATH=
-ExecStart=/usr/bin/python3 -I -B /srv/AbyssOS/abyss-stack/Configs/mcp/protocol-lab/scripts/protocol_watcher.py --plan /srv/AbyssOS/abyss-stack/Configs/mcp/protocol-lab/protocol-watch-plan.v1.json --state-root /srv/AbyssOS/abyss-stack/Logs/mcp/protocol-watch --runtime-config /srv/AbyssOS/abyss-stack/Secrets/Configs/mcp-protocol-watch-runtime.json --execute
+ExecStart=/usr/bin/python3 -I -B /srv/AbyssOS/abyss-stack/Configs/mcp/protocol-lab/scripts/protocol_watcher.py --plan /srv/AbyssOS/abyss-stack/Configs/mcp/protocol-lab/protocol-watch-plan.v1.json --state-root /srv/AbyssOS/abyss-stack/Logs/mcp/protocol-watch --runtime-config /srv/AbyssOS/abyss-stack/Secrets/Configs/mcp-protocol-watch-runtime.json --execute --apply-retention
 Nice=10
 IOSchedulingClass=idle
 CPUWeight=20
