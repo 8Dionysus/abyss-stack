@@ -5502,6 +5502,8 @@ def test_reviewer_preparation_forwards_exact_writer_evidence_without_starting(
         reviewer_state_root,
         profile_path=fixture["runtime_profile_path"],
     )
+    # Preparation ends at an admitted, non-started launch; reviewer execution
+    # and A2A export have dedicated integration tests.
     assert (
         reviewer_runtime.preflight(Path(preparation["launch_path"]))["admitted"] is True
     )
@@ -5527,25 +5529,6 @@ def test_reviewer_preparation_forwards_exact_writer_evidence_without_starting(
         retry_preparation["reviewer_incarnation_id"]
         != preparation["reviewer_incarnation_id"]
     )
-
-    reviewer_runtime.start(Path(preparation["launch_path"]))
-    assert (
-        _wait_terminal(reviewer_runtime, preparation["reviewer_session_id"])["status"]
-        == "completed"
-    )
-    summon_path = fixture["summon_request_path"]
-    exported = writer_runtime.export_a2a_result(
-        fixture["session_id"],
-        reviewer_session_id=preparation["reviewer_session_id"],
-        reviewer_state_root=reviewer_state_root,
-        summon_request_path=summon_path,
-        output_path=tmp_path / "cross-state-child-task-result.json",
-    )
-    assert (
-        exported["child_task_result"]["schema_version"]
-        == "abyss_stack_external_codex_a2a_return_v1"
-    )
-    assert exported["child_task_result"]["review_outcome"] == "proceed"
 
 
 def test_reviewer_semantics_are_generic_outside_landing() -> None:
