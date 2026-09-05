@@ -3,11 +3,10 @@
 This package descends from flat runtime experience surfaces that carried old
 wave, seed, and `_v1` naming.
 
-The refactor mirrors the AOA archive pattern:
+The current placement separates runtime contracts from historical evidence:
 
 - keep active package route short
-- archive old source names under `legacy/`
-- keep an archive index and distillation log
+- preserve old sources, indexes, and distillation logs in an immutable Git snapshot
 - route stronger owner meaning away from `abyss-stack`
 
 ## Owner Boundary
@@ -16,14 +15,15 @@ The refactor mirrors the AOA archive pattern:
 experience program and governance meaning. `Tree-of-Sophia` owns authored
 meaning and write stop-lines.
 
-## Current Bridges
+## Active Contracts and Historical Recovery
 
 - [parts/experience-records/docs/EXPERIENCE_RECORDS_DISTILLATION.md](parts/experience-records/docs/EXPERIENCE_RECORDS_DISTILLATION.md)
   records the active/archive classification.
-- [legacy/INDEX.md](legacy/INDEX.md) maps old root families to current paths.
-- [legacy/DISTILLATION_LOG.md](legacy/DISTILLATION_LOG.md) records what remains
+- [legacy/INDEX.md](https://github.com/8Dionysus/abyss-stack/blob/a4e0e0cbe7fd9c6961b733de1f06d8d62c15f02f/mechanics/experience-runtime/legacy/INDEX.md) records the old family-to-package mapping at that commit.
+- [legacy/DISTILLATION_LOG.md](https://github.com/8Dionysus/abyss-stack/blob/a4e0e0cbe7fd9c6961b733de1f06d8d62c15f02f/mechanics/experience-runtime/legacy/DISTILLATION_LOG.md) records what remains
   raw archive.
-- [legacy/ARCHIVE_CLASSIFICATION.md](legacy/ARCHIVE_CLASSIFICATION.md) records
+- [legacy/ARCHIVE_CLASSIFICATION.md](https://github.com/8Dionysus/abyss-stack/blob/a4e0e0cbe7fd9c6961b733de1f06d8d62c15f02f/mechanics/experience-runtime/legacy/ARCHIVE_CLASSIFICATION.md) records
   why each preserved family remains archive-only until a concrete runtime
   consumer exists.
-- `legacy/artifacts/tests/` proves the package-local schemas and examples.
+- Historical seed-contract tests remain in that snapshot; they are not an
+  active runtime validation obligation.

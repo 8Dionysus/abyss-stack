@@ -29,5 +29,5 @@ Detailed upstream identifiers, lineage notes, and removal triggers live in
 - Runtime adapters may accept upstream contract values only at explicit bridge
   boundaries.
 - Tests may assert upstream values only when proving the bridge.
-- Removal starts from the legacy index after the stronger owner publishes a
+- Removal starts from the active compatibility detail after the stronger owner publishes a
   clean replacement.

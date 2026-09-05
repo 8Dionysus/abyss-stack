@@ -11,9 +11,6 @@ REQUIRED_FILE_PATHS = tuple(
         ".agents/AGENTS.md",
         ".agents/README.md",
         ".agents/skills/AGENTS.md",
-        ".agents/spark/AGENTS.md",
-        ".agents/spark/README.md",
-        ".agents/spark/SWARM.md",
         ".github/GITHUB_SURFACE.md",
         "DESIGN.AGENTS.md",
         "DESIGN.md",
@@ -623,7 +620,7 @@ def validate_root_residual_topology(
 ) -> None:
     forbidden_paths = {
         root / "AUDIT.md": "docs/routes/AUDIT.md",
-        root / "Spark": ".agents/spark/",
+        root / "Spark": "current source-owner routes (ABYSS-STACK-D-0142)",
         root / ".github" / "README.md": ".github/GITHUB_SURFACE.md",
         root
         / "docs"
@@ -655,10 +652,7 @@ def validate_root_residual_topology(
                 f"must live under {target}"
             )
 
-    agents_readme = read_text_func(root / ".agents" / "README.md") or ""
     docs_readme = read_text_func(root / "docs" / "README.md") or ""
-    if ".agents/spark" not in agents_readme and "spark/README.md" not in agents_readme:
-        errors.append(".agents/README.md must route the Spark fast-loop lane")
     if "routes/AUDIT.md" not in docs_readme:
         errors.append("docs/README.md must route docs/routes/AUDIT.md")
     for district in (

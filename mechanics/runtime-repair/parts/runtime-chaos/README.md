@@ -1,6 +1,6 @@
 # Runtime Chaos
 
-Routes archived runtime chaos lineage through `../../PROVENANCE.md` and
-`../../legacy/INDEX.md`.
+Routes historical runtime chaos lineage through
+[package provenance](../../PROVENANCE.md).
 
 The old route name stays contained as lineage, not active route naming.

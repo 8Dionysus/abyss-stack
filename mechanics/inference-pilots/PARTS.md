@@ -8,7 +8,7 @@
 | Local trials | `parts/local-trials/` | `mechanics/inference-pilots/parts/local-trials/docs/LOCAL_AI_TRIALS.md`, `mechanics/inference-pilots/parts/local-trials/docs/RUNTIME_BENCH_POLICY.md`, `scripts/aoa-local-ai-trials`, `parts/local-trials/aoa_local_ai_trials.py` compatibility bridge, `parts/local-trials/trial_compatibility_bridge.py` role-level bridge, active runner under `parts/local-trials/compatibility-runners/aoa-local-ai-trials`, runtime benchmark schema, example, and focused test |
 | Tree of Sophia foundation laboratory | `parts/tos-foundation-lab/` | `parts/tos-foundation-lab/docs/EXPERIMENT_LAW.md`, frozen A/B/C suite, resource preflight, run/review schemas, `scripts/aoa-tos-foundation-lab`, and focused tests |
 | Promotion loop | `parts/promotion-loop/` | `mechanics/inference-pilots/parts/promotion-loop/docs/RUNTIME_WINNER_PROMOTION_LOOP.md`, `scripts/aoa-runtime-bench-index`, `parts/promotion-loop/aoa_runtime_bench_index.py` |
-| Pilot archive bridge | `parts/pilot-archive-bridge/` | `PROVENANCE.md`, `legacy/INDEX.md`, `legacy/DISTILLATION_LOG.md`, `legacy/trials/` |
+| Pilot archive bridge | `parts/pilot-archive-bridge/` | `PROVENANCE.md` |
 | Quiet bridge commands | `parts/quiet-bridge-commands/` | `scripts/aoa-long-horizon-pilot`, `scripts/aoa-bounded-autonomy-pilot`, `parts/quiet-bridge-commands/aoa_long_horizon_pilot.sh`, `parts/quiet-bridge-commands/aoa_bounded_autonomy_pilot.sh`, active W5/W6 runners under `parts/quiet-bridge-commands/runners/` |
 | Agon dry-run handoff | `parts/agon-dry-run-handoff/` | `mechanics/agon-runtime/README.md` |
 

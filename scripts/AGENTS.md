@@ -36,7 +36,7 @@ Read only the source, README, and owner contract needed for the current touched 
 - `scripts/aoa-diagnose` routes through `mechanics/diagnostic-spine/parts/diagnose-wrapper/aoa_diagnose.sh` into the diagnostic Python backend. Keep it stdlib-only and citation-friendly.
 - `scripts/aoa-qwen-run` routes to `mechanics/inference-pilots/parts/qwen-routes/aoa_qwen_run.py`. Keep it stdlib-only and local-only.
 - `scripts/aoa-long-horizon-pilot` and `scripts/aoa-bounded-autonomy-pilot`
-  are quiet operator bridges into package-local archived pilot runners.
+  are quiet operator bridges into active package-local compatibility runners.
   Keep the bridge names stable unless the package route changes too.
 
 ## Shell script rules

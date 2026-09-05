@@ -5,7 +5,7 @@ This package keeps the Agon dry-run runtime family convex inside
 
 Current posture:
 
-- keep raw old Agon docs under package-local `legacy/`
+- recover raw old Agon docs through `PROVENANCE.md`
 - keep dry-run validators runnable from `parts/runtime-kernels/`
 - maintain generated registries as derived artifacts, not hand-authored truth
 - route doctrinal questions back to `Agents-of-Abyss`

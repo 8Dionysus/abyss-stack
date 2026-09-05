@@ -4,7 +4,7 @@ This package makes the old experience runtime contract family convex.
 
 Current posture:
 
-- old named surfaces live under `legacy/`
+- old named surfaces are recovered through `PROVENANCE.md`
 - stronger owner doctrine stays outside this repository
 - tests read package-local schemas and examples
 - active package docs name the distillation stop-line instead of pretending the

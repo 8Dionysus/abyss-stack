@@ -14,7 +14,7 @@ package-local.
   that need the preserved runner's wire IDs without making archived stage names
   current topology again.
 
-The archive remains provenance under `../../legacy/`; active wrappers and
+The archive remains provenance in Git via `PROVENANCE.md`; active wrappers and
 validators route through package-local runner files.
 
 Live benchmark runs remain runtime artifacts under `${AOA_STACK_ROOT}/Logs/`.

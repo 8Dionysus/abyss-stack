@@ -3,7 +3,7 @@
 ## Current route
 
 - keep active dry-run runtime-kernel surfaces under `parts/runtime-kernels/`
-- keep old raw Agon docs contained under `legacy/raw/`
+- recover old raw Agon docs through `PROVENANCE.md`
 - keep validators, tests, route cards, and generated registries pointed at the
   active part path
 

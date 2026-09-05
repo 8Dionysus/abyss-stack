@@ -267,6 +267,10 @@
 - [ABYSS-STACK-D-0083 Tree of Sophia Foundation Laboratory Boundary](../ABYSS-STACK-D-0083-tree-of-sophia-foundation-laboratory-boundary.md) (`docs/decisions/ABYSS-STACK-D-0083-tree-of-sophia-foundation-laboratory-boundary.md`)
 - [ABYSS-STACK-D-0088 Tree of Sophia Human Review Workbench Boundary](../ABYSS-STACK-D-0088-tree-of-sophia-human-review-workbench-boundary.md) (`docs/decisions/ABYSS-STACK-D-0088-tree-of-sophia-human-review-workbench-boundary.md`)
 
+## agent guidance
+
+- [ABYSS-STACK-D-0142 Retire Historical Trees Without Retiring Runtime Compatibility](../ABYSS-STACK-D-0142-retire-historical-trees.md) (`docs/decisions/ABYSS-STACK-D-0142-retire-historical-trees.md`)
+
 ## agent surface
 
 - [ABYSS-STACK-D-0062 Agent Skill Projection Validator Module](../ABYSS-STACK-D-0062-agent-skill-projection-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0062-agent-skill-projection-validator-module.md`)
@@ -325,6 +329,10 @@
 ## human review
 
 - [ABYSS-STACK-D-0088 Tree of Sophia Human Review Workbench Boundary](../ABYSS-STACK-D-0088-tree-of-sophia-human-review-workbench-boundary.md) (`docs/decisions/ABYSS-STACK-D-0088-tree-of-sophia-human-review-workbench-boundary.md`)
+
+## mechanics
+
+- [ABYSS-STACK-D-0142 Retire Historical Trees Without Retiring Runtime Compatibility](../ABYSS-STACK-D-0142-retire-historical-trees.md) (`docs/decisions/ABYSS-STACK-D-0142-retire-historical-trees.md`)
 
 ## model admission
 
@@ -510,6 +518,7 @@
 - [ABYSS-STACK-D-0135 Typed Incarnation Capability Projection](../ABYSS-STACK-D-0135-typed-incarnation-capability-projection.md) (`docs/decisions/ABYSS-STACK-D-0135-typed-incarnation-capability-projection.md`)
 - [ABYSS-STACK-D-0140 Prompt-Light Agent Routes And On-Demand Validation](../ABYSS-STACK-D-0140-prompt-light-agent-routes-and-on-demand-validation.md) (`docs/decisions/ABYSS-STACK-D-0140-prompt-light-agent-routes-and-on-demand-validation.md`)
 - [ABYSS-STACK-D-0141 Budget Inherited Agent Context](../ABYSS-STACK-D-0141-budget-inherited-agent-context.md) (`docs/decisions/ABYSS-STACK-D-0141-budget-inherited-agent-context.md`)
+- [ABYSS-STACK-D-0142 Retire Historical Trees Without Retiring Runtime Compatibility](../ABYSS-STACK-D-0142-retire-historical-trees.md) (`docs/decisions/ABYSS-STACK-D-0142-retire-historical-trees.md`)
 
 ## validation lane
 

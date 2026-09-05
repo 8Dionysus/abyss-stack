@@ -6,12 +6,11 @@ This package owns the `abyss-stack` runtime-side experience contract family
 after the mechanics archive refactor.
 
 Read only the source and owner contract needed for the current touched surface;
-`legacy/ARCHIVE_CLASSIFICATION.md`, `PROVENANCE.md`, and
-`EXPERIENCE_RECORDS_DISTILLATION.md` are consulted when archive or distillation
+`PROVENANCE.md` and its historical Git references are consulted when archive or distillation
 meaning is in scope, and entering this subtree does not require an
 unconditional README inventory.
 
-Archive files under `legacy/` preserve old flat named surfaces. They are not a
+Historical Git sources preserve old flat named surfaces. They are not a
 claim that `abyss-stack` owns experience doctrine, and they are not active
 runtime contracts until the distillation rule is satisfied.
 
@@ -21,10 +20,10 @@ Do not:
 - move preserved contracts back to flat root folders without a new route
 - promote legacy contracts without one concrete stack service, storage path, or
   operator route consuming them
-- let tests read root `schemas/` or `examples/` for this preserved family
+- restore archive-only tests as if they protected a current runtime consumer
 - mutate stronger owner repos from this package
 
 Use [VALIDATION.md](../../VALIDATION.md) for exact commands and focused checks.
 
-The archived test files keep their `test_experience_wave*_seed_contracts.py`
-names until a future distillation pass creates quieter active contract tests.
+New active contract tests require a concrete runtime consumer; historical
+seed-contract tests remain in the recorded Git snapshot.

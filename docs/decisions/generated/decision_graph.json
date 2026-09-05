@@ -1,19 +1,19 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
-  "decision_count": 141,
-  "edge_count": 3185,
+  "decision_count": 142,
+  "edge_count": 3205,
   "edge_type_counts": {
     "CITES_SOURCE_SURFACE": 1157,
-    "DATED": 141,
-    "GUARDED_BY": 437,
-    "HAS_STATUS": 141,
-    "HAS_SURFACE_CLASS": 387,
-    "IN_STACK_LANE": 340,
-    "NEXT_DECISION": 140,
-    "OWNED_BY_SURFACE": 152,
-    "OWNS_DECISION": 141,
+    "DATED": 142,
+    "GUARDED_BY": 440,
+    "HAS_STATUS": 142,
+    "HAS_SURFACE_CLASS": 391,
+    "IN_STACK_LANE": 343,
+    "NEXT_DECISION": 141,
+    "OWNED_BY_SURFACE": 153,
+    "OWNS_DECISION": 142,
     "SUPERSEDED_BY": 4,
-    "UNDER_MECHANIC_PARENT": 145
+    "UNDER_MECHANIC_PARENT": 150
   },
   "edges": [
     {
@@ -15223,6 +15223,11 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0141",
+      "target": "decision:ABYSS-STACK-D-0142",
+      "type": "NEXT_DECISION"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0141",
       "target": "owner_surface:AGENTS.md",
       "type": "OWNED_BY_SURFACE"
     },
@@ -15235,6 +15240,96 @@
       "source": "decision:ABYSS-STACK-D-0141",
       "target": "owner_surface:scripts/validate_nested_agents.py",
       "type": "OWNED_BY_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0142",
+      "target": "date:2026-09-04",
+      "type": "DATED"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0142",
+      "target": "guard_family:owner%20boundary",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0142",
+      "target": "guard_family:runtime%20compatibility",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0142",
+      "target": "guard_family:source/history%20preservation",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0142",
+      "target": "status:accepted",
+      "type": "HAS_STATUS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0142",
+      "target": "surface_class:agent/route",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0142",
+      "target": "surface_class:docs/provenance",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0142",
+      "target": "surface_class:mechanics/topology",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0142",
+      "target": "surface_class:scripts/validation",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0142",
+      "target": "stack_lane:agent%20guidance",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0142",
+      "target": "stack_lane:mechanics",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0142",
+      "target": "stack_lane:validation",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0142",
+      "target": "owner_surface:mechanics/ARTIFACT_TOPOLOGY.md",
+      "type": "OWNED_BY_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0142",
+      "target": "mechanic_parent:agon-runtime",
+      "type": "UNDER_MECHANIC_PARENT"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0142",
+      "target": "mechanic_parent:experience-runtime",
+      "type": "UNDER_MECHANIC_PARENT"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0142",
+      "target": "mechanic_parent:federation-seams",
+      "type": "UNDER_MECHANIC_PARENT"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0142",
+      "target": "mechanic_parent:inference-pilots",
+      "type": "UNDER_MECHANIC_PARENT"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0142",
+      "target": "mechanic_parent:runtime-repair",
+      "type": "UNDER_MECHANIC_PARENT"
     },
     {
       "source": "repo:abyss-stack",
@@ -15940,21 +16035,26 @@
       "source": "repo:abyss-stack",
       "target": "decision:ABYSS-STACK-D-0141",
       "type": "OWNS_DECISION"
+    },
+    {
+      "source": "repo:abyss-stack",
+      "target": "decision:ABYSS-STACK-D-0142",
+      "type": "OWNS_DECISION"
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 1381,
+  "node_count": 1393,
   "node_type_counts": {
-    "date": 50,
-    "decision": 141,
-    "guard_family": 239,
-    "mechanic_parent": 13,
-    "owner_surface": 74,
+    "date": 51,
+    "decision": 142,
+    "guard_family": 241,
+    "mechanic_parent": 14,
+    "owner_surface": 75,
     "repo": 1,
     "source_surface": 647,
-    "stack_lane": 58,
+    "stack_lane": 60,
     "status": 4,
-    "surface_class": 154
+    "surface_class": 158
   },
   "nodes": [
     {
@@ -16205,6 +16305,11 @@
     {
       "id": "date:2026-08-31",
       "label": "2026-08-31",
+      "type": "date"
+    },
+    {
+      "id": "date:2026-09-04",
+      "label": "2026-09-04",
       "type": "date"
     },
     {
@@ -17618,6 +17723,16 @@
       "type": "decision"
     },
     {
+      "date": "2026-09-04",
+      "id": "decision:ABYSS-STACK-D-0142",
+      "label": "ABYSS-STACK-D-0142",
+      "path": "docs/decisions/ABYSS-STACK-D-0142-retire-historical-trees.md",
+      "posture": "accepted retirement rationale",
+      "status": "accepted",
+      "title": "ABYSS-STACK-D-0142 Retire Historical Trees Without Retiring Runtime Compatibility",
+      "type": "decision"
+    },
+    {
       "id": "guard_family:A/B/C%20freeze",
       "label": "A/B/C freeze",
       "type": "guard_family"
@@ -18618,6 +18733,11 @@
       "type": "guard_family"
     },
     {
+      "id": "guard_family:runtime%20compatibility",
+      "label": "runtime compatibility",
+      "type": "guard_family"
+    },
+    {
       "id": "guard_family:runtime%20identity",
       "label": "runtime identity",
       "type": "guard_family"
@@ -18720,6 +18840,11 @@
     {
       "id": "guard_family:source/deployed%20parity",
       "label": "source/deployed parity",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:source/history%20preservation",
+      "label": "source/history preservation",
       "type": "guard_family"
     },
     {
@@ -18878,6 +19003,11 @@
       "type": "mechanic_parent"
     },
     {
+      "id": "mechanic_parent:runtime-repair",
+      "label": "runtime-repair",
+      "type": "mechanic_parent"
+    },
+    {
       "id": "owner_surface:AGENTS.md",
       "label": "AGENTS.md",
       "type": "owner_surface"
@@ -19030,6 +19160,11 @@
     {
       "id": "owner_surface:mcp/services/tos-corpus-mcp/",
       "label": "mcp/services/tos-corpus-mcp/",
+      "type": "owner_surface"
+    },
+    {
+      "id": "owner_surface:mechanics/ARTIFACT_TOPOLOGY.md",
+      "label": "mechanics/ARTIFACT_TOPOLOGY.md",
       "type": "owner_surface"
     },
     {
@@ -22529,6 +22664,11 @@
       "type": "stack_lane"
     },
     {
+      "id": "stack_lane:agent%20guidance",
+      "label": "agent guidance",
+      "type": "stack_lane"
+    },
+    {
       "id": "stack_lane:agent%20surface",
       "label": "agent surface",
       "type": "stack_lane"
@@ -22616,6 +22756,11 @@
     {
       "id": "stack_lane:machine%20fit",
       "label": "machine fit",
+      "type": "stack_lane"
+    },
+    {
+      "id": "stack_lane:mechanics",
+      "label": "mechanics",
       "type": "stack_lane"
     },
     {
@@ -22909,6 +23054,11 @@
       "type": "surface_class"
     },
     {
+      "id": "surface_class:agent/route",
+      "label": "agent/route",
+      "type": "surface_class"
+    },
+    {
       "id": "surface_class:approval%20policy",
       "label": "approval policy",
       "type": "surface_class"
@@ -23011,6 +23161,11 @@
     {
       "id": "surface_class:docs%20route",
       "label": "docs route",
+      "type": "surface_class"
+    },
+    {
+      "id": "surface_class:docs/provenance",
+      "label": "docs/provenance",
       "type": "surface_class"
     },
     {
@@ -23206,6 +23361,11 @@
     {
       "id": "surface_class:mechanic%20topology",
       "label": "mechanic topology",
+      "type": "surface_class"
+    },
+    {
+      "id": "surface_class:mechanics/topology",
+      "label": "mechanics/topology",
       "type": "surface_class"
     },
     {
@@ -23476,6 +23636,11 @@
     {
       "id": "surface_class:schema/contract",
       "label": "schema/contract",
+      "type": "surface_class"
+    },
+    {
+      "id": "surface_class:scripts/validation",
+      "label": "scripts/validation",
       "type": "surface_class"
     },
     {

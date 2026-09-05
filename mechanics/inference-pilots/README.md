@@ -61,6 +61,6 @@ Current source surfaces stay in package-local `parts/` routes, root
 benchmark surfaces under `mechanics/inference-pilots/parts/local-trials/`, the
 Tree of Sophia A/B/C suite under
 `mechanics/inference-pilots/parts/tos-foundation-lab/`, and package tests under
-`mechanics/inference-pilots/parts/`. Archived pilot
-surfaces now stay under `legacy/` with quiet root bridge commands for operator
-compatibility.
+`mechanics/inference-pilots/parts/`. Historical pilot notes remain recoverable
+through `PROVENANCE.md`. Quiet root bridge commands execute the active
+[part-owned compatibility runners](parts/quiet-bridge-commands/CONTRACT.md).

@@ -139,6 +139,17 @@ The bridge does not:
 - validate or mutate an `aoa-routing` checkout; current routing owner checks
   use `aoa-sdk`, and predecessor W4 mutation cases remain legacy provenance
 
+## Preserved mutation contract
+
+The active compatibility runner retains `prepare-wave W4 --lane docs` and
+`apply-case W4 <case-id>` as compatibility commands, not a new-work stage
+taxonomy. Preparation produces `proposal.edit-spec.json`; `exact_replace`
+and `anchored_replace` edits are applied deterministically inside the runner.
+The `script_refresh` mode remains bounded to its declared generated surface.
+`approval.status.json` and the isolated git worktree boundary remain required
+by the runner's supervised mutation route. This contract does not authorize
+running those commands, revive predecessor ownership, or supply approval.
+
 ## LangGraph sidecar origin and promoted role
 
 The original comparison layer still exists:

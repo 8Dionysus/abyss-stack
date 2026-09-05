@@ -7,7 +7,7 @@ lived across root `docs/`, `config/`, `generated/`, `examples/`, `schemas/`,
 The AOA pattern being mirrored is:
 
 - active route first
-- raw historical sources in `legacy/raw`
+- raw historical sources in the immutable Git snapshot below
 - technical runnable artifacts distilled into active `parts/runtime-kernels/`
 - an index that maps old names to their current package path
 - no claim that archived raw files are current doctrine
@@ -18,15 +18,15 @@ The AOA pattern being mirrored is:
 only preserves the `abyss-stack` runtime-side dry-run substrate and validates
 that it cannot mutate live authority.
 
-## Current Bridges
+## Active Contracts and Historical Recovery
 
 - [parts/runtime-kernels/docs/RUNTIME_KERNELS.md](parts/runtime-kernels/docs/RUNTIME_KERNELS.md)
   describes the active dry-run substrate.
-- [legacy/INDEX.md](legacy/INDEX.md) maps old flat paths to package-local paths.
-- [legacy/DISTILLATION_LOG.md](legacy/DISTILLATION_LOG.md) records what has and
+- [legacy/INDEX.md](https://github.com/8Dionysus/abyss-stack/blob/a4e0e0cbe7fd9c6961b733de1f06d8d62c15f02f/mechanics/agon-runtime/legacy/INDEX.md) records the old flat-to-package mapping at that commit.
+- [legacy/DISTILLATION_LOG.md](https://github.com/8Dionysus/abyss-stack/blob/a4e0e0cbe7fd9c6961b733de1f06d8d62c15f02f/mechanics/agon-runtime/legacy/DISTILLATION_LOG.md) records what has and
   has not been distilled out of the archive.
-- [legacy/ARCHIVE_CLASSIFICATION.md](legacy/ARCHIVE_CLASSIFICATION.md) records
+- [legacy/ARCHIVE_CLASSIFICATION.md](https://github.com/8Dionysus/abyss-stack/blob/a4e0e0cbe7fd9c6961b733de1f06d8d62c15f02f/mechanics/agon-runtime/legacy/ARCHIVE_CLASSIFICATION.md) records
   why raw wave-era docs and old `ABS-Q-AGON-*` quest stubs remain
   provenance-only unless a concrete runtime-kernel consumer is promoted.
-- `legacy/artifacts/README.md` remains as a marker for the old technical
+- The historical artifact receipt records the old technical
   artifact family; active validation now runs from `parts/runtime-kernels/`.

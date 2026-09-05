@@ -782,6 +782,7 @@
 - [ABYSS-STACK-D-0102 R1 Memory Runtime Is Exact Pull Delivery](../ABYSS-STACK-D-0102-r1-memory-runtime-is-exact-pull-delivery.md) (`docs/decisions/ABYSS-STACK-D-0102-r1-memory-runtime-is-exact-pull-delivery.md`)
 - [ABYSS-STACK-D-0103 Compose Independent Codex Hook Fragments](../ABYSS-STACK-D-0103-compose-independent-codex-hook-fragments.md) (`docs/decisions/ABYSS-STACK-D-0103-compose-independent-codex-hook-fragments.md`)
 - [ABYSS-STACK-D-0104 Bind KAG Owner Coverage to the Admitted Bundle](../ABYSS-STACK-D-0104-bind-kag-owner-coverage-to-the-admitted-bundle.md) (`docs/decisions/ABYSS-STACK-D-0104-bind-kag-owner-coverage-to-the-admitted-bundle.md`)
+- [ABYSS-STACK-D-0142 Retire Historical Trees Without Retiring Runtime Compatibility](../ABYSS-STACK-D-0142-retire-historical-trees.md) (`docs/decisions/ABYSS-STACK-D-0142-retire-historical-trees.md`)
 
 ## owner cache
 
@@ -1009,6 +1010,10 @@
 
 - [ABYSS-STACK-D-0086 Receipt-Bound SDK Routing Cutover](../ABYSS-STACK-D-0086-receipt-bound-sdk-routing-cutover.md) (`docs/decisions/ABYSS-STACK-D-0086-receipt-bound-sdk-routing-cutover.md`)
 
+## runtime compatibility
+
+- [ABYSS-STACK-D-0142 Retire Historical Trees Without Retiring Runtime Compatibility](../ABYSS-STACK-D-0142-retire-historical-trees.md) (`docs/decisions/ABYSS-STACK-D-0142-retire-historical-trees.md`)
+
 ## runtime identity
 
 - [ABYSS-STACK-D-0128 Exact Content-Addressed Runtime Subject Admission](../ABYSS-STACK-D-0128-exact-runtime-subject-admission.md) (`docs/decisions/ABYSS-STACK-D-0128-exact-runtime-subject-admission.md`)
@@ -1094,6 +1099,10 @@
 ## source/deployed parity
 
 - [ABYSS-STACK-D-0077 Loopback MCP Owner Lifecycle](../ABYSS-STACK-D-0077-loopback-mcp-owner-lifecycle.md) (`docs/decisions/ABYSS-STACK-D-0077-loopback-mcp-owner-lifecycle.md`)
+
+## source/history preservation
+
+- [ABYSS-STACK-D-0142 Retire Historical Trees Without Retiring Runtime Compatibility](../ABYSS-STACK-D-0142-retire-historical-trees.md) (`docs/decisions/ABYSS-STACK-D-0142-retire-historical-trees.md`)
 
 ## source/runtime parity
 

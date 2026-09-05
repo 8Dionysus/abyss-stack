@@ -20,5 +20,5 @@ and a runtime check.
 Use [VALIDATION.md](../../VALIDATION.md) for exact commands and focused checks.
 
 Agon dry-run kernels now route through `mechanics/agon-runtime/`.
-Archived pilot surfaces route through `mechanics/inference-pilots/legacy/`
-and `PROVENANCE.md`; active wrappers must not execute files from that archive.
+Historical pilot sources are recovered through the immutable Git references
+in `PROVENANCE.md`; active wrappers execute their current part-owned runners.
