@@ -482,7 +482,7 @@ def test_explicit_pytest_plugins_are_carried_into_process_children() -> None:
     )[-3:] == ["-p", "custom_plugin", "tests/test_example.py::test_example"]
 
 
-def test_pytest_children_disable_plugin_autoload_by_default_but_allow_opt_out(
+def test_pytest_children_disable_plugin_autoload_by_default_and_preserve_values(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.delenv(run_pytest_lane.PYTEST_DISABLE_PLUGIN_AUTOLOAD_ENV, raising=False)
@@ -492,12 +492,15 @@ def test_pytest_children_disable_plugin_autoload_by_default_but_allow_opt_out(
     )
     assert environment[run_pytest_lane.PYTEST_DISABLE_PLUGIN_AUTOLOAD_ENV] == "1"
 
-    monkeypatch.setenv(run_pytest_lane.PYTEST_DISABLE_PLUGIN_AUTOLOAD_ENV, "0")
-    assert run_pytest_lane._pytest_environment()[run_pytest_lane.PYTEST_DISABLE_PLUGIN_AUTOLOAD_ENV] == "0"
+    monkeypatch.setenv(run_pytest_lane.PYTEST_DISABLE_PLUGIN_AUTOLOAD_ENV, "")
+    assert run_pytest_lane._pytest_environment()[run_pytest_lane.PYTEST_DISABLE_PLUGIN_AUTOLOAD_ENV] == ""
     opted_out = run_pytest_lane._partition_environment(
         baseline_path=Path("/tmp/baseline.json"),
     )
-    assert opted_out[run_pytest_lane.PYTEST_DISABLE_PLUGIN_AUTOLOAD_ENV] == "0"
+    assert opted_out[run_pytest_lane.PYTEST_DISABLE_PLUGIN_AUTOLOAD_ENV] == ""
+
+    monkeypatch.setenv(run_pytest_lane.PYTEST_DISABLE_PLUGIN_AUTOLOAD_ENV, "0")
+    assert run_pytest_lane._pytest_environment()[run_pytest_lane.PYTEST_DISABLE_PLUGIN_AUTOLOAD_ENV] == "0"
 
 
 def test_release_dependencies_do_not_add_a_threaded_pytest_scheduler() -> None:

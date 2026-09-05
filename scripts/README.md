@@ -80,9 +80,10 @@ still synced into deployed `Configs/` with the wrappers.
   descendant-owned descriptor EOF; failed shard logs are replayed at aggregate
   closeout for bounded-log diagnostics, and tests are not retried. The runner
   disables third-party pytest plugin autoload by default because this lane
-  owns its process scheduler and does not use those plugin fixtures; set
-  `PYTEST_DISABLE_PLUGIN_AUTOLOAD=0` when an explicit external plugin contract
-  is part of a deliberate run.
+  owns its process scheduler and does not use those plugin fixtures. For an
+  explicit external plugin contract, use `PYTEST_DISABLE_PLUGIN_AUTOLOAD=`
+  (an empty value) to opt out; pytest treats any non-empty value, including
+  `=0`, as the disable flag.
 - Keep `validate_local_stats_port.py` as a thin delegation to the `aoa-stats`
   contract owner; do not copy the central schemas or validator into this repo.
 - Keep `validate_nested_agents.py` responsible for every discovered inherited
