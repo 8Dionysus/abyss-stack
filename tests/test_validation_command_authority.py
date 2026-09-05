@@ -4,6 +4,7 @@ import json
 import re
 import subprocess
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -261,7 +262,7 @@ def test_pytest_scheduler_uses_process_isolated_workstealing() -> None:
         "effective": "process-4x32-file-aware",
         "reason": "isolated_process_workstealing",
         "worker_limit": 4,
-        "shard_count": 32,
+        "shard_count": 16,
         "ordering": "file_aware_duration_hints",
         "selection_proof": "baseline_manifest_exact_union",
         "selection_changed": False,
@@ -275,6 +276,26 @@ def test_pytest_process_partitions_are_disjoint_and_complete() -> None:
 
     assert len(partitions) == 8
     assert max(map(len, partitions)) - min(map(len, partitions)) <= 1
+    assert len(flattened) == len(set(flattened)) == len(nodeids)
+    assert set(flattened) == set(nodeids)
+
+
+def test_pytest_shard_count_scales_small_selections_and_keeps_full_default() -> None:
+    assert run_pytest_lane.shard_count_for_selection(0) == 0
+    assert run_pytest_lane.shard_count_for_selection(1) == 1
+    assert run_pytest_lane.shard_count_for_selection(364) == 4
+    assert run_pytest_lane.shard_count_for_selection(369) == 5
+    assert run_pytest_lane.shard_count_for_selection(2853) == 16
+    assert run_pytest_lane.shard_count_for_selection(2974) == 16
+
+
+def test_pytest_full_default_partition_is_exactly_sixteen_shards() -> None:
+    nodeids = [f"tests/test_example.py::test_{index}" for index in range(2974)]
+    shard_count = run_pytest_lane.shard_count_for_selection(len(nodeids))
+    partitions = run_pytest_lane.partition_nodeids(nodeids, shard_count=shard_count)
+    flattened = [nodeid for partition in partitions for nodeid in partition]
+
+    assert shard_count == len(partitions) == 16
     assert len(flattened) == len(set(flattened)) == len(nodeids)
     assert set(flattened) == set(nodeids)
 
@@ -317,6 +338,54 @@ def test_pytest_process_partitions_queue_measured_slow_units_first() -> None:
     assert all(nodeid.startswith(f"{slow_path}::") for nodeid in partitions[0])
 
 
+def test_pytest_process_shards_use_durable_logs_without_pipe_eof(monkeypatch) -> None:
+    nodeid = "tests/test_example.py::test_example"
+    popen_stdout: list[object] = []
+
+    def fake_collect(*_args, **kwargs):
+        run_pytest_lane.write_manifest(
+            Path(kwargs["env"][run_pytest_lane.PARTITION_BASELINE_ENV]),
+            [nodeid],
+        )
+        return subprocess.CompletedProcess([], 0)
+
+    class FakeProcess:
+        def poll(self):
+            return 0
+
+    def fake_popen(_command, **kwargs):
+        popen_stdout.append(kwargs["stdout"])
+        kwargs["stdout"].write("fake shard output\n")
+        kwargs["stdout"].flush()
+        environment = kwargs["env"]
+        run_pytest_lane.write_manifest(
+            Path(environment[run_pytest_lane.PARTITION_OBSERVED_ENV]),
+            [nodeid],
+        )
+        Path(environment[run_pytest_lane.PARTITION_RESULT_ENV]).write_text(
+            json.dumps(
+                {
+                    "schema_version": run_pytest_lane.PARTITION_RESULT_SCHEMA,
+                    "exitstatus": 0,
+                    "stats": {"passed": 1},
+                }
+            ),
+            encoding="utf-8",
+        )
+        return FakeProcess()
+
+    monkeypatch.setattr(run_pytest_lane.subprocess, "run", fake_collect)
+    monkeypatch.setattr(run_pytest_lane.subprocess, "Popen", fake_popen)
+
+    assert run_pytest_lane.run_process_worksteal(extra_args=[nodeid]) == 0
+    assert popen_stdout
+    assert popen_stdout[0] is not subprocess.PIPE
+
+
+def test_pytest_live_preview_tolerates_partial_utf8() -> None:
+    assert run_pytest_lane._decode_live_output(b"prefix \xe2\x82") == "prefix \ufffd"
+
+
 def test_pytest_scheduler_keeps_an_exact_serial_rollback() -> None:
     rollback = run_pytest_lane.scheduler_plan("serial")
     command = run_pytest_lane.build_pytest_command(
@@ -331,6 +400,29 @@ def test_pytest_scheduler_keeps_an_exact_serial_rollback() -> None:
         "-q",
         "tests/test_validation_command_authority.py",
     ]
+
+
+def test_explicit_process_scheduler_accepts_targeted_selection(monkeypatch) -> None:
+    calls: list[list[str]] = []
+
+    monkeypatch.setattr(
+        run_pytest_lane,
+        "run_process_worksteal",
+        lambda *, extra_args: calls.append(extra_args) or 7,
+    )
+
+    assert (
+        run_pytest_lane.main(
+            [
+                "--scheduler",
+                "process-4x32-file-aware",
+                "--",
+                "tests/test_example.py",
+            ]
+        )
+        == 7
+    )
+    assert calls == [["tests/test_example.py"]]
 
 
 def test_pytest_scheduler_replays_failed_shard_log_at_closeout(
@@ -355,6 +447,72 @@ def test_pytest_scheduler_replays_failed_shard_log_at_closeout(
     assert "[pytest-failed-shard 2/4]" in captured.err
     assert "FAILED tests/test_example.py::test_failure" in captured.err
     assert "selected=7 returncode=1 selection_proof=exact" in captured.err
+
+
+def test_pytest_shard_emits_bounded_failure_excerpt_while_running(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setenv(run_pytest_lane.PARTITION_MODE_ENV, "shard")
+    run_pytest_lane._LIVE_FAILURES.clear()
+    report = SimpleNamespace(
+        nodeid="tests/test_example.py::test_failure",
+        when="call",
+        failed=True,
+        longreprtext="traceback\n" + ("x" * (run_pytest_lane.LIVE_FAILURE_MAX_CHARS + 50)),
+    )
+
+    run_pytest_lane.pytest_runtest_logreport(report)
+    run_pytest_lane.pytest_runtest_logreport(report)
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err.count("[pytest-live-failure]") == 1
+    assert "nodeid=tests/test_example.py::test_failure phase=call" in captured.err
+    assert "[pytest-live-failure-truncated]" in captured.err
+    assert len(captured.err) < run_pytest_lane.LIVE_FAILURE_MAX_CHARS + 250
+
+
+def test_pytest_child_command_is_unbuffered_for_live_diagnostics() -> None:
+    command = run_pytest_lane._plugin_command(selection_args=[])
+
+    assert command[1:4] == ["-u", "-m", "pytest"]
+    plugin_index = command.index("-p")
+    assert command[plugin_index : plugin_index + 2] == [
+        "-p",
+        "scripts.run_pytest_lane",
+    ]
+
+
+def test_explicit_pytest_plugins_are_carried_into_process_children() -> None:
+    assert run_pytest_lane._explicit_plugin_args(
+        ["tests", "-p", "custom_plugin", "-pno:cacheprovider", "--", "-p", "literal"]
+    ) == ["-p", "custom_plugin", "-pno:cacheprovider"]
+    assert run_pytest_lane._plugin_command(
+        selection_args=["tests/test_example.py::test_example"],
+        explicit_plugin_args=["-p", "custom_plugin"],
+    )[-3:] == ["-p", "custom_plugin", "tests/test_example.py::test_example"]
+
+
+def test_pytest_children_disable_plugin_autoload_by_default_and_preserve_values(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv(run_pytest_lane.PYTEST_DISABLE_PLUGIN_AUTOLOAD_ENV, raising=False)
+    assert run_pytest_lane._pytest_environment()[run_pytest_lane.PYTEST_DISABLE_PLUGIN_AUTOLOAD_ENV] == "1"
+    environment = run_pytest_lane._partition_environment(
+        baseline_path=Path("/tmp/baseline.json"),
+    )
+    assert environment[run_pytest_lane.PYTEST_DISABLE_PLUGIN_AUTOLOAD_ENV] == "1"
+
+    monkeypatch.setenv(run_pytest_lane.PYTEST_DISABLE_PLUGIN_AUTOLOAD_ENV, "")
+    assert run_pytest_lane._pytest_environment()[run_pytest_lane.PYTEST_DISABLE_PLUGIN_AUTOLOAD_ENV] == ""
+    opted_out = run_pytest_lane._partition_environment(
+        baseline_path=Path("/tmp/baseline.json"),
+    )
+    assert opted_out[run_pytest_lane.PYTEST_DISABLE_PLUGIN_AUTOLOAD_ENV] == ""
+
+    monkeypatch.setenv(run_pytest_lane.PYTEST_DISABLE_PLUGIN_AUTOLOAD_ENV, "0")
+    assert run_pytest_lane._pytest_environment()[run_pytest_lane.PYTEST_DISABLE_PLUGIN_AUTOLOAD_ENV] == "0"
 
 
 def test_release_dependencies_do_not_add_a_threaded_pytest_scheduler() -> None:
