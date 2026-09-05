@@ -34,6 +34,23 @@ scripts/aoa-sync-configs --item mcp --item schemas --item systemd --item scripts
 Include `scripts` and `mechanics` with the bounded MCP lifecycle projection so
 new unit arguments and the deployed installer implementation cannot drift.
 
+For a running MCP service whose shared source-projection lock must remain held,
+the protocol watcher has a separate exact-file route:
+
+```bash
+scripts/aoa-sync-configs --protocol-watch-only --dry-run
+scripts/aoa-sync-configs --protocol-watch-only
+```
+
+This route requires an existing owner-held
+`Logs/mcp/protocol-watch/.lock`, takes it exclusively for the transaction, and
+requires a clean exact source commit. It copies only the eleven protocol-lab
+and watcher-service files declared by the builder, never enables delete mode or
+projects `mcp/services`, and writes a per-file parity receipt under the
+watcher's private deployment records. The receipt explicitly carries
+`whole_stack_projection_claim: false`; runtime health, unit activation, and
+consumer acceptance remain separate evidence.
+
 Unknown items and `Secrets` are rejected. Preview requires an existing target.
 Source-control and interpreter/test cache material (`.git`, `__pycache__`,
 pytest/mypy/ruff caches, `.coverage`, `*.pyc`) is excluded from both preview and
