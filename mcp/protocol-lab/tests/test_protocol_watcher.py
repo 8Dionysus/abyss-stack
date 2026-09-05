@@ -657,7 +657,9 @@ def test_proc_scan_protects_same_user_run_cwd_and_fd(tmp_path: Path) -> None:
     proc_root = tmp_path / "proc"
     process = proc_root / "123" / "fd"
     process.mkdir(parents=True)
-    (proc_root / "123" / "status").write_text("Name:\tchild\nUid:\t1000\t1000\t1000\t1000\n")
+    (proc_root / "123" / "status").write_text(
+        f"Name:\tchild\nUid:\t{os.getuid()}\t{os.getuid()}\t{os.getuid()}\t{os.getuid()}\n"
+    )
     (proc_root / "123" / "cwd").symlink_to(run_root, target_is_directory=True)
     (process / "4").symlink_to(run_root / "fd-target")
 
@@ -687,7 +689,7 @@ def test_proc_scan_indexes_siblings_without_prefix_false_positive(tmp_path: Path
     process = proc_root / "123" / "fd"
     process.mkdir(parents=True)
     (proc_root / "123" / "status").write_text(
-        "Name:\tchild\nUid:\t1000\t1000\t1000\t1000\n"
+        f"Name:\tchild\nUid:\t{os.getuid()}\t{os.getuid()}\t{os.getuid()}\t{os.getuid()}\n"
     )
     (proc_root / "123" / "cwd").symlink_to(selected / "nested", target_is_directory=True)
     # This path shares the selected run's lexical prefix but is a sibling.
