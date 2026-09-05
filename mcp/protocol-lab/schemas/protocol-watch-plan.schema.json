@@ -22,6 +22,7 @@
       "minItems": 1,
       "items": {"$ref": "#/$defs/input"}
     },
+    "retention": {"$ref": "#/$defs/retention"},
     "claim_limits": {
       "type": "array",
       "minItems": 3,
@@ -66,6 +67,37 @@
         {"if": {"properties": {"kind": {"const": "executable"}}}, "then": {"required": ["command", "probe_argv", "feature_argv"]}},
         {"if": {"properties": {"kind": {"const": "https_json"}}}, "then": {"required": ["url", "select"]}}
       ]
+    },
+    "retention": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "max_successful_runs": {"type": "integer", "minimum": 0},
+        "max_successful_bytes": {"type": "integer", "minimum": 0},
+        "max_successful_age_seconds": {"type": "integer", "minimum": 0},
+        "max_failed_runs": {"type": "integer", "minimum": 0},
+        "max_failed_bytes": {"type": "integer", "minimum": 0},
+        "max_failed_age_seconds": {"type": "integer", "minimum": 0},
+        "retain_failed_diagnostics": {"type": "integer", "minimum": 0},
+        "max_observations": {"type": "integer", "minimum": 0},
+        "max_observation_bytes": {"type": "integer", "minimum": 0},
+        "max_observation_age_seconds": {"type": "integer", "minimum": 0},
+        "disposable_roots": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "diagnostic_roots": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1}
+        },
+        "cache_roots": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1}
+        },
+        "receipt_archive_root": {"type": "string", "minLength": 1},
+        "pin_file": {"type": "string", "minLength": 1}
+      }
     }
   }
 }

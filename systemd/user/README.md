@@ -35,7 +35,8 @@ This directory stores user-unit skeletons for the deployed runtime.
   `abyss-stack-mcp-observation.timer`, the bounded five-minute observation
   producer and two-minute refresh schedule
 - `abyss-mcp-protocol-watch.service`, `.path`, and `.timer`, the removable
-  protocol-lab drift/TTL detector with an hourly upstream backstop
+  protocol-lab drift/TTL detector with an hourly upstream backstop; its
+  service applies the source-declared bounded run-artifact retention policy
 - `managed-units.txt` allowlists the host-local user units that can be linked
   from the deployed Configs mirror.
 

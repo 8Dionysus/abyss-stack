@@ -5021,6 +5021,7 @@ esac
         self.assertIn("Type=oneshot", unit)
         self.assertIn("scripts/protocol_watcher.py", unit)
         self.assertIn("--execute", unit)
+        self.assertIn("--apply-retention", unit)
         self.assertIn(
             "--state-root /srv/AbyssOS/abyss-stack/Logs/mcp/protocol-watch",
             unit,

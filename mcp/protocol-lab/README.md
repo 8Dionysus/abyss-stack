@@ -126,6 +126,27 @@ evidence, missing runtime config, changed protected bytes, or missing receipts
 remain fail-closed. The watcher never starts, stops, restarts, registers, or
 migrates a production contour itself.
 
+Run roots carry a private lifecycle marker so a concurrent or interrupted run
+is protected. The plan's retention policy removes only owner-created
+`stable-home`, `lab/codex-home`, and `step-logs` trees after verifying their
+ownership, regular entries, inode-deduplicated allocated bytes, device and
+mount boundaries; nested plugin cache roots are measured separately. It
+preserves last-success, pinned, running, current observation, required
+receipts, and a bounded set of failed diagnostics. A
+completed run outside the compact limits is archived to
+`retained-receipts/<run-id>/` with its input, execution, and required receipt
+bytes verified before the run tree is removed. Use
+`protocol_watcher.py --retention-plan` for a private dry run and
+`--retention-apply` for a rechecked apply; neither mode reads the private
+runtime config or runs the lab.
+An operator pin is a mode `0600` `pinned-runs.json` object with a `run_ids`
+array; malformed or missing references fail closed.
+
+The service combines the lab pass with `--apply-retention`. Its TTL remains
+bound to the generated protocol status; a successful lab pass does not rewrite
+that source, so a still-expired status continues to produce
+`evidence_ttl_due`.
+
 The private status retains exact machine-local refs for diagnosis. Its
 `public-safe.json` projection replaces those refs with content identities,
 reduces blocked observations to error classes and reason codes, and strips

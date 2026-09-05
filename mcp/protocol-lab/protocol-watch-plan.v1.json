@@ -114,6 +114,23 @@
       "required": true
     }
   ],
+  "retention": {
+    "max_successful_runs": 14,
+    "max_successful_bytes": 1073741824,
+    "max_successful_age_seconds": 604800,
+    "max_failed_runs": 6,
+    "max_failed_bytes": 536870912,
+    "max_failed_age_seconds": 1209600,
+    "retain_failed_diagnostics": 2,
+    "max_observations": 64,
+    "max_observation_bytes": 16777216,
+    "max_observation_age_seconds": 2592000,
+    "disposable_roots": ["stable-home", "lab/codex-home", "step-logs"],
+    "diagnostic_roots": ["step-logs"],
+    "cache_roots": ["stable-home/.tmp/plugins", "lab/codex-home/.tmp/plugins"],
+    "receipt_archive_root": "retained-receipts",
+    "pin_file": "pinned-runs.json"
+  },
   "claim_limits": [
     "A detected upstream or local change requests a fresh isolated lab run; it does not authorize production migration.",
     "Network metadata is a refresh signal and must be followed by exact source, package, binary and pair receipts.",

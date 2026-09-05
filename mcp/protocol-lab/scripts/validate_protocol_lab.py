@@ -17,6 +17,23 @@ REPO_ROOT = LAB_ROOT.parents[1]
 BUILDER_PATH = LAB_ROOT / "scripts" / "build_protocol_lab_status.py"
 WATCH_PLAN_PATH = LAB_ROOT / "protocol-watch-plan.v1.json"
 WATCH_PLAN_SCHEMA_PATH = LAB_ROOT / "schemas" / "protocol-watch-plan.schema.json"
+EXPECTED_WATCH_RETENTION = {
+    "max_successful_runs": 14,
+    "max_successful_bytes": 1073741824,
+    "max_successful_age_seconds": 604800,
+    "max_failed_runs": 6,
+    "max_failed_bytes": 536870912,
+    "max_failed_age_seconds": 1209600,
+    "retain_failed_diagnostics": 2,
+    "max_observations": 64,
+    "max_observation_bytes": 16777216,
+    "max_observation_age_seconds": 2592000,
+    "disposable_roots": ["stable-home", "lab/codex-home", "step-logs"],
+    "diagnostic_roots": ["step-logs"],
+    "cache_roots": ["stable-home/.tmp/plugins", "lab/codex-home/.tmp/plugins"],
+    "receipt_archive_root": "retained-receipts",
+    "pin_file": "pinned-runs.json",
+}
 TASKS_MATRIX_PATH = LAB_ROOT / "tasks-compatibility-matrix.v1.json"
 TASKS_MATRIX_SCHEMA_PATH = LAB_ROOT / "schemas" / "tasks-compatibility-matrix.schema.json"
 RUNTIME_CONFIG_PATH = (
@@ -301,6 +318,11 @@ def validate(checked_at: datetime | None = None) -> list[str]:
         "pointer": "/evidence_expires_at",
     }:
         errors.append("protocol watcher must consume the derived earliest evidence expiry")
+    if watch_plan.get("retention") != EXPECTED_WATCH_RETENTION:
+        errors.append(
+            "protocol watcher retention must keep bounded receipts, diagnostics, "
+            "observations, and explicitly disposable roots"
+        )
 
     next_spec = matrix["next_spec"]
     if next_spec != {

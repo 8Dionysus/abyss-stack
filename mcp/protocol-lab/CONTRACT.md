@@ -139,6 +139,27 @@ Machine-local paths and raw errors remain private watcher evidence. The
 public-safe status contains only content identities, bounded error classes,
 reason codes, and path-free receipt metadata.
 
+Each run records a private `run-state.json` (`running`, `completed`, or
+`failed`) beside its immutable input and execution receipts. The retention
+policy in `protocol-watch-plan.v1.json` treats `stable-home`,
+`lab/codex-home`, and `step-logs` as the only disposable run roots and reports
+their nested plugin cache roots separately. It keeps
+the last successful and operator-pinned runs, active runs, the newest failed
+diagnostics, the current observation, and required receipt files. Older
+completed runs are first copied to the private `retained-receipts/` archive,
+verified, and then removed. Ownership, regular-file, symlink, inode, device,
+and mount-boundary checks are required before an operation is emitted or
+applied. A plan is a dry run; `--retention-apply` rechecks every path and byte
+count under the state lock before changing it. Operator pins use a private
+mode `0600` `pinned-runs.json` object containing a `run_ids` array; malformed
+or missing references suppress all destructive operations.
+
+The hourly service uses `--apply-retention` after its normal lab pass. The
+source-generated protocol status remains the TTL authority: a successful lab
+does not refresh that generated evidence, so an unchanged expired source
+continues to report `evidence_ttl_due` until its owner refreshes the source
+status.
+
 ## Claim limits
 
 A green source validator proves the source posture and deterministic gating.
