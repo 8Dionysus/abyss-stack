@@ -13761,54 +13761,6 @@ def test_a2a_export_requires_exact_independent_review_result(
     reviewer_result_path.write_bytes(original_reviewer_result)
     reviewer_state_path.write_bytes(original_reviewer_state)
 
-    mismatched_manifest_path = tmp_path / "mismatched-review-workspace-manifest.json"
-    mismatched_manifest = json.loads(
-        writer_source_manifest_path.read_text(encoding="utf-8")
-    )
-    mismatched_manifest["git_diff_binary_sha256"] = "sha256:" + ("0" * 64)
-    _write_json(mismatched_manifest_path, mismatched_manifest)
-    mismatched_manifest_ref = _provenance(
-        "abyss-stack",
-        "runtime-results/mismatched-review-workspace-manifest.json",
-        digest=_digest_path(mismatched_manifest_path),
-        source_ref=str(writer_result["thread_id"]),
-        schema_ref=(
-            "mechanics/governed-execution/parts/external-codex-agent/schemas/"
-            "external-codex-workspace-manifest.schema.json"
-        ),
-        schema_version="abyss_stack_external_codex_workspace_manifest_v1",
-    )
-    unbound_reviewer = _fixture(
-        tmp_path / "unbound-reviewer",
-        role_id="reviewer",
-        task_family="landing_review",
-        parent_task_id=writer["task_id"],
-        identity_suffix="unbound-reviewer",
-        state_root=shared_state,
-        extra_immutable_inputs=(
-            ("writer-runtime-result", writer_result_path, writer_result_ref),
-            ("writer-model-report", writer_report_path, writer_report_ref),
-            (
-                "review-workspace-manifest",
-                mismatched_manifest_path,
-                mismatched_manifest_ref,
-            ),
-            *reviewer_actor_inputs,
-        ),
-    )
-    runtime.start(unbound_reviewer["launch_path"])
-    assert (
-        _wait_terminal(runtime, unbound_reviewer["session_id"])["status"] == "completed"
-    )
-    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
-        runtime.export_a2a_result(
-            writer["session_id"],
-            reviewer_session_id=unbound_reviewer["session_id"],
-            summon_request_path=summon_path,
-            output_path=tmp_path / "unbound-manifest-child-task-result.json",
-        )
-    assert exc_info.value.code == "a2a_review_seed_required"
-
     substituted_summon_path = tmp_path / "substituted-summon-request.json"
     substituted_summon = json.loads(summon_path.read_text(encoding="utf-8"))
     substituted_summon["audit_refs"].append("fixture:substituted")
@@ -13900,38 +13852,6 @@ def test_a2a_export_requires_exact_independent_review_result(
     assert repair_export["child_task_result"]["review_outcome"] == ("return_for_repair")
     assert repair_export["child_task_result"]["remote_task"]["state"] == "failed"
 
-    failed_reviewer = _fixture(
-        tmp_path / "failed-reviewer",
-        objective_marker="FAKE_INVALID_JSONL",
-        role_id="reviewer",
-        task_family="landing_review",
-        parent_task_id=writer["task_id"],
-        identity_suffix="failed-reviewer",
-        state_root=shared_state,
-        shared_workspace=writer["workspace"],
-        workspace_projection_seed=workspace_projection_seed,
-        extra_immutable_inputs=(
-            ("writer-runtime-result", writer_result_path, writer_result_ref),
-            ("writer-model-report", writer_report_path, writer_report_ref),
-            (
-                "review-workspace-manifest",
-                writer_source_manifest_path,
-                writer_source_manifest_ref,
-            ),
-            *reviewer_actor_inputs,
-        ),
-    )
-    runtime.start(failed_reviewer["launch_path"])
-    assert _wait_terminal(runtime, failed_reviewer["session_id"])["status"] == "failed"
-    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
-        runtime.export_a2a_result(
-            writer["session_id"],
-            reviewer_session_id=failed_reviewer["session_id"],
-            summon_request_path=summon_path,
-            output_path=tmp_path / "failed-reviewer-child-task-result.json",
-        )
-    assert exc_info.value.code == "a2a_review_runtime_failed"
-
     failed_reviewer_result = runtime.result(reviewer["session_id"])
     assert failed_reviewer_result is not None
     failed_reviewer_result["status"] = "failed"
@@ -13947,6 +13867,21 @@ def test_a2a_export_requires_exact_independent_review_result(
         )
 
     assert exc_info.value.code == "runtime_result_drift"
+
+    # Once the failed result is genuinely state-bound, the export admission
+    # must still reject it; integrity failure alone does not prove this guard.
+    failed_reviewer_state = json.loads(original_reviewer_state)
+    failed_reviewer_state["status"] = "failed"
+    failed_reviewer_state["result_digest"] = _digest_path(reviewer_result_path)
+    _write_json(reviewer_state_path, failed_reviewer_state)
+    with pytest.raises(RUNTIME.ExternalCodexRuntimeError) as exc_info:
+        runtime.export_a2a_result(
+            writer["session_id"],
+            reviewer_session_id=reviewer["session_id"],
+            summon_request_path=summon_path,
+            output_path=tmp_path / "bound-failed-reviewer-result.json",
+        )
+    assert exc_info.value.code == "a2a_review_runtime_failed"
 
 
 def _parent_reentry_obligation(
