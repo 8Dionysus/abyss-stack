@@ -39,9 +39,22 @@
     "receipts": {"type": "array", "items": {"type": "object"}},
     "failures": {"type": "array", "items": {"type": "string"}},
     "claim_limits": {"type": "array", "minItems": 3, "items": {"type": "string", "minLength": 3}},
+    "retention": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {"enum": ["disabled", "applied"]},
+        "plan_digest": {"oneOf": [{"$ref": "#/$defs/digest"}, {"type": "null"}]},
+        "planned_operations": {"type": "integer", "minimum": 0},
+        "applied_operations": {"type": "integer", "minimum": 0},
+        "skipped_operations": {"type": "integer", "minimum": 0},
+        "errors": {"type": "array", "items": {"type": "string", "minLength": 1}}
+      },
+      "required": ["mode", "plan_digest", "planned_operations", "applied_operations", "skipped_operations", "errors"]
+    },
     "status_digest": {"$ref": "#/$defs/digest"}
   },
-  "required": ["schema_version", "plan_id", "observed_at", "input_snapshot_digest", "private_observation_ref", "private_observation_sha256", "previous_success_digest", "observation_ready", "triggered", "trigger_reasons", "execution_state", "run_id", "inputs", "ttl", "verdicts", "production_automatically_changed", "protected_paths_unchanged", "receipts", "failures", "claim_limits", "status_digest"],
+  "required": ["schema_version", "plan_id", "observed_at", "input_snapshot_digest", "private_observation_ref", "private_observation_sha256", "previous_success_digest", "observation_ready", "triggered", "trigger_reasons", "execution_state", "run_id", "inputs", "ttl", "verdicts", "production_automatically_changed", "protected_paths_unchanged", "receipts", "failures", "claim_limits", "retention", "status_digest"],
   "$defs": {
     "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
   }
