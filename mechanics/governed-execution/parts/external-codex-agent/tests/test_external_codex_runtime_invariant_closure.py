@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -31,6 +32,202 @@ RUNTIME = _load_runtime_module()
 PROFILE = json.loads(
     (PART_ROOT / "runtime-profile.v1.json").read_text(encoding="utf-8")
 )
+
+
+_DEEP_SHELL_COMMAND = "/usr/bin/git push"
+for _ in range(4):
+    _DEEP_SHELL_COMMAND = shlex.join(
+        ["/usr/bin/bash", "-lc", _DEEP_SHELL_COMMAND]
+    )
+
+
+@pytest.mark.parametrize(
+    ("commands", "expected_effects"),
+    (
+        pytest.param(
+            ("/usr/bin/python3 -c 'print(42)'",),
+            ["unclassified_indirect_effect"],
+            id="opaque-interpreter",
+        ),
+        pytest.param(
+            ("/usr/bin/nice /usr/bin/cat /home/fixture/.ssh/id_rsa",),
+            ["secret_access", "unclassified_indirect_effect"],
+            id="launch-wrapper-secret",
+        ),
+        pytest.param(
+            (_DEEP_SHELL_COMMAND,),
+            ["unclassified_indirect_effect"],
+            id="deep-shell-nesting",
+        ),
+        pytest.param(
+            ("/usr/bin/bash -lc 'echo $(cat /home/operator/.ssh/id_rsa)'",),
+            ["secret_access", "unclassified_indirect_effect"],
+            id="command-substitution-secret",
+        ),
+        pytest.param(
+            ("/usr/bin/make -f /tmp/leak.mk leak",),
+            ["unclassified_indirect_effect"],
+            id="build-runner",
+        ),
+        pytest.param(
+            ("/usr/bin/git -c alias.leak='!cat /home/operator/.ssh/id_rsa' leak",),
+            ["secret_access", "unclassified_indirect_effect"],
+            id="git-alias-indirection",
+        ),
+        pytest.param(
+            ("/usr/bin/bash -lc 'source scripts/helper.sh'",),
+            ["unclassified_indirect_effect"],
+            id="sourced-shell",
+        ),
+        pytest.param(
+            ("/usr/bin/bash scripts/helper.sh -c '/usr/bin/true'",),
+            ["unclassified_indirect_effect"],
+            id="shell-script-before-c",
+        ),
+        pytest.param(
+            ("/usr/bin/bash --rcfile -x -ic '/usr/bin/true'",),
+            ["unclassified_indirect_effect"],
+            id="shell-startup-file",
+        ),
+        pytest.param(
+            ("/usr/bin/git config --local core.hooksPath /tmp/hooks",),
+            ["unclassified_indirect_effect"],
+            id="git-local-config-write",
+        ),
+        pytest.param(
+            ("/usr/bin/git config --get http.https://example.com/.extraheader",),
+            ["unclassified_indirect_effect"],
+            id="git-config-read",
+        ),
+        pytest.param(
+            (
+                "/usr/bin/git branch --edit-description",
+                "/usr/bin/git bisect run scripts/helper",
+                "/usr/bin/git verify-commit HEAD",
+                "/usr/bin/git fetch --upload-pack=/tmp/helper /tmp/remote",
+                "/usr/bin/git notes edit HEAD",
+                "/usr/bin/git grep --open-files-in-pager=/tmp/helper pattern",
+                "/usr/bin/git init --separate-git-dir=/tmp/repo-meta --template=/tmp/template .",
+                "/usr/bin/git ls-remote --upload-pack=/tmp/helper /tmp/remote",
+            ),
+            ["unclassified_indirect_effect"],
+            id="git-hidden-programs",
+        ),
+        pytest.param(
+            ("/usr/bin/git cat-file --filter HEAD:README.md",),
+            ["unclassified_indirect_effect"],
+            id="git-cat-file-filter",
+        ),
+        pytest.param(
+            ("/usr/bin/git for-each-ref --sort=version:signature:grade",),
+            ["unclassified_indirect_effect"],
+            id="git-signature-format",
+        ),
+        pytest.param(
+            ("/usr/bin/git hash-object -- README.md --no-filters",),
+            ["unclassified_indirect_effect"],
+            id="git-hash-object-filter",
+        ),
+        pytest.param(
+            ("/usr/bin/rg --pre=/bin/sh pattern scripts/helper.sh",),
+            ["unclassified_indirect_effect"],
+            id="ripgrep-hidden-program",
+        ),
+        pytest.param(
+            ("/usr/bin/jq -n env",),
+            ["secret_access", "unclassified_indirect_effect"],
+            id="jq-environment-read",
+        ),
+        pytest.param(
+            ("/usr/bin/sort -S 4K --compress-program=/tmp/helper input",),
+            ["unclassified_indirect_effect"],
+            id="sort-hidden-program",
+        ),
+        pytest.param(
+            ("/usr/bin/git update-ref refs/heads/hidden HEAD",),
+            ["unclassified_indirect_effect"],
+            id="git-hidden-ref-mutation",
+        ),
+        pytest.param(
+            ("/usr/bin/git symbolic-ref HEAD refs/heads/other",),
+            ["unclassified_indirect_effect"],
+            id="git-symbolic-ref-mutation",
+        ),
+        pytest.param(
+            ("/usr/bin/git reflog expire --expire=now --all",),
+            ["unclassified_indirect_effect"],
+            id="git-reflog-mutation",
+        ),
+        pytest.param(
+            ("/usr/bin/base64 /home/operator/.ssh/id_rsa",),
+            ["secret_access", "unclassified_indirect_effect"],
+            id="direct-secret-encoder",
+        ),
+        pytest.param(
+            ("./scripts/helper",),
+            ["unclassified_indirect_effect"],
+            id="workspace-executable",
+        ),
+        pytest.param(
+            ("/usr/bin/bash -lc 'git${IFS}push'",),
+            ["unclassified_indirect_effect"],
+            id="parameter-expansion",
+        ),
+        pytest.param(
+            ("helper --emit-secret",),
+            ["unclassified_indirect_effect"],
+            id="bare-executable",
+        ),
+        pytest.param(
+            ("/usr/bin/bash -O extglob -lc 'g@(it) push'",),
+            ["unclassified_indirect_effect"],
+            id="extglob-expansion",
+        ),
+        pytest.param(
+            ("/usr/bin/awk 'BEGIN { system(\"git push\") }'",),
+            ["unclassified_indirect_effect"],
+            id="awk-launcher",
+        ),
+        pytest.param(
+            ("/tmp/bash -lc '/usr/bin/true'",),
+            ["unclassified_indirect_effect"],
+            id="non-system-shell",
+        ),
+        pytest.param(
+            ("/usr/bin/sed -nf scripts/leak.sed README.md",),
+            ["unclassified_indirect_effect"],
+            id="unsandboxed-sed",
+        ),
+        pytest.param(
+            ("/usr/bin/git diff --check",),
+            ["unclassified_indirect_effect"],
+            id="config-driven-git",
+        ),
+        pytest.param(
+            (r"/usr/bin/bash -lc 'true\ngit push'",),
+            ["unclassified_indirect_effect"],
+            id="multiline-shell",
+        ),
+    ),
+)
+def test_opaque_command_guard_covers_each_worker_shape(
+    commands: tuple[str, ...],
+    expected_effects: list[str],
+) -> None:
+    task = {
+        "allowed_effect_class": "read_only",
+        "indirect_command_policy": "fail_closed",
+    }
+    observed = RUNTIME.ExternalCodexRuntime._forbidden_effects(
+        None,
+        [
+            {"command": command, "status": "completed", "exit_code": 0}
+            for command in commands
+        ],
+        task,
+    )
+
+    assert observed == expected_effects
 
 
 def _tool_profile(profile_id: str) -> dict[str, object]:
@@ -173,6 +370,19 @@ def test_nested_text_redaction_prefers_longest_alias_and_preserves_suffix() -> N
     assert redacted == r"left\n/tmp/aoa-external-actor-workspace/notes\tend"
     assert not RUNTIME._contains_source_path(redacted, source)
     assert not RUNTIME._contains_source_path(redacted, ancestor)
+
+
+def test_plain_text_redaction_keeps_identity_span_mapping() -> None:
+    source = "/tmp/plain/workspace"
+    value = f"prefix {source} suffix"
+
+    redacted = RUNTIME._replace_source_aliases_in_text(
+        value,
+        ((source, "<controller-path-redacted>"),),
+    )
+
+    assert redacted == "prefix <controller-path-redacted> suffix"
+    assert not RUNTIME._contains_source_path(redacted, source)
 
 
 def test_actor_safe_utf8_fixture_keeps_literal_backslash_bytes_outside_redaction() -> None:

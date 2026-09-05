@@ -16,6 +16,9 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Keep opaque-command authority coverage split between a direct 31-shape guard
+  matrix and four representative terminal-effect sentinels, while bypassing
+  escape decoding work for plain text that cannot contain an escape marker.
 - Keep inherited `AGENTS.md` chains within a 32-KiB budget and remove the
   duplicated all-service MCP command matrices from parent route cards. Exact
   checks remain in each service-local card, while district-wide work uses the
