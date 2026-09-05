@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import fcntl
 import hashlib
 import http.client
@@ -615,8 +616,6 @@ if "FAKE_RETURN_FOR_REPAIR" in task["objective"]:
     report["reentry_request"]["condition_id"] = "review-required"
     if prepared_review:
         report["reentry_request"]["proposed_action"] = "stop"
-if "FAKE_STATUS_DECISION_MISMATCH" in task["objective"]:
-    report["decision"] = "return_for_repair"
 if "FAKE_IDENTITY_MISMATCH_ON_START" in task["objective"] and not resume:
     report["incarnation_id"] = incarnation_id.replace("incarnation:", "incation:", 1)
 if "FAKE_REVIEW_TRANSITION_MISMATCH" in task["objective"] and not (
@@ -632,18 +631,6 @@ if "FAKE_REVIEW_TRANSITION_MISMATCH" in task["objective"] and not (
     report["reentry_request"]["condition_id"] = "review-required"
 if "FAKE_FALSE_VALIDATION_CLAIM" in task["objective"]:
     report["validation_claims"][0]["status"] = "failed"
-if "FAKE_FALSE_VALIDATION_EVIDENCE" in task["objective"]:
-    report["validation_claims"][0]["evidence_ref"] = "runtime:validation:other-command"
-if "FAKE_INVALID_CLAIMS" in task["objective"]:
-    report["validation_claims"] = []
-if "FAKE_WAKE_MISMATCH" in task["objective"]:
-    report["reentry_request"]["proposed_action"] = "stop"
-if "FAKE_WAKE_CONDITION_MISMATCH" in task["objective"]:
-    report["reentry_request"] = {
-        "condition_id": "authority-needed",
-        "proposed_action": "wake_parent",
-        "reason": "Crafted condition mismatch.",
-    }
 if "FAKE_ARTIFACT_PREEXISTING" in task["objective"]:
     report["artifact_paths"] = ["README.md"]
 if "FAKE_ARTIFACT_PRODUCED" in task["objective"]:
@@ -657,27 +644,6 @@ if "FAKE_ARTIFACT_SOURCE_EVIDENCE" in task["objective"]:
     }]
 if "FAKE_NESTED_ARTIFACT_PRODUCED" in task["objective"]:
     report["artifact_paths"] = ["actor-output/result.json"]
-if "FAKE_INVALID_SOURCE_EVIDENCE" in task["objective"]:
-    report["findings"] = [{
-        "severity": "blocking",
-        "category": "invalid-source-evidence",
-        "summary": "A deliberately absent source path must fail closed.",
-        "evidence_refs": ["source:README.md/does-not-exist#L1"],
-    }]
-if "FAKE_INVALID_SOURCE_LINE" in task["objective"]:
-    report["findings"] = [{
-        "severity": "blocking",
-        "category": "invalid-source-line",
-        "summary": "A deliberately invalid source line must fail closed.",
-        "evidence_refs": ["source:README.md#L999"],
-    }]
-if "FAKE_OUT_OF_SCOPE_SOURCE_EVIDENCE" in task["objective"]:
-    report["findings"] = [{
-        "severity": "blocking",
-        "category": "out-of-scope-source-evidence",
-        "summary": "An existing source outside allowed_paths must fail closed.",
-        "evidence_refs": ["source:.git/HEAD#L1"],
-    }]
 if "FAKE_VALID_IMMUTABLE_EVIDENCE" in task["objective"]:
     report["transition"]["evidence_refs"] = ["immutable:fixture-readme#L1"]
 if "FAKE_MIXED_NESTED_EVIDENCE" in task["objective"]:
@@ -719,14 +685,6 @@ if "FAKE_DUPLICATE_EVIDENCE_REFS" in task["objective"]:
         "severity": "info",
         "summary": "The exact evidence identity is repeated without changing meaning.",
     }]
-if "FAKE_MISSING_IMMUTABLE_EVIDENCE" in task["objective"]:
-    report["transition"]["evidence_refs"] = ["immutable:missing-input#L1"]
-if "FAKE_INVALID_IMMUTABLE_LINE" in task["objective"]:
-    report["transition"]["evidence_refs"] = ["immutable:fixture-readme#L999"]
-if "FAKE_ORDINAL_IMMUTABLE_EVIDENCE" in task["objective"]:
-    report["transition"]["evidence_refs"] = ["immutable:001.input#L1"]
-if "FAKE_OPAQUE_EVIDENCE" in task["objective"]:
-    report["transition"]["evidence_refs"] = ["artifact:/tmp/unbound#L1"]
 if "FAKE_VALID_RUNTIME_FINAL_MANIFEST_EVIDENCE" in task["objective"]:
     report["transition"]["evidence_refs"] = [
         "runtime:workspace-final-manifest#content_entries"
@@ -738,10 +696,6 @@ if "FAKE_VALID_RUNTIME_FINAL_MANIFEST_LINE_EVIDENCE" in task["objective"]:
 if "FAKE_VALID_RUNTIME_FINAL_MANIFEST_PATH_EVIDENCE" in task["objective"]:
     report["transition"]["evidence_refs"] = [
         "runtime:workspace-final-manifest#landing-note.md"
-    ]
-if "FAKE_PARTIAL_RUNTIME_FINAL_MANIFEST_ANCHOR" in task["objective"]:
-    report["transition"]["evidence_refs"] = [
-        "runtime:workspace-final-manifest#git_head"
     ]
 if (
     "FAKE_INVALID_RUNTIME_FINAL_MANIFEST_ANCHOR" in task["objective"]
@@ -8370,73 +8324,158 @@ def test_runtime_final_workspace_manifest_exact_content_path_is_admitted_evidenc
     )
 
 
-@pytest.mark.parametrize(
-    ("marker", "failure_code"),
-    (
-        ("FAKE_INVALID_CLAIMS", "model_report_validation_claims_incomplete"),
-        ("FAKE_WAKE_MISMATCH", "model_report_wake_action_mismatch"),
-        (
-            "FAKE_WAKE_CONDITION_MISMATCH",
-            "model_report_wake_condition_mismatch",
-        ),
-        (
-            "FAKE_INVALID_SOURCE_EVIDENCE",
-            "model_report_source_evidence_unavailable",
-        ),
-        (
-            "FAKE_INVALID_SOURCE_LINE",
-            "model_report_source_evidence_anchor_invalid",
-        ),
-        (
-            "FAKE_OUT_OF_SCOPE_SOURCE_EVIDENCE",
-            "model_report_source_evidence_out_of_scope",
-        ),
-        (
-            "FAKE_MISSING_IMMUTABLE_EVIDENCE",
-            "model_report_immutable_evidence_unavailable",
-        ),
-        (
-            "FAKE_INVALID_IMMUTABLE_LINE",
-            "model_report_immutable_evidence_anchor_invalid",
-        ),
-        ("FAKE_ORDINAL_IMMUTABLE_EVIDENCE", "schema_validation_failed"),
-        ("FAKE_OPAQUE_EVIDENCE", "schema_validation_failed"),
-        (
-            "FAKE_INVALID_RUNTIME_FINAL_MANIFEST_ANCHOR",
-            "model_report_runtime_evidence_anchor_invalid",
-        ),
-        (
-            "FAKE_PARTIAL_RUNTIME_FINAL_MANIFEST_ANCHOR",
-            "model_report_runtime_evidence_anchor_invalid",
-        ),
-        (
-            "FAKE_FALSE_VALIDATION_EVIDENCE",
-            "model_report_validation_evidence_unbound",
-        ),
-        (
-            "FAKE_STATUS_DECISION_MISMATCH",
-            "model_report_status_decision_mismatch",
-        ),
-        (
-            "FAKE_REVIEW_TRANSITION_MISMATCH",
-            "model_report_transition_mismatch",
-        ),
-    ),
+_REPORT_SEMANTIC_CASES = (
+    ("invalid-claims", "model_report_validation_claims_incomplete"),
+    ("wake-action-mismatch", "model_report_wake_action_mismatch"),
+    ("wake-condition-mismatch", "model_report_wake_condition_mismatch"),
+    ("invalid-source-evidence", "model_report_source_evidence_unavailable"),
+    ("invalid-source-line", "model_report_source_evidence_anchor_invalid"),
+    ("out-of-scope-source-evidence", "model_report_source_evidence_out_of_scope"),
+    ("missing-immutable-evidence", "model_report_immutable_evidence_unavailable"),
+    ("invalid-immutable-line", "model_report_immutable_evidence_anchor_invalid"),
+    ("ordinal-immutable-evidence", "schema_validation_failed"),
+    ("opaque-evidence", "schema_validation_failed"),
+    ("invalid-runtime-final-manifest-anchor", "model_report_runtime_evidence_anchor_invalid"),
+    ("partial-runtime-final-manifest-anchor", "model_report_runtime_evidence_anchor_invalid"),
+    ("false-validation-evidence", "model_report_validation_evidence_unbound"),
+    ("status-decision-mismatch", "model_report_status_decision_mismatch"),
+    ("review-transition-mismatch", "model_report_transition_mismatch"),
 )
-def test_report_semantics_fail_closed(
+
+
+def _mutate_report_for_semantic_case(report: dict[str, Any], case: str) -> None:
+    if case == "invalid-claims":
+        report["validation_claims"] = []
+    elif case == "wake-action-mismatch":
+        report["reentry_request"]["proposed_action"] = "stop"
+    elif case == "wake-condition-mismatch":
+        report["reentry_request"] = {
+            "condition_id": "authority-needed",
+            "proposed_action": "wake_parent",
+            "reason": "Crafted condition mismatch.",
+        }
+    elif case == "invalid-source-evidence":
+        report["findings"] = [{
+            "severity": "blocking",
+            "category": "invalid-source-evidence",
+            "summary": "A deliberately absent source path must fail closed.",
+            "evidence_refs": ["source:README.md/does-not-exist#L1"],
+        }]
+    elif case == "invalid-source-line":
+        report["findings"] = [{
+            "severity": "blocking",
+            "category": "invalid-source-line",
+            "summary": "A deliberately invalid source line must fail closed.",
+            "evidence_refs": ["source:README.md#L999"],
+        }]
+    elif case == "out-of-scope-source-evidence":
+        report["findings"] = [{
+            "severity": "blocking",
+            "category": "out-of-scope-source-evidence",
+            "summary": "An existing source outside allowed_paths must fail closed.",
+            "evidence_refs": ["source:.git/HEAD#L1"],
+        }]
+    elif case == "missing-immutable-evidence":
+        report["transition"]["evidence_refs"] = ["immutable:missing-input#L1"]
+    elif case == "invalid-immutable-line":
+        report["transition"]["evidence_refs"] = ["immutable:fixture-readme#L999"]
+    elif case == "ordinal-immutable-evidence":
+        report["transition"]["evidence_refs"] = ["immutable:001.input#L1"]
+    elif case == "opaque-evidence":
+        report["transition"]["evidence_refs"] = ["artifact:/tmp/unbound#L1"]
+    elif case == "invalid-runtime-final-manifest-anchor":
+        report["transition"]["evidence_refs"] = [
+            "runtime:workspace-final-manifest#absent-final-manifest-key"
+        ]
+    elif case == "partial-runtime-final-manifest-anchor":
+        report["transition"]["evidence_refs"] = [
+            "runtime:workspace-final-manifest#git_head"
+        ]
+    elif case == "false-validation-evidence":
+        report["validation_claims"][0]["evidence_ref"] = (
+            "runtime:validation:other-command"
+        )
+    elif case == "status-decision-mismatch":
+        report["decision"] = "return_for_repair"
+    elif case == "review-transition-mismatch":
+        report["status"] = "review_required"
+        report["decision"] = "submit_for_review"
+        report["transition"]["to_status"] = "unbound-review-target"
+        report["reentry_request"]["condition_id"] = "review-required"
+    else:
+        raise AssertionError(f"unknown report semantic case: {case}")
+
+
+def test_report_semantics_fail_closed_without_repeating_worker(
     tmp_path: Path,
-    marker: str,
-    failure_code: str,
 ) -> None:
-    fixture = _fixture(tmp_path, objective_marker=marker)
+    """Exercise report-only rejection on one admitted worker result.
+
+    Full worker/event/terminal closeout remains covered by the neighboring
+    artifact and source-evidence tests.
+    """
+
+    fixture = _fixture(tmp_path)
     runtime = fixture["runtime"]
     runtime.start(fixture["launch_path"])
 
     terminal = _wait_terminal(runtime, fixture["session_id"])
     result = runtime.result(fixture["session_id"])
+    assert terminal["status"] == "completed"
+    assert result is not None and result["failure_code"] is None
 
-    assert terminal["status"] == "failed"
-    assert result is not None and result["failure_code"] == failure_code
+    state = runtime._load_state(fixture["session_id"])
+    _, _, binding, task, _, _ = runtime._materialized_payloads(state)
+    report = json.loads(
+        Path(result["report_ref"]["artifact_ref"]).read_text(encoding="utf-8")
+    )
+    workspace_manifest_path = Path(
+        result["workspace_manifest_ref"]["artifact_ref"]
+    )
+    final_manifest = json.loads(workspace_manifest_path.read_text(encoding="utf-8"))
+    final_manifest_digest = RUNTIME.canonical_digest(final_manifest)
+    semantic_schema = RUNTIME.report_semantic_validation_schema(
+        RUNTIME.load_schema(Path(state["materialized_inputs"]["result_schema"]))
+    )
+
+    observed: list[tuple[str, str | None]] = []
+    for case, _ in _REPORT_SEMANTIC_CASES:
+        try:
+            candidate = copy.deepcopy(report)
+            _mutate_report_for_semantic_case(candidate, case)
+            RUNTIME._validate_json_against_schema(
+                candidate,
+                semantic_schema,
+                label="model report",
+                schema_label="semantic external-codex-report schema",
+            )
+            runtime._validate_report_against_task(
+                candidate,
+                state=state,
+                task=task,
+                binding=binding,
+                runtime_evidence_paths={
+                    "workspace-final-manifest": workspace_manifest_path
+                },
+                final_workspace_manifest_digest=final_manifest_digest,
+            )
+        except RUNTIME.ExternalCodexRuntimeError as exc:
+            observed.append((case, exc.code))
+        except Exception as exc:
+            observed.append((case, f"unexpected:{type(exc).__name__}"))
+        else:
+            observed.append((case, None))
+
+    expected = list(_REPORT_SEMANTIC_CASES)
+    assert observed == expected, (
+        "report semantic error-code matrix mismatch:\n"
+        + "\n".join(
+            f"{case}: expected={expected_code!r}, observed={observed_code!r}"
+            for (case, expected_code), (_, observed_code) in zip(
+                expected, observed, strict=True
+            )
+        )
+    )
 
 
 def test_stable_immutable_input_evidence_is_admitted(tmp_path: Path) -> None:
