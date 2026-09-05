@@ -565,9 +565,9 @@
         "state": "present"
       },
       {
-        "bytes": 148835,
-        "content_digest": "23765ed0a67a676f3b80607b61a9f58dea1f4d0e926f6ad119d57202cd8cf66e",
-        "git_blob": "sha1:bec8f3e49ef13196cfb3b3903d350c1fad2a582e",
+        "bytes": 148553,
+        "content_digest": "be1eb5b6ba5d8133a4ded51e71e48ebcb61bd5ec82109859270c376190b95eb0",
+        "git_blob": "sha1:c9f724f02838bd9e903495b02bf4f5641f113a6f",
         "path": "scripts/repo_local/portable_family.py",
         "state": "present"
       },
@@ -1160,7 +1160,7 @@
         "state": "present"
       }
     ],
-    "identity_digest": "4279cf7b1cc63c2e2e297e3dc4f542f27666d0b8cb5176fee6b023189f0f1e8a",
+    "identity_digest": "821dd93b1d2746c6be509de300c99abe8266cec0ab53e35f426fe5d3a2d257d5",
     "owner": "aoa-kag",
     "procedure_manifest": {
       "action_inputs": [
@@ -1360,7 +1360,7 @@
       "schema_path": "schemas/repo-local-kag-budget-producer-manifest.schema.json"
     },
     "revision_binding": "content-addressed-procedure-import-closure-portable-runtime-contract-and-descriptor-io-v1",
-    "source_digest": "33a045fadeb39fd981761d3ebfaa4312af06e1dc6fb9478f143e9cec272a585c"
+    "source_digest": "14bd8ea5abf9d997d32ebdab040e93f4f69759e2696d2b77f1c5aa4ca76f9566"
   },
   "reason": "Refresh the repo-local KAG family for the bounded protocol watcher retention source and its portable process-reference safety regression fix.",
   "repo": "abyss-stack",
