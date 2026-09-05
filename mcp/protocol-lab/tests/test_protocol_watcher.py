@@ -427,6 +427,19 @@ def test_retention_dry_run_and_apply_archive_old_run_preserves_receipts(
     assert (archive / "execution-receipt.json").is_file()
     assert (archive / "required" / "000-private-receipt.json").read_bytes() == required_payload
 
+    archive_plan = _retention_plan(
+        plan_path,
+        max_successful_runs=0,
+        max_failed_runs=0,
+        retain_failed_diagnostics=0,
+    )
+    archive_preview = watcher._retention_plan(state_root, archive_plan, now=now)
+    assert archive_preview["summary"]["archive_budget_warning"] is True
+    assert archive_preview["warnings"] == [
+        "receipt_archives_preserved_without_default_expiry"
+    ]
+    assert not any(item["action"] == "remove_archive" for item in archive_preview["operations"])
+
 
 def test_retention_prunes_only_declared_disposable_roots_and_keeps_compact_run(
     tmp_path: Path,
@@ -574,3 +587,122 @@ def test_tree_measure_rejects_mountpoint_ancestor_before_traversal(
 
     assert measured["safe"] is False
     assert "mount_boundary" in measured["error_classes"]
+
+
+def test_retention_blocks_when_mountinfo_is_unavailable(tmp_path: Path, monkeypatch: Any) -> None:
+    watcher = _load_watcher()
+    plan_path, state_root, now = _fixture(tmp_path)
+    plan = _retention_plan(plan_path, max_successful_runs=0)
+    _write_run(state_root, "20260808T100000.000000Z", now - timedelta(days=2))
+    monkeypatch.setattr(
+        watcher,
+        "_mount_points",
+        lambda: (_ for _ in ()).throw(watcher._MountInfoError("mountinfo_unavailable")),
+    )
+
+    preview = watcher._retention_plan(state_root, plan, now=now)
+
+    assert preview["blocked"] == ["mountinfo_unavailable"]
+    assert preview["operations"] == []
+
+
+def test_retention_plan_does_not_create_or_chmod_state(tmp_path: Path, monkeypatch: Any) -> None:
+    watcher = _load_watcher()
+    plan_path, state_root, now = _fixture(tmp_path)
+    missing_root = tmp_path / "missing-state"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "protocol_watcher.py",
+            "--plan",
+            str(plan_path),
+            "--state-root",
+            str(missing_root),
+            "--retention-plan",
+        ],
+    )
+
+    assert watcher.main() == 0
+    assert not missing_root.exists()
+
+    state_root.mkdir(mode=0o755)
+    lock = state_root / ".lock"
+    lock.write_text("existing\n", encoding="utf-8")
+    lock.chmod(0o644)
+    root_mode = state_root.stat().st_mode & 0o777
+    lock_mode = lock.stat().st_mode & 0o777
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "protocol_watcher.py",
+            "--plan",
+            str(plan_path),
+            "--state-root",
+            str(state_root),
+            "--retention-plan",
+        ],
+    )
+
+    assert watcher.main() == 0
+    assert state_root.stat().st_mode & 0o777 == root_mode
+    assert lock.stat().st_mode & 0o777 == lock_mode
+
+
+def test_proc_scan_protects_same_user_run_cwd_and_fd(tmp_path: Path) -> None:
+    watcher = _load_watcher()
+    run_root = tmp_path / "runs" / "20260808T100000.000000Z"
+    (run_root / "fd-target").mkdir(parents=True)
+    proc_root = tmp_path / "proc"
+    process = proc_root / "123" / "fd"
+    process.mkdir(parents=True)
+    (proc_root / "123" / "status").write_text("Name:\tchild\nUid:\t1000\t1000\t1000\t1000\n")
+    (proc_root / "123" / "cwd").symlink_to(run_root, target_is_directory=True)
+    (process / "4").symlink_to(run_root / "fd-target")
+
+    references, error = watcher._proc_run_references(
+        [{"run_id": run_root.name, "path": run_root}],
+        owner_uid=os.getuid(),
+        proc_root=proc_root,
+    )
+
+    assert error is None
+    assert references[run_root.name] == ["proc:123/cwd", "proc:123/4"]
+
+
+def test_retention_protects_run_referenced_by_proc_scan(tmp_path: Path, monkeypatch: Any) -> None:
+    watcher = _load_watcher()
+    plan_path, state_root, now = _fixture(tmp_path)
+    plan = _retention_plan(plan_path, max_successful_runs=0)
+    run_id = "20260808T100000.000000Z"
+    run_root = _write_run(state_root, run_id, now - timedelta(days=2))
+    monkeypatch.setattr(
+        watcher,
+        "_proc_run_references",
+        lambda records, owner_uid: ({run_id: ["proc:123/cwd"]}, None),
+    )
+
+    preview = watcher._retention_plan(state_root, plan, now=now)
+    view = next(item for item in preview["runs"] if item["run_id"] == run_id)
+
+    assert view["retention_action"] == "protect_reference"
+    assert view["proc_references"] == ["proc:123/cwd"]
+    assert not any(item.get("run_id") == run_id for item in preview["operations"])
+    assert run_root.is_dir()
+
+
+def test_retention_blocks_whole_run_with_unknown_top_level(tmp_path: Path) -> None:
+    watcher = _load_watcher()
+    plan_path, state_root, now = _fixture(tmp_path)
+    plan = _retention_plan(plan_path, max_successful_runs=0)
+    run_id = "20260808T100000.000000Z"
+    run_root = _write_run(state_root, run_id, now - timedelta(days=2))
+    (run_root / "unclassified-result").write_text("keep for review\n", encoding="utf-8")
+
+    preview = watcher._retention_plan(state_root, plan, now=now)
+    view = next(item for item in preview["runs"] if item["run_id"] == run_id)
+
+    assert view["unknown_top_level"] == ["unclassified-result"]
+    assert view["retention_action"] == "blocked_unknown_top_level"
+    assert not any(item.get("run_id") == run_id for item in preview["operations"])

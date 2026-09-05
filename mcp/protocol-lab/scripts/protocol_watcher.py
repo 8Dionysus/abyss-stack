@@ -33,6 +33,12 @@ USER_AGENT = "os-abyss-mcp-protocol-watcher/1"
 RUN_ID_RE = re.compile(r"^[0-9]{8}T[0-9]{6}\.[0-9]{6}Z$")
 RETENTION_SCHEMA_VERSION = "abyss_mcp_protocol_watch_retention_v1"
 RUN_STATE_SCHEMA_VERSION = "abyss_mcp_protocol_watch_run_state_v1"
+MAX_PROC_ENTRIES = 4096
+MAX_PROC_FDS = 4096
+
+
+class _MountInfoError(RuntimeError):
+    """The host mount topology could not be trusted for a cleanup decision."""
 
 # The defaults are intentionally small compared with the observed watcher
 # footprint (411 runs and roughly 9.9 GiB, with 1.2--1.6 GiB arriving on a
@@ -550,6 +556,42 @@ def _state_lock(state_root: Path) -> Iterator[None]:
         os.close(lock_fd)
 
 
+@contextmanager
+def _state_read_lock(state_root: Path) -> Iterator[None]:
+    """Take a shared lock without creating or changing any state metadata."""
+
+    state_root = Path(os.path.abspath(state_root))
+    if state_root.is_symlink():
+        raise ValueError("state root must not be a symlink")
+    if not state_root.exists():
+        # A missing-root preview is an empty, read-only plan.  In particular,
+        # do not create the root or its lock just to report zero operations.
+        yield
+        return
+    info = state_root.lstat()
+    if not stat.S_ISDIR(info.st_mode):
+        raise ValueError("state root must be a directory")
+    if info.st_uid != os.getuid():
+        raise ValueError("state root is not owner-created")
+    lock_path = state_root / ".lock"
+    if lock_path.is_symlink():
+        raise ValueError("state lock must not be a symlink")
+    if not lock_path.exists():
+        # The preview remains read-only when an old state root predates the
+        # lock.  An apply still requires the normal writer lock.
+        yield
+        return
+    lock_info = lock_path.lstat()
+    if not stat.S_ISREG(lock_info.st_mode) or lock_info.st_uid != os.getuid():
+        raise ValueError("state lock must be an owner regular file")
+    lock_fd = os.open(lock_path, os.O_RDONLY)
+    try:
+        fcntl.flock(lock_fd, fcntl.LOCK_SH)
+        yield
+    finally:
+        os.close(lock_fd)
+
+
 def _parse_timestamp(value: Any) -> datetime | None:
     if not isinstance(value, str) or not value:
         return None
@@ -585,18 +627,27 @@ def _mount_points() -> set[str]:
     points: set[str] = set()
     try:
         lines = Path("/proc/self/mountinfo").read_text(encoding="utf-8").splitlines()
-    except OSError:
-        return points
+    except OSError as exc:
+        raise _MountInfoError("mountinfo_unavailable") from exc
+    if not lines:
+        raise _MountInfoError("mountinfo_invalid")
     for line in lines:
-        fields = line.split(" - ", 1)[0].split()
-        if len(fields) < 5:
-            continue
+        parts = line.split(" - ", 1)
+        if len(parts) != 2:
+            raise _MountInfoError("mountinfo_invalid")
+        fields = parts[0].split()
+        if len(fields) < 5 or not fields[0].isdigit() or not fields[1].isdigit():
+            raise _MountInfoError("mountinfo_invalid")
         raw = fields[4]
+        if re.search(r"\\(?![0-7]{3})", raw):
+            raise _MountInfoError("mountinfo_invalid")
 
         def decode(match: re.Match[str]) -> str:
             return chr(int(match.group(1), 8))
 
         points.add(re.sub(r"\\([0-7]{3})", decode, raw))
+    if not points:
+        raise _MountInfoError("mountinfo_invalid")
     return points
 
 
@@ -691,7 +742,18 @@ def _tree_measure(
         safe = False
         reasons.add("foreign_owner")
     root_device = root_info.st_dev
-    mount_points = _mount_points()
+    try:
+        mount_points = _mount_points()
+    except _MountInfoError as exc:
+        return {
+            "bytes": max(0, int(root_info.st_blocks)) * 512,
+            "logical_bytes": 0,
+            "allocated_bytes": max(0, int(root_info.st_blocks)) * 512,
+            "files": 0,
+            "safe": False,
+            "error_class": str(exc),
+            "error_classes": [str(exc)],
+        }
     root_name = os.path.abspath(path)
     if boundary_root is not None and not _mount_boundary_safe(
         path, boundary_root, mount_points
@@ -823,6 +885,33 @@ def _required_receipt_paths(run_root: Path, execution_receipt: dict[str, Any]) -
     return paths
 
 
+def _unknown_top_level_paths(
+    run_root: Path,
+    *,
+    policy: dict[str, Any],
+    required_paths: list[Path],
+) -> list[str]:
+    """Find top-level producer outputs outside receipts and declared roots."""
+
+    allowed = {
+        "run-state.json",
+        "input-snapshot.json",
+        "execution-receipt.json",
+    }
+    allowed.update(Path(raw).parts[0] for raw in policy["disposable_roots"])
+    for path in required_paths:
+        if _within(path, run_root):
+            try:
+                allowed.add(path.relative_to(run_root).parts[0])
+            except ValueError:
+                pass
+    try:
+        entries = sorted(run_root.iterdir(), key=lambda item: item.name)
+    except OSError:
+        return ["<unreadable>"]
+    return [entry.name for entry in entries if entry.name not in allowed]
+
+
 def _protected_path(path: Path, protected_paths: list[Path]) -> bool:
     candidate = Path(os.path.abspath(path))
     return any(
@@ -877,6 +966,12 @@ def _run_record(
         except ValueError:
             finished_at = datetime.fromtimestamp(run_dir.stat().st_mtime, tz=UTC)
     required_paths = _required_receipt_paths(run_dir, execution or {})
+    unknown_top_level = _unknown_top_level_paths(
+        run_dir,
+        policy=policy,
+        required_paths=required_paths,
+    )
+    safety_errors = set(measured.get("error_classes", []))
     disposable: list[dict[str, Any]] = []
     disposable_errors: list[str] = []
     for raw in policy["disposable_roots"]:
@@ -898,6 +993,7 @@ def _run_record(
             boundary_root=boundary_root,
         )
         if not candidate_measure["safe"]:
+            safety_errors.update(candidate_measure.get("error_classes", []))
             disposable_errors.append(f"unsafe:{raw}")
             continue
         disposable.append(
@@ -928,6 +1024,7 @@ def _run_record(
             boundary_root=boundary_root,
         )
         if not cache_measure["safe"]:
+            safety_errors.update(cache_measure.get("error_classes", []))
             cache_errors.append(f"unsafe:{raw}")
             continue
         cache.append(
@@ -949,10 +1046,12 @@ def _run_record(
         "execution": execution,
         "run_state": run_state,
         "required_paths": required_paths,
+        "unknown_top_level": unknown_top_level,
         "disposable": disposable,
         "disposable_errors": disposable_errors,
         "cache": cache,
         "cache_errors": cache_errors,
+        "safety_errors": sorted(safety_errors),
         "logical_bytes": measured["logical_bytes"],
         "allocated_bytes": measured["allocated_bytes"],
         "compact_logical_bytes": max(
@@ -1089,6 +1188,84 @@ def _current_observation_id(state_root: Path) -> tuple[str | None, str | None]:
     return path.name, None
 
 
+def _proc_run_references(
+    run_records: list[dict[str, Any]],
+    *,
+    owner_uid: int,
+    proc_root: Path = Path("/proc"),
+) -> tuple[dict[str, list[str]], str | None]:
+    """Find same-user process cwd/fd references into known run roots once."""
+
+    if not run_records:
+        return {}, None
+    try:
+        proc_info = proc_root.lstat()
+    except OSError:
+        return {}, "proc_scan_unavailable"
+    if stat.S_ISLNK(proc_info.st_mode) or not stat.S_ISDIR(proc_info.st_mode):
+        return {}, "proc_scan_unavailable"
+    try:
+        entries = sorted(
+            (item for item in proc_root.iterdir() if item.name.isdigit()),
+            key=lambda item: int(item.name),
+        )
+    except OSError:
+        return {}, "proc_scan_unavailable"
+    if len(entries) > MAX_PROC_ENTRIES:
+        return {}, "proc_scan_limit"
+
+    references: dict[str, list[str]] = {}
+    run_paths = [
+        (record["run_id"], Path(os.path.abspath(record["path"])))
+        for record in run_records
+    ]
+    for process in entries:
+        status_path = process / "status"
+        try:
+            status_text = status_path.read_text(encoding="utf-8")
+        except FileNotFoundError:
+            continue
+        except PermissionError:
+            continue
+        except OSError:
+            continue
+        match = re.search(r"^Uid:\s+(\d+)", status_text, re.MULTILINE)
+        if match is None or int(match.group(1)) != owner_uid:
+            continue
+        links: list[Path] = [process / "cwd"]
+        fd_root = process / "fd"
+        try:
+            fd_entries = sorted(
+                (item for item in fd_root.iterdir() if item.name.isdigit()),
+                key=lambda item: int(item.name),
+            )
+        except FileNotFoundError:
+            continue
+        except PermissionError:
+            continue
+        except OSError:
+            continue
+        if len(fd_entries) > MAX_PROC_FDS:
+            return references, "proc_fd_scan_limit"
+        links.extend(fd_entries)
+        for link in links:
+            try:
+                target = os.readlink(link)
+            except (FileNotFoundError, PermissionError, OSError):
+                continue
+            target_path = target.removesuffix(" (deleted)")
+            if not target_path.startswith("/"):
+                continue
+            target = os.path.abspath(target_path)
+            for run_id, run_path in run_paths:
+                if _within(Path(target), run_path):
+                    references.setdefault(run_id, []).append(
+                        f"proc:{process.name}/{link.name}"
+                    )
+                    break
+    return references, None
+
+
 def _observation_records(state_root: Path, *, owner_uid: int) -> list[dict[str, Any]]:
     observations = state_root / "observations"
     if not observations.is_dir() or observations.is_symlink():
@@ -1100,7 +1277,10 @@ def _observation_records(state_root: Path, *, owner_uid: int) -> list[dict[str, 
     if root_info.st_uid != owner_uid:
         return []
     root_device = root_info.st_dev
-    mount_points = _mount_points()
+    try:
+        mount_points = _mount_points()
+    except _MountInfoError:
+        return []
     if not _mount_boundary_safe(observations, state_root, mount_points):
         return []
     records: list[dict[str, Any]] = []
@@ -1288,7 +1468,11 @@ def _archive_run(
         if _valid_archive(archive_dir, owner_uid=os.getuid(), state_root=state_root) is None:
             raise ValueError("receipt archive collision or unsafe archive")
         return {"status": "existing", "path": archive_dir}
-    if record["state"] not in {"completed", "failed"} or not record["safe"]:
+    if (
+        record["state"] not in {"completed", "failed"}
+        or not record["safe"]
+        or record.get("unknown_top_level")
+    ):
         raise ValueError("run is not a completed safe owner tree")
     if not _safe_owned_directory(run_root, root=run_root.parent, owner_uid=os.getuid()):
         raise ValueError("run root is not a safe owner directory")
@@ -1379,7 +1563,11 @@ def _archive_run(
 
 
 def _archive_possible(record: dict[str, Any]) -> bool:
-    if record["state"] not in {"completed", "failed"} or not record["safe"]:
+    if (
+        record["state"] not in {"completed", "failed"}
+        or not record["safe"]
+        or record.get("unknown_top_level")
+    ):
         return False
     run_root = record["path"]
     for name in ("input-snapshot.json", "execution-receipt.json"):
@@ -1439,6 +1627,10 @@ def _retention_plan(
     protected_ids, protected_reasons, protection_errors = _load_protected_run_ids(
         state_root, policy
     )
+    try:
+        _mount_points()
+    except _MountInfoError as exc:
+        protection_errors.append(str(exc))
     current_observation, observation_error = _current_observation_id(state_root)
     if observation_error:
         protection_errors.append(observation_error)
@@ -1464,6 +1656,21 @@ def _retention_plan(
                 continue
             record["protected_reasons"] = list(protected_reasons.get(record["run_id"], []))
             run_records.append(record)
+            protection_errors.extend(
+                error
+                for error in record.get("safety_errors", [])
+                if error in {"mountinfo_unavailable", "mountinfo_invalid"}
+            )
+
+    proc_references, proc_error = _proc_run_references(
+        run_records,
+        owner_uid=owner_uid,
+    )
+    if proc_error:
+        protection_errors.append(proc_error)
+    for record in run_records:
+        record["proc_references"] = proc_references.get(record["run_id"], [])
+        record["protected_reasons"].extend(record["proc_references"])
 
     archive_root = state_root / policy["receipt_archive_root"]
     if archive_root.is_symlink() or not _no_symlink_ancestors(archive_root, state_root):
@@ -1524,6 +1731,8 @@ def _retention_plan(
             action = "protect_running"
         elif protected:
             action = "protect_reference"
+        elif record["unknown_top_level"]:
+            action = "blocked_unknown_top_level"
         elif keep:
             action = "keep_compact"
         elif _archive_possible(record):
@@ -1605,6 +1814,8 @@ def _retention_plan(
                 "cache_logical_bytes": run_cache_logical,
                 "disposable": record["disposable"],
                 "required_evidence_count": len(record["required_paths"]),
+                "unknown_top_level": record["unknown_top_level"],
+                "proc_references": record["proc_references"],
                 "protected_reasons": record["protected_reasons"],
                 "safe": record["safe"],
                 "retention_action": action,
@@ -1612,48 +1823,14 @@ def _retention_plan(
             }
         )
 
-    # Existing receipt archives are compact and can be expired independently
-    # of the live run root.  A pinned or last-success archive remains forever
-    # eligible for reference protection.
-    archive_successful = [record for record in archive_records if record["passed"]]
-    archive_failed = [record for record in archive_records if not record["passed"]]
-    archive_success_keep = _select_retained(
-        archive_successful,
-        protected_ids=protected_ids,
-        forced_ids=set(),
-        max_runs=policy["max_successful_runs"],
-        max_bytes=policy["max_successful_bytes"],
-        max_age_seconds=policy["max_successful_age_seconds"],
-        now=now,
-        byte_key="total_bytes",
-    )
-    archive_failed_keep = _select_retained(
-        archive_failed,
-        protected_ids=protected_ids,
-        forced_ids=set(),
-        max_runs=policy["max_failed_runs"],
-        max_bytes=policy["max_failed_bytes"],
-        max_age_seconds=policy["max_failed_age_seconds"],
-        now=now,
-        byte_key="total_bytes",
-    )
+    # Receipt archives are the compact evidence fallback.  They remain until
+    # an explicitly reviewed external archive policy exists; the run-count
+    # and byte limits below only govern live disposable roots and observations.
     archive_views: list[dict[str, Any]] = []
     for record in sorted(archive_records, key=lambda item: item["run_id"]):
         run_id = record["run_id"]
         protected = bool(record["protected_reasons"])
-        keep = run_id in (archive_success_keep | archive_failed_keep)
-        action = "protect_reference" if protected else "keep_archive" if keep else "remove_archive"
-        if not protected and not keep:
-            operations.append(
-                {
-                    "action": "remove_archive",
-                    "run_id": run_id,
-                    "relative_path": _state_relative(record["path"], state_root),
-                    "expected_bytes": record["allocated_bytes"],
-                    "expected_logical_bytes": record["logical_bytes"],
-                    "reason": "receipt_archive_retention_limit",
-                }
-            )
+        action = "protect_reference" if protected else "keep_archive"
         archive_views.append(
             {
                 "run_id": run_id,
@@ -1721,9 +1898,13 @@ def _retention_plan(
             "remove_disposable": 1,
             "remove_run": 2,
             "remove_observation": 3,
-            "remove_archive": 4,
         }.get(item["action"], 9)
     )
+    archive_allocated_bytes = sum(item["allocated_bytes"] for item in archive_records)
+    archive_logical_bytes = sum(item["logical_bytes"] for item in archive_records)
+    warnings = []
+    if archive_records:
+        warnings.append("receipt_archives_preserved_without_default_expiry")
     result: dict[str, Any] = {
         "schema_version": RETENTION_SCHEMA_VERSION,
         "generated_at": _timestamp(now),
@@ -1734,6 +1915,7 @@ def _retention_plan(
         "archives": archive_views,
         "observations": observation_views,
         "operations": operations,
+        "warnings": warnings,
         "summary": {
             "runs_scanned": len(run_records),
             "completed_runs": sum(item["state"] == "completed" for item in run_records),
@@ -1741,6 +1923,9 @@ def _retention_plan(
             "running_runs": sum(item["state"] == "running" for item in run_records),
             "unknown_run_roots": unknown_run_count,
             "archives_scanned": len(archive_records),
+            "archive_allocated_bytes": archive_allocated_bytes,
+            "archive_logical_bytes": archive_logical_bytes,
+            "archive_budget_warning": bool(archive_records),
             "observations_scanned": len(observations),
             "disposable_candidate_bytes": sum(
                 item["expected_bytes"]
@@ -1894,6 +2079,7 @@ def _apply_retention_operation(
         record = _fresh_run_for_operation(state_root, run_id, policy)
         if (
             not record["safe"]
+            or record["unknown_top_level"]
             or record["allocated_bytes"] != expected
             or record["logical_bytes"]
             != int(operation.get("expected_logical_bytes", record["logical_bytes"]))
@@ -2419,12 +2605,12 @@ def main() -> int:
     state_root = Path(os.path.abspath(args.state_root))
     if args.retention_plan or args.retention_apply:
         plan = _read_json(plan_path)
-        with _state_lock(state_root):
-            result = (
-                _apply_retention(state_root, plan, now=_now())
-                if args.retention_apply
-                else _retention_plan(state_root, plan, now=_now())
-            )
+        if args.retention_apply:
+            with _state_lock(state_root):
+                result = _apply_retention(state_root, plan, now=_now())
+        else:
+            with _state_read_lock(state_root):
+                result = _retention_plan(state_root, plan, now=_now())
         print(json.dumps(result, indent=2, sort_keys=True))
         return 0 if not result.get("blocked") and not result.get("errors") and not result.get("skipped_operations") else 1
     status = run(

@@ -147,12 +147,19 @@ their nested plugin cache roots separately. It keeps
 the last successful and operator-pinned runs, active runs, the newest failed
 diagnostics, the current observation, and required receipt files. Older
 completed runs are first copied to the private `retained-receipts/` archive,
-verified, and then removed. Ownership, regular-file, symlink, inode, device,
-and mount-boundary checks are required before an operation is emitted or
-applied. A plan is a dry run; `--retention-apply` rechecks every path and byte
-count under the state lock before changing it. Operator pins use a private
-mode `0600` `pinned-runs.json` object containing a `run_ids` array; malformed
-or missing references suppress all destructive operations.
+verified, and then removed. Unknown top-level run outputs block whole-run
+removal, while declared disposable subtrees may still be removed from a run
+whose compact receipts are retained. Ownership, regular-file, symlink, inode,
+device, and mount-boundary checks are required before an operation is emitted
+or applied. A plan is a dry run; it takes a shared lock only over an existing
+state lock and never creates or chmods state. `--retention-apply` rechecks every
+path and byte count under the writer lock before changing it. Same-user
+`/proc` cwd/fd references protect a run while a process still has it open.
+Compact receipt archives are retained by default; the plan reports their byte
+budget warning and emits no archive deletion without a separately reviewed
+external archive policy. Operator pins use a private mode `0600`
+`pinned-runs.json` object containing a `run_ids` array; malformed or missing
+references suppress all destructive operations.
 
 The hourly service uses `--apply-retention` after its normal lab pass. The
 source-generated protocol status remains the TTL authority: a successful lab

@@ -46,10 +46,13 @@ admission, Tasks support, effectful handles, cross-replica cache invalidation,
 or deployed cutover.
 
 The retention plan command scans only the explicitly named watcher state root
-and emits a private JSON dry run. It does not remove anything. The apply form
-(`--retention-apply`) is an operator action: it recomputes the plan under the
-state lock, rechecks ownership, mount/device boundaries, inode-deduplicated
-allocated bytes, and protected references, then archives required receipts
-before removing a completed run. The hourly deployed unit adds
+and emits a private JSON dry run. It takes a shared lock only over an existing
+lock file and does not create or chmod state. It does not remove anything. The
+apply form (`--retention-apply`) is an operator action: it recomputes the plan
+under the state lock, rechecks ownership, mount/device boundaries,
+inode-deduplicated allocated bytes, same-user process references, unknown
+top-level outputs, and protected references, then archives required receipts
+before removing a completed run. Compact receipt archives are preserved by
+default; their size is reported as a budget warning. The hourly deployed unit adds
 `--apply-retention` to combine this apply step with its ordinary pass; source
 validation and these tests never touch the deployed log root.

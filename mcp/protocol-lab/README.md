@@ -135,10 +135,17 @@ preserves last-success, pinned, running, current observation, required
 receipts, and a bounded set of failed diagnostics. A
 completed run outside the compact limits is archived to
 `retained-receipts/<run-id>/` with its input, execution, and required receipt
-bytes verified before the run tree is removed. Use
+bytes verified before the run tree is removed. Unknown top-level run outputs
+block whole-run removal; only the declared disposable subtrees remain eligible
+for a compact run. The receipt archive is preserved by default and emits a
+budget warning rather than deleting evidence without a separately reviewed
+external archive policy. Use
 `protocol_watcher.py --retention-plan` for a private dry run and
 `--retention-apply` for a rechecked apply; neither mode reads the private
-runtime config or runs the lab.
+runtime config or runs the lab. The plan takes a shared lock only when an
+existing state lock is present and never creates or chmods state during a
+preview. A bounded same-user `/proc` cwd/fd scan protects runs still referenced
+by a live process.
 An operator pin is a mode `0600` `pinned-runs.json` object with a `run_ids`
 array; malformed or missing references fail closed.
 
