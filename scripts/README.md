@@ -69,11 +69,21 @@ still synced into deployed `Configs/` with the wrappers.
   `docs/validation/validation_lanes.json`; `ci_gate.py` and `release_check.py`
   read that manifest instead of owning duplicate command lists.
 - Keep the complete pytest selection behind `run_pytest_lane.py`: automatic
-  mode uses at most four process-isolated workers over 32 file-aware shards,
-  proves their exact disjoint union against one baseline collection, and
-  supports exact serial rollback through `ABYSS_STACK_TEST_SCHEDULER=serial`.
-  Failed shard logs are replayed at aggregate closeout for bounded-log
-  diagnostics; tests are not retried.
+  mode uses at most four process-isolated workers over a measured default of
+  16 file-aware shards (smaller selections retain a soft target of 92 tests
+  per shard), proves their exact disjoint union against one baseline
+  collection, and supports exact serial rollback through
+  `ABYSS_STACK_TEST_SCHEDULER=serial`. Automatic mode keeps targeted arguments
+  on the serial path; the existing `--scheduler process-4x32-file-aware`
+  route may process a targeted selection using the same exact partition proof.
+  Shard output is written to a durable log and tailed without waiting for
+  descendant-owned descriptor EOF; failed shard logs are replayed at aggregate
+  closeout for bounded-log diagnostics, and tests are not retried. The runner
+  disables third-party pytest plugin autoload by default because this lane
+  owns its process scheduler and does not use those plugin fixtures. For an
+  explicit external plugin contract, use `PYTEST_DISABLE_PLUGIN_AUTOLOAD=`
+  (an empty value) to opt out; pytest treats any non-empty value, including
+  `=0`, as the disable flag.
 - Keep `validate_local_stats_port.py` as a thin delegation to the `aoa-stats`
   contract owner; do not copy the central schemas or validator into this repo.
 - Keep `validate_nested_agents.py` responsible for every discovered inherited

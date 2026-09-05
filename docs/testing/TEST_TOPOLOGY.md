@@ -36,9 +36,14 @@ deterministic, public-safe, and explicit about which owner surface failed.
 
 The `tests` and `release` lanes keep the complete default pytest selection and
 route only its scheduling through `scripts/run_pytest_lane.py`. Automatic mode
-uses at most four process-isolated workers over 32 deterministic file-aware
-shards. One baseline collection and each child's observed manifest prove an
-exact disjoint union before the aggregate can pass. Use:
+uses at most four process-isolated workers over a measured default of 16
+deterministic file-aware shards; smaller selections retain a soft target of 92
+tests per shard so they do not pay for unnecessary fresh import/fixture
+environments. One baseline collection and each
+child's observed manifest prove an exact disjoint union before the aggregate
+can pass. Automatic targeted arguments stay serial; explicitly selecting the
+process scheduler enables the same exact partition proof for a scoped
+selection. Use:
 
 ```bash
 ABYSS_STACK_TEST_SCHEDULER=serial python scripts/ci_gate.py --mode tests
@@ -48,6 +53,13 @@ as the exact rollback and independent sequential oracle. The scheduler may
 change execution order only. Duration hints cannot change membership. It does
 not skip, lose, retry, or reinterpret failures. It replays failed shard logs
 after the aggregate so an early traceback remains visible in bounded log tails.
+The parent tails each durable shard log while the child runs and decides
+completion from child process status, not pipe EOF that a descendant could keep
+open.
+The runner also disables third-party pytest plugin autoload by default to avoid
+repeating unused plugin imports in every isolated process. To restore the host
+plugin set, explicitly pass `PYTEST_DISABLE_PLUGIN_AUTOLOAD=` (empty); pytest
+treats any non-empty value, including `=0`, as disabled.
 
 Expensive transport setup may be stratified from semantic assertions only
 inside the owning test harness. The external Codex suite keeps named exact

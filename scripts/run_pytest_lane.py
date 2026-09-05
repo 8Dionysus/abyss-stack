@@ -19,7 +19,12 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCHEDULER_ENV = "ABYSS_STACK_TEST_SCHEDULER"
 PROCESS_WORKER_LIMIT = 4
-PROCESS_SHARD_COUNT = 32
+# A same-selection matrix showed that sixteen shards reduce repeated process,
+# import, and fixture work on the four-worker lane; smaller selections still
+# use the adaptive target below.
+PROCESS_SHARD_COUNT = 16
+PROCESS_SHARD_TARGET_ITEMS = 92
+PYTEST_DISABLE_PLUGIN_AUTOLOAD_ENV = "PYTEST_DISABLE_PLUGIN_AUTOLOAD"
 SCHEDULERS = ("auto", "serial", "process-4x32-file-aware")
 
 # These conservative weights came from repeated complete-suite trials. They
@@ -45,6 +50,9 @@ PARTITION_OBSERVED_ENV = "ABYSS_STACK_PYTEST_PARTITION_OBSERVED"
 PARTITION_RESULT_ENV = "ABYSS_STACK_PYTEST_PARTITION_RESULT"
 PARTITION_MANIFEST_SCHEMA = "abyss-stack-pytest-partition-manifest-v1"
 PARTITION_RESULT_SCHEMA = "abyss-stack-pytest-partition-result-v1"
+LIVE_FAILURE_MAX_CHARS = 4_000
+
+_LIVE_FAILURES: set[tuple[str, str]] = set()
 
 
 def nodeid_digest(nodeids: list[str]) -> str:
@@ -148,6 +156,33 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int | pytest.ExitC
     )
 
 
+@pytest.hookimpl(trylast=True)
+def pytest_runtest_logreport(report: pytest.TestReport) -> None:
+    """Publish a bounded failure excerpt while a process-isolated shard runs.
+
+    Pytest normally prints failure tracebacks only when its worker session
+    finishes.  The parent still replays the complete shard log at aggregate
+    closeout, so this is an early diagnostic signal rather than a replacement
+    for the full verdict or traceback.
+    """
+
+    if os.environ.get(PARTITION_MODE_ENV) != "shard" or not report.failed:
+        return
+    key = (report.nodeid, report.when)
+    if key in _LIVE_FAILURES:
+        return
+    _LIVE_FAILURES.add(key)
+    excerpt = report.longreprtext.strip()
+    if len(excerpt) > LIVE_FAILURE_MAX_CHARS:
+        excerpt = excerpt[:LIVE_FAILURE_MAX_CHARS].rstrip() + "\n[pytest-live-failure-truncated]"
+    print(
+        f"[pytest-live-failure] nodeid={report.nodeid} phase={report.when}\n"
+        f"{excerpt}\n",
+        file=sys.stderr,
+        flush=True,
+    )
+
+
 def scheduler_plan(requested: str) -> dict[str, Any]:
     if requested not in SCHEDULERS:
         return {
@@ -242,6 +277,27 @@ def partition_nodeids(nodeids: list[str], *, shard_count: int) -> list[list[str]
     )
 
 
+def shard_count_for_selection(test_count: int) -> int:
+    """Choose enough shards for the selection without spawning empty work.
+
+    The full CI selection defaults to sixteen shards, as measured on the
+    four-worker lane.  Smaller selections keep the 92-item target as a soft
+    sizing heuristic instead of paying for unnecessary fresh Python
+    interpreters and repeated import/fixture setup.
+    """
+
+    if test_count <= 0:
+        return 0
+    sized = (test_count + PROCESS_SHARD_TARGET_ITEMS - 1) // PROCESS_SHARD_TARGET_ITEMS
+    return min(test_count, PROCESS_SHARD_COUNT, max(PROCESS_WORKER_LIMIT, sized))
+
+
+def _pytest_environment() -> dict[str, str]:
+    environment = os.environ.copy()
+    environment.setdefault(PYTEST_DISABLE_PLUGIN_AUTOLOAD_ENV, "1")
+    return environment
+
+
 def _partition_environment(
     *,
     baseline_path: Path,
@@ -249,7 +305,7 @@ def _partition_environment(
     observed_path: Path | None = None,
     result_path: Path | None = None,
 ) -> dict[str, str]:
-    environment = os.environ.copy()
+    environment = _pytest_environment()
     environment[PARTITION_BASELINE_ENV] = str(baseline_path)
     if assignment_path is None:
         environment[PARTITION_MODE_ENV] = "collect"
@@ -270,10 +326,12 @@ def _partition_environment(
 def _plugin_command(
     *,
     selection_args: list[str],
+    explicit_plugin_args: list[str] | None = None,
     collect_only: bool = False,
 ) -> list[str]:
     command = [
         sys.executable,
+        "-u",
         "-m",
         "pytest",
         "-q",
@@ -282,8 +340,29 @@ def _plugin_command(
     ]
     if collect_only:
         command.append("--collect-only")
+    if explicit_plugin_args:
+        command.extend(explicit_plugin_args)
     command.extend(selection_args)
     return command
+
+
+def _explicit_plugin_args(selection_args: list[str]) -> list[str]:
+    """Keep caller-selected pytest plugins in every process-isolated child."""
+
+    plugins: list[str] = []
+    index = 0
+    while index < len(selection_args):
+        argument = selection_args[index]
+        if argument == "--":
+            break
+        if argument == "-p" and index + 1 < len(selection_args):
+            plugins.extend((argument, selection_args[index + 1]))
+            index += 2
+            continue
+        if argument.startswith("-p") and argument != "-p":
+            plugins.append(argument)
+        index += 1
+    return plugins
 
 
 def _read_result(path: Path) -> dict[str, Any]:
@@ -297,6 +376,12 @@ def _read_result(path: Path) -> dict[str, Any]:
     return payload
 
 
+def _decode_live_output(raw: bytes) -> str:
+    """Decode an in-progress log line without making preview a verdict gate."""
+
+    return raw.decode("utf-8", errors="replace")
+
+
 def _replay_failed_shards(
     records: dict[int, dict[str, Any]],
     failed_shards: list[int],
@@ -308,6 +393,7 @@ def _replay_failed_shards(
         print(
             f"[pytest-failed-shard {shard_index + 1}/{shard_count}]",
             file=sys.stderr,
+            flush=True,
         )
         print(
             record["log"].read_text(encoding="utf-8"),
@@ -335,6 +421,7 @@ def run_process_worksteal(*, extra_args: list[str]) -> int:
         baseline_path = temporary / "baseline.json"
         collect_log = temporary / "collect.log"
         collect_command = _plugin_command(selection_args=extra_args, collect_only=True)
+        explicit_plugin_args = _explicit_plugin_args(extra_args)
         collect_started = time.monotonic()
         with collect_log.open("w", encoding="utf-8") as output:
             collected = subprocess.run(
@@ -364,7 +451,8 @@ def run_process_worksteal(*, extra_args: list[str]) -> int:
             print("[error] exact pytest collection selected no tests", file=sys.stderr)
             return 5
 
-        assignments = partition_nodeids(baseline, shard_count=PROCESS_SHARD_COUNT)
+        shard_count = shard_count_for_selection(len(baseline))
+        assignments = partition_nodeids(baseline, shard_count=shard_count)
         flattened = [nodeid for assignment in assignments for nodeid in assignment]
         if len(flattened) != len(baseline) or set(flattened) != set(baseline):
             print("[error] pytest partition union does not equal the baseline", file=sys.stderr)
@@ -373,15 +461,34 @@ def run_process_worksteal(*, extra_args: list[str]) -> int:
             "[pytest-partition] "
             f"collected={len(baseline)} digest={nodeid_digest(baseline)} "
             f"shards={len(assignments)} workers={min(PROCESS_WORKER_LIMIT, len(assignments))} "
+            f"target_items={PROCESS_SHARD_TARGET_ITEMS} "
             f"collect_seconds={collect_elapsed:.2f} exact_union=true overlap=false",
             flush=True,
         )
 
         pending: deque[int] = deque(range(len(assignments)))
-        active: dict[int, tuple[subprocess.Popen[str], Any, float]] = {}
+        active: dict[int, tuple[subprocess.Popen[str], Any, Any, float]] = {}
         records: dict[int, dict[str, Any]] = {}
+
+        def drain_output_logs() -> None:
+            """Stream durable shard logs without waiting for descriptor EOF."""
+
+            for shard_index, (_process, _output, tail, _started) in list(active.items()):
+                while True:
+                    line = tail.readline()
+                    if not line:
+                        break
+                    decoded = _decode_live_output(line)
+                    for chunk in decoded.splitlines(keepends=True) or [decoded]:
+                        print(
+                            f"[pytest-shard-live {shard_index + 1}/{len(assignments)}] {chunk}",
+                            end="",
+                            flush=True,
+                        )
+
         try:
             while pending or active:
+                drain_output_logs()
                 while pending and len(active) < PROCESS_WORKER_LIMIT:
                     shard_index = pending.popleft()
                     assignment_path = temporary / f"assignment-{shard_index}.json"
@@ -392,6 +499,7 @@ def run_process_worksteal(*, extra_args: list[str]) -> int:
                     output = log_path.open("w", encoding="utf-8")
                     command = _plugin_command(
                         selection_args=assignments[shard_index],
+                        explicit_plugin_args=explicit_plugin_args,
                     )
                     process = subprocess.Popen(
                         command,
@@ -406,7 +514,8 @@ def run_process_worksteal(*, extra_args: list[str]) -> int:
                         stderr=subprocess.STDOUT,
                         text=True,
                     )
-                    active[shard_index] = (process, output, time.monotonic())
+                    tail = log_path.open("rb")
+                    active[shard_index] = (process, output, tail, time.monotonic())
                     records[shard_index] = {
                         "assignment": assignment_path,
                         "observed": observed_path,
@@ -416,32 +525,35 @@ def run_process_worksteal(*, extra_args: list[str]) -> int:
                     }
 
                 completed_any = False
-                for shard_index, (process, output, started) in list(active.items()):
+                for shard_index, (process, output, tail, started) in list(active.items()):
                     returncode = process.poll()
                     if returncode is None:
                         continue
+                    drain_output_logs()
+                    tail.close()
                     output.close()
                     records[shard_index]["returncode"] = returncode
                     records[shard_index]["elapsed"] = time.monotonic() - started
                     del active[shard_index]
                     completed_any = True
                 if not completed_any and active:
-                    time.sleep(0.1)
+                    time.sleep(0.05)
         except BaseException:
-            for process, output, _started in active.values():
+            for process, _output, _tail, _started in active.values():
                 process.terminate()
-                output.close()
-            for process, _output, _started in active.values():
+            for process, _output, _tail, _started in active.values():
                 process.wait()
+            for _process, output, tail, _started in active.values():
+                tail.close()
+                output.close()
             raise
+        drain_output_logs()
 
         failed = False
         failed_shards: list[int] = []
         totals: Counter[str] = Counter()
         for shard_index in range(len(assignments)):
             record = records[shard_index]
-            print(f"[pytest-shard {shard_index + 1}/{len(assignments)}]")
-            print(record["log"].read_text(encoding="utf-8"), end="")
             try:
                 observed = read_manifest(record["observed"])
                 result = _read_result(record["result"])
@@ -517,15 +629,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"[error] {scheduler['error']}", file=sys.stderr, flush=True)
         return 2
 
-    if scheduler["effective"] != "serial" and extra_args:
-        if args.scheduler != "auto":
-            print(
-                "[error] explicit process work stealing admits only the complete "
-                "default pytest selection; use serial for targeted arguments",
-                file=sys.stderr,
-                flush=True,
-            )
-            return 2
+    if scheduler["effective"] != "serial" and extra_args and args.scheduler == "auto":
         scheduler = {
             "ok": True,
             "requested": args.scheduler,
@@ -546,7 +650,7 @@ def main(argv: list[str] | None = None) -> int:
         completed = subprocess.run(
             command,
             cwd=REPO_ROOT,
-            env=os.environ.copy(),
+            env=_pytest_environment(),
             check=False,
         )
         return completed.returncode
