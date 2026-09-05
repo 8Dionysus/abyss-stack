@@ -6626,6 +6626,8 @@ def _replace_prompt_source_path(
 
 def _contains_source_path(value: Any, source_path: str) -> bool:
     if isinstance(value, str):
+        if "\\" not in value:
+            return source_path in value
         return any(
             source_path in candidate
             for candidate in _json_escape_decoding_layers(value)
@@ -6715,6 +6717,11 @@ def _decode_one_json_escape_layer(value: str) -> str:
 def _json_escape_decoding_layers(value: str) -> tuple[str, ...]:
     """Expose bounded nested JSON escape spellings for source-alias checks."""
 
+    # Most actor-facing values are ordinary text.  Keep the common case out of
+    # the span-building decoder entirely; escape-bearing inputs still take the
+    # bounded path below.
+    if "\\" not in value:
+        return (value,)
     return tuple(layer for layer, _spans in _json_escape_layers_with_spans(value))
 
 
@@ -6724,6 +6731,8 @@ def _json_escape_layers_with_spans(
     """Return bounded decoded layers mapped back to original string spans."""
 
     identity = tuple((index, index + 1) for index in range(len(value)))
+    if "\\" not in value:
+        return ((value, identity),)
     layers = [(value, identity)]
     current = value
     current_spans = identity
