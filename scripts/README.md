@@ -69,13 +69,13 @@ still synced into deployed `Configs/` with the wrappers.
   `docs/validation/validation_lanes.json`; `ci_gate.py` and `release_check.py`
   read that manifest instead of owning duplicate command lists.
 - Keep the complete pytest selection behind `run_pytest_lane.py`: automatic
-  mode uses at most four process-isolated workers over up to 32 file-aware
-  shards (smaller selections target 92 tests per shard), proves their exact
-  disjoint union against one baseline collection, and supports exact serial
-  rollback through `ABYSS_STACK_TEST_SCHEDULER=serial`. Automatic mode keeps
-  targeted arguments on the serial path; an explicit
-  `--scheduler process-4x32-file-aware` may process a targeted selection using
-  the same exact partition proof.
+  mode uses at most four process-isolated workers over a measured default of
+  16 file-aware shards (smaller selections retain a soft target of 92 tests
+  per shard), proves their exact disjoint union against one baseline
+  collection, and supports exact serial rollback through
+  `ABYSS_STACK_TEST_SCHEDULER=serial`. Automatic mode keeps targeted arguments
+  on the serial path; the existing `--scheduler process-4x32-file-aware`
+  route may process a targeted selection using the same exact partition proof.
   Shard output is written to a durable log and tailed without waiting for
   descendant-owned descriptor EOF; failed shard logs are replayed at aggregate
   closeout for bounded-log diagnostics, and tests are not retried. The runner

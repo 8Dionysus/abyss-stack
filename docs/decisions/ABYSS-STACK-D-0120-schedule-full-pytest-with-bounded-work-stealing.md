@@ -189,7 +189,7 @@ seconds with 574.47 aggregate shard-seconds. Its four-worker lower bound was
 
 The complete default `tests` and `release` selections run through
 `scripts/run_pytest_lane.py`. Automatic mode uses at most four independent
-pytest processes and a queue of 32 deterministic file-aware shards. Small test
+pytest processes and a queue of 16 deterministic file-aware shards. Small test
 files stay in one import unit; only files larger than the target shard size are
 split. Conservative duration hints start known slow units first. Hints affect
 queue order only and cannot alter membership or verdict.
@@ -218,12 +218,22 @@ a targeted selection, while `ABYSS_STACK_TEST_SCHEDULER=serial` remains the
 exact full-selection rollback and independent sequential oracle.
 
 The current runner keeps that full-selection bound while sizing smaller
-selections to a target of 92 tests per shard, with a minimum of four shards
-when the selection is large enough and an upper bound of 32 shards. This avoids
-paying for dozens of fresh import/fixture environments when a scoped selection
-contains only a few hundred tests; the exact baseline/assignment/observed-
-selection proof remains unchanged. The full 2,966-test CI selection still
-resolves to 32 shards.
+selections to a soft target of 92 tests per shard, with a minimum of four
+shards when the selection is large enough and an upper bound of 16 shards. This
+avoids paying for dozens of fresh import/fixture environments when a scoped
+selection contains only a few hundred tests; the exact
+baseline/assignment/observed-selection proof remains unchanged. The current
+full selection resolves to 16 shards.
+
+A same-selection matrix on 2026-09-04 measured the current 2,974-node digest
+`32b49cc7ed754437de163e6cf6f9c07ef18cda79558fc57fd4a84a3e6db2d996` with the
+same four-worker route and exact union proof: 16 shards completed in 188.10
+seconds, 24 in 192.48 seconds, and 32 in 276.30 seconds. All three runs
+returned 2,970 passed, four skipped, and 267 passed subtests. The 16-shard
+route therefore reduced wall time 31.9 percent against the 32-shard route and
+reduced summed shard wall work from 1,070.22 to 704.16 seconds (34.2 percent).
+The 92-item heuristic and the serial rollback remain unchanged for scoped and
+failure paths.
 
 The external Codex production runtime still executes every admitted probe and
 repeats the complete preflight in the worker. Its independent probes may

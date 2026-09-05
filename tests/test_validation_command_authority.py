@@ -262,7 +262,7 @@ def test_pytest_scheduler_uses_process_isolated_workstealing() -> None:
         "effective": "process-4x32-file-aware",
         "reason": "isolated_process_workstealing",
         "worker_limit": 4,
-        "shard_count": 32,
+        "shard_count": 16,
         "ordering": "file_aware_duration_hints",
         "selection_proof": "baseline_manifest_exact_union",
         "selection_changed": False,
@@ -280,12 +280,24 @@ def test_pytest_process_partitions_are_disjoint_and_complete() -> None:
     assert set(flattened) == set(nodeids)
 
 
-def test_pytest_shard_count_scales_small_selections_and_keeps_full_bound() -> None:
+def test_pytest_shard_count_scales_small_selections_and_keeps_full_default() -> None:
     assert run_pytest_lane.shard_count_for_selection(0) == 0
     assert run_pytest_lane.shard_count_for_selection(1) == 1
     assert run_pytest_lane.shard_count_for_selection(364) == 4
-    assert run_pytest_lane.shard_count_for_selection(2853) == 32
-    assert run_pytest_lane.shard_count_for_selection(2966) == 32
+    assert run_pytest_lane.shard_count_for_selection(369) == 5
+    assert run_pytest_lane.shard_count_for_selection(2853) == 16
+    assert run_pytest_lane.shard_count_for_selection(2974) == 16
+
+
+def test_pytest_full_default_partition_is_exactly_sixteen_shards() -> None:
+    nodeids = [f"tests/test_example.py::test_{index}" for index in range(2974)]
+    shard_count = run_pytest_lane.shard_count_for_selection(len(nodeids))
+    partitions = run_pytest_lane.partition_nodeids(nodeids, shard_count=shard_count)
+    flattened = [nodeid for partition in partitions for nodeid in partition]
+
+    assert shard_count == len(partitions) == 16
+    assert len(flattened) == len(set(flattened)) == len(nodeids)
+    assert set(flattened) == set(nodeids)
 
 
 def test_pytest_process_partitions_keep_small_files_as_import_units() -> None:

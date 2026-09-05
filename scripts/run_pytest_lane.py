@@ -19,7 +19,10 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCHEDULER_ENV = "ABYSS_STACK_TEST_SCHEDULER"
 PROCESS_WORKER_LIMIT = 4
-PROCESS_SHARD_COUNT = 32
+# A same-selection matrix showed that sixteen shards reduce repeated process,
+# import, and fixture work on the four-worker lane; smaller selections still
+# use the adaptive target below.
+PROCESS_SHARD_COUNT = 16
 PROCESS_SHARD_TARGET_ITEMS = 92
 PYTEST_DISABLE_PLUGIN_AUTOLOAD_ENV = "PYTEST_DISABLE_PLUGIN_AUTOLOAD"
 SCHEDULERS = ("auto", "serial", "process-4x32-file-aware")
@@ -277,9 +280,10 @@ def partition_nodeids(nodeids: list[str], *, shard_count: int) -> list[list[str]
 def shard_count_for_selection(test_count: int) -> int:
     """Choose enough shards for the selection without spawning empty work.
 
-    The full CI selection is about 92 tests per shard, so that remains the
-    upper-bound shape at 32 shards.  Smaller selections do not need 32 fresh
-    Python interpreters and repeat their import/fixture setup needlessly.
+    The full CI selection defaults to sixteen shards, as measured on the
+    four-worker lane.  Smaller selections keep the 92-item target as a soft
+    sizing heuristic instead of paying for unnecessary fresh Python
+    interpreters and repeated import/fixture setup.
     """
 
     if test_count <= 0:
