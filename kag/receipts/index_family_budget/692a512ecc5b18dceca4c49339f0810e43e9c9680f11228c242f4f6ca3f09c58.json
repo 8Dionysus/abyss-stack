@@ -9,8 +9,8 @@
     "contract_version": "aoa-kag:budget-receipt-candidate-identity-v2",
     "excluded_path": "kag/receipts/index_family_budget/692a512ecc5b18dceca4c49339f0810e43e9c9680f11228c242f4f6ca3f09c58.json",
     "family_digest": "692a512ecc5b18dceca4c49339f0810e43e9c9680f11228c242f4f6ca3f09c58",
-    "file_count": 3327,
-    "seal": "a08d91e5203ab9c5852efc0e54836e0bc25df6e4861f2f75556b60f81fbd216b",
+    "file_count": 3326,
+    "seal": "a9b15d0d88777643c79eaf63eb7b833eb126227c5a2a4355630d40b9cdc96785",
     "source_epoch": "sha256:b69ec9032ebf48f7076e70c38b7056951e16dcc527bb168b7406ea0b0fda2f54",
     "source_snapshot": "sha256:185ffa049e3b1b728517bb8d12db2af98ffae67c37b492627858663960abb73b"
   },
@@ -1362,7 +1362,7 @@
     "revision_binding": "content-addressed-procedure-import-closure-portable-runtime-contract-and-descriptor-io-v1",
     "source_digest": "4882f50ab3a09b04b02715510f2e5dbec13fa60a5032f98e9e043dc9e79f812e"
   },
-  "reason": "ABYSS-STACK-D-0142: operator-approved historical-tree retirement, active runtime contracts retained; exact CI-pinned producer and unchanged standing budgets.",
+  "reason": "ABYSS-STACK-D-0142 operator-approved historical-tree retirement; final candidate with exact CI producer and no intermediate migration receipt archive, standing budgets unchanged.",
   "repo": "abyss-stack",
   "schema_version": "aoa-repo-local-kag-budget-receipt-v2",
   "scope": "generated_delta_and_tracked_size",
