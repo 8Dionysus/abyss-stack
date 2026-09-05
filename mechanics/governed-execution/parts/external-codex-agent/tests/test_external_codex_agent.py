@@ -10,11 +10,13 @@ import json
 import os
 import re
 import shlex
+import shutil
 import signal
 import socket
 import stat
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import urllib.parse
@@ -102,6 +104,9 @@ PREPARER_PATH = PART_ROOT / "prepare_landing_study.py"
 SUPERVISOR_PATH = PART_ROOT / "external_codex_supervisor.py"
 CLI_PATH = PART_ROOT.parents[3] / "scripts/aoa-external-codex-agent"
 ZERO_DIGEST = "sha256:" + "0" * 64
+
+_WORKSPACE_TEMPLATE_ROOT: tempfile.TemporaryDirectory[str] | None = None
+_WORKSPACE_TEMPLATES: dict[bool, Path] = {}
 
 
 def _load_module(name: str, path: Path) -> ModuleType:
@@ -267,6 +272,46 @@ def _git(workspace: Path, *args: str) -> str:
         check=True,
     )
     return completed.stdout.strip()
+
+
+def _workspace_template(*, ignored_baseline: bool) -> Path:
+    """Create one immutable Git baseline per worker process.
+
+    Most external-runtime tests need a fresh repository, but not a fresh Git
+    initialization.  Copying this tiny repository preserves the exact baseline
+    tree and branch while avoiding six subprocesses for every semantic fixture.
+    Each copied workspace receives its own empty commit in ``_fixture`` so
+    independent workspaces retain distinct HEAD identities.
+    The ignored variant is separate so its initial commit remains identical to
+    the historical fixture shape.
+    """
+
+    global _WORKSPACE_TEMPLATE_ROOT
+    cached = _WORKSPACE_TEMPLATES.get(ignored_baseline)
+    if cached is not None:
+        return cached
+    if _WORKSPACE_TEMPLATE_ROOT is None:
+        parent = os.environ.get("TMPDIR")
+        _WORKSPACE_TEMPLATE_ROOT = tempfile.TemporaryDirectory(
+            prefix="abyss-stack-external-codex-workspace-",
+            dir=parent if parent and Path(parent).is_dir() else None,
+        )
+    template = Path(_WORKSPACE_TEMPLATE_ROOT.name) / (
+        "ignored" if ignored_baseline else "clean"
+    )
+    template.mkdir()
+    _git(template, "init", "-b", "main")
+    _git(template, "config", "user.email", "fixture@example.invalid")
+    _git(template, "config", "user.name", "Fixture")
+    (template / "README.md").write_text("# Landing fixture\n", encoding="utf-8")
+    tracked_paths = ["README.md"]
+    if ignored_baseline:
+        (template / ".gitignore").write_text("cache/\n", encoding="utf-8")
+        tracked_paths.append(".gitignore")
+    _git(template, "add", *tracked_paths)
+    _git(template, "commit", "-m", "fixture")
+    _WORKSPACE_TEMPLATES[ignored_baseline] = template
+    return template
 
 
 def _fake_codex(path: Path) -> None:
@@ -1345,23 +1390,27 @@ def _fixture(
     workspace = shared_workspace or (tmp_path / "workspace")
     initialize_workspace = not workspace.exists()
     if initialize_workspace:
-        workspace.mkdir()
-        _git(workspace, "init", "-b", "main")
-        _git(workspace, "config", "user.email", "fixture@example.invalid")
-        _git(workspace, "config", "user.name", "Fixture")
-    readme = workspace / "README.md"
-    if initialize_workspace:
-        readme.write_text("# Landing fixture\n", encoding="utf-8")
-        _git(workspace, "add", "README.md")
-        if ignored_baseline:
-            (workspace / ".gitignore").write_text("cache/\n", encoding="utf-8")
-            _git(workspace, "add", ".gitignore")
-        _git(workspace, "commit", "-m", "fixture")
+        template = _workspace_template(ignored_baseline=ignored_baseline)
+        shutil.copytree(template, workspace)
+        workspace_token = hashlib.sha256(
+            str(workspace).encode("utf-8")
+        ).hexdigest()[:16]
+        _git(
+            workspace,
+            "commit",
+            "--allow-empty",
+            "--no-verify",
+            "-m",
+            f"fixture baseline {workspace_token}",
+        )
+        head = _git(workspace, "rev-parse", "HEAD")
     elif ignored_baseline or exact_baseline:
         raise AssertionError(
             "shared workspace fixtures cannot create a second baseline posture"
         )
-    head = _git(workspace, "rev-parse", "HEAD")
+    else:
+        head = _git(workspace, "rev-parse", "HEAD")
+    readme = workspace / "README.md"
     if ignored_baseline:
         cache = workspace / "cache"
         cache.mkdir()
