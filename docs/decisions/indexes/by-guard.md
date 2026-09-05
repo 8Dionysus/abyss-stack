@@ -705,6 +705,7 @@
 ## mechanics topology
 
 - [ABYSS-STACK-D-0057 Mechanics Topology Validator Module](../ABYSS-STACK-D-0057-mechanics-topology-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0057-mechanics-topology-validator-module.md`)
+- [ABYSS-STACK-D-0143 Package-Wide Mechanics Docs on Demand](../ABYSS-STACK-D-0143-package-wide-mechanics-docs-on-demand.md) (`docs/decisions/ABYSS-STACK-D-0143-package-wide-mechanics-docs-on-demand.md`)
 
 ## method-blind candidate review
 
@@ -825,6 +826,10 @@
 ## owner-route confinement
 
 - [ABYSS-STACK-D-0078 Federated Stats MCP Access Plane](../ABYSS-STACK-D-0078-federated-stats-mcp-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0078-federated-stats-mcp-access-plane.md`)
+
+## package route
+
+- [ABYSS-STACK-D-0143 Package-Wide Mechanics Docs on Demand](../ABYSS-STACK-D-0143-package-wide-mechanics-docs-on-demand.md) (`docs/decisions/ABYSS-STACK-D-0143-package-wide-mechanics-docs-on-demand.md`)
 
 ## packet semantic parity
 

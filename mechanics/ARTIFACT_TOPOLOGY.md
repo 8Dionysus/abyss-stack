@@ -19,7 +19,7 @@ current archive tree merely to preserve old names.
 
 | Artifact kind | Current default | Package home when clearly local |
 |---|---|---|
-| operator docs | `docs/` | `mechanics/<package>/docs/` for package-owned prose detail or `mechanics/<package>/parts/<part>/` for current part contracts and routes |
+| operator docs | `docs/` | `mechanics/<package>/docs/` only for real package-wide prose detail; `mechanics/<package>/parts/<part>/` for current part contracts and routes |
 | runtime scripts | stable operator wrappers in `scripts/` | `mechanics/<package>/parts/<part>/` for active implementations and required compatibility runners |
 | schemas | `schemas/` | `mechanics/<package>/parts/<part>/schemas/` for active package-local contracts |
 | examples | `examples/` | `mechanics/<package>/parts/<part>/examples/` for active package-local public examples |

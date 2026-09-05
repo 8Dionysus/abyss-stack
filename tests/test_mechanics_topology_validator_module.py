@@ -76,6 +76,32 @@ def test_minimal_valid_mechanics_surface_passes(tmp_path: Path) -> None:
     assert run_validator(tmp_path) == []
 
 
+def test_package_docs_are_optional_when_part_routes_exist(tmp_path: Path) -> None:
+    write_valid_mechanics_surface(tmp_path)
+    for package in mechanics_topology.MECHANIC_PACKAGES:
+        (tmp_path / "mechanics" / package / "docs" / "README.md").unlink(missing_ok=True)
+
+    assert run_validator(tmp_path) == []
+
+
+def test_named_part_doc_remains_required(tmp_path: Path) -> None:
+    write_valid_mechanics_surface(tmp_path)
+    part_doc = (
+        tmp_path
+        / "mechanics"
+        / "agon-runtime"
+        / "parts"
+        / "runtime-kernels"
+        / "docs"
+        / "RUNTIME_KERNELS.md"
+    )
+    part_doc.unlink()
+
+    errors = run_validator(tmp_path)
+
+    assert "mechanics package agon-runtime part runtime-kernels is missing docs/RUNTIME_KERNELS.md" in errors
+
+
 def test_mechanics_atlas_must_route_to_each_package(tmp_path: Path) -> None:
     write_valid_mechanics_surface(tmp_path)
     atlas_path = tmp_path / "mechanics" / "README.md"

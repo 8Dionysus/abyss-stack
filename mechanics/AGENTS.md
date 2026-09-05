@@ -42,7 +42,6 @@ Every mechanics package contains:
 - `ROADMAP.md`
 - `LANDING_LOG.md`
 - `parts/README.md`
-- `docs/README.md`
 
 The package `README.md` is the mechanic card. It should answer when to use the
 mechanic, what abyss-stack owns, which stronger owners remain outside it, what
@@ -54,8 +53,9 @@ owner-boundary bridges, and stop-lines. `PARTS.md` owns the active
 source-surface map. `parts/README.md` owns the package-local part index, and
 each `parts/<part>/README.md` owns the route for that part. `ROADMAP.md` owns
 future movement. `LANDING_LOG.md` records checked topology landings. `docs/`
-holds package-owned prose detail when it is not a machine-readable contract,
-example, generated capsule, or focused part-local test.
+is optional package-owned prose detail when a real package-wide document is
+needed; a duplicate route index or future reservation is not a reason to keep
+the directory.
 
 ## Boundaries
 
