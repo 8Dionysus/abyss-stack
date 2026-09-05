@@ -296,3 +296,7 @@
 ## 2026-09-04
 
 - [ABYSS-STACK-D-0142 Retire Historical Trees Without Retiring Runtime Compatibility](../ABYSS-STACK-D-0142-retire-historical-trees.md) (`docs/decisions/ABYSS-STACK-D-0142-retire-historical-trees.md`)
+
+## 2026-09-05
+
+- [ABYSS-STACK-D-0143 Package-Wide Mechanics Docs on Demand](../ABYSS-STACK-D-0143-package-wide-mechanics-docs-on-demand.md) (`docs/decisions/ABYSS-STACK-D-0143-package-wide-mechanics-docs-on-demand.md`)

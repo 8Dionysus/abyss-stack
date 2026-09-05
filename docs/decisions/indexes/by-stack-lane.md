@@ -234,6 +234,7 @@
 - [ABYSS-STACK-D-0098 Agent OS Subprocess Runtime Adapter](../ABYSS-STACK-D-0098-agent-os-subprocess-runtime-adapter.md) (`docs/decisions/ABYSS-STACK-D-0098-agent-os-subprocess-runtime-adapter.md`)
 - [ABYSS-STACK-D-0099 Owner-Bound Agent OS Execution Lanes](../ABYSS-STACK-D-0099-owner-bound-agent-os-execution-lanes.md) (`docs/decisions/ABYSS-STACK-D-0099-owner-bound-agent-os-execution-lanes.md`)
 - [ABYSS-STACK-D-0100 Project Runtime Approvals into Run Plans](../ABYSS-STACK-D-0100-project-runtime-approvals-into-run-plans.md) (`docs/decisions/ABYSS-STACK-D-0100-project-runtime-approvals-into-run-plans.md`)
+- [ABYSS-STACK-D-0143 Package-Wide Mechanics Docs on Demand](../ABYSS-STACK-D-0143-package-wide-mechanics-docs-on-demand.md) (`docs/decisions/ABYSS-STACK-D-0143-package-wide-mechanics-docs-on-demand.md`)
 
 ## Codex consumer
 
@@ -333,6 +334,7 @@
 ## mechanics
 
 - [ABYSS-STACK-D-0142 Retire Historical Trees Without Retiring Runtime Compatibility](../ABYSS-STACK-D-0142-retire-historical-trees.md) (`docs/decisions/ABYSS-STACK-D-0142-retire-historical-trees.md`)
+- [ABYSS-STACK-D-0143 Package-Wide Mechanics Docs on Demand](../ABYSS-STACK-D-0143-package-wide-mechanics-docs-on-demand.md) (`docs/decisions/ABYSS-STACK-D-0143-package-wide-mechanics-docs-on-demand.md`)
 
 ## model admission
 
