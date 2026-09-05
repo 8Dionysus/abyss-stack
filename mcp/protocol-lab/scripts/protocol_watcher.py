@@ -1215,10 +1215,17 @@ def _proc_run_references(
         return {}, "proc_scan_limit"
 
     references: dict[str, list[str]] = {}
-    run_paths = [
-        (record["run_id"], Path(os.path.abspath(record["path"])))
-        for record in run_records
-    ]
+    # Runs are created as siblings below one ``runs`` directory.  Index each
+    # sibling name under its parent prefix once, so every cwd/fd target needs
+    # one parent containment check and one dictionary lookup instead of a
+    # comparison with every retained run.  Keep the final ``_within`` check:
+    # the index narrows a lexical candidate, but never replaces containment.
+    runs_by_parent: dict[str, dict[str, str]] = {}
+    for record in run_records:
+        run_path = Path(os.path.abspath(record["path"]))
+        runs_by_parent.setdefault(os.path.abspath(run_path.parent), {})[run_path.name] = record[
+            "run_id"
+        ]
     for process in entries:
         status_path = process / "status"
         try:
@@ -1256,9 +1263,23 @@ def _proc_run_references(
             target_path = target.removesuffix(" (deleted)")
             if not target_path.startswith("/"):
                 continue
-            target = os.path.abspath(target_path)
-            for run_id, run_path in run_paths:
-                if _within(Path(target), run_path):
+            target_path = os.path.abspath(target_path)
+            for parent_name, run_names in runs_by_parent.items():
+                parent_path = Path(parent_name)
+                if not _within(Path(target_path), parent_path):
+                    continue
+                try:
+                    relative = Path(target_path).relative_to(parent_path)
+                except ValueError:
+                    continue
+                if not relative.parts:
+                    continue
+                run_name = relative.parts[0]
+                run_id = run_names.get(run_name)
+                if run_id is None:
+                    continue
+                run_path = parent_path / run_name
+                if _within(Path(target_path), run_path):
                     references.setdefault(run_id, []).append(
                         f"proc:{process.name}/{link.name}"
                     )

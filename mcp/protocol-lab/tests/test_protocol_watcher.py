@@ -671,6 +671,49 @@ def test_proc_scan_protects_same_user_run_cwd_and_fd(tmp_path: Path) -> None:
     assert references[run_root.name] == ["proc:123/cwd", "proc:123/4"]
 
 
+def test_proc_scan_indexes_siblings_without_prefix_false_positive(tmp_path: Path) -> None:
+    watcher = _load_watcher()
+    runs_root = tmp_path / "runs"
+    selected_id = "20260808T100000.000000Z"
+    sibling_id = "20260808T100001.000000Z"
+    other_id = "20260808T100002.000000Z"
+    selected = runs_root / selected_id
+    sibling = runs_root / sibling_id
+    other = runs_root / other_id
+    for run_root in (selected, sibling, other):
+        (run_root / "nested").mkdir(parents=True)
+
+    proc_root = tmp_path / "proc"
+    process = proc_root / "123" / "fd"
+    process.mkdir(parents=True)
+    (proc_root / "123" / "status").write_text(
+        "Name:\tchild\nUid:\t1000\t1000\t1000\t1000\n"
+    )
+    (proc_root / "123" / "cwd").symlink_to(selected / "nested", target_is_directory=True)
+    # This path shares the selected run's lexical prefix but is a sibling.
+    (process / "4").symlink_to(
+        runs_root / f"{selected_id}-review",
+        target_is_directory=True,
+    )
+    (process / "5").symlink_to(other / "nested", target_is_directory=True)
+
+    references, error = watcher._proc_run_references(
+        [
+            {"run_id": selected_id, "path": selected},
+            {"run_id": sibling_id, "path": sibling},
+            {"run_id": other_id, "path": other},
+        ],
+        owner_uid=os.getuid(),
+        proc_root=proc_root,
+    )
+
+    assert error is None
+    assert references == {
+        selected_id: ["proc:123/cwd"],
+        other_id: ["proc:123/5"],
+    }
+
+
 def test_retention_protects_run_referenced_by_proc_scan(tmp_path: Path, monkeypatch: Any) -> None:
     watcher = _load_watcher()
     plan_path, state_root, now = _fixture(tmp_path)
