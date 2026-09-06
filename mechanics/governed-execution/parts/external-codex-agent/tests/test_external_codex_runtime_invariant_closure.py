@@ -415,3 +415,51 @@ def test_actor_safe_utf8_fixture_keeps_literal_backslash_bytes_outside_redaction
     )[1:-1].encode("utf-8")
     assert encoded_payload in encoded
     assert source.encode("utf-8") not in encoded
+
+
+def test_actor_envelope_reuses_decoded_layers_only_within_one_build(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provenance = {
+        "artifact_digest": "sha256:" + "a" * 64,
+        "schema_ref": "fixture-v1",
+        "schema_version": "fixture-v1",
+    }
+    aliases = (
+        "/tmp/данные/workspace",
+        "/tmp/данные",
+        "/tmp",
+    )
+    raw = rb"TEXT literal\\n suffix"
+    original_decoder = RUNTIME._json_escape_decoding_layers
+    decoder_calls: list[str] = []
+
+    def counted_decoder(value: str) -> tuple[str, ...]:
+        decoder_calls.append(value)
+        return original_decoder(value)
+
+    monkeypatch.setattr(
+        RUNTIME,
+        "_json_escape_decoding_layers",
+        counted_decoder,
+    )
+
+    RUNTIME._actor_safe_input_envelope(
+        input_id="decoded-layer-cache-first-build",
+        raw=raw,
+        original_provenance=provenance,
+        aliases=aliases,
+        source_roots=frozenset(),
+    )
+    first_build_calls = tuple(decoder_calls)
+    assert first_build_calls
+    assert len(first_build_calls) == len(set(first_build_calls))
+
+    RUNTIME._actor_safe_input_envelope(
+        input_id="decoded-layer-cache-first-build",
+        raw=raw,
+        original_provenance=provenance,
+        aliases=aliases,
+        source_roots=frozenset(),
+    )
+    assert tuple(decoder_calls) == first_build_calls + first_build_calls
