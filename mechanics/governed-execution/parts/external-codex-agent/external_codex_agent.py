@@ -6624,20 +6624,48 @@ def _replace_prompt_source_path(
     return value
 
 
-def _contains_source_path(value: Any, source_path: str) -> bool:
+def _contains_source_path(
+    value: Any,
+    source_path: str,
+    *,
+    decoded_layers_cache: dict[str, tuple[str, ...]] | None = None,
+) -> bool:
+    """Check one alias while optionally reusing this call's decoded layers."""
+
     if isinstance(value, str):
         if "\\" not in value:
             return source_path in value
-        return any(
-            source_path in candidate
-            for candidate in _json_escape_decoding_layers(value)
+        layers = (
+            decoded_layers_cache.get(value)
+            if decoded_layers_cache is not None
+            else None
         )
+        if layers is None:
+            layers = _json_escape_decoding_layers(value)
+            if decoded_layers_cache is not None:
+                decoded_layers_cache[value] = layers
+        return any(source_path in candidate for candidate in layers)
     if isinstance(value, (list, tuple)):
-        return any(_contains_source_path(item, source_path) for item in value)
+        return any(
+            _contains_source_path(
+                item,
+                source_path,
+                decoded_layers_cache=decoded_layers_cache,
+            )
+            for item in value
+        )
     if isinstance(value, dict):
         return any(
-            _contains_source_path(key, source_path)
-            or _contains_source_path(item, source_path)
+            _contains_source_path(
+                key,
+                source_path,
+                decoded_layers_cache=decoded_layers_cache,
+            )
+            or _contains_source_path(
+                item,
+                source_path,
+                decoded_layers_cache=decoded_layers_cache,
+            )
             for key, item in value.items()
         )
     return False
@@ -6917,13 +6945,22 @@ def _actor_safe_input_envelope(
 ) -> tuple[dict[str, Any], bytes]:
     """Build one schema-checked derivative without controller coordinates."""
 
+    # The two post-sanitization checks intentionally remain alias-major so
+    # their first match/error order is unchanged.  Reuse only decoded layers
+    # within this envelope build; nothing survives the invocation.
+    decoded_layers_cache: dict[str, tuple[str, ...]] = {}
+
     try:
         text = raw.decode("utf-8")
     except UnicodeDecodeError:
         binary_text_shadow = raw.decode("utf-8", errors="surrogateescape")
         if any(
             alias.encode("utf-8") in raw
-            or _contains_source_path(binary_text_shadow, alias)
+            or _contains_source_path(
+                binary_text_shadow,
+                alias,
+                decoded_layers_cache=decoded_layers_cache,
+            )
             for alias in aliases
         ):
             raise ExternalCodexRuntimeError(
@@ -6956,7 +6993,14 @@ def _actor_safe_input_envelope(
         ACTOR_INPUT_ENVELOPE_SCHEMA_PATH,
         label=f"actor-safe immutable input {input_id}",
     )
-    if any(_contains_source_path(envelope, alias) for alias in aliases):
+    if any(
+        _contains_source_path(
+            envelope,
+            alias,
+            decoded_layers_cache=decoded_layers_cache,
+        )
+        for alias in aliases
+    ):
         raise ExternalCodexRuntimeError(
             "actor_source_path_exposed",
             "actor-safe immutable envelope retained a source coordinate",
@@ -6965,7 +7009,14 @@ def _actor_safe_input_envelope(
         json.dumps(envelope, ensure_ascii=True, sort_keys=True, indent=2) + "\n"
     ).encode("utf-8")
     encoded_text = encoded.decode("utf-8")
-    if any(_contains_source_path(encoded_text, alias) for alias in aliases):
+    if any(
+        _contains_source_path(
+            encoded_text,
+            alias,
+            decoded_layers_cache=decoded_layers_cache,
+        )
+        for alias in aliases
+    ):
         raise ExternalCodexRuntimeError(
             "actor_source_path_exposed",
             "serialized actor-safe immutable envelope retained a source coordinate",
