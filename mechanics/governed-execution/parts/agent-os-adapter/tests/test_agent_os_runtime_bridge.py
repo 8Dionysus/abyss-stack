@@ -1952,7 +1952,10 @@ def test_runner_drives_real_governed_execution_and_restores_exactly(
         ).state
         == "completed"
     )
-    assert restored_runner.outcome(session) == outcome
+    # restore() already validates the durable outcome and its event digest
+    # through the subprocess bridge; compare the full restored event chain
+    # locally instead of spawning a second bridge process for that outcome.
+    assert restored_runner.events(session) == runner.events(session)
     assert (
         restored_runner.resume(session, restored_adapter, resume).state == "completed"
     )
