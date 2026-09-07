@@ -14,6 +14,7 @@ import time
 from typing import Any
 
 import pytest
+from _pytest.config import get_config
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -54,6 +55,19 @@ LIVE_FAILURE_MAX_CHARS = 4_000
 
 _LIVE_FAILURES: set[tuple[str, str]] = set()
 _FINISHED_NODEIDS: set[str] = set()
+
+_NON_EXECUTING_OPTIONS = (
+    "collectonly",
+    "setuponly",
+    "setupplan",
+    "showfixtures",
+    "show_fixtures_per_test",
+    "cacheshow",
+    "markers",
+    "version",
+    "help",
+)
+_STATEFUL_OPTIONS = ("stepwise", "stepwise_skip", "stepwise_reset")
 
 
 def nodeid_digest(nodeids: list[str]) -> str:
@@ -102,15 +116,13 @@ def _manifest_path_from_env(name: str) -> Path:
     return Path(raw)
 
 
-@pytest.hookimpl(trylast=True)
-def pytest_collection_modifyitems(
-    config: pytest.Config,
-    items: list[pytest.Item],
-) -> None:
+def _record_collection(session: pytest.Session) -> None:
+    config = session.config
     mode = os.environ.get(PARTITION_MODE_ENV)
     if not mode:
         return
 
+    items = session.items
     nodeids = [item.nodeid for item in items]
     if len(nodeids) != len(set(nodeids)):
         raise pytest.UsageError("duplicate pytest nodeids cannot form an exact partition")
@@ -144,6 +156,20 @@ def pytest_collection_modifyitems(
 
 
 @pytest.hookimpl(trylast=True)
+def pytest_collection_finish(session: pytest.Session) -> None:
+    """Record the final collection after filtering hookwrappers have run."""
+
+    _record_collection(session)
+
+
+@pytest.hookimpl(tryfirst=True)
+def pytest_sessionstart(session: pytest.Session) -> None:
+    if os.environ.get(PARTITION_MODE_ENV) == "shard":
+        _LIVE_FAILURES.clear()
+        _FINISHED_NODEIDS.clear()
+
+
+@pytest.hookimpl(trylast=True)
 def pytest_sessionfinish(session: pytest.Session, exitstatus: int | pytest.ExitCode) -> None:
     if os.environ.get(PARTITION_MODE_ENV) != "shard":
         return
@@ -161,11 +187,14 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int | pytest.ExitC
         "exitstatus": int(exitstatus),
         "stats": stats,
         "finished_nodeids": sorted(_FINISHED_NODEIDS),
-        "failed_nodeids": sorted({
-            report.nodeid
-            for outcome in ("failed", "error")
-            for report in (terminal.stats.get(outcome, []) if terminal else [])
-        }),
+        "failed_nodeids": sorted(
+            {nodeid for nodeid, _when in _LIVE_FAILURES}
+            | {
+                report.nodeid
+                for outcome in ("failed", "error")
+                for report in (terminal.stats.get(outcome, []) if terminal else [])
+            }
+        ),
     }
     result_path.write_text(
         json.dumps(payload, indent=2, sort_keys=True) + "\n",
@@ -319,6 +348,83 @@ def _pytest_environment() -> dict[str, str]:
     return environment
 
 
+def _effective_pytest_options(extra_args: list[str]) -> dict[str, Any] | None:
+    """Read built-in pytest modes after env and ini ``addopts`` are applied.
+
+    The process scheduler can only preserve ordinary test semantics when it
+    knows whether a selection is stateful or does not execute test bodies.
+    Pytest applies ``PYTEST_ADDOPTS`` and the config file's ``addopts`` before
+    the explicit argv, so inspecting argv alone is not sufficient.  Parsing a
+    no-conftest config keeps this probe from importing a test suite twice; the
+    real serial or shard invocation remains responsible for conftest/plugin
+    behavior and error reporting.
+    """
+
+    probe_args = ["--noconftest", *extra_args]
+    config: pytest.Config | None = None
+    had_autoload_setting = PYTEST_DISABLE_PLUGIN_AUTOLOAD_ENV in os.environ
+    previous_autoload_setting = os.environ.get(PYTEST_DISABLE_PLUGIN_AUTOLOAD_ENV)
+    if not had_autoload_setting:
+        os.environ[PYTEST_DISABLE_PLUGIN_AUTOLOAD_ENV] = "1"
+    previous_cwd = Path.cwd()
+    try:
+        # The real serial and collection/shard children run from REPO_ROOT.
+        # Pytest resolves relative -c/--config-file and --rootdir paths from
+        # its process cwd, so the probe must use that same working directory.
+        os.chdir(REPO_ROOT)
+        config = get_config(probe_args)
+        config.invocation_params = pytest.Config.InvocationParams(
+            args=tuple(probe_args),
+            plugins=None,
+            dir=REPO_ROOT,
+        )
+        config.parse(list(probe_args))
+        option = config.option
+        return {
+            "non_executing": tuple(
+                name for name in _NON_EXECUTING_OPTIONS if bool(getattr(option, name, False))
+            ),
+            "stateful": tuple(
+                name for name in _STATEFUL_OPTIONS if bool(getattr(option, name, False))
+            ),
+        }
+    except (Exception, SystemExit):
+        # Let the actual pytest invocation report malformed options or a
+        # broken config.  This probe is advisory and must not replace pytest's
+        # own diagnostics with a scheduler-internal error.
+        return None
+    finally:
+        if config is not None:
+            config._ensure_unconfigure()
+        os.chdir(previous_cwd)
+        if had_autoload_setting:
+            assert previous_autoload_setting is not None
+            os.environ[PYTEST_DISABLE_PLUGIN_AUTOLOAD_ENV] = previous_autoload_setting
+        else:
+            os.environ.pop(PYTEST_DISABLE_PLUGIN_AUTOLOAD_ENV, None)
+
+
+def _serial_fallback_reason(options: dict[str, Any] | None) -> str | None:
+    if options is None:
+        return "effective_options_unresolved_requires_serial"
+    if options["stateful"]:
+        return "effective_stateful_mode_requires_serial"
+    if options["non_executing"]:
+        return "effective_non_executing_mode_requires_serial"
+    return None
+
+
+def _run_serial(extra_args: list[str]) -> int:
+    command = build_pytest_command(extra_args=extra_args)
+    completed = subprocess.run(
+        command,
+        cwd=REPO_ROOT,
+        env=_pytest_environment(),
+        check=False,
+    )
+    return completed.returncode
+
+
 def _partition_environment(
     *,
     baseline_path: Path,
@@ -457,6 +563,15 @@ def _replay_failed_shards(
 
 
 def run_process_worksteal(*, extra_args: list[str]) -> int:
+    effective_options = _effective_pytest_options(extra_args)
+    fallback_reason = _serial_fallback_reason(effective_options)
+    if fallback_reason is not None:
+        print(
+            f"[pytest-scheduler] effective={fallback_reason}",
+            flush=True,
+        )
+        return _run_serial(extra_args)
+
     parent = os.environ.get("TMPDIR")
     temporary_parent = parent if parent and Path(parent).is_dir() else None
     with tempfile.TemporaryDirectory(
@@ -634,9 +749,7 @@ def run_process_worksteal(*, extra_args: list[str]) -> int:
                 # -x, interruption, or an aborted phase can leave collected
                 # tests unexecuted. Only a completed teardown accounts for one.
                 retry_nodeids.extend(set(expected) - set(finished))
-                retry_nodeids.extend(
-                    reported_failures or (expected if int(record["returncode"]) != 0 else [])
-                )
+                retry_nodeids.extend(reported_failures)
                 totals.update(
                     {str(key): int(value) for key, value in result["stats"].items()}
                 )
@@ -724,13 +837,7 @@ def main(argv: list[str] | None = None) -> int:
     if scheduler["effective"] == "serial":
         command = build_pytest_command(extra_args=extra_args)
         print(f"[run] tests: {subprocess.list2cmdline(command)}", flush=True)
-        completed = subprocess.run(
-            command,
-            cwd=REPO_ROOT,
-            env=_pytest_environment(),
-            check=False,
-        )
-        return completed.returncode
+        return _run_serial(extra_args)
     return run_process_worksteal(extra_args=extra_args)
 
 

@@ -436,6 +436,234 @@ def test_process_retry_cache_preserves_failures_and_clears_fixed_selection(
         assert not cache_path.exists()
 
 
+def test_process_retry_collection_baseline_follows_last_failed_filter(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    monkeypatch.setattr(run_pytest_lane, "REPO_ROOT", tmp_path)
+    monkeypatch.setenv("PYTHONPATH", str(REPO_ROOT))
+    monkeypatch.setenv("PYTEST_DISABLE_PLUGIN_AUTOLOAD", "1")
+    monkeypatch.setenv("PYTEST_ADDOPTS", "--lf")
+    (tmp_path / "pytest.ini").write_text("[pytest]\n", encoding="utf-8")
+    (tmp_path / "test_selection.py").write_text(
+        "from pathlib import Path\n"
+        "def test_old(): Path('old-ran').touch()\n"
+        "def test_new(): Path('new-ran').touch()\n",
+        encoding="utf-8",
+    )
+    cache_path = tmp_path / ".pytest_cache/v/cache/lastfailed"
+    cache_path.parent.mkdir(parents=True)
+    cache_path.write_text(json.dumps({"test_selection.py::test_old": True}), encoding="utf-8")
+
+    assert run_pytest_lane.run_process_worksteal(extra_args=["test_selection.py"]) == 0
+    assert (tmp_path / "old-ran").exists()
+    assert not (tmp_path / "new-ran").exists()
+    assert json.loads(cache_path.read_text()) == {}
+
+
+def test_process_retry_does_not_cache_passing_tests_on_session_policy_failure(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    monkeypatch.setattr(run_pytest_lane, "REPO_ROOT", tmp_path)
+    monkeypatch.setenv("PYTHONPATH", str(REPO_ROOT))
+    monkeypatch.setenv("PYTEST_DISABLE_PLUGIN_AUTOLOAD", "1")
+    monkeypatch.setenv("PYTEST_ADDOPTS", "")
+    (tmp_path / "pytest.ini").write_text("[pytest]\n", encoding="utf-8")
+    (tmp_path / "conftest.py").write_text(
+        "import pytest\n"
+        "@pytest.hookimpl(wrapper=True, trylast=True)\n"
+        "def pytest_runtestloop(session):\n"
+        "    result = yield\n"
+        "    if not session.config.getoption('collectonly'):\n"
+        "        session.testsfailed = 1\n"
+        "    return result\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "test_policy.py").write_text("def test_passes(): pass\n", encoding="utf-8")
+    cache_path = tmp_path / ".pytest_cache/v/cache/lastfailed"
+    cache_path.parent.mkdir(parents=True)
+    unselected = {"other.py::test_old": True}
+    cache_path.write_text(json.dumps(unselected), encoding="utf-8")
+
+    assert run_pytest_lane.run_process_worksteal(extra_args=["test_policy.py"]) == 1
+    assert json.loads(cache_path.read_text()) == unselected
+
+
+def test_process_retry_records_failures_without_terminal_reporter(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    monkeypatch.setattr(run_pytest_lane, "REPO_ROOT", tmp_path)
+    monkeypatch.setenv("PYTHONPATH", str(REPO_ROOT))
+    monkeypatch.setenv("PYTEST_DISABLE_PLUGIN_AUTOLOAD", "1")
+    monkeypatch.setenv("PYTEST_ADDOPTS", "")
+    (tmp_path / "pytest.ini").write_text("[pytest]\n", encoding="utf-8")
+    (tmp_path / "conftest.py").write_text(
+        "def pytest_sessionstart(session):\n"
+        "    terminal = session.config.pluginmanager.getplugin('terminalreporter')\n"
+        "    if terminal is not None:\n"
+        "        session.config.pluginmanager.unregister(terminal)\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "test_no_terminal.py").write_text(
+        "def test_failure():\n    assert False\n", encoding="utf-8",
+    )
+
+    assert run_pytest_lane.run_process_worksteal(extra_args=["test_no_terminal.py"]) == 1
+    assert json.loads(
+        (tmp_path / ".pytest_cache/v/cache/lastfailed").read_text()
+    ) == {"test_no_terminal.py::test_failure": True}
+
+
+@pytest.mark.parametrize(
+    ("ini_addopts", "env_addopts", "extra_args"),
+    [
+        ("--sw", "", ["--sw"]),
+        ("", "--sw", []),
+    ],
+)
+def test_process_scheduler_preserves_stepwise_cursor_across_invocations(
+    tmp_path: Path,
+    monkeypatch,
+    ini_addopts: str,
+    env_addopts: str,
+    extra_args: list[str],
+) -> None:
+    monkeypatch.setattr(run_pytest_lane, "REPO_ROOT", tmp_path)
+    monkeypatch.setenv("PYTHONPATH", str(REPO_ROOT))
+    monkeypatch.setenv("PYTEST_DISABLE_PLUGIN_AUTOLOAD", "1")
+    monkeypatch.setenv("PYTEST_ADDOPTS", env_addopts)
+    (tmp_path / "pytest.ini").write_text(
+        f"[pytest]\naddopts = {ini_addopts}\n", encoding="utf-8",
+    )
+    (tmp_path / "test_stepwise.py").write_text(
+        "from pathlib import Path\n"
+        "def test_first():\n"
+        "    Path('first-ran').touch()\n"
+        "    assert Path('fix').exists()\n"
+        "def test_second():\n"
+        "    Path('second-ran').touch()\n",
+        encoding="utf-8",
+    )
+
+    selection = [*extra_args, "test_stepwise.py"]
+    assert run_pytest_lane.run_process_worksteal(extra_args=selection) == 2
+    assert (tmp_path / "first-ran").exists()
+    assert not (tmp_path / "second-ran").exists()
+    stepwise_path = tmp_path / ".pytest_cache/v/cache/stepwise"
+    assert json.loads(stepwise_path.read_text())["last_failed"] == (
+        "test_stepwise.py::test_first"
+    )
+
+    (tmp_path / "fix").touch()
+    assert run_pytest_lane.run_process_worksteal(extra_args=selection) == 0
+    assert (tmp_path / "second-ran").exists()
+    assert json.loads(stepwise_path.read_text())["last_failed"] is None
+
+
+def test_process_scheduler_uses_serial_when_effective_options_are_unresolved(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(run_pytest_lane, "_effective_pytest_options", lambda _: None)
+    calls: list[list[str]] = []
+
+    monkeypatch.setattr(
+        run_pytest_lane,
+        "_run_serial",
+        lambda args: calls.append(args) or 19,
+    )
+
+    assert run_pytest_lane.run_process_worksteal(extra_args=["test_example.py"]) == 19
+    assert calls == [["test_example.py"]]
+
+
+@pytest.mark.parametrize(
+    ("extra_args", "repo_config", "outside_config", "expected"),
+    [
+        (
+            ["-c", "selected.ini"],
+            "[pytest]\naddopts = --sw\n",
+            "[pytest]\naddopts = --collect-only\n",
+            {"non_executing": (), "stateful": ("stepwise",)},
+        ),
+        (
+            ["--rootdir", "project"],
+            "[pytest]\n",
+            "[pytest]\naddopts = --collect-only\n",
+            {"non_executing": (), "stateful": ()},
+        ),
+    ],
+)
+def test_effective_options_resolve_relative_paths_from_repo_root(
+    tmp_path: Path,
+    monkeypatch,
+    extra_args: list[str],
+    repo_config: str,
+    outside_config: str,
+    expected: dict[str, tuple[str, ...]],
+) -> None:
+    repo_root = tmp_path / "repo"
+    outside = tmp_path / "outside"
+    repo_root.mkdir()
+    outside.mkdir()
+    monkeypatch.setattr(run_pytest_lane, "REPO_ROOT", repo_root)
+    monkeypatch.chdir(outside)
+    monkeypatch.setenv("PYTEST_DISABLE_PLUGIN_AUTOLOAD", "1")
+
+    if extra_args[0] == "-c":
+        (repo_root / "selected.ini").write_text(repo_config, encoding="utf-8")
+        (outside / "selected.ini").write_text(outside_config, encoding="utf-8")
+    else:
+        (repo_root / "project").mkdir()
+        (outside / "project").mkdir()
+        (repo_root / "project" / "pytest.ini").write_text(
+            repo_config, encoding="utf-8",
+        )
+        (outside / "project" / "pytest.ini").write_text(
+            outside_config, encoding="utf-8",
+        )
+
+    assert run_pytest_lane._effective_pytest_options(extra_args) == expected
+
+
+@pytest.mark.parametrize(
+    ("mode", "ini_addopts", "env_addopts", "extra_args"),
+    [
+        ("collect-only", "--collect-only", "", []),
+        ("setup-only", "", "--setup-only", []),
+        ("setup-plan", "", "", ["--setup-plan"]),
+        ("fixtures", "--fixtures", "", []),
+        ("fixtures-per-test", "", "--fixtures-per-test", []),
+        ("cache-show", "", "", ["--cache-show=cache/"]),
+        ("markers", "", "", ["--markers"]),
+        ("version", "", "", ["--version"]),
+        ("help", "", "", ["--help"]),
+    ],
+)
+def test_process_scheduler_delegates_non_executing_modes_to_native_serial(
+    tmp_path: Path,
+    monkeypatch,
+    mode: str,
+    ini_addopts: str,
+    env_addopts: str,
+    extra_args: list[str],
+) -> None:
+    monkeypatch.setattr(run_pytest_lane, "REPO_ROOT", tmp_path)
+    monkeypatch.setenv("PYTHONPATH", str(REPO_ROOT))
+    monkeypatch.setenv("PYTEST_DISABLE_PLUGIN_AUTOLOAD", "1")
+    monkeypatch.setenv("PYTEST_ADDOPTS", env_addopts)
+    (tmp_path / "pytest.ini").write_text(
+        f"[pytest]\naddopts = {ini_addopts}\n", encoding="utf-8",
+    )
+    (tmp_path / "test_non_executing.py").write_text(
+        "from pathlib import Path\n"
+        "def test_body_is_not_run(): Path('body-ran').touch()\n",
+        encoding="utf-8",
+    )
+    assert run_pytest_lane.run_process_worksteal(
+        extra_args=[*extra_args, "test_non_executing.py"]
+    ) == 0
+    assert not (tmp_path / "body-ran").exists()
+
+
 @pytest.mark.parametrize("previous", ["not json", "[]", '{"old":true,"fixed":true}'])
 def test_retry_hint_repairs_corruption_without_losing_unselected_failures(
     tmp_path: Path, previous: str,
@@ -601,15 +829,18 @@ def test_pytest_shard_emits_bounded_failure_excerpt_while_running(
         longreprtext="traceback\n" + ("x" * (run_pytest_lane.LIVE_FAILURE_MAX_CHARS + 50)),
     )
 
-    run_pytest_lane.pytest_runtest_logreport(report)
-    run_pytest_lane.pytest_runtest_logreport(report)
+    try:
+        run_pytest_lane.pytest_runtest_logreport(report)
+        run_pytest_lane.pytest_runtest_logreport(report)
 
-    captured = capsys.readouterr()
-    assert captured.out == ""
-    assert captured.err.count("[pytest-live-failure]") == 1
-    assert "nodeid=tests/test_example.py::test_failure phase=call" in captured.err
-    assert "[pytest-live-failure-truncated]" in captured.err
-    assert len(captured.err) < run_pytest_lane.LIVE_FAILURE_MAX_CHARS + 250
+        captured = capsys.readouterr()
+        assert captured.out == ""
+        assert captured.err.count("[pytest-live-failure]") == 1
+        assert "nodeid=tests/test_example.py::test_failure phase=call" in captured.err
+        assert "[pytest-live-failure-truncated]" in captured.err
+        assert len(captured.err) < run_pytest_lane.LIVE_FAILURE_MAX_CHARS + 250
+    finally:
+        run_pytest_lane._LIVE_FAILURES.clear()
 
 
 def test_pytest_child_command_is_unbuffered_for_live_diagnostics() -> None:
