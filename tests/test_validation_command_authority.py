@@ -368,6 +368,7 @@ def test_pytest_process_shards_use_durable_logs_without_pipe_eof(monkeypatch) ->
                     "schema_version": run_pytest_lane.PARTITION_RESULT_SCHEMA,
                     "exitstatus": 0,
                     "stats": {"passed": 1},
+                    "finished_nodeids": [nodeid],
                 }
             ),
             encoding="utf-8",
@@ -384,6 +385,144 @@ def test_pytest_process_shards_use_durable_logs_without_pipe_eof(monkeypatch) ->
 
 def test_pytest_live_preview_tolerates_partial_utf8() -> None:
     assert run_pytest_lane._decode_live_output(b"prefix \xe2\x82") == "prefix \ufffd"
+
+
+@pytest.mark.parametrize("cache_enabled", [True, False])
+def test_process_retry_cache_preserves_failures_and_clears_fixed_selection(
+    tmp_path: Path, monkeypatch, cache_enabled: bool,
+) -> None:
+    monkeypatch.setattr(run_pytest_lane, "REPO_ROOT", tmp_path)
+    monkeypatch.setenv("PYTHONPATH", str(REPO_ROOT))
+    monkeypatch.setenv("PYTEST_DISABLE_PLUGIN_AUTOLOAD", "1")
+    monkeypatch.setenv("PYTHONDONTWRITEBYTECODE", "1")
+    monkeypatch.setenv("PYTEST_ADDOPTS", "" if cache_enabled else "-p no:cacheprovider")
+    (tmp_path / "pytest.ini").write_text("[pytest]\ncache_dir = retry cache\n", encoding="utf-8")
+    cache_path = tmp_path / "retry cache/v/cache/lastfailed"
+    unselected = {"unselected.py::test_old_failure": True}
+    if cache_enabled:
+        cache_path.parent.mkdir(parents=True)
+        cache_path.write_text(json.dumps(unselected), encoding="utf-8")
+    for name, peer in (("a", "b"), ("b", "a")):
+        (tmp_path / f"test_{name}.py").write_text(
+            "from pathlib import Path\nimport time\n"
+            f"def test_{name}():\n"
+            f"    Path('ready_{name}').touch()\n"
+            "    deadline = time.monotonic() + 10\n"
+            f"    while not Path('ready_{peer}').exists():\n"
+            "        assert time.monotonic() < deadline, 'peer worker did not start'\n"
+            "        time.sleep(0.01)\n"
+            f"    assert Path('fixed_{name}').exists(), 'deliberate failure'\n",
+            encoding="utf-8",
+        )
+    selection = ["test_a.py", "test_b.py"]
+    assert run_pytest_lane.run_process_worksteal(extra_args=selection) == 1
+    if cache_enabled:
+        assert json.loads(cache_path.read_text()) == {
+            **unselected, "test_a.py::test_a": True, "test_b.py::test_b": True,
+        }
+    else:
+        assert not cache_path.exists()
+
+    (tmp_path / "fixed_a").touch()
+    assert run_pytest_lane.run_process_worksteal(extra_args=selection) == 1
+    if cache_enabled:
+        assert json.loads(cache_path.read_text()) == {**unselected, "test_b.py::test_b": True}
+
+    (tmp_path / "fixed_b").touch()
+    assert run_pytest_lane.run_process_worksteal(extra_args=selection) == 0
+    if cache_enabled:
+        assert json.loads(cache_path.read_text()) == unselected
+    else:
+        assert not cache_path.exists()
+
+
+@pytest.mark.parametrize("previous", ["not json", "[]", '{"old":true,"fixed":true}'])
+def test_retry_hint_repairs_corruption_without_losing_unselected_failures(
+    tmp_path: Path, previous: str,
+) -> None:
+    cache_path = tmp_path / "lastfailed"
+    cache_path.write_text(previous, encoding="utf-8")
+    run_pytest_lane._update_lastfailed(cache_path, ["fixed"], ["failed"])
+    assert json.loads(cache_path.read_text()) == (
+        {"old": True, "failed": True} if previous.startswith("{") else {"failed": True}
+    )
+
+
+@pytest.mark.parametrize("failure", ["setup", "teardown", "crash"])
+def test_process_retry_retains_fixture_errors_and_worker_crashes(
+    tmp_path: Path, monkeypatch, failure: str,
+) -> None:
+    monkeypatch.setattr(run_pytest_lane, "REPO_ROOT", tmp_path)
+    monkeypatch.setenv("PYTHONPATH", str(REPO_ROOT))
+    monkeypatch.setenv("PYTEST_DISABLE_PLUGIN_AUTOLOAD", "1")
+    monkeypatch.setenv("PYTEST_ADDOPTS", "")
+    (tmp_path / "pytest.ini").write_text("[pytest]\n", encoding="utf-8")
+    (tmp_path / "test_error.py").write_text(
+        "import os\nimport pytest\n"
+        "@pytest.fixture\n"
+        "def resource():\n"
+        f"    assert {failure != 'setup'!r}, 'setup failed'\n"
+        "    yield\n"
+        f"    assert {failure != 'teardown'!r}, 'teardown failed'\n"
+        "def test_error(resource):\n"
+        f"    {'os._exit(9)' if failure == 'crash' else 'pass'}\n",
+        encoding="utf-8",
+    )
+    assert run_pytest_lane.run_process_worksteal(extra_args=["test_error.py"]) == 1
+    assert json.loads((tmp_path / ".pytest_cache/v/cache/lastfailed").read_text()) == {
+        "test_error.py::test_error": True,
+    }
+
+
+def test_interrupted_scheduler_retains_unfinished_selection(tmp_path: Path, monkeypatch) -> None:
+    nodeid = "tests/test_pending.py::test_pending"
+    cache_path = tmp_path / "lastfailed"
+
+    def collect(*_args, **kwargs):
+        run_pytest_lane.write_manifest(
+            Path(kwargs["env"][run_pytest_lane.PARTITION_BASELINE_ENV]),
+            [nodeid], lastfailed_path=cache_path,
+        )
+        return subprocess.CompletedProcess([], 0)
+
+    def interrupted(*_args, **_kwargs):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(run_pytest_lane.subprocess, "run", collect)
+    monkeypatch.setattr(run_pytest_lane.subprocess, "Popen", interrupted)
+    with pytest.raises(KeyboardInterrupt):
+        run_pytest_lane.run_process_worksteal(extra_args=[])
+    assert json.loads(cache_path.read_text()) == {nodeid: True}
+
+
+def test_process_retry_keeps_unexecuted_tests_and_honors_inherited_lastfailed(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    monkeypatch.setattr(run_pytest_lane, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(run_pytest_lane, "shard_count_for_selection", lambda _count: 1)
+    monkeypatch.setenv("PYTHONPATH", str(REPO_ROOT))
+    monkeypatch.setenv("PYTEST_DISABLE_PLUGIN_AUTOLOAD", "1")
+    monkeypatch.setenv("PYTEST_ADDOPTS", "")
+    (tmp_path / "pytest.ini").write_text("[pytest]\naddopts = -x\n", encoding="utf-8")
+    (tmp_path / "test_partial.py").write_text(
+        "from pathlib import Path\n"
+        "def test_passed():\n    pass\n"
+        "def test_failed():\n    assert Path('fixed').exists()\n"
+        "def test_pending():\n    Path('executed').touch()\n",
+        encoding="utf-8",
+    )
+    assert run_pytest_lane.run_process_worksteal(extra_args=["test_partial.py"]) == 1
+    cache_path = tmp_path / ".pytest_cache/v/cache/lastfailed"
+    assert json.loads(cache_path.read_text()) == {
+        "test_partial.py::test_failed": True,
+        "test_partial.py::test_pending": True,
+    }
+    assert not (tmp_path / "executed").exists()
+    (tmp_path / "fixed").touch()
+    monkeypatch.setenv("PYTEST_ADDOPTS", "--lf --last-failed-no-failures=none")
+    assert run_pytest_lane.run_process_worksteal(extra_args=["test_partial.py"]) == 0
+    assert (tmp_path / "executed").exists()
+    assert json.loads(cache_path.read_text()) == {}
 
 
 def test_pytest_scheduler_keeps_an_exact_serial_rollback() -> None:

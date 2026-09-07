@@ -84,6 +84,12 @@ still synced into deployed `Configs/` with the wrappers.
   explicit external plugin contract, use `PYTEST_DISABLE_PLUGIN_AUTOLOAD=`
   (an empty value) to opt out; pytest treats any non-empty value, including
   `=0`, as the disable flag.
+  Each shard now writes its own temporary pytest cache; the parent combines
+  failures into pytest's ordinary `lastfailed` cache once. Unfinished or
+  unaccounted shards remain conservatively eligible for retry, fixed selected
+  tests are cleared, and failures outside the selection are retained.
+  `-p no:cacheprovider` still disables this local hint. No cached result is
+  reused by the full lane, and no automatic retry is added.
 - Keep `validate_local_stats_port.py` as a thin delegation to the `aoa-stats`
   contract owner; do not copy the central schemas or validator into this repo.
 - Keep `validate_nested_agents.py` responsible for every discovered inherited

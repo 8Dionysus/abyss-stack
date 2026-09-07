@@ -13,6 +13,14 @@ It uses at most four process-isolated workers over an exact, file-aware shard
 union. Set `ABYSS_STACK_TEST_SCHEDULER=serial` for the explicit sequential
 oracle.
 
+For a quick check of previously observed failures, use
+`python scripts/run_pytest_lane.py -- --lf path/to/affected/tests`. The parallel
+lane preserves failures from every shard in pytest's ordinary cache. This is
+only an edit-time hint: it does not bind code, fixtures, dependencies, or the
+environment, and it is not release acceptance. After fixing source, run the
+complete affected owner territory; use the full lane when that boundary is
+unknown. Disabled or unwritable cache cannot provide reliable retry hints.
+
 ## Current Test Surface
 
 - `test_source_topology_validator_modules.py`: required source files and portable

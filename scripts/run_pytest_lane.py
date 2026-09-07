@@ -53,6 +53,7 @@ PARTITION_RESULT_SCHEMA = "abyss-stack-pytest-partition-result-v1"
 LIVE_FAILURE_MAX_CHARS = 4_000
 
 _LIVE_FAILURES: set[tuple[str, str]] = set()
+_FINISHED_NODEIDS: set[str] = set()
 
 
 def nodeid_digest(nodeids: list[str]) -> str:
@@ -60,13 +61,15 @@ def nodeid_digest(nodeids: list[str]) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
-def write_manifest(path: Path, nodeids: list[str]) -> None:
+def write_manifest(path: Path, nodeids: list[str], *, lastfailed_path: Path | None = None) -> None:
     payload = {
         "schema_version": PARTITION_MANIFEST_SCHEMA,
         "count": len(nodeids),
         "digest": nodeid_digest(nodeids),
         "nodeids": nodeids,
     }
+    if lastfailed_path is not None:
+        payload["lastfailed_path"] = str(lastfailed_path)
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
     temporary.write_text(
@@ -113,7 +116,15 @@ def pytest_collection_modifyitems(
         raise pytest.UsageError("duplicate pytest nodeids cannot form an exact partition")
 
     if mode == "collect":
-        write_manifest(_manifest_path_from_env(PARTITION_BASELINE_ENV), nodeids)
+        # Resolve pytest's actual cache target once, including cache_dir
+        # overrides. This private pytest seam is covered by a process test;
+        # the cache remains a local retry hint, never a release receipt.
+        cache = getattr(config, "cache", None)
+        write_manifest(
+            _manifest_path_from_env(PARTITION_BASELINE_ENV),
+            nodeids,
+            lastfailed_path=cache._getvaluepath("cache/lastfailed") if cache else None,
+        )
         return
     if mode != "shard":
         raise pytest.UsageError(f"unknown bounded pytest partition mode: {mode!r}")
@@ -149,6 +160,12 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int | pytest.ExitC
         "schema_version": PARTITION_RESULT_SCHEMA,
         "exitstatus": int(exitstatus),
         "stats": stats,
+        "finished_nodeids": sorted(_FINISHED_NODEIDS),
+        "failed_nodeids": sorted({
+            report.nodeid
+            for outcome in ("failed", "error")
+            for report in (terminal.stats.get(outcome, []) if terminal else [])
+        }),
     }
     result_path.write_text(
         json.dumps(payload, indent=2, sort_keys=True) + "\n",
@@ -166,7 +183,11 @@ def pytest_runtest_logreport(report: pytest.TestReport) -> None:
     for the full verdict or traceback.
     """
 
-    if os.environ.get(PARTITION_MODE_ENV) != "shard" or not report.failed:
+    if os.environ.get(PARTITION_MODE_ENV) != "shard":
+        return
+    if report.when == "teardown":
+        _FINISHED_NODEIDS.add(report.nodeid)
+    if not report.failed:
         return
     key = (report.nodeid, report.when)
     if key in _LIVE_FAILURES:
@@ -382,6 +403,31 @@ def _decode_live_output(raw: bytes) -> str:
     return raw.decode("utf-8", errors="replace")
 
 
+def _update_lastfailed(path: Path | None, completed: list[str], failed: list[str]) -> None:
+    """Update pytest's ordinary retry hint once in the parent, not per shard."""
+    if path is None:
+        return
+    try:
+        try:
+            previous = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            previous = {}
+        completed_set = set(completed)
+        remaining = {
+            nodeid: True for nodeid, value in (previous.items() if isinstance(previous, dict) else [])
+            if isinstance(nodeid, str) and value and nodeid not in completed_set
+        }
+        remaining.update(dict.fromkeys(failed, True))
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+        temporary.write_text(json.dumps(remaining, indent=2) + "\n", encoding="utf-8")
+        os.replace(temporary, path)
+    except OSError as exc:
+        # Match pytest's advisory cache posture: the actual test verdict is
+        # independent from whether a writable retry cache is available.
+        print(f"[warning] pytest retry cache not updated: {exc}", file=sys.stderr, flush=True)
+
+
 def _replay_failed_shards(
     records: dict[int, dict[str, Any]],
     failed_shards: list[int],
@@ -451,12 +497,18 @@ def run_process_worksteal(*, extra_args: list[str]) -> int:
             print("[error] exact pytest collection selected no tests", file=sys.stderr)
             return 5
 
+        raw_cache_path = json.loads(baseline_path.read_text(encoding="utf-8")).get("lastfailed_path")
+        lastfailed_path = Path(raw_cache_path) if raw_cache_path else None
+
         shard_count = shard_count_for_selection(len(baseline))
         assignments = partition_nodeids(baseline, shard_count=shard_count)
         flattened = [nodeid for assignment in assignments for nodeid in assignment]
         if len(flattened) != len(baseline) or set(flattened) != set(baseline):
             print("[error] pytest partition union does not equal the baseline", file=sys.stderr)
             return 2
+        # Until each shard is accounted for, retry conservatively includes all
+        # selected work. Interruptions and worker crashes must not erase it.
+        _update_lastfailed(lastfailed_path, [], baseline)
         print(
             "[pytest-partition] "
             f"collected={len(baseline)} digest={nodeid_digest(baseline)} "
@@ -501,6 +553,13 @@ def run_process_worksteal(*, extra_args: list[str]) -> int:
                         selection_args=assignments[shard_index],
                         explicit_plugin_args=explicit_plugin_args,
                     )
+                    # Independent pytest sessions otherwise overwrite each
+                    # other's cache/lastfailed, losing failures for --lf.
+                    command.extend(("-o", f"cache_dir={temporary / f'cache-{shard_index}'}"))
+                    if lastfailed_path is not None:
+                        # Collection already applied the user's --lf filter.
+                        # Empty isolated caches must not deselect assignments.
+                        command.append("--last-failed-no-failures=all")
                     process = subprocess.Popen(
                         command,
                         cwd=REPO_ROOT,
@@ -551,6 +610,7 @@ def run_process_worksteal(*, extra_args: list[str]) -> int:
 
         failed = False
         failed_shards: list[int] = []
+        retry_nodeids: list[str] = []
         totals: Counter[str] = Counter()
         for shard_index in range(len(assignments)):
             record = records[shard_index]
@@ -562,6 +622,21 @@ def run_process_worksteal(*, extra_args: list[str]) -> int:
                     raise ValueError("observed selection differs from assignment")
                 if int(result["exitstatus"]) != int(record["returncode"]):
                     raise ValueError("pytest exit status differs from process return code")
+                reported_failures = result.get("failed_nodeids", [])
+                finished = result.get("finished_nodeids", [])
+                if not all(
+                    isinstance(nodeids, list) and all(
+                        isinstance(nodeid, str) and nodeid in expected for nodeid in nodeids
+                    )
+                    for nodeids in (reported_failures, finished)
+                ):
+                    raise ValueError("pytest outcome nodeids are outside the assignment")
+                # -x, interruption, or an aborted phase can leave collected
+                # tests unexecuted. Only a completed teardown accounts for one.
+                retry_nodeids.extend(set(expected) - set(finished))
+                retry_nodeids.extend(
+                    reported_failures or (expected if int(record["returncode"]) != 0 else [])
+                )
                 totals.update(
                     {str(key): int(value) for key, value in result["stats"].items()}
                 )
@@ -569,6 +644,7 @@ def run_process_worksteal(*, extra_args: list[str]) -> int:
             except (OSError, ValueError, json.JSONDecodeError) as exc:
                 proof = f"invalid:{exc}"
                 failed = True
+                retry_nodeids.extend(assignments[shard_index])
             if int(record["returncode"]) != 0:
                 failed = True
             record["selected"] = len(assignments[shard_index])
@@ -583,6 +659,7 @@ def run_process_worksteal(*, extra_args: list[str]) -> int:
                 flush=True,
             )
 
+        _update_lastfailed(lastfailed_path, baseline, retry_nodeids)
         print(
             "[pytest-aggregate] "
             f"verdict={'failed' if failed else 'passed'} selected={len(baseline)} "

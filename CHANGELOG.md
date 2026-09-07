@@ -16,6 +16,10 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Preserve all parallel pytest failures in the ordinary last-failed cache for
+  explicit edit-time retries, retaining unfinished work conservatively and
+  clearing fixed selections without adding automatic retries or cached
+  release verdicts.
 - Keep opaque-command authority coverage split between a direct 31-shape guard
   matrix and four representative terminal-effect sentinels, while bypassing
   escape decoding work for plain text that cannot contain an escape marker.
