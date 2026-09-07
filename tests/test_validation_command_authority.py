@@ -575,23 +575,40 @@ def test_process_scheduler_uses_serial_when_effective_options_are_unresolved(
     assert calls == [["test_example.py"]]
 
 
-@pytest.mark.parametrize("mode", ["collect-only", "setup-only", "setup-plan"])
+@pytest.mark.parametrize(
+    ("mode", "ini_addopts", "env_addopts", "extra_args"),
+    [
+        ("collect-only", "--collect-only", "", []),
+        ("setup-only", "", "--setup-only", []),
+        ("setup-plan", "", "", ["--setup-plan"]),
+        ("fixtures", "--fixtures", "", []),
+        ("fixtures-per-test", "", "--fixtures-per-test", []),
+        ("cache-show", "", "", ["--cache-show=cache/"]),
+    ],
+)
 def test_process_scheduler_delegates_non_executing_modes_to_native_serial(
-    tmp_path: Path, monkeypatch, mode: str,
+    tmp_path: Path,
+    monkeypatch,
+    mode: str,
+    ini_addopts: str,
+    env_addopts: str,
+    extra_args: list[str],
 ) -> None:
     monkeypatch.setattr(run_pytest_lane, "REPO_ROOT", tmp_path)
     monkeypatch.setenv("PYTHONPATH", str(REPO_ROOT))
     monkeypatch.setenv("PYTEST_DISABLE_PLUGIN_AUTOLOAD", "1")
-    monkeypatch.setenv("PYTEST_ADDOPTS", "")
+    monkeypatch.setenv("PYTEST_ADDOPTS", env_addopts)
     (tmp_path / "pytest.ini").write_text(
-        f"[pytest]\naddopts = --{mode}\n", encoding="utf-8",
+        f"[pytest]\naddopts = {ini_addopts}\n", encoding="utf-8",
     )
     (tmp_path / "test_non_executing.py").write_text(
         "from pathlib import Path\n"
         "def test_body_is_not_run(): Path('body-ran').touch()\n",
         encoding="utf-8",
     )
-    assert run_pytest_lane.run_process_worksteal(extra_args=["test_non_executing.py"]) == 0
+    assert run_pytest_lane.run_process_worksteal(
+        extra_args=[*extra_args, "test_non_executing.py"]
+    ) == 0
     assert not (tmp_path / "body-ran").exists()
 
 

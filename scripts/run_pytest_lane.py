@@ -56,7 +56,14 @@ LIVE_FAILURE_MAX_CHARS = 4_000
 _LIVE_FAILURES: set[tuple[str, str]] = set()
 _FINISHED_NODEIDS: set[str] = set()
 
-_NON_EXECUTING_OPTIONS = ("collectonly", "setuponly", "setupplan")
+_NON_EXECUTING_OPTIONS = (
+    "collectonly",
+    "setuponly",
+    "setupplan",
+    "showfixtures",
+    "show_fixtures_per_test",
+    "cacheshow",
+)
 _STATEFUL_OPTIONS = ("stepwise", "stepwise_skip", "stepwise_reset")
 
 
