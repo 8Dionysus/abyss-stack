@@ -54,9 +54,10 @@ stabilizer, but it reads the release command sequence from the lane manifest.
   output is tailed from each durable shard log, so a descendant inheriting a
   shard descriptor cannot hold the scheduler past the pytest process exit. The
   effective `--sw`, `--collect-only`, `--setup-only`, `--setup-plan`,
-  `--fixtures`, `--fixtures-per-test`, and `--cache-show` modes use the serial
-  path even when enabled through `PYTEST_ADDOPTS` or config `addopts`;
-  non-executing modes retain native pytest cache semantics.
+  `--fixtures`, `--fixtures-per-test`, `--cache-show`, `--markers`,
+  `--version`, and `--help` modes use the serial path even when enabled through
+  `PYTEST_ADDOPTS` or config `addopts`; non-executing modes retain native
+  pytest cache semantics.
   runner disables third-party pytest plugin autoload by default; set
   `PYTEST_DISABLE_PLUGIN_AUTOLOAD=` (empty) for an explicit external-plugin
   run; pytest treats any non-empty value, including `=0`, as disabled.

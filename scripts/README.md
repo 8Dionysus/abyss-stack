@@ -78,9 +78,9 @@ still synced into deployed `Configs/` with the wrappers.
   route may process a targeted selection using the same exact partition proof.
   Effective stateful options such as `--sw` and non-executing options such as
   `--collect-only`, `--setup-only`, `--setup-plan`, `--fixtures`,
-  `--fixtures-per-test`, or `--cache-show` use the serial path even when
-  supplied through `PYTEST_ADDOPTS` or config `addopts`; non-executing runs
-  retain native pytest cache semantics.
+  `--fixtures-per-test`, `--cache-show`, `--markers`, `--version`, or `--help`
+  use the serial path even when supplied through `PYTEST_ADDOPTS` or config
+  `addopts`; non-executing runs retain native pytest cache semantics.
   Shard output is written to a durable log and tailed without waiting for
   descendant-owned descriptor EOF; failed shard logs are replayed at aggregate
   closeout for bounded-log diagnostics, and tests are not retried. The runner

@@ -584,6 +584,9 @@ def test_process_scheduler_uses_serial_when_effective_options_are_unresolved(
         ("fixtures", "--fixtures", "", []),
         ("fixtures-per-test", "", "--fixtures-per-test", []),
         ("cache-show", "", "", ["--cache-show=cache/"]),
+        ("markers", "", "", ["--markers"]),
+        ("version", "", "", ["--version"]),
+        ("help", "", "", ["--help"]),
     ],
 )
 def test_process_scheduler_delegates_non_executing_modes_to_native_serial(

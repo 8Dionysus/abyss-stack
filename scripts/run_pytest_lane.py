@@ -63,6 +63,9 @@ _NON_EXECUTING_OPTIONS = (
     "showfixtures",
     "show_fixtures_per_test",
     "cacheshow",
+    "markers",
+    "version",
+    "help",
 )
 _STATEFUL_OPTIONS = ("stepwise", "stepwise_skip", "stepwise_reset")
 
