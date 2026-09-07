@@ -1,25 +1,25 @@
 {
-  "allowed_bytes": 25407845,
-  "allowed_tracked_bytes": 40041221,
+  "allowed_bytes": 5791773,
+  "allowed_tracked_bytes": 40045619,
   "approved_by": "repository-owner",
   "base_ref": "ef7dbced929437c4f76f77bbef004a8cb6f9a18f",
   "candidate_identity": {
     "algorithm": "sha256:canonical-json-file-inventory-v2",
     "base_ref": "ef7dbced929437c4f76f77bbef004a8cb6f9a18f",
     "contract_version": "aoa-kag:budget-receipt-candidate-identity-v2",
-    "excluded_path": "kag/receipts/index_family_budget/48d1626927ac22178aeca7f0425abfbb11d67dca1ec68b3ba19b5dd1c49336d8.json",
-    "family_digest": "48d1626927ac22178aeca7f0425abfbb11d67dca1ec68b3ba19b5dd1c49336d8",
+    "excluded_path": "kag/receipts/index_family_budget/b42c385489a5323b13aabea2af9f6012a1d3962fabdb2ccd3068df34674d5448.json",
+    "family_digest": "b42c385489a5323b13aabea2af9f6012a1d3962fabdb2ccd3068df34674d5448",
     "file_count": 3332,
-    "seal": "c167bc9621a6863e62d99843f93b0a61ca419eeea226e9ac982c2419117360f3",
-    "source_epoch": "sha256:533f937fba9e6d885aa3d54ee97b3c88812c89f964c0321bae8b83a7b13f589b",
-    "source_snapshot": "sha256:a79f26d003ac9745664088f88d6de0f4f3cd678233932f6d0d32fd1a43598bdb"
+    "seal": "73e70b137607670ce4a8679bfe51d70735b18b1b7c2b0f000e2e9967dcf4eef7",
+    "source_epoch": "sha256:9f16608e0112187d86ab5491bde50db6ac731cfcce0f5a635b2c77b2e5af73c7",
+    "source_snapshot": "sha256:348e526245b16b9e5d189cbe9ba2b70673f6b363cba0315e49ccc548d7ae1ebe"
   },
-  "changed_generated_bytes": 25407845,
-  "changed_generated_files": 226,
+  "changed_generated_bytes": 5791773,
+  "changed_generated_files": 54,
   "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
   "default_limit_bytes": 1048576,
-  "head_family_digest": "48d1626927ac22178aeca7f0425abfbb11d67dca1ec68b3ba19b5dd1c49336d8",
-  "head_source_snapshot": "sha256:a79f26d003ac9745664088f88d6de0f4f3cd678233932f6d0d32fd1a43598bdb",
+  "head_family_digest": "b42c385489a5323b13aabea2af9f6012a1d3962fabdb2ccd3068df34674d5448",
+  "head_source_snapshot": "sha256:348e526245b16b9e5d189cbe9ba2b70673f6b363cba0315e49ccc548d7ae1ebe",
   "producer_identity": {
     "action": {
       "bytes": 5200,
@@ -1362,10 +1362,10 @@
     "revision_binding": "content-addressed-procedure-import-closure-portable-runtime-contract-and-descriptor-io-v1",
     "source_digest": "4882f50ab3a09b04b02715510f2e5dbec13fa60a5032f98e9e043dc9e79f812e"
   },
-  "reason": "Owner-approved portable-family regeneration after the bounded MCP outcome-preservation source commit 4edd9874c; bind the measured family to the exact source head and require normal CI review.",
+  "reason": "Bind the pytest last-failed repair candidate to the pinned owner-family producer.",
   "repo": "abyss-stack",
   "schema_version": "aoa-repo-local-kag-budget-receipt-v2",
   "scope": "generated_delta_and_tracked_size",
-  "tracked_bytes": 40041221,
+  "tracked_bytes": 40045619,
   "tracked_bytes_max": 24117248
 }
