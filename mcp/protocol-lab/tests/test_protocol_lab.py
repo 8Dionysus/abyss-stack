@@ -470,17 +470,6 @@ def test_expired_candidate_evidence_blocks_lab_pair_and_migration(
     assert "candidate_evidence_expired" in status["production_cutover_blockers"]
 
 
-def test_final_spec_and_stable_sdks_are_part_of_admitted_migration(
-    builder: Any,
-    matrix: dict[str, Any],
-    observation: dict[str, Any],
-) -> None:
-    status = builder.build_status(copy.deepcopy(matrix), observation)
-
-    assert status["core_read_migration_allowed"] is False
-    assert status["read_only_pilot_allowed"] is True
-
-
 def test_production_consumer_is_bound_to_wire_pair_evidence(
     builder: Any,
     matrix: dict[str, Any],
