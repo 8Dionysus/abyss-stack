@@ -16,6 +16,10 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Preserve structured stale and empty session-memory read outcomes without
+  misreporting them as backend command failures; retain transport errors,
+  unknown diagnostics, and nonempty evidence as separate states.
+
 - Preserve all parallel pytest failures in the ordinary last-failed cache for
   explicit edit-time retries, retaining unfinished work conservatively and
   clearing fixed selections without adding automatic retries or cached
