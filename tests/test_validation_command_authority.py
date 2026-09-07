@@ -436,6 +436,140 @@ def test_process_retry_cache_preserves_failures_and_clears_fixed_selection(
         assert not cache_path.exists()
 
 
+def test_process_retry_collection_baseline_follows_last_failed_filter(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    monkeypatch.setattr(run_pytest_lane, "REPO_ROOT", tmp_path)
+    monkeypatch.setenv("PYTHONPATH", str(REPO_ROOT))
+    monkeypatch.setenv("PYTEST_DISABLE_PLUGIN_AUTOLOAD", "1")
+    monkeypatch.setenv("PYTEST_ADDOPTS", "--lf")
+    (tmp_path / "pytest.ini").write_text("[pytest]\n", encoding="utf-8")
+    (tmp_path / "test_selection.py").write_text(
+        "from pathlib import Path\n"
+        "def test_old(): Path('old-ran').touch()\n"
+        "def test_new(): Path('new-ran').touch()\n",
+        encoding="utf-8",
+    )
+    cache_path = tmp_path / ".pytest_cache/v/cache/lastfailed"
+    cache_path.parent.mkdir(parents=True)
+    cache_path.write_text(json.dumps({"test_selection.py::test_old": True}), encoding="utf-8")
+
+    assert run_pytest_lane.run_process_worksteal(extra_args=["test_selection.py"]) == 0
+    assert (tmp_path / "old-ran").exists()
+    assert not (tmp_path / "new-ran").exists()
+    assert json.loads(cache_path.read_text()) == {}
+
+
+def test_process_retry_does_not_cache_passing_tests_on_session_policy_failure(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    monkeypatch.setattr(run_pytest_lane, "REPO_ROOT", tmp_path)
+    monkeypatch.setenv("PYTHONPATH", str(REPO_ROOT))
+    monkeypatch.setenv("PYTEST_DISABLE_PLUGIN_AUTOLOAD", "1")
+    monkeypatch.setenv("PYTEST_ADDOPTS", "")
+    (tmp_path / "pytest.ini").write_text("[pytest]\n", encoding="utf-8")
+    (tmp_path / "conftest.py").write_text(
+        "import pytest\n"
+        "@pytest.hookimpl(wrapper=True, trylast=True)\n"
+        "def pytest_runtestloop(session):\n"
+        "    result = yield\n"
+        "    if not session.config.getoption('collectonly'):\n"
+        "        session.testsfailed = 1\n"
+        "    return result\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "test_policy.py").write_text("def test_passes(): pass\n", encoding="utf-8")
+    cache_path = tmp_path / ".pytest_cache/v/cache/lastfailed"
+    cache_path.parent.mkdir(parents=True)
+    unselected = {"other.py::test_old": True}
+    cache_path.write_text(json.dumps(unselected), encoding="utf-8")
+
+    assert run_pytest_lane.run_process_worksteal(extra_args=["test_policy.py"]) == 1
+    assert json.loads(cache_path.read_text()) == unselected
+
+
+@pytest.mark.parametrize(
+    ("ini_addopts", "env_addopts", "extra_args"),
+    [
+        ("--sw", "", ["--sw"]),
+        ("", "--sw", []),
+    ],
+)
+def test_process_scheduler_preserves_stepwise_cursor_across_invocations(
+    tmp_path: Path,
+    monkeypatch,
+    ini_addopts: str,
+    env_addopts: str,
+    extra_args: list[str],
+) -> None:
+    monkeypatch.setattr(run_pytest_lane, "REPO_ROOT", tmp_path)
+    monkeypatch.setenv("PYTHONPATH", str(REPO_ROOT))
+    monkeypatch.setenv("PYTEST_DISABLE_PLUGIN_AUTOLOAD", "1")
+    monkeypatch.setenv("PYTEST_ADDOPTS", env_addopts)
+    (tmp_path / "pytest.ini").write_text(
+        f"[pytest]\naddopts = {ini_addopts}\n", encoding="utf-8",
+    )
+    (tmp_path / "test_stepwise.py").write_text(
+        "from pathlib import Path\n"
+        "def test_first():\n"
+        "    Path('first-ran').touch()\n"
+        "    assert Path('fix').exists()\n"
+        "def test_second():\n"
+        "    Path('second-ran').touch()\n",
+        encoding="utf-8",
+    )
+
+    selection = [*extra_args, "test_stepwise.py"]
+    assert run_pytest_lane.run_process_worksteal(extra_args=selection) == 2
+    assert (tmp_path / "first-ran").exists()
+    assert not (tmp_path / "second-ran").exists()
+    stepwise_path = tmp_path / ".pytest_cache/v/cache/stepwise"
+    assert json.loads(stepwise_path.read_text())["last_failed"] == (
+        "test_stepwise.py::test_first"
+    )
+
+    (tmp_path / "fix").touch()
+    assert run_pytest_lane.run_process_worksteal(extra_args=selection) == 0
+    assert (tmp_path / "second-ran").exists()
+    assert json.loads(stepwise_path.read_text())["last_failed"] is None
+
+
+def test_process_scheduler_uses_serial_when_effective_options_are_unresolved(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(run_pytest_lane, "_effective_pytest_options", lambda _: None)
+    calls: list[list[str]] = []
+
+    monkeypatch.setattr(
+        run_pytest_lane,
+        "_run_serial",
+        lambda args: calls.append(args) or 19,
+    )
+
+    assert run_pytest_lane.run_process_worksteal(extra_args=["test_example.py"]) == 19
+    assert calls == [["test_example.py"]]
+
+
+@pytest.mark.parametrize("mode", ["collect-only", "setup-only", "setup-plan"])
+def test_process_scheduler_delegates_non_executing_modes_to_native_serial(
+    tmp_path: Path, monkeypatch, mode: str,
+) -> None:
+    monkeypatch.setattr(run_pytest_lane, "REPO_ROOT", tmp_path)
+    monkeypatch.setenv("PYTHONPATH", str(REPO_ROOT))
+    monkeypatch.setenv("PYTEST_DISABLE_PLUGIN_AUTOLOAD", "1")
+    monkeypatch.setenv("PYTEST_ADDOPTS", "")
+    (tmp_path / "pytest.ini").write_text(
+        f"[pytest]\naddopts = --{mode}\n", encoding="utf-8",
+    )
+    (tmp_path / "test_non_executing.py").write_text(
+        "from pathlib import Path\n"
+        "def test_body_is_not_run(): Path('body-ran').touch()\n",
+        encoding="utf-8",
+    )
+    assert run_pytest_lane.run_process_worksteal(extra_args=["test_non_executing.py"]) == 0
+    assert not (tmp_path / "body-ran").exists()
+
+
 @pytest.mark.parametrize("previous", ["not json", "[]", '{"old":true,"fixed":true}'])
 def test_retry_hint_repairs_corruption_without_losing_unselected_failures(
     tmp_path: Path, previous: str,

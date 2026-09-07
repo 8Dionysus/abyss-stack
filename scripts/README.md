@@ -76,6 +76,10 @@ still synced into deployed `Configs/` with the wrappers.
   `ABYSS_STACK_TEST_SCHEDULER=serial`. Automatic mode keeps targeted arguments
   on the serial path; the existing `--scheduler process-4x32-file-aware`
   route may process a targeted selection using the same exact partition proof.
+  Effective stateful options such as `--sw` and non-executing options such as
+  `--collect-only`, `--setup-only`, or `--setup-plan` use the serial path even
+  when supplied through `PYTEST_ADDOPTS` or config `addopts`; non-executing
+  runs retain native pytest cache semantics.
   Shard output is written to a durable log and tailed without waiting for
   descendant-owned descriptor EOF; failed shard logs are replayed at aggregate
   closeout for bounded-log diagnostics, and tests are not retried. The runner
