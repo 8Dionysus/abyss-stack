@@ -760,15 +760,18 @@ def test_pytest_shard_emits_bounded_failure_excerpt_while_running(
         longreprtext="traceback\n" + ("x" * (run_pytest_lane.LIVE_FAILURE_MAX_CHARS + 50)),
     )
 
-    run_pytest_lane.pytest_runtest_logreport(report)
-    run_pytest_lane.pytest_runtest_logreport(report)
+    try:
+        run_pytest_lane.pytest_runtest_logreport(report)
+        run_pytest_lane.pytest_runtest_logreport(report)
 
-    captured = capsys.readouterr()
-    assert captured.out == ""
-    assert captured.err.count("[pytest-live-failure]") == 1
-    assert "nodeid=tests/test_example.py::test_failure phase=call" in captured.err
-    assert "[pytest-live-failure-truncated]" in captured.err
-    assert len(captured.err) < run_pytest_lane.LIVE_FAILURE_MAX_CHARS + 250
+        captured = capsys.readouterr()
+        assert captured.out == ""
+        assert captured.err.count("[pytest-live-failure]") == 1
+        assert "nodeid=tests/test_example.py::test_failure phase=call" in captured.err
+        assert "[pytest-live-failure-truncated]" in captured.err
+        assert len(captured.err) < run_pytest_lane.LIVE_FAILURE_MAX_CHARS + 250
+    finally:
+        run_pytest_lane._LIVE_FAILURES.clear()
 
 
 def test_pytest_child_command_is_unbuffered_for_live_diagnostics() -> None:
