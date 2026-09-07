@@ -488,6 +488,31 @@ def test_process_retry_does_not_cache_passing_tests_on_session_policy_failure(
     assert json.loads(cache_path.read_text()) == unselected
 
 
+def test_process_retry_records_failures_without_terminal_reporter(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    monkeypatch.setattr(run_pytest_lane, "REPO_ROOT", tmp_path)
+    monkeypatch.setenv("PYTHONPATH", str(REPO_ROOT))
+    monkeypatch.setenv("PYTEST_DISABLE_PLUGIN_AUTOLOAD", "1")
+    monkeypatch.setenv("PYTEST_ADDOPTS", "")
+    (tmp_path / "pytest.ini").write_text("[pytest]\n", encoding="utf-8")
+    (tmp_path / "conftest.py").write_text(
+        "def pytest_sessionstart(session):\n"
+        "    terminal = session.config.pluginmanager.getplugin('terminalreporter')\n"
+        "    if terminal is not None:\n"
+        "        session.config.pluginmanager.unregister(terminal)\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "test_no_terminal.py").write_text(
+        "def test_failure():\n    assert False\n", encoding="utf-8",
+    )
+
+    assert run_pytest_lane.run_process_worksteal(extra_args=["test_no_terminal.py"]) == 1
+    assert json.loads(
+        (tmp_path / ".pytest_cache/v/cache/lastfailed").read_text()
+    ) == {"test_no_terminal.py::test_failure": True}
+
+
 @pytest.mark.parametrize(
     ("ini_addopts", "env_addopts", "extra_args"),
     [

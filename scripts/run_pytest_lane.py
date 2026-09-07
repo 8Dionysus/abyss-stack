@@ -177,11 +177,14 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int | pytest.ExitC
         "exitstatus": int(exitstatus),
         "stats": stats,
         "finished_nodeids": sorted(_FINISHED_NODEIDS),
-        "failed_nodeids": sorted({
-            report.nodeid
-            for outcome in ("failed", "error")
-            for report in (terminal.stats.get(outcome, []) if terminal else [])
-        }),
+        "failed_nodeids": sorted(
+            {nodeid for nodeid, _when in _LIVE_FAILURES}
+            | {
+                report.nodeid
+                for outcome in ("failed", "error")
+                for report in (terminal.stats.get(outcome, []) if terminal else [])
+            }
+        ),
     }
     result_path.write_text(
         json.dumps(payload, indent=2, sort_keys=True) + "\n",
