@@ -81,6 +81,8 @@ still synced into deployed `Configs/` with the wrappers.
   `--fixtures-per-test`, `--cache-show`, `--markers`, `--version`, or `--help`
   use the serial path even when supplied through `PYTEST_ADDOPTS` or config
   `addopts`; non-executing runs retain native pytest cache semantics.
+  Relative `-c`/`--config-file` and `--rootdir` paths are resolved from the
+  repository root, matching the working directory used by each child.
   Shard output is written to a durable log and tailed without waiting for
   descendant-owned descriptor EOF; failed shard logs are replayed at aggregate
   closeout for bounded-log diagnostics, and tests are not retried. The runner

@@ -366,7 +366,12 @@ def _effective_pytest_options(extra_args: list[str]) -> dict[str, Any] | None:
     previous_autoload_setting = os.environ.get(PYTEST_DISABLE_PLUGIN_AUTOLOAD_ENV)
     if not had_autoload_setting:
         os.environ[PYTEST_DISABLE_PLUGIN_AUTOLOAD_ENV] = "1"
+    previous_cwd = Path.cwd()
     try:
+        # The real serial and collection/shard children run from REPO_ROOT.
+        # Pytest resolves relative -c/--config-file and --rootdir paths from
+        # its process cwd, so the probe must use that same working directory.
+        os.chdir(REPO_ROOT)
         config = get_config(probe_args)
         config.invocation_params = pytest.Config.InvocationParams(
             args=tuple(probe_args),
@@ -391,6 +396,7 @@ def _effective_pytest_options(extra_args: list[str]) -> dict[str, Any] | None:
     finally:
         if config is not None:
             config._ensure_unconfigure()
+        os.chdir(previous_cwd)
         if had_autoload_setting:
             assert previous_autoload_setting is not None
             os.environ[PYTEST_DISABLE_PLUGIN_AUTOLOAD_ENV] = previous_autoload_setting

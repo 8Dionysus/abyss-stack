@@ -576,6 +576,55 @@ def test_process_scheduler_uses_serial_when_effective_options_are_unresolved(
 
 
 @pytest.mark.parametrize(
+    ("extra_args", "repo_config", "outside_config", "expected"),
+    [
+        (
+            ["-c", "selected.ini"],
+            "[pytest]\naddopts = --sw\n",
+            "[pytest]\naddopts = --collect-only\n",
+            {"non_executing": (), "stateful": ("stepwise",)},
+        ),
+        (
+            ["--rootdir", "project"],
+            "[pytest]\n",
+            "[pytest]\naddopts = --collect-only\n",
+            {"non_executing": (), "stateful": ()},
+        ),
+    ],
+)
+def test_effective_options_resolve_relative_paths_from_repo_root(
+    tmp_path: Path,
+    monkeypatch,
+    extra_args: list[str],
+    repo_config: str,
+    outside_config: str,
+    expected: dict[str, tuple[str, ...]],
+) -> None:
+    repo_root = tmp_path / "repo"
+    outside = tmp_path / "outside"
+    repo_root.mkdir()
+    outside.mkdir()
+    monkeypatch.setattr(run_pytest_lane, "REPO_ROOT", repo_root)
+    monkeypatch.chdir(outside)
+    monkeypatch.setenv("PYTEST_DISABLE_PLUGIN_AUTOLOAD", "1")
+
+    if extra_args[0] == "-c":
+        (repo_root / "selected.ini").write_text(repo_config, encoding="utf-8")
+        (outside / "selected.ini").write_text(outside_config, encoding="utf-8")
+    else:
+        (repo_root / "project").mkdir()
+        (outside / "project").mkdir()
+        (repo_root / "project" / "pytest.ini").write_text(
+            repo_config, encoding="utf-8",
+        )
+        (outside / "project" / "pytest.ini").write_text(
+            outside_config, encoding="utf-8",
+        )
+
+    assert run_pytest_lane._effective_pytest_options(extra_args) == expected
+
+
+@pytest.mark.parametrize(
     ("mode", "ini_addopts", "env_addopts", "extra_args"),
     [
         ("collect-only", "--collect-only", "", []),

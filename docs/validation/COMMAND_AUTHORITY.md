@@ -57,7 +57,9 @@ stabilizer, but it reads the release command sequence from the lane manifest.
   `--fixtures`, `--fixtures-per-test`, `--cache-show`, `--markers`,
   `--version`, and `--help` modes use the serial path even when enabled through
   `PYTEST_ADDOPTS` or config `addopts`; non-executing modes retain native
-  pytest cache semantics.
+  pytest cache semantics. Relative `-c`/`--config-file` and `--rootdir` paths
+  are resolved from the repository root, matching the working directory used
+  by the serial and process-isolated child invocations.
   runner disables third-party pytest plugin autoload by default; set
   `PYTEST_DISABLE_PLUGIN_AUTOLOAD=` (empty) for an explicit external-plugin
   run; pytest treats any non-empty value, including `=0`, as disabled.
