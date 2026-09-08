@@ -22,6 +22,9 @@ Tracking starts with the community-docs baseline for this repository.
 - Compact recognized nested session-evidence packet containers within the
   existing MCP output ceiling while preserving owner refs, freshness reasons,
   and explicit omissions; unknown oversized payloads remain blocked.
+- Keep authenticated canary attestations out of generic secret-material
+  screening while scanning all other model and owner payload fields, so
+  generated Ed25519 signatures cannot trigger false secret detections.
 
 - Preserve all parallel pytest failures in the ordinary last-failed cache for
   explicit edit-time retries, retaining unfinished work conservatively and
