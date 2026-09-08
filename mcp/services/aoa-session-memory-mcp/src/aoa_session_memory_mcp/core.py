@@ -805,6 +805,11 @@ def _archive_payload_data_status(payload: dict[str, Any], command: str) -> str |
         if key in mapping
     ]
     usage_chain = payload.get("usage_chain")
+    if any(
+        mapping.get("first_ref")
+        for mapping in (payload, usage_chain if isinstance(usage_chain, dict) else {})
+    ):
+        return None
     lists = [
         mapping[key]
         for mapping in (payload, usage_chain if isinstance(usage_chain, dict) else {})
@@ -822,7 +827,9 @@ def _archive_payload_data_status(payload: dict[str, Any], command: str) -> str |
     return None
 
 
-def _archive_payload_has_hard_diagnostic(payload: dict[str, Any]) -> bool:
+def _archive_payload_has_hard_diagnostic(payload: dict[str, Any], *, depth: int = 0) -> bool:
+    if depth > 6:
+        return True
     diagnostics = payload.get("diagnostics", [])
     if not isinstance(diagnostics, list):
         return True
@@ -835,7 +842,20 @@ def _archive_payload_has_hard_diagnostic(payload: dict[str, Any]) -> bool:
         if isinstance(provider, dict)
         and provider.get("status") in {"dirty", "stale", "stale-readable", "not_current"}
     }
-    return any(not isinstance(item, str) or item not in allowed for item in diagnostics)
+    if any(not isinstance(item, str) or item not in allowed for item in diagnostics):
+        return True
+    # A top-level stale summary does not overrule a provider's own failure.
+    if isinstance(providers, dict) and any(
+        not isinstance(provider, dict)
+        or _archive_payload_has_hard_diagnostic(provider, depth=depth + 1)
+        for provider in providers.values()
+    ):
+        return True
+    return any(
+        _archive_payload_has_hard_diagnostic(child, depth=depth + 1)
+        for key in ("provider", "freshness", "global", "scoped", "projection_freshness")
+        if isinstance(child := payload.get(key), dict)
+    )
 
 
 def _normalize_trace_route_payload(payload: dict[str, Any]) -> dict[str, Any]:
