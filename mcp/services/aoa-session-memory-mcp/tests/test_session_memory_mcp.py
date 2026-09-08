@@ -2220,6 +2220,8 @@ def test_allow_nonzero_json_preserves_owner_empty_or_stale_payload(
         ("usage-chain", 1, {"evidence_refs": ["raw:line:1"]}),
         ("usage-chain", 1, {"first_ref": {"raw_ref": "raw:line:1"}}),
         ("usage-chain", 1, {"usage_chain": {"first_ref": {"raw_ref": "raw:line:1"}}}),
+        ("usage-chain", 1, {"false_correlation_event_count": 1}),
+        ("usage-chain", 1, {"false_correlation_events": [{"raw_ref": "raw:line:1"}]}),
         ("search-provider-status", 1, {
             "providers": {"sqlite": {"status": "stale", "diagnostics": ["database read failure"]}},
             "diagnostics": ["sqlite:stale"],

@@ -188,6 +188,9 @@ MCP_USAGE_DATA_COUNT_FIELDS = (
     "evidence_ref_count",
     "window_count",
     "neighborhood_count",
+    "false_correlation_event_count",
+    "false_correlation_edge_count",
+    "unique_false_correlation_event_count",
 )
 STATUS_TIMEOUT_SECONDS = RUNTIME_LIMITS.status_timeout_seconds
 SEARCH_TIMEOUT_SECONDS = RUNTIME_LIMITS.search_timeout_seconds
@@ -816,7 +819,8 @@ def _archive_payload_data_status(payload: dict[str, Any], command: str) -> str |
         for key in (
             "entrypoint_events", "usage_events", "result_events", "outcome_events",
             "context_events", "consequence_events", "document_refs", "evidence_refs",
-            "neighborhoods", "chains",
+            "neighborhoods", "chains", "unmatched_consequence_events",
+            "false_correlation_events",
         )
         if isinstance(mapping.get(key), list)
     ]
