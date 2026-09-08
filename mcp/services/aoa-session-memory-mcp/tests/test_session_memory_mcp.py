@@ -2157,6 +2157,94 @@ def test_nonzero_archive_exit_cannot_preserve_ok_true_json(tmp_path: Path) -> No
     assert payload["mcp_access"]["degraded"] is True
 
 
+@pytest.mark.parametrize(
+    ("freshness", "expected_outcome", "expected_response_kind", "expected_degraded"),
+    [
+        ({"global": {"status": "stale"}}, "stale", "degraded", True),
+        ({}, "no_data", "empty", False),
+    ],
+)
+def test_allow_nonzero_json_preserves_owner_empty_or_stale_payload(
+    tmp_path: Path,
+    freshness: dict[str, Any],
+    expected_outcome: str,
+    expected_response_kind: str,
+    expected_degraded: bool,
+) -> None:
+    class OwnerStateRunner(FakeRunner):
+        def __call__(self, argv: list[str], timeout: float) -> CommandOutput:
+            if argv[2] == "usage-chain":
+                self.calls.append((argv[2], tuple(argv[3:])))
+                self.timeouts.append((argv[2], timeout))
+                payload = {
+                    "schema_version": 1,
+                    "artifact_type": "session_memory_entity_usage_chain",
+                    "ok": False,
+                    "mutates": False,
+                    "counts": {
+                        "event_count": 0,
+                        "usage_event_count": 0,
+                        "chain_count": 0,
+                        "document_ref_count": 0,
+                        "evidence_ref_count": 0,
+                    },
+                    "usage_chain": {"chains": []},
+                    "first_ref": {},
+                    "evidence_refs": [],
+                    "freshness": freshness,
+                    "diagnostics": [],
+                }
+                return CommandOutput(argv, 1, json.dumps(payload), "", 1.0)
+            return super().__call__(argv, timeout)
+
+    state = state_with_fixture(tmp_path, OwnerStateRunner())
+
+    payload = state._archive_command("usage-chain", [], allow_nonzero_json=True)
+
+    assert payload["ok"] is False
+    assert payload["diagnostics"] == []
+    assert payload["mcp_access"]["returncode"] == 1
+    assert payload["mcp_access"]["outcome"] == expected_outcome
+    assert payload["mcp_access"]["response_kind"] == expected_response_kind
+    assert payload["mcp_access"]["degraded"] is expected_degraded
+    assert payload["mcp_access"]["data_status"] == "no_data"
+    assert "archive command failed" not in payload["diagnostics"]
+
+
+@pytest.mark.parametrize(
+    ("command", "returncode", "overrides"),
+    [
+        ("usage-chain", 137, {}),
+        ("retrieve", 1, {}),
+        ("usage-chain", 1, {"diagnostics": ["database connection lost"]}),
+        ("usage-chain", 1, {"evidence_refs": ["raw:line:1"]}),
+        ("usage-chain", 1, {"first_ref": {"raw_ref": "raw:line:1"}}),
+        ("usage-chain", 1, {"usage_chain": {"first_ref": {"raw_ref": "raw:line:1"}}}),
+        ("usage-chain", 1, {"false_correlation_event_count": 1}),
+        ("usage-chain", 1, {"false_correlation_events": [{"raw_ref": "raw:line:1"}]}),
+        ("search-provider-status", 1, {
+            "providers": {"sqlite": {"status": "stale", "diagnostics": ["database read failure"]}},
+            "diagnostics": ["sqlite:stale"],
+        }),
+    ],
+)
+def test_owner_state_exception_does_not_hide_process_or_payload_failure(
+    tmp_path: Path, command: str, returncode: int, overrides: dict[str, Any]
+) -> None:
+    class FailedRunner(FakeRunner):
+        def __call__(self, argv: list[str], timeout: float) -> CommandOutput:
+            payload = {
+                "ok": False, "counts": {"event_count": 0},
+                "evidence_refs": [], "diagnostics": [], **overrides,
+            }
+            return CommandOutput(argv, returncode, json.dumps(payload), "", 1.0)
+
+    state = state_with_fixture(tmp_path, FailedRunner())
+    payload = state._archive_command(command, [], allow_nonzero_json=True)
+    assert payload["mcp_access"]["outcome"] == "backend_error"
+    assert "archive command failed" in payload["diagnostics"]
+
+
 def test_trace_returns_structured_degradation_when_backend_has_no_route_candidates(tmp_path: Path) -> None:
     class FailedTraceRunner(FakeRunner):
         def __call__(self, argv: list[str], timeout: float) -> CommandOutput:
@@ -5239,6 +5327,8 @@ def test_freshness_check_keeps_target_refs_ok_when_unrelated_session_is_stale(tm
     assert provider_freshness["dirty_session_samples"][0]["session_id"] == "session-other"
     assert provider_freshness["omitted_fields"] == ["dirty_session_ids", "dirty_sessions"]
     assert freshness["provider"]["mcp_access"]["response_compacted"] is True
+    assert freshness["provider"]["mcp_access"]["outcome"] == "stale"
+    assert "archive command failed" not in freshness["provider"]["diagnostics"]
     full_freshness_route = freshness["provider"]["mcp_access"]["full_freshness_route"]
     assert tmp_path.as_posix() in full_freshness_route
     assert (tmp_path / ".aoa").as_posix() in full_freshness_route

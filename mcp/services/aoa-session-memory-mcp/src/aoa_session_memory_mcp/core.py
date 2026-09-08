@@ -167,6 +167,31 @@ MCP_ARCHIVE_FORBIDDEN_FLAG_PREFIXES = (
     "--refresh-state",
     "--write",
 )
+MCP_STRUCTURED_STATE_COMMANDS = frozenset(
+    {
+        "entity-usage-audit",
+        "entity-usage-neighborhood",
+        "search-provider-status",
+        "usage-chain",
+    }
+)
+MCP_USAGE_DATA_COUNT_FIELDS = (
+    "event_count",
+    "entrypoint_event_count",
+    "usage_event_count",
+    "result_event_count",
+    "outcome_event_count",
+    "context_event_count",
+    "consequence_event_count",
+    "chain_count",
+    "document_ref_count",
+    "evidence_ref_count",
+    "window_count",
+    "neighborhood_count",
+    "false_correlation_event_count",
+    "false_correlation_edge_count",
+    "unique_false_correlation_event_count",
+)
 STATUS_TIMEOUT_SECONDS = RUNTIME_LIMITS.status_timeout_seconds
 SEARCH_TIMEOUT_SECONDS = RUNTIME_LIMITS.search_timeout_seconds
 GOAL_LIFECYCLE_TIMEOUT_SECONDS = RUNTIME_LIMITS.goal_lifecycle_timeout_seconds
@@ -749,6 +774,92 @@ def _append_diagnostic(payload: dict[str, Any], diagnostic: str) -> list[str]:
         diagnostics.append(diagnostic)
     payload["diagnostics"] = diagnostics
     return diagnostics
+
+
+def _archive_status_is_stale(value: Any, *, depth: int = 0) -> bool:
+    if depth > 6:
+        return False
+    if isinstance(value, dict):
+        for key in ("status", "freshness_status"):
+            status = str(value.get(key) or "").strip().casefold()
+            if status in {"dirty", "stale", "stale-readable", "not_current"}:
+                return True
+        return any(
+            _archive_status_is_stale(child, depth=depth + 1)
+            for key, child in value.items()
+            if key in {"freshness", "provider", "providers", "global", "scoped", "projection_freshness"}
+            or (depth < 2 and isinstance(child, dict))
+        )
+    elif isinstance(value, list):
+        return any(_archive_status_is_stale(child, depth=depth + 1) for child in value)
+    return False
+
+
+def _archive_payload_data_status(payload: dict[str, Any], command: str) -> str | None:
+    if command not in MCP_STRUCTURED_STATE_COMMANDS - {"search-provider-status"}:
+        return None
+    # Use all observed result-bearing fields: one empty count must not hide
+    # nonempty evidence elsewhere in the owner's packet.
+    counts = payload.get("counts")
+    count_values = [
+        mapping[key]
+        for mapping in (payload, counts if isinstance(counts, dict) else {})
+        for key in MCP_USAGE_DATA_COUNT_FIELDS
+        if key in mapping
+    ]
+    usage_chain = payload.get("usage_chain")
+    if any(
+        mapping.get("first_ref")
+        for mapping in (payload, usage_chain if isinstance(usage_chain, dict) else {})
+    ):
+        return None
+    lists = [
+        mapping[key]
+        for mapping in (payload, usage_chain if isinstance(usage_chain, dict) else {})
+        for key in (
+            "entrypoint_events", "usage_events", "result_events", "outcome_events",
+            "context_events", "consequence_events", "document_refs", "evidence_refs",
+            "neighborhoods", "chains", "unmatched_consequence_events",
+            "false_correlation_events",
+        )
+        if isinstance(mapping.get(key), list)
+    ]
+    if (count_values or lists) and all(
+        type(value) is int and value == 0 for value in count_values
+    ) and all(not values for values in lists):
+        return "no_data"
+    return None
+
+
+def _archive_payload_has_hard_diagnostic(payload: dict[str, Any], *, depth: int = 0) -> bool:
+    if depth > 6:
+        return True
+    diagnostics = payload.get("diagnostics", [])
+    if not isinstance(diagnostics, list):
+        return True
+    # Only known provider-state summaries may accompany a non-error state.
+    # Unknown diagnostics stay failures; do not guess from English keywords.
+    providers = payload.get("providers")
+    allowed = {
+        f"{name}:{provider.get('status')}"
+        for name, provider in (providers.items() if isinstance(providers, dict) else ())
+        if isinstance(provider, dict)
+        and provider.get("status") in {"dirty", "stale", "stale-readable", "not_current"}
+    }
+    if any(not isinstance(item, str) or item not in allowed for item in diagnostics):
+        return True
+    # A top-level stale summary does not overrule a provider's own failure.
+    if isinstance(providers, dict) and any(
+        not isinstance(provider, dict)
+        or _archive_payload_has_hard_diagnostic(provider, depth=depth + 1)
+        for provider in providers.values()
+    ):
+        return True
+    return any(
+        _archive_payload_has_hard_diagnostic(child, depth=depth + 1)
+        for key in ("provider", "freshness", "global", "scoped", "projection_freshness")
+        if isinstance(child := payload.get(key), dict)
+    )
 
 
 def _normalize_trace_route_payload(payload: dict[str, Any]) -> dict[str, Any]:
@@ -3688,18 +3799,35 @@ class AoASessionMemoryMCPState:
                 payload["timeout_seconds"] = effective_timeout
         if not isinstance(payload, dict):
             payload = {"ok": False, "payload": payload, "diagnostics": ["command returned non-object JSON"]}
-        if output.returncode != 0:
+        data_status = _archive_payload_data_status(payload, command)
+        stale = _archive_status_is_stale(payload)
+        owner_reported_state = (
+            allow_nonzero_json
+            and command in MCP_STRUCTURED_STATE_COMMANDS
+            and output.returncode in {0, 1}
+            and not timed_out
+            and payload.get("ok") is False
+            and not output.stderr.strip()
+            and not _archive_payload_has_hard_diagnostic(payload)
+            and (stale or data_status == "no_data")
+        )
+        if output.returncode != 0 and not owner_reported_state:
             payload["ok"] = False
             _append_diagnostic(payload, "command timed out" if timed_out else "archive command failed")
-        backend_not_ready = payload.get("ok") is False and output.returncode == 0
         if timed_out:
             outcome = "timeout"
+        elif owner_reported_state and stale:
+            outcome = "stale"
+        elif owner_reported_state and data_status == "no_data":
+            outcome = "no_data"
         elif output.returncode != 0:
             outcome = "backend_error"
-        elif backend_not_ready:
+        elif payload.get("ok") is False:
             outcome = "backend_not_ready"
         else:
             outcome = "ok"
+        response_kind = "empty" if outcome == "no_data" else "normal" if outcome == "ok" else "degraded"
+        degraded = outcome not in {"ok", "no_data"}
         payload["mcp_access"] = {
             "mutates": False,
             "archive_command": command,
@@ -3708,11 +3836,13 @@ class AoASessionMemoryMCPState:
             "timeout_seconds": effective_timeout,
             "stderr": output.stderr.strip()[:1000],
             "outcome": outcome,
-            "response_kind": "degraded" if outcome != "ok" else "normal",
-            "degraded": outcome != "ok",
+            "response_kind": response_kind,
+            "degraded": degraded,
             "allow_nonzero_json": allow_nonzero_json,
             "authority_boundary": "MCP output routes to .aoa refs; it is not reviewed truth.",
         }
+        if owner_reported_state and data_status is not None:
+            payload["mcp_access"]["data_status"] = data_status
         return payload
 
     def _archive_argv(self, command: str, args: list[str] | None = None) -> list[str]:
@@ -6679,6 +6809,7 @@ class AoASessionMemoryMCPState:
         provider_full = self._archive_command(
             "search-provider-status",
             provider_args,
+            allow_nonzero_json=True,
             timeout_seconds=self._route_timeout(STATUS_TIMEOUT_SECONDS),
         )
         diagnostics = []
@@ -6692,6 +6823,7 @@ class AoASessionMemoryMCPState:
             global_provider = self._archive_command(
                 "search-provider-status",
                 global_provider_args,
+                allow_nonzero_json=True,
                 timeout_seconds=self._route_timeout(STATUS_TIMEOUT_SECONDS),
             )
             if global_provider.get("ok"):

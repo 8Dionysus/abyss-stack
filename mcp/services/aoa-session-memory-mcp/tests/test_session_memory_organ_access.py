@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import json
 import os
 
 import pytest
@@ -149,6 +150,136 @@ def test_capability_projection_removes_bulky_provider_metadata() -> None:
     assert "metadata" not in str(projected["provider"])
     assert projected["mcp_access"]["source_payload_bytes"] > 40_000
     assert _payload_bytes(projected) <= CAPABILITY_PROFILE_MAX_OUTPUT_BYTES
+
+
+def test_capability_projection_compacts_nested_evidence_packet_and_preserves_refs() -> None:
+    provider = {
+        "selected": "portable_sqlite",
+        "authoritative_result_provider": "portable_sqlite",
+        "status": {
+            "ok": False,
+            "selected_provider": "portable_sqlite",
+            "reasons": ["portable provider is stale"],
+            "providers": {
+                "portable_sqlite": {
+                    "ok": False,
+                    "status": "stale",
+                    "reasons": ["freshness state is dirty"],
+                    "metadata": {"large": "x" * 40_000},
+                    "freshness": {
+                        "status": "stale",
+                        "reasons": ["freshness state is dirty"],
+                        "diagnostics": ["projection_dirty"],
+                        "dirty_session_ids": ["session-1", "session-2"],
+                    },
+                    "diagnostics": ["projection_dirty"],
+                }
+            },
+        },
+    }
+    freshness_provider = {
+        "schema_version": 1,
+        "artifact_type": "search_provider_status",
+        "ok": False,
+        "selected_provider": "portable_sqlite",
+        "reasons": ["portable provider is stale"],
+        "diagnostics": ["portable_sqlite:stale"],
+        "providers": {
+            "portable_sqlite": {
+                "provider": "portable_sqlite",
+                "ok": False,
+                "status": "stale",
+                "reasons": ["freshness state is dirty"],
+                "metadata": {"large": "x" * 40_000},
+                "diagnostics": ["projection_dirty"],
+                "freshness": {
+                    "status": "stale",
+                    "dirty_session_ids": [f"session-{index}" for index in range(100)],
+                    "dirty_session_count": 100,
+                },
+            }
+        },
+    }
+    evidence_item = {
+        "event_id": "event-1",
+        "raw_ref": "raw:line:17",
+        "segment_ref": "segment-1.md#event-1",
+        "session_ref": "session:session-1",
+        "refs": {
+            "raw": "raw:line:17",
+            "segment": "segment-1.md#event-1",
+            "session": "session:session-1",
+        },
+        "preview": "bounded evidence",
+        "body": "x" * 40_000,
+    }
+    payload = {
+        "schema": "aoa_session_memory_evidence_packet_v1",
+        "ok": True,
+        "mutates": False,
+        "candidate_posture": "candidate evidence for review; not a verdict",
+        "search_hits": [evidence_item],
+        "retrieval_packet": {
+            "ok": True,
+            "provider": provider,
+            "evidence_hits": [evidence_item],
+        },
+        "route_traces": [
+            {
+                "ok": True,
+                "provider": provider,
+                "results": [evidence_item],
+            }
+        ],
+        "freshness": {
+            "ok": False,
+            "provider": freshness_provider,
+            "checks": [{"ref": "raw:line:17", "status": "present"}],
+            "diagnostics": ["provider stale"],
+        },
+    }
+
+    projected = _project_capability_output("aoa_session_evidence_packet", payload)
+
+    assert projected["ok"] is True
+    assert _payload_bytes(projected) <= CAPABILITY_PROFILE_MAX_OUTPUT_BYTES
+    assert projected["candidate_posture"].startswith("candidate evidence")
+    assert projected["retrieval_packet"]["evidence_hits"][0]["raw_ref"] == "raw:line:17"
+    assert projected["retrieval_packet"]["evidence_hits"][0]["refs"]["segment"] == "segment-1.md#event-1"
+    assert projected["route_traces"][0]["results"][0]["session_ref"] == "session:session-1"
+    projected_provider_state = projected["retrieval_packet"]["provider"]["status"]["provider_states"]["portable_sqlite"]
+    assert projected["retrieval_packet"]["provider"]["status"]["reasons"] == ["portable provider is stale"]
+    assert projected_provider_state["reasons"] == ["freshness state is dirty"]
+    assert projected_provider_state["freshness"]["reasons"] == ["freshness state is dirty"]
+    assert projected_provider_state["freshness"]["diagnostics"] == ["projection_dirty"]
+    assert "dirty_session_ids" not in projected_provider_state["freshness"]
+    assert projected["freshness"]["ok"] is False
+    assert projected["freshness"]["diagnostics"] == ["provider stale"]
+    assert projected["freshness"]["provider"]["providers"]["portable_sqlite"]["status"] == "stale"
+    assert projected["freshness"]["provider"]["reasons"] == ["portable provider is stale"]
+    assert projected["freshness"]["provider"]["providers"]["portable_sqlite"]["reasons"] == [
+        "freshness state is dirty"
+    ]
+    access = projected["mcp_access"]
+    assert "retrieval_packet.provider" in access["compacted_collections"]
+    assert "freshness.provider" in access["compacted_collections"]
+    assert "retrieval_packet.provider.status.providers.portable_sqlite.metadata" in access["omitted_fields"]
+    assert "x" * 100 not in json.dumps(projected, ensure_ascii=False)
+
+
+def test_capability_projection_still_blocks_unknown_nested_evidence_packet_data() -> None:
+    payload = {
+        "schema": "aoa_session_memory_evidence_packet_v1",
+        "ok": True,
+        "candidate_posture": "candidate evidence",
+        "retrieval_packet": {"unrecognized": {"body": "x" * 40_000}},
+    }
+
+    projected = _project_capability_output("aoa_session_evidence_packet", payload)
+
+    assert projected["ok"] is False
+    assert projected["error"] == "capability_output_limit_exceeded"
+    assert projected["source_payload_bytes"] > 40_000
 
 
 def test_capability_projection_fails_closed_above_output_ceiling() -> None:

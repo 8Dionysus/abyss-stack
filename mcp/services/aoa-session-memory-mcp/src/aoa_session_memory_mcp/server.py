@@ -108,7 +108,12 @@ def _payload_bytes(payload: Any) -> int:
     )
 
 
-def _compact_provider(provider: Any) -> Any:
+def _compact_provider(
+    provider: Any,
+    *,
+    omitted_fields: list[str] | None = None,
+    path: str = "provider",
+) -> Any:
     if not isinstance(provider, dict):
         return provider
     status = provider.get("status")
@@ -120,21 +125,43 @@ def _compact_provider(provider: Any) -> Any:
                 continue
             provider_states[str(name)] = {
                 key: item[key]
-                for key in ("ok", "status", "reasons", "diagnostics")
+                for key in ("ok", "status", "reasons", "diagnostics", "freshness")
                 if key in item
             }
+            if isinstance(item.get("freshness"), dict):
+                provider_states[str(name)]["freshness"] = _compact_provider_freshness(
+                    item["freshness"],
+                    omitted_fields=omitted_fields,
+                    path=f"{path}.status.providers.{name}.freshness",
+                )
+            if omitted_fields is not None:
+                omitted_fields.extend(
+                    f"{path}.status.providers.{name}.{key}"
+                    for key, value in item.items()
+                    if key not in {"ok", "status", "reasons", "diagnostics", "freshness"}
+                    and value not in (None, "", [], {})
+                )
         compact_status = {
             key: status[key]
             for key in (
                 "ok",
                 "selected_provider",
                 "status_mode",
+                "status",
+                "reasons",
                 "diagnostics",
             )
             if key in status
         }
         if provider_states:
             compact_status["provider_states"] = provider_states
+        if omitted_fields is not None:
+            omitted_fields.extend(
+                f"{path}.status.{key}"
+                for key, value in status.items()
+                if key not in {"ok", "selected_provider", "status_mode", "status", "reasons", "diagnostics", "providers"}
+                and value not in (None, "", [], {})
+            )
     compact = {
         key: provider[key]
         for key in (
@@ -147,6 +174,19 @@ def _compact_provider(provider: Any) -> Any:
     }
     if compact_status is not None:
         compact["status"] = compact_status
+    if omitted_fields is not None:
+        omitted_fields.extend(
+            f"{path}.{key}"
+            for key, value in provider.items()
+            if key not in {
+                "selected",
+                "authoritative_result_provider",
+                "accelerator_provider",
+                "authority_law",
+                "status",
+            }
+            and value not in (None, "", [], {})
+        )
     return compact
 
 
@@ -186,6 +226,181 @@ def _compact_evidence_item(item: Any) -> Any:
             if key in refs
         }
     return compact
+
+
+def _compact_provider_freshness(
+    freshness: Any,
+    *,
+    omitted_fields: list[str] | None,
+    path: str,
+) -> Any:
+    if not isinstance(freshness, dict):
+        return freshness
+    omitted = {
+        "dirty_session_ids",
+        "actionable_dirty_session_ids",
+        "dirty_sessions",
+        "actionable_dirty_sessions",
+        "deferred_live_sessions",
+    }
+    compact = {key: value for key, value in freshness.items() if key not in omitted}
+    for key in ("dirty_session_samples", "deferred_live_session_samples"):
+        samples = freshness.get(key)
+        if isinstance(samples, list) and len(samples) > 5:
+            compact[key] = samples[:5]
+            compact[f"omitted_{key.removesuffix('_samples')}_sample_count"] = len(samples) - 5
+    if omitted_fields is not None:
+        omitted_fields.extend(
+            f"{path}.{key}"
+            for key, value in freshness.items()
+            if key in omitted and value not in (None, "", [], {})
+        )
+    return compact
+
+
+def _compact_provider_status(
+    provider: Any,
+    *,
+    omitted_fields: list[str],
+    path: str,
+) -> Any:
+    """Compact the status-shaped provider returned inside freshness packets."""
+
+    if not isinstance(provider, dict):
+        return provider
+    allowed = (
+        "schema_version",
+        "artifact_type",
+        "provider_schema_version",
+        "generated_at",
+        "ok",
+        "aoa_root",
+        "config_path",
+        "default_provider",
+        "authority_law",
+        "selected_provider",
+        "status_mode",
+        "reasons",
+        "diagnostics",
+        "providers",
+        "mcp_access",
+    )
+    compact = {key: provider[key] for key in allowed if key in provider}
+    state_allowed = (
+        "provider",
+        "ok",
+        "status",
+        "db_path",
+        "index_generated_at",
+        "search_schema_version",
+        "expected_search_schema_version",
+        "document_count",
+        "route_index_count",
+        "has_documents",
+        "has_route_index",
+        "has_route_terms",
+        "count_mode",
+        "reasons",
+        "diagnostics",
+        "freshness",
+    )
+    providers = provider.get("providers")
+    if isinstance(providers, dict):
+        compact_providers: dict[str, Any] = {}
+        for name, item in providers.items():
+            if not isinstance(item, dict):
+                compact_providers[str(name)] = item
+                continue
+            compact_item = {key: item[key] for key in state_allowed if key in item}
+            if isinstance(item.get("freshness"), dict):
+                compact_item["freshness"] = _compact_provider_freshness(
+                    item["freshness"],
+                    omitted_fields=omitted_fields,
+                    path=f"{path}.providers.{name}.freshness",
+                )
+            compact_providers[str(name)] = compact_item
+            omitted_fields.extend(
+                f"{path}.providers.{name}.{key}"
+                for key, value in item.items()
+                if key not in state_allowed and value not in (None, "", [], {})
+            )
+        compact["providers"] = compact_providers
+    if isinstance(provider.get("mcp_access"), dict):
+        compact["mcp_access"] = dict(provider["mcp_access"])
+    omitted_fields.extend(
+        f"{path}.{key}"
+        for key, value in provider.items()
+        if key not in allowed and value not in (None, "", [], {})
+    )
+    return compact
+
+
+def _compact_capability_packet_container(
+    value: Any,
+    *,
+    path: str,
+    compacted_collections: list[str],
+    omitted_fields: list[str],
+    compact_provider: bool = True,
+) -> Any:
+    """Compact recognized packet children while retaining unknown fields."""
+
+    if not isinstance(value, dict):
+        return value
+    projected = dict(value)
+    provider = value.get("provider")
+    if compact_provider and isinstance(provider, dict):
+        if path.endswith(".freshness") or path == "freshness":
+            projected["provider"] = _compact_provider_status(
+                provider,
+                omitted_fields=omitted_fields,
+                path=f"{path}.provider",
+            )
+        else:
+            projected["provider"] = _compact_provider(
+                provider,
+                omitted_fields=omitted_fields,
+                path=f"{path}.provider",
+            )
+        compacted_collections.append(f"{path}.provider")
+    for key in ("evidence_hits", "results", "search_hits"):
+        values = value.get(key)
+        if isinstance(values, list):
+            child_path = f"{path}.{key}" if path else key
+            projected[key] = [_compact_evidence_item(item) for item in values]
+            compacted_collections.append(child_path)
+    for key in ("freshness", "retrieval_packet"):
+        child = value.get(key)
+        if isinstance(child, dict):
+            child_path = f"{path}.{key}" if path else key
+            projected[key] = _compact_capability_packet_container(
+                child,
+                path=child_path,
+                compacted_collections=compacted_collections,
+                omitted_fields=omitted_fields,
+            )
+            compacted_collections.append(child_path)
+    route_traces = value.get("route_traces")
+    if isinstance(route_traces, list):
+        child_path = f"{path}.route_traces" if path else "route_traces"
+        projected["route_traces"] = [
+            _compact_capability_packet_container(
+                trace,
+                path=f"{child_path}[{index}]",
+                compacted_collections=compacted_collections,
+                omitted_fields=omitted_fields,
+            )
+            for index, trace in enumerate(route_traces)
+        ]
+        compacted_collections.append(child_path)
+    return projected
+
+
+def _is_capability_evidence_packet(tool_name: str, payload: dict[str, Any]) -> bool:
+    return (
+        tool_name == "aoa_session_evidence_packet"
+        or payload.get("schema") == "aoa_session_memory_evidence_packet_v1"
+    )
 
 
 def _capability_profile_active() -> bool:
@@ -259,23 +474,51 @@ def _project_capability_output(tool_name: str, payload: Any) -> Any:
         return payload
     source_bytes = _payload_bytes(payload)
     projected = dict(payload)
-    if "provider" in projected:
-        projected["provider"] = _compact_provider(projected["provider"])
+    packet = _is_capability_evidence_packet(tool_name, payload)
     compacted_collections: list[str] = []
+    omitted_fields: list[str] = []
+    if "provider" in projected:
+        projected["provider"] = _compact_provider(
+            projected["provider"],
+            omitted_fields=omitted_fields,
+            path="provider",
+        )
     if _payload_bytes(projected) > CAPABILITY_PROFILE_MAX_OUTPUT_BYTES:
-        for key in ("evidence_hits", "results"):
-            value = projected.get(key)
-            if isinstance(value, list):
-                projected[key] = [_compact_evidence_item(item) for item in value]
-                compacted_collections.append(key)
+        if packet:
+            projected = _compact_capability_packet_container(
+                projected,
+                path="",
+                compacted_collections=compacted_collections,
+                omitted_fields=omitted_fields,
+                compact_provider=False,
+            )
+        else:
+            for key in ("evidence_hits", "results"):
+                value = projected.get(key)
+                if isinstance(value, list):
+                    projected[key] = [_compact_evidence_item(item) for item in value]
+                    compacted_collections.append(key)
     access = projected.get("mcp_access")
+    prior_omitted_fields = (
+        access.get("omitted_fields")
+        if isinstance(access, dict) and isinstance(access.get("omitted_fields"), list)
+        else []
+    )
+    all_omitted_fields = list(dict.fromkeys(
+        [str(item) for item in prior_omitted_fields]
+        + [str(item) for item in omitted_fields]
+    ))
     projected["mcp_access"] = {
         **(access if isinstance(access, dict) else {}),
         "capability_profile": CAPABILITY_ID,
         "response_projection": "bounded_owner_refs_v1",
         "source_payload_bytes": source_bytes,
-        "provider_detail_omitted": "provider" in payload,
-        "compacted_collections": compacted_collections,
+        "provider_detail_omitted": "provider" in payload or any(
+            path.endswith(".provider") or ".provider." in path
+            for path in compacted_collections + all_omitted_fields
+        ),
+        "compacted_collections": list(dict.fromkeys(compacted_collections)),
+        "omitted_fields": all_omitted_fields,
         "max_output_bytes": CAPABILITY_PROFILE_MAX_OUTPUT_BYTES,
     }
     projected["mcp_access"]["projected_payload_bytes"] = _payload_bytes(projected)
