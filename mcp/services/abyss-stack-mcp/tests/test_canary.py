@@ -35,6 +35,7 @@ from abyss_stack_mcp.canary import (
     validate_result_contract,
     verify_canary_receipt,
 )
+from abyss_stack_mcp.core import StackMCPError, _reject_secret_material
 from abyss_stack_mcp.observation import (
     RuntimeCanaryContract,
     RuntimeTarget,
@@ -358,6 +359,35 @@ def test_receipt_is_content_addressed_and_preserves_claim_limit() -> None:
     assert receipt.process_identity == PROCESS_IDENTITY
     assert "owner freshness" in receipt.claim_limit
     assert receipt.server_version == "0.1.0"
+
+
+def test_generated_attestation_does_not_collide_with_secret_scan() -> None:
+    receipt = build_receipt(
+        target=target(),
+        contract=canary_contract(),
+        probe=successful_probe(),
+        observed_at=NOW,
+        ttl_seconds=600,
+        signing_key=SIGNING_KEY,
+        deployment=deployment_binding(),
+    )
+    collision = receipt.model_copy(update={"attestation": "sk-" + ("A" * 83)})
+
+    with pytest.raises(StackMCPError, match="secret-like value"):
+        _reject_secret_material(collision.model_dump(mode="json"))
+    canary._reject_attested_model_material(collision)
+
+    artifact = build_result_artifact(
+        receipt=receipt,
+        owner_payload=grounded_result(),
+        signing_key=SIGNING_KEY,
+    )
+    artifact_collision = artifact.model_copy(
+        update={"attestation": "sk-" + ("A" * 83)}
+    )
+    with pytest.raises(StackMCPError, match="secret-like value"):
+        _reject_secret_material(artifact_collision.model_dump(mode="json"))
+    canary._reject_attested_model_material(artifact_collision)
 
 
 def test_receipt_verification_requires_current_success_and_pinned_signer() -> None:

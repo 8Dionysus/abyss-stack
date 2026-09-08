@@ -304,6 +304,15 @@ class CanaryResultArtifact(StrictModel):
         return self
 
 
+def _reject_attested_model_material(
+    model: CanaryReceipt | CanaryResultArtifact,
+) -> None:
+    """Screen model content while retaining its authenticated signature."""
+
+    payload = model.model_dump(mode="json", exclude={"attestation"})
+    _reject_secret_material(payload)
+
+
 ProbeRunner = Callable[
     [RuntimeTarget, RuntimeCanaryContract, str, int],
     Awaitable[CanaryProbeResult],
@@ -1168,7 +1177,7 @@ def build_result_artifact(
         raise CanaryRunnerError(
             "produced canary result artifact failed contract validation"
         ) from exc
-    _reject_secret_material(artifact.model_dump(mode="json"))
+    _reject_attested_model_material(artifact)
     return artifact
 
 
@@ -1240,7 +1249,7 @@ def build_receipt(
         raise CanaryRunnerError(
             "produced canary receipt failed contract validation"
         ) from exc
-    _reject_secret_material(receipt.model_dump(mode="json"))
+    _reject_attested_model_material(receipt)
     return receipt
 
 
