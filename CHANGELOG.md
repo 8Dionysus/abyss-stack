@@ -19,6 +19,9 @@ Tracking starts with the community-docs baseline for this repository.
 - Preserve structured stale and empty session-memory read outcomes without
   misreporting them as backend command failures; retain transport errors,
   unknown diagnostics, and nonempty evidence as separate states.
+- Preserve provider-owned stale freshness reason codes for structured
+  session-memory reads while malformed provider markers and unknown diagnostics
+  remain backend failures.
 - Compact recognized nested session-evidence packet containers within the
   existing MCP output ceiling while preserving owner refs, freshness reasons,
   and explicit omissions; unknown oversized payloads remain blocked.
