@@ -1886,6 +1886,97 @@ def state_with_fixture(tmp_path: Path, runner: FakeRunner | None = None) -> AoAS
     )
 
 
+def owner_stale_empty_usage_chain_payload(
+    *, provider_diagnostics: list[str] | None = None
+) -> dict[str, Any]:
+    stale_reasons = provider_diagnostics or [
+        "session_projection_dirty",
+        "projection_fingerprint_mode_changed",
+        "search_generation_identity_changed",
+        "exact_literal_projection_version_changed",
+    ]
+    return {
+        "schema_version": 1,
+        "artifact_type": "session_memory_entity_usage_chain",
+        "ok": False,
+        "mutates": False,
+        "counts": {
+            "event_count": 0,
+            "entrypoint_event_count": 0,
+            "usage_event_count": 0,
+            "result_event_count": 0,
+            "outcome_event_count": 0,
+            "context_event_count": 0,
+            "consequence_event_count": 0,
+            "false_correlation_event_count": 0,
+            "false_correlation_edge_count": 0,
+            "unique_false_correlation_event_count": 0,
+            "chain_count": 0,
+            "document_ref_count": 0,
+            "evidence_ref_count": 0,
+        },
+        "quality": {"diagnostics": []},
+        "usage_chain": {
+            "entrypoint_events": [],
+            "chains": [],
+            "unmatched_consequence_events": [],
+            "result_events": [],
+            "outcome_events": [],
+            "false_correlation_events": [],
+            "context_events": [],
+        },
+        "first_ref": {},
+        "evidence_refs": [],
+        "freshness": {
+            "global": {
+                "status": "stale",
+                "scope": "selected_search_provider_projection",
+                "provider": "portable_sqlite",
+            },
+            "scoped": {
+                "status": "unresolved",
+                "scope": "2026-09-07__020__codex-in-aoa-session-memory",
+                "coverage": "complete",
+                "event_counts": {},
+                "does_not_upgrade_global_freshness": True,
+            },
+            "event_counts": {},
+            "provider": {
+                "provider": "portable_sqlite",
+                "status": "stale",
+                "freshness_status": "stale",
+                "has_route_index": True,
+                "has_route_terms": True,
+                "count_mode": "not_counted_fast",
+                "diagnostics": list(stale_reasons),
+                "freshness": {
+                    "status": "stale",
+                    "reasons": [
+                        *stale_reasons,
+                        "recent_live_projection_updates_deferred",
+                    ],
+                },
+                "full_status_route": "search-provider-status --provider portable_sqlite",
+            },
+        },
+        "diagnostics": [],
+    }
+
+
+def owner_stale_provider_status_payload() -> dict[str, Any]:
+    provider = owner_stale_empty_usage_chain_payload()["freshness"]["provider"]
+    return {
+        "schema_version": 1,
+        "artifact_type": "search_provider_status",
+        "provider_schema_version": 2,
+        "ok": False,
+        "default_provider": "portable_sqlite",
+        "selected_provider": "portable_sqlite",
+        "providers": {"portable_sqlite": provider},
+        "diagnostics": ["portable_sqlite:stale"],
+    }
+
+
 def test_latest_session_resolution_uses_registry_updated_at(tmp_path: Path) -> None:
     aoa = seed_archive(tmp_path)
     registry_path = aoa / "session-registry.json"
@@ -2209,6 +2300,123 @@ def test_allow_nonzero_json_preserves_owner_empty_or_stale_payload(
     assert payload["mcp_access"]["degraded"] is expected_degraded
     assert payload["mcp_access"]["data_status"] == "no_data"
     assert "archive command failed" not in payload["diagnostics"]
+
+
+def test_allow_nonzero_json_preserves_nested_owner_stale_state_with_no_data(tmp_path: Path) -> None:
+    class NestedStaleRunner(FakeRunner):
+        def __call__(self, argv: list[str], timeout: float) -> CommandOutput:
+            if argv[2] == "usage-chain":
+                self.calls.append((argv[2], tuple(argv[3:])))
+                self.timeouts.append((argv[2], timeout))
+                return CommandOutput(
+                    argv,
+                    1,
+                    json.dumps(owner_stale_empty_usage_chain_payload()),
+                    "",
+                    1.0,
+                )
+            return super().__call__(argv, timeout)
+
+    state = state_with_fixture(tmp_path, NestedStaleRunner())
+
+    payload = state._archive_command("usage-chain", [], allow_nonzero_json=True)
+
+    assert payload["ok"] is False
+    assert payload["diagnostics"] == []
+    assert payload["mcp_access"]["outcome"] == "stale"
+    assert payload["mcp_access"]["response_kind"] == "degraded"
+    assert payload["mcp_access"]["degraded"] is True
+    assert payload["mcp_access"]["data_status"] == "no_data"
+    assert payload["freshness"]["provider"]["diagnostics"] == [
+        "session_projection_dirty",
+        "projection_fingerprint_mode_changed",
+        "search_generation_identity_changed",
+        "exact_literal_projection_version_changed",
+    ]
+    assert "archive command failed" not in payload["diagnostics"]
+
+
+def test_allow_nonzero_json_preserves_owner_stale_provider_status(tmp_path: Path) -> None:
+    class ProviderStatusRunner(FakeRunner):
+        def __call__(self, argv: list[str], timeout: float) -> CommandOutput:
+            if argv[2] == "search-provider-status":
+                self.calls.append((argv[2], tuple(argv[3:])))
+                self.timeouts.append((argv[2], timeout))
+                return CommandOutput(
+                    argv,
+                    1,
+                    json.dumps(owner_stale_provider_status_payload()),
+                    "",
+                    1.0,
+                )
+            return super().__call__(argv, timeout)
+
+    state = state_with_fixture(tmp_path, ProviderStatusRunner())
+
+    payload = state._archive_command(
+        "search-provider-status", [], allow_nonzero_json=True
+    )
+
+    assert payload["ok"] is False
+    assert payload["diagnostics"] == ["portable_sqlite:stale"]
+    assert payload["mcp_access"]["outcome"] == "stale"
+    assert payload["mcp_access"]["response_kind"] == "degraded"
+    assert payload["mcp_access"]["degraded"] is True
+    assert payload["providers"]["portable_sqlite"]["diagnostics"] == [
+        "session_projection_dirty",
+        "projection_fingerprint_mode_changed",
+        "search_generation_identity_changed",
+        "exact_literal_projection_version_changed",
+    ]
+    assert "archive command failed" not in payload["diagnostics"]
+
+
+def test_allow_nonzero_json_rejects_unknown_nested_owner_stale_diagnostic(tmp_path: Path) -> None:
+    class NestedDiagnosticRunner(FakeRunner):
+        def __call__(self, argv: list[str], timeout: float) -> CommandOutput:
+            if argv[2] == "usage-chain":
+                self.calls.append((argv[2], tuple(argv[3:])))
+                self.timeouts.append((argv[2], timeout))
+                payload = owner_stale_empty_usage_chain_payload(
+                    provider_diagnostics=["unknown_provider_diagnostic"]
+                )
+                return CommandOutput(argv, 1, json.dumps(payload), "", 1.0)
+            return super().__call__(argv, timeout)
+
+    state = state_with_fixture(tmp_path, NestedDiagnosticRunner())
+
+    payload = state._archive_command("usage-chain", [], allow_nonzero_json=True)
+
+    assert payload["mcp_access"]["outcome"] == "backend_error"
+    assert payload["mcp_access"]["response_kind"] == "degraded"
+    assert payload["mcp_access"]["degraded"] is True
+    assert "data_status" not in payload["mcp_access"]
+    assert "archive command failed" in payload["diagnostics"]
+
+
+def test_allow_nonzero_json_rejects_malformed_provider_marker(tmp_path: Path) -> None:
+    class MalformedProviderRunner(FakeRunner):
+        def __call__(self, argv: list[str], timeout: float) -> CommandOutput:
+            if argv[2] == "search-provider-status":
+                self.calls.append((argv[2], tuple(argv[3:])))
+                self.timeouts.append((argv[2], timeout))
+                payload = owner_stale_provider_status_payload()
+                payload["providers"]["portable_sqlite"]["provider"] = {
+                    "name": "portable_sqlite"
+                }
+                return CommandOutput(argv, 1, json.dumps(payload), "", 1.0)
+            return super().__call__(argv, timeout)
+
+    state = state_with_fixture(tmp_path, MalformedProviderRunner())
+
+    payload = state._archive_command(
+        "search-provider-status", [], allow_nonzero_json=True
+    )
+
+    assert payload["mcp_access"]["outcome"] == "backend_error"
+    assert payload["mcp_access"]["response_kind"] == "degraded"
+    assert payload["mcp_access"]["degraded"] is True
+    assert "archive command failed" in payload["diagnostics"]
 
 
 @pytest.mark.parametrize(

@@ -192,6 +192,18 @@ MCP_USAGE_DATA_COUNT_FIELDS = (
     "false_correlation_edge_count",
     "unique_false_correlation_event_count",
 )
+# These are the exact stale reason codes emitted by the .aoa search freshness
+# producer.  Keep this closed set local to provider-shaped stale payloads so
+# unknown diagnostics continue to fail closed.
+MCP_OWNER_PROVIDER_STALE_REASON_CODES = frozenset(
+    {
+        "session_projection_dirty",
+        "projection_fingerprint_mode_changed",
+        "search_generation_identity_changed",
+        "exact_literal_projection_version_changed",
+        "recent_live_projection_updates_deferred",
+    }
+)
 STATUS_TIMEOUT_SECONDS = RUNTIME_LIMITS.status_timeout_seconds
 SEARCH_TIMEOUT_SECONDS = RUNTIME_LIMITS.search_timeout_seconds
 GOAL_LIFECYCLE_TIMEOUT_SECONDS = RUNTIME_LIMITS.goal_lifecycle_timeout_seconds
@@ -846,6 +858,16 @@ def _archive_payload_has_hard_diagnostic(payload: dict[str, Any], *, depth: int 
         if isinstance(provider, dict)
         and provider.get("status") in {"dirty", "stale", "stale-readable", "not_current"}
     }
+    provider_status = str(
+        payload.get("status") or payload.get("freshness_status") or ""
+    ).strip().casefold()
+    provider_name = payload.get("provider")
+    if (
+        isinstance(provider_name, str)
+        and provider_name.strip()
+        and provider_status in {"dirty", "stale", "stale-readable", "not_current"}
+    ):
+        allowed.update(MCP_OWNER_PROVIDER_STALE_REASON_CODES)
     if any(not isinstance(item, str) or item not in allowed for item in diagnostics):
         return True
     # A top-level stale summary does not overrule a provider's own failure.
