@@ -22,6 +22,9 @@ from analysis_inputs import AnalysisInputError, _directory, _name, _signature
 
 SCHEMA = "abyss-stack-code-runtime-image-v1"
 _CHUNK = 64 * 1024
+# The supported namespace launcher's total ceiling is 9000 arguments, including
+# --args input. Reserve headroom; callers still check their whole composed plan.
+MAX_IMAGE_MOUNT_ARGUMENTS = 8000
 
 
 class RuntimeImageError(ValueError):
@@ -277,6 +280,10 @@ def seal_runtime_tree(
         expected_files = [item for item in manifest["entries"] if item["kind"] == "file"]
         if (not isinstance(image.files, tuple) or len(image.files) != len(expected_files)):
             raise RuntimeImageError("captured runtime file set changed")
+        mount_arguments = 4 + sum({"file": 5, "directory": 4, "symlink": 3}[item["kind"]]
+                                  for item in manifest["entries"])
+        if mount_arguments > MAX_IMAGE_MOUNT_ARGUMENTS:
+            raise RuntimeImageError("runtime image exceeds per-file mount argument budget; compact staging required")
         for pair, item in zip(image.files, expected_files, strict=True):
             if (not isinstance(pair, tuple) or len(pair) != 2 or pair[0] != item["path"]
                     or type(pair[1]) is not bytes or len(pair[1]) != item["bytes"]

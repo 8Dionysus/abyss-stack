@@ -301,6 +301,18 @@ class RuntimeImageTests(unittest.TestCase):
             allocate.assert_not_called()
             change.assert_not_called()
 
+    def test_large_image_requires_compact_staging_before_descriptor_allocation(self) -> None:
+        entries = [file_entry(str(number), b"") for number in range(1600)]
+        manifest = runtime._manifest({"schema": runtime.SCHEMA, "entries": entries}, runtime.RuntimeLimits())
+        raw = runtime._canonical(manifest)
+        image = runtime.RuntimeImage("/unused", raw, tuple((row["path"], b"") for row in manifest["entries"]),
+                                     hashlib.sha256(raw).hexdigest())
+        with mock.patch.object(runtime.os, "memfd_create") as allocate:
+            with self.assertRaisesRegex(runtime.RuntimeImageError, "compact staging required"):
+                with runtime.seal_runtime_tree(image, namespace_root="/provider"):
+                    pass
+            allocate.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

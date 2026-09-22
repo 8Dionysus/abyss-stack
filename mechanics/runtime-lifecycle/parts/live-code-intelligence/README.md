@@ -228,6 +228,14 @@ it is not a reservation and allocation races still fail closed. The helper
 never raises limits. A launch owner must explicitly admit sufficient capacity
 for all simultaneously staged images and inputs.
 
+The current per-file staging adapter also caps one image's mount arguments at
+8,000, below the supported bubblewrap launcher's 9,000-argument total ceiling.
+The caller must check its complete composed command as well. `--args` does not
+remove that total ceiling. Large npm images can be captured exactly but cannot
+be launched through this adapter; they fail before descriptor allocation and
+require a separate compact staging implementation. Do not prune the verified
+closure or substitute mutable directory binds to make the canary pass.
+
 These are image-only arguments, not a launch authority or complete sandbox.
 The caller must also bind exact host-library bytes, decoder, inputs, command,
 environment, namespace and resource/output limits, and make directory/link
