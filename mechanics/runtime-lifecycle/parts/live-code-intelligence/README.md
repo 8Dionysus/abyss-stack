@@ -235,6 +235,10 @@ remove that total ceiling. Large npm images can be captured exactly but cannot
 be launched through this adapter; they fail before descriptor allocation and
 require a separate compact staging implementation. Do not prune the verified
 closure or substitute mutable directory binds to make the canary pass.
+An anonymous executable can also report a kernel pathname ending in
+`(deleted)` through process introspection. That string is not a relaunch handle:
+the caller must retain the admitted bytes and explicit namespace command,
+not rediscover an interpreter through `process.execPath` or ambient PATH.
 
 These are image-only arguments, not a launch authority or complete sandbox.
 The caller must also bind exact host-library bytes, decoder, inputs, command,
