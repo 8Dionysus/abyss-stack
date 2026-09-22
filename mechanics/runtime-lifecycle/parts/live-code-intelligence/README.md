@@ -203,6 +203,35 @@ bind the complete configuration, resolver inputs, environment, source view,
 namespace, output limits and lifecycle before a SCIP or other external run.
 The helper is not yet wired into a deployed SCIP worker or the signed LSP gate.
 
+### Immutable runtime images
+
+`runtime_image.py` separately captures a complete, explicitly expected runtime
+layout. The caller must derive that manifest from verified owner evidence;
+learning a manifest from a mutable installation does not authenticate it.
+Every path, byte count, SHA-256, file type, executable mode and internal link
+target is checked. Missing/extra entries (including empty directories), hard
+links, special files, symlinked parents, observed drift and root replacement
+fail closed. Relative links must resolve directly to captured regular files:
+no external targets, directory links, chains or loops are accepted.
+
+Runtime bounds are separate from analysis-input and legacy LSP bounds: up to
+12,000 entries, 128 MiB per file, 256 MiB total and 64 path components. This
+accommodates an explicit bundled Node executable and npm closure without
+loosening the older consumers. Sealed staging preserves executable modes and
+constructs files from anonymous sealed descriptors, never mutable host binds.
+Manifest/content integrity is rechecked before allocating descriptors; partial
+failure and caller exceptions close them. The namespace root is relocatable
+and not part of the image's content identity.
+
+These are image-only arguments, not a launch authority or complete sandbox.
+The caller must also bind exact host-library bytes, decoder, inputs, command,
+environment, namespace and resource/output limits, and make directory/link
+parents read-only. The image neither issues nor consumes a signed execution
+admission and is not implicitly wired into the old AST/LSP gate. MACHINE's
+artifact/installation checks, STACK's execution/lifecycle, KAG normalization
+and EVALS verdict remain separate. A successful image canary is not deployment
+or recovery evidence.
+
 ### Validation
 
 Use [VALIDATION.md](VALIDATION.md) for focused source checks and the root

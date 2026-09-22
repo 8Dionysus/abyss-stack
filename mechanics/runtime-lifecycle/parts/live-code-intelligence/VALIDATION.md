@@ -17,6 +17,11 @@ not host keys or registry admission. Sealed staging requires Linux anonymous-fil
 sealing; unavailable platform support fails closed rather than widening input
 mounts.
 
+Runtime-image tests additionally cover exact layouts, executable modes,
+contained file links, complete path sets, independent byte/depth bounds,
+no-follow replacement races, sealed integrity and descriptor lifetime. They
+exercise fixture bytes only, not an installed Node or SCIP distribution.
+
 ## Repository integration
 
 Use the root [validation route](../../../../VALIDATION.md) for the `source-fast`
