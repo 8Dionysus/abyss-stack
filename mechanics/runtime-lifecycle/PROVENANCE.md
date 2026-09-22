@@ -22,6 +22,11 @@ activation, persistence, storage mutation, and service state.
 ## Current Bridges
 
 - [PARTS.md](PARTS.md) maps lifecycle commands and root docs to package parts.
+- [parts/live-code-intelligence/README.md](parts/live-code-intelligence/README.md)
+  retains the source-only LIVE/LSP part from source commit
+  `2101d3b893e2623585040b0a33a0999175f79d02`, with input capture extended in
+  the same part. This selective source restoration does not carry the old
+  branch's other changes, historical host evidence, or any deployment claim.
 - [parts/layout-install/README.md](parts/layout-install/README.md) owns layout
   install and check routes.
 - [parts/first-run-bootstrap/README.md](parts/first-run-bootstrap/README.md)
