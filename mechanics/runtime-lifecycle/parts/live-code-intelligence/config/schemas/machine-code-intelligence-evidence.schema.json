@@ -1,0 +1,250 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://abyss-stack/schemas/machine-code-intelligence-evidence.schema.json",
+  "title": "abyss-machine owner-qualified code-intelligence evidence",
+  "description": "Inner machine evidence record. It is not consumable without the signed content-addressed registry/gate bundle.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "evidence_class",
+    "issuer",
+    "receipt_id",
+    "observed_at",
+    "subject",
+    "installation",
+    "admission",
+    "health",
+    "verification",
+    "providers",
+    "lsp_sessions",
+    "observations",
+    "lifecycle",
+    "owner_boundaries",
+    "claim_limits",
+    "receipt_digest"
+  ],
+  "properties": {
+    "schema_version": {"const": "abyss-stack-machine-code-intelligence-evidence-v1"},
+    "evidence_class": {"const": "machine-owned-verification"},
+    "issuer": {"const": "abyss-machine"},
+    "receipt_id": {"type": "string", "minLength": 1},
+    "observed_at": {"type": "string", "minLength": 1},
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provider",
+        "provider_source_digest",
+        "config_digest",
+        "artifact_digest",
+        "artifact_ref"
+      ],
+      "properties": {
+        "provider": {"type": "object"},
+        "provider_source_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "config_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "artifact_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "artifact_ref": {"type": "string", "minLength": 1}
+      }
+    },
+    "installation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["owner", "state", "identity", "artifact_digest", "evidence_ref"],
+      "properties": {
+        "owner": {"const": "abyss-machine"},
+        "state": {"const": "verified"},
+        "identity": {"type": "string", "minLength": 1},
+        "artifact_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "evidence_ref": {"type": "string", "minLength": 1}
+      }
+    },
+    "admission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["owner", "state", "trust_state", "admission_ref"],
+      "properties": {
+        "owner": {"const": "abyss-machine"},
+        "state": {"const": "admitted"},
+        "trust_state": {"const": "trusted"},
+        "admission_ref": {"type": "string", "minLength": 1}
+      }
+    },
+    "health": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["owner", "state", "measurement_ref", "observed_at"],
+      "properties": {
+        "owner": {"const": "abyss-machine"},
+        "state": {"const": "healthy"},
+        "measurement_ref": {"type": "string", "minLength": 1},
+        "observed_at": {"type": "string", "minLength": 1}
+      }
+    },
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["owner", "state", "method", "verification_ref"],
+      "properties": {
+        "owner": {"const": "abyss-machine"},
+        "state": {"const": "verified"},
+        "method": {"const": "abyss-machine-owner-receipt-v1"},
+        "verification_ref": {"type": "string", "minLength": 1}
+      }
+    },
+    "providers": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "version", "language", "protocol", "observation_state"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "version": {"type": "string", "minLength": 1},
+          "language": {"type": "string", "minLength": 1},
+          "protocol": {"type": "string", "minLength": 1},
+          "observation_state": {"enum": ["observed", "available", "unobserved"]}
+        }
+      }
+    },
+    "lsp_sessions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "session_id",
+          "provider_id",
+          "language",
+          "state",
+          "transport",
+          "source_epoch",
+          "evidence_ref",
+          "runtime_manifest",
+          "source_manifest"
+        ],
+        "properties": {
+          "session_id": {"type": "string", "minLength": 1},
+          "provider_id": {"type": "string", "minLength": 1},
+          "language": {"type": "string", "minLength": 1},
+          "state": {"enum": ["observed", "unobserved"]},
+          "transport": {"type": "string", "minLength": 1},
+          "source_epoch": {"type": "string", "minLength": 1},
+          "evidence_ref": {"type": "string", "minLength": 1},
+          "source_root": {"type": "string", "minLength": 1},
+          "command_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+          "artifact_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+          "interpreter_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+          "runtime_manifest": {
+            "type": "array",
+            "items": {"$ref": "#/$defs/file_binding"}
+          },
+          "source_manifest": {
+            "type": "array",
+            "items": {"$ref": "#/$defs/file_binding"}
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {"state": {"const": "observed"}}
+            },
+            "then": {
+              "required": ["source_root"],
+              "properties": {
+                "runtime_manifest": {"minItems": 1}
+              }
+            }
+          }
+        ]
+      }
+    },
+    "observations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "provider_id",
+          "language",
+          "state",
+          "source_epoch",
+          "observation_ref",
+          "semantic_owner"
+        ],
+        "properties": {
+          "provider_id": {"type": "string", "minLength": 1},
+          "language": {"type": "string", "minLength": 1},
+          "state": {"enum": ["observed", "unobserved"]},
+          "source_epoch": {"type": "string", "minLength": 1},
+          "observation_ref": {"type": "string", "minLength": 1},
+          "semantic_owner": {"const": "aoa-kag"}
+        }
+      }
+    },
+    "lifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "restart", "last_good", "canary", "rollback"],
+      "properties": {
+        "state": {"enum": ["ready", "degraded"]},
+        "restart": {"$ref": "#/$defs/lifecycle_component"},
+        "last_good": {"$ref": "#/$defs/lifecycle_component"},
+        "canary": {"$ref": "#/$defs/lifecycle_component"},
+        "rollback": {"$ref": "#/$defs/lifecycle_component"}
+      }
+    },
+    "owner_boundaries": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runtime_lifecycle", "observation_meaning", "installation_and_admission", "proof_and_verdict"],
+      "properties": {
+        "runtime_lifecycle": {"const": "abyss-stack"},
+        "observation_meaning": {"const": "aoa-kag"},
+        "installation_and_admission": {"const": "abyss-machine"},
+        "proof_and_verdict": {"const": "aoa-evals"}
+      }
+    },
+    "claim_limits": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "receipt_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  },
+  "$defs": {
+    "file_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "digest"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.{1,2}(?:/|$))[^/]+(?:/[^/]+)*$"
+        },
+        "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      }
+    },
+    "lifecycle_component": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "evidence_ref"],
+      "properties": {
+        "state": {
+          "enum": [
+            "observed",
+            "available",
+            "passed",
+            "ready",
+            "unobserved",
+            "not-observed"
+          ]
+        },
+        "evidence_ref": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}

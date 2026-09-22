@@ -10,6 +10,7 @@ readiness, status readouts, and systemd user unit routes.
 - [wait-smoke](wait-smoke/README.md)
 - [logs-status](logs-status/README.md)
 - [status-readouts](status-readouts/README.md)
+- [live-code-intelligence](live-code-intelligence/README.md)
 - [user-unit](user-unit/README.md)
 
 Packet routes:

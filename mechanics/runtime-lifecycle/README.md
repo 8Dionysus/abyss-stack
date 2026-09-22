@@ -35,6 +35,10 @@ host facts, and deployment sync status.
 Dry-run commands, validated lifecycle routes, service start/stop wrappers, and
 operator-facing runbook guidance. Package-local status readout contracts may
 also describe source-safe runtime log artifacts without claiming they are live.
+The [LIVE code-intelligence part](parts/live-code-intelligence/README.md) owns
+source-candidate observation lifecycle and bounded immutable input staging;
+MACHINE admission, KAG normalization and EVALS proof remain separate owner
+boundaries. Its source presence does not activate an external provider.
 
 ### Must not claim
 

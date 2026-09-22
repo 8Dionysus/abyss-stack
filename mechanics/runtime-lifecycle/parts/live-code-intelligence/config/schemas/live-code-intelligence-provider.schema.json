@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://abyss-stack/schemas/live-code-intelligence-provider.schema.json",
+  "title": "abyss-stack LIVE code-intelligence provider config",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "schema_version", "provider", "source", "state", "machine_binding", "owner_boundaries"],
+  "properties": {
+    "$schema": {"const": "schemas/live-code-intelligence-provider.schema.json"},
+    "schema_version": {"const": "abyss-stack-live-code-intelligence-provider-v1"},
+    "provider": {
+      "type": "object",
+      "additionalProperties": false,
+        "required": ["id", "version", "language", "mode", "observation_schema", "boundary_schema", "executable", "entrypoint", "protocol", "operations"],
+      "properties": {
+        "id": {"const": "python-ast-bootstrap"},
+        "version": {"const": "1.1.0"},
+        "language": {"const": "python"},
+        "mode": {"const": "bootstrap"},
+        "observation_schema": {"const": "abyss-stack-code-observation-v1"},
+        "boundary_schema": {"const": "abyss-stack-live-code-intelligence-provider-boundary-v1"},
+        "executable": {"const": "python3"},
+        "entrypoint": {"const": "mechanics/runtime-lifecycle/parts/live-code-intelligence/live_code_intelligence.py"},
+        "protocol": {"const": "json-command-v1"},
+        "operations": {
+          "const": ["discover", "refresh", "status", "definitions", "references", "restart", "last_good", "canary", "rollback"]
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["include_suffixes", "exclude_dirs", "max_file_bytes"],
+      "properties": {
+        "include_suffixes": {
+          "const": [".py"]
+        },
+        "exclude_dirs": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1}
+        },
+        "max_file_bytes": {"const": 1000000}
+      }
+    },
+    "state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["relative_root", "promotion", "fallback"],
+      "properties": {
+        "relative_root": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!/)(?![A-Za-z]:)(?!.*\\\\)(?!.*(?:^|/)(?:\\.|\\.\\.)(?:/|$)).+$"
+        },
+        "promotion": {"const": "complete-observation-only"},
+        "fallback": {"const": "current-then-last-good"}
+      }
+    },
+    "machine_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "owner", "installation_identity", "artifact_subject", "resource_envelope", "live_measurement"],
+      "properties": {
+        "schema_version": {"const": "abyss-machine-code-intelligence-provider-binding-v1"},
+        "owner": {"const": "abyss-machine"},
+        "installation_identity": {"const": "source-local-provider-candidate"},
+        "artifact_subject": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "source_ref", "trust_state", "admission_state"],
+          "properties": {
+            "kind": {"const": "source-local-provider"},
+            "source_ref": {"const": "mechanics/runtime-lifecycle/parts/live-code-intelligence/live_code_intelligence.py"},
+            "trust_state": {"const": "not-admitted"},
+            "admission_state": {"const": "unknown"}
+          }
+        },
+        "resource_envelope": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["max_file_bytes", "max_query_results"],
+          "properties": {
+            "max_file_bytes": {"const": 1000000},
+            "max_query_results": {"const": 100}
+          }
+        },
+        "live_measurement": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["required_for_admission", "state"],
+          "properties": {
+            "required_for_admission": {"const": true},
+            "state": {"const": "unobserved"}
+          }
+        }
+      }
+    },
+    "owner_boundaries": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runtime_lifecycle", "observation_meaning", "installation_and_admission", "proof_and_verdict"],
+      "properties": {
+        "runtime_lifecycle": {"const": "abyss-stack"},
+        "observation_meaning": {"const": "aoa-kag"},
+        "installation_and_admission": {"const": "abyss-machine"},
+        "proof_and_verdict": {"const": "aoa-evals"}
+      }
+    }
+  }
+}
