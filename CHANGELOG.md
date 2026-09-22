@@ -7,6 +7,24 @@ Tracking starts with the community-docs baseline for this repository.
 
 ## [Unreleased]
 
+### Code-intelligence source restoration and immutable capture
+
+- Summary: Restore the source-only LIVE code-intelligence part and its existing
+  strict bootstrap/LSP boundary. Add exact, bounded source-input capture and
+  manifest-bound runtime-image capture with sealed small-image staging,
+  descriptor-capacity and namespace-argument preflights, executable modes,
+  explicit internal file links, and cleanup on failure.
+- Validation: The part's 137 tests and the full local release lane pass:
+  3,163 tests plus 388 subtests, four skipped cases, and synthetic Configs
+  parity. The restored schemas are registered in the shared schema manifest.
+  A separate native Node canary preserved captured bytes after task-local
+  source/runtime copies changed; it is not a complete SCIP execution.
+- Notes: This is an importable source capability, not a deployed service or
+  execution-admission verdict. Expected runtime manifests require independent
+  owner evidence. Full npm images exceed the per-file staging budget and need
+  a compact immutable backend; the helper fails closed without changing legacy
+  LSP limits, host resource limits, trust roots, or installed providers.
+
 ### Added
 
 - Add the default-off progressive tool-exposure adapter with five published
