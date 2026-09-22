@@ -284,6 +284,16 @@ def seal_runtime_tree(
                 raise RuntimeImageError("captured runtime bytes changed")
         if not hasattr(os, "memfd_create") or not hasattr(fcntl, "F_ADD_SEALS"):
             raise RuntimeImageError("sealed anonymous runtime descriptors required")
+        # Do not silently raise a process or host resource limit. Leave space
+        # for the caller's pipes/launcher and fail before staging large bytes.
+        # Concurrent descriptor allocation may still fail later; cleanup below
+        # covers that race. This is a preflight, not a reservation.
+        import resource
+
+        soft_limit, _ = resource.getrlimit(resource.RLIMIT_NOFILE)
+        if (soft_limit != resource.RLIM_INFINITY
+                and len(os.listdir("/proc/self/fd")) + len(expected_files) + 16 > soft_limit):
+            raise RuntimeImageError("insufficient caller-owned runtime descriptor budget")
         arguments = ["--perms", "0755", "--dir", namespace_root]
         directories = sorted((item for item in manifest["entries"] if item["kind"] == "directory"),
                              key=lambda item: (item["path"].count("/"), item["path"]))

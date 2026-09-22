@@ -6,6 +6,7 @@ import fcntl
 import hashlib
 import os
 from pathlib import Path
+import resource
 import stat
 import sys
 import tempfile
@@ -288,6 +289,17 @@ class RuntimeImageTests(unittest.TestCase):
         for fd in fds:
             with self.assertRaises(OSError):
                 os.fstat(fd)
+
+    def test_descriptor_budget_fails_before_allocation_without_changing_limits(self) -> None:
+        image = self.capture()
+        with (mock.patch.object(resource, "getrlimit", return_value=(16, 1024)),
+              mock.patch.object(resource, "setrlimit") as change,
+              mock.patch.object(runtime.os, "memfd_create") as allocate):
+            with self.assertRaisesRegex(runtime.RuntimeImageError, "descriptor budget"):
+                with runtime.seal_runtime_tree(image, namespace_root="/provider"):
+                    pass
+            allocate.assert_not_called()
+            change.assert_not_called()
 
 
 if __name__ == "__main__":

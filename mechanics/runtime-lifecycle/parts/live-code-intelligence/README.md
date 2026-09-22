@@ -222,6 +222,11 @@ constructs files from anonymous sealed descriptors, never mutable host binds.
 Manifest/content integrity is rechecked before allocating descriptors; partial
 failure and caller exceptions close them. The namespace root is relocatable
 and not part of the image's content identity.
+Staging needs one descriptor per regular file. A process-local descriptor
+budget check leaves launcher headroom and fails before staging if insufficient;
+it is not a reservation and allocation races still fail closed. The helper
+never raises limits. A launch owner must explicitly admit sufficient capacity
+for all simultaneously staged images and inputs.
 
 These are image-only arguments, not a launch authority or complete sandbox.
 The caller must also bind exact host-library bytes, decoder, inputs, command,
