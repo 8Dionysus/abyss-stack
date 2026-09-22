@@ -385,6 +385,18 @@ EXPECTED_ACTIVE_SCHEMA_PATHS = {
     Path("mechanics/machine-fit/parts/machine-bridge/schemas/schema.v1.json"),
     Path("mechanics/machine-fit/parts/platform-adaptations/schemas/schema.v1.json"),
     Path(
+        "mechanics/runtime-lifecycle/parts/live-code-intelligence/config/schemas/live-code-intelligence-provider.schema.json"
+    ),
+    Path(
+        "mechanics/runtime-lifecycle/parts/live-code-intelligence/config/schemas/machine-code-intelligence-evidence.schema.json"
+    ),
+    Path(
+        "mechanics/runtime-lifecycle/parts/live-code-intelligence/config/schemas/machine-code-intelligence-gate-public-key.schema.json"
+    ),
+    Path(
+        "mechanics/runtime-lifecycle/parts/live-code-intelligence/config/schemas/machine-code-intelligence-gate.schema.json"
+    ),
+    Path(
         "mechanics/runtime-lifecycle/parts/status-readouts/schemas/runtime-gateway-cache-status.schema.json"
     ),
     Path(
