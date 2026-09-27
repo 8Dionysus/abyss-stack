@@ -42,6 +42,16 @@ def _write_public(path: Path, value: dict[str, Any]) -> None:
     path.chmod(0o644)
 
 
+def require_same_sdk(conformance, adapter, handle, cache, codex):
+    """Do not combine conformance for one SDK with adapter proofs for another."""
+    expected = conformance.get("python_sdk", {})
+    identity = tuple(expected.get(key) for key in ("version", "commit", "artifact_digest"))
+    _require(all(isinstance(value, str) and value for value in identity), "conformance SDK identity is incomplete")
+    for row in (adapter.get("exact_inputs", {}), handle.get("exact_inputs", {}), cache.get("exact_inputs", {}), codex.get("server", {})):
+        actual = tuple(row.get(key) for key in ("python_mcp_version", "python_mcp_commit", "python_mcp_artifact_digest"))
+        _require(actual == identity, "lab receipts refer to different SDK identities")
+
+
 def normalize(paths: dict[str, Path]) -> dict[str, Any]:
     conformance = _load(paths["conformance"])
     adapter = _load(paths["adapter"])
@@ -49,6 +59,7 @@ def normalize(paths: dict[str, Path]) -> dict[str, Any]:
     cache = _load(paths["cache"])
     codex = _load(paths["codex"])
     rollback = _load(paths["rollback"])
+    require_same_sdk(conformance, adapter, handle, cache, codex)
     _require(
         conformance.get("verdict") == "frozen_requirements_passed"
         and conformance.get("requirements_revision") == "2026-07-28"

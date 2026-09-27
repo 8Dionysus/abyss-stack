@@ -41,7 +41,7 @@ from run_kag_next_pair import (
     build_next_server,
 )
 from runtime_catalog import deployment_settings, load_runtime_catalog, mcp_settings
-from _mcp_sdk_identity import installed_mcp_identity
+from _lab_runtime_identity import sdk_identity as lab_sdk_identity, stack_revision
 from run_live_modern_read_fleet import (
     _listener_attestation,
     _runtime_sdk_identity,
@@ -209,7 +209,7 @@ class PersistentAccessRecorder(AccessRecorder):
 
 
 def _serve(args: argparse.Namespace) -> int:
-    installed_mcp_identity(args.python_sdk_root)
+    lab_sdk_identity(args)
     raw_token = os.environ.get(TOKEN_ENV)
     if raw_token is None or len(raw_token) < 32:
         raise RuntimeError(f"{TOKEN_ENV} is missing or too short")
@@ -730,7 +730,7 @@ def _run(args: argparse.Namespace) -> int:
     started_at = _utc_now()
     if args.port == 0:
         args.port = _free_port()
-    sdk_identity = installed_mcp_identity(args.python_sdk_root)
+    sdk_identity = lab_sdk_identity(args)
     binary = args.codex_binary.resolve()
     if _sha256(binary) != CODEX_SHA256:
         raise RuntimeError("isolated Codex binary digest drifted")
@@ -764,7 +764,7 @@ def _run(args: argparse.Namespace) -> int:
         f"bearer_token_env_var = {json.dumps(TOKEN_ENV)}\n"
         "enabled_tools = [\"kag_discover\"]\n"
         "startup_timeout_sec = 20\n"
-        "tool_timeout_sec = 30\n"
+        f"tool_timeout_sec = {load_runtime_catalog()['limits']['status_timeout_seconds']}\n"
     ).encode()
     config_path = lab_root / "codex-home" / "config.toml"
     _write_private(config_path, config)
@@ -783,9 +783,8 @@ def _run(args: argparse.Namespace) -> int:
         str(args.aoa_kag_root),
         "--stack-runtime-root",
         str(args.stack_runtime_root),
-        "--python-sdk-root",
-        str(args.python_sdk_root),
     ]
+    server_command.extend(["--installed-runtime"] if args.installed_runtime else ["--python-sdk-root", str(args.python_sdk_root)])
     environment = dict(os.environ)
     environment[TOKEN_ENV] = raw_token
     environment["CODEX_HOME"] = str(lab_root / "codex-home")
@@ -843,7 +842,7 @@ def _run(args: argparse.Namespace) -> int:
         )
         _result(rpc.response(1))
         rpc.notify("initialized")
-        rpc.send(2, "thread/start", {"cwd": str(args.stack_source_root)})
+        rpc.send(2, "thread/start", {"cwd": str(args.stack_runtime_root if args.installed_runtime else args.stack_source_root)})
         thread_result = _result(rpc.response(2))
         thread = thread_result.get("thread")
         if not isinstance(thread, dict) or not isinstance(thread.get("id"), str):
@@ -868,7 +867,7 @@ def _run(args: argparse.Namespace) -> int:
                 "_meta": {"traceparent": TRACEPARENT},
             },
         )
-        call_result = _result(rpc.response(4))
+        call_result = _result(rpc.response(4, timeout=float(load_runtime_catalog()["limits"]["status_timeout_seconds"]) + 5))
         structured = _assert_call_result(call_result)
         oversized_status, oversized_result, _ = _direct_modern_request(
             url,
@@ -964,18 +963,15 @@ def _run(args: argparse.Namespace) -> int:
             "python_mcp_commit": sdk_identity["commit"],
             "python_mcp_artifact_digest": sdk_identity["artifact_digest"],
             "source_revisions": {
-                "abyss_stack": _git_head(args.stack_source_root),
+                "abyss_stack": stack_revision(args),
                 "aoa_kag": _git_head(args.aoa_kag_root),
             },
             "source_artifacts": {
                 "driver_sha256": _sha256(Path(__file__).resolve()),
                 "adapter_harness_sha256": _sha256(Path(__file__).with_name("run_kag_next_pair.py")),
                 "adapter_package_tree_sha256": _tree_sha256(
-                    Path(__file__).resolve().parents[2]
-                    / "services"
-                    / "aoa-kag-mcp"
-                    / "src"
-                    / "aoa_kag_mcp"
+                    (args.stack_runtime_root / "Configs/mcp" if args.installed_runtime else Path(__file__).resolve().parents[2])
+                    / "services/aoa-kag-mcp/src/aoa_kag_mcp"
                 ),
             },
             "config_sha256": config_digest,
@@ -1321,7 +1317,8 @@ def main() -> int:
     serve.add_argument("--workspace-root", required=True, type=Path)
     serve.add_argument("--aoa-kag-root", required=True, type=Path)
     serve.add_argument("--stack-runtime-root", required=True, type=Path)
-    serve.add_argument("--python-sdk-root", required=True, type=Path)
+    serve.add_argument("--python-sdk-root", type=Path)
+    serve.add_argument("--installed-runtime", action="store_true")
 
     run = subparsers.add_parser("run")
     run.add_argument("--output", required=True, type=Path)
@@ -1331,9 +1328,10 @@ def main() -> int:
     run.add_argument("--workspace-root", required=True, type=Path)
     run.add_argument("--aoa-kag-root", required=True, type=Path)
     run.add_argument("--stack-runtime-root", required=True, type=Path)
-    run.add_argument("--stack-source-root", required=True, type=Path)
+    run.add_argument("--stack-source-root", type=Path)
     run.add_argument("--stable-codex-config", required=True, type=Path)
-    run.add_argument("--python-sdk-root", required=True, type=Path)
+    run.add_argument("--python-sdk-root", type=Path)
+    run.add_argument("--installed-runtime", action="store_true")
     stable = subparsers.add_parser("stable-canary")
     stable.add_argument("--output", required=True, type=Path)
     stable.add_argument("--stable-codex-binary", required=True, type=Path)

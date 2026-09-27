@@ -219,3 +219,24 @@ Read [CONTRACT.md](CONTRACT.md) for admission law and
 refresh workflow, and
 [docs/TASKS_COMPATIBILITY_MATRIX.md](docs/TASKS_COMPATIBILITY_MATRIX.md) for
 the separately gated Tasks ecosystem verdicts.
+
+## Watcher inputs from the installed runtime
+
+Recurring host checks use `--installed-runtime`, the managed interpreter, and
+`Configs/mcp/services/aoa-kag-mcp/src`. They do not depend on a development
+checkout. SDK distribution bytes must pass the existing runtime identity
+attestation and match the runtime catalog; imported KAG source must match its
+owner deployment manifest. Development probes retain explicit source arguments,
+which cannot be combined with installed mode.
+
+Frozen conformance uses the five upstream fixture/license files in
+`fixtures/sdk-conformance-2.1.1`, exported from the exact reviewed SDK revision.
+Their manifest preserves origin and byte hashes. The fixtures run with the
+same installed SDK as the adapter probes, with no separate SDK environment.
+The normalizer rejects mixed SDK versions, revisions, or artifact digests.
+A passing lab run does not refresh admission or rewrite historical fixtures.
+
+The pinned Codex 0.147.0 binary is an explicit compatibility fixture, not the
+current production client. The separate post-lab canary uses the selected
+production client and a fresh read-fleet observation. Request budgets come from
+the runtime catalog rather than a second hardcoded status timeout.
