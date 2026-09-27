@@ -448,6 +448,7 @@
       "paths": [
         "mcp/protocol-lab/scripts/build_protocol_lab_status.py",
         "mcp/protocol-lab/scripts/_mcp_sdk_identity.py",
+        "mcp/protocol-lab/scripts/_lab_runtime_identity.py",
         "mcp/protocol-lab/scripts/inspector_tasks_adapter_client.ts",
         "mcp/protocol-lab/scripts/normalize_protocol_watch_run.py",
         "mcp/protocol-lab/scripts/protocol_watcher.py",
@@ -489,7 +490,7 @@
       "side_effects": "source-local generation and validation, plus bounded loopback client/server pair runs; no registration, global credential, service, or owner-truth mutation",
       "validation_lane": "mcp-services/release",
       "ci_inclusion": "mcp-services lane and default pytest collection",
-      "test_target": "mcp/protocol-lab/tests/test_protocol_lab.py mcp/protocol-lab/tests/test_protocol_watcher.py",
+      "test_target": "mcp/protocol-lab/tests/test_protocol_lab.py mcp/protocol-lab/tests/test_protocol_watcher.py mcp/protocol-lab/tests/test_installed_lab_runtime.py",
       "disposition": "keep"
     },
     {

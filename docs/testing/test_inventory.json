@@ -220,18 +220,19 @@
     },
     {
       "family": "mcp-protocol-lab-tests",
-  "paths": [
-    "mcp/protocol-lab/tests/test_protocol_lab.py",
-    "mcp/protocol-lab/tests/test_protocol_watcher.py"
-  ],
+      "paths": [
+        "mcp/protocol-lab/tests/test_protocol_lab.py",
+        "mcp/protocol-lab/tests/test_protocol_watcher.py",
+        "mcp/protocol-lab/tests/test_installed_lab_runtime.py"
+      ],
       "home_scope": "mcp-protocol-lab",
-      "protects": "deterministic protocol migration gating, evidence conjunction, read-only pilot isolation, and stable-preserving rollback prerequisites",
+      "protects": "deterministic protocol migration gating, evidence conjunction, read-only pilot isolation, stable-preserving rollback prerequisites, and installed-runtime identity binding",
       "owner_surface": "mcp/protocol-lab/AGENTS.md",
       "lane": "mcp-services/tests/release",
       "mode": "blocking-fail-closed",
       "runtime_cost": "fast",
       "focused_target": "mcp/protocol-lab/tests",
-      "failure_route": "Fix the protocol matrix, pair observation, schema, or derived status without weakening a missing-evidence gate.",
+      "failure_route": "Fix the protocol matrix, pair observation, runtime identity, schema, or derived status without weakening a missing-evidence gate.",
       "disposition": "keep"
     }
   ]
