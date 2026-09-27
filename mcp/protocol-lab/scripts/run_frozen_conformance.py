@@ -11,6 +11,7 @@ import shlex
 import socket
 import subprocess
 import time
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -128,19 +129,42 @@ def _sdk_identity(sdk_python: Path, sdk_root: Path) -> dict[str, str]:
 def run(args: argparse.Namespace) -> dict[str, Any]:
     started_at = _timestamp()
     conformance_root = args.conformance_root.resolve(strict=True)
-    sdk_root = args.python_sdk_root.resolve(strict=True)
+    sdk_root = args.python_sdk_root.resolve(strict=True) if args.python_sdk_root else None
     node = args.node.resolve(strict=True)
     cli = (conformance_root / "dist" / "index.js").resolve(strict=True)
-    sdk_python = sdk_root / ".venv" / "bin" / "python"
-    sdk_client = (sdk_root / ".github" / "actions" / "conformance" / "client.py").resolve(strict=True)
-    sdk_server = (sdk_root / ".venv" / "bin" / "mcp-everything-server").resolve(strict=True)
-    if not sdk_python.is_file() or not os.access(sdk_python, os.X_OK):
-        raise RuntimeError("Python SDK venv interpreter is unavailable")
+    if args.installed_runtime:
+        if sdk_root is not None:
+            raise ValueError("installed runtime cannot be combined with SDK source")
+        from _lab_runtime_identity import sdk_identity as lab_sdk_identity
+        sdk_identity = lab_sdk_identity(args)
+        sdk_python = Path(sys.executable)
+        fixture = Path(__file__).resolve().parents[1] / "fixtures/sdk-conformance-2.1.1"
+        manifest = json.loads((fixture / "manifest.json").read_text())
+        if manifest["source_revision"] != sdk_identity["commit"]:
+            raise RuntimeError("conformance fixture revision differs from installed SDK")
+        expected_files = {"client.py", "LICENSE", "mcp_everything_server/__init__.py", "mcp_everything_server/__main__.py", "mcp_everything_server/server.py"}
+        if set(manifest["files"]) != expected_files:
+            raise RuntimeError("conformance fixture file set differs")
+        for relative, digest in manifest["files"].items():
+            path = fixture / relative
+            if path.is_symlink() or hashlib.sha256(path.read_bytes()).hexdigest() != digest:
+                raise RuntimeError("conformance fixture bytes differ")
+        sdk_client = fixture / "client.py"
+        server_command = [str(sdk_python), "-B", "-m", "mcp_everything_server", "--port", str(args.port)]
+        server_cwd = fixture
+    else:
+        if sdk_root is None:
+            raise ValueError("development conformance requires --python-sdk-root")
+        sdk_python = sdk_root / ".venv/bin/python"
+        sdk_client = (sdk_root / ".github/actions/conformance/client.py").resolve(strict=True)
+        sdk_server = (sdk_root / ".venv/bin/mcp-everything-server").resolve(strict=True)
+        if _git_head(sdk_root) != PYTHON_SDK_COMMIT:
+            raise RuntimeError("Python SDK checkout does not match v2.1.1")
+        sdk_identity = _sdk_identity(sdk_python, sdk_root)
+        server_command = [str(sdk_server), "--port", str(args.port)]
+        server_cwd = sdk_root
     if _git_head(conformance_root) != CONFORMANCE_COMMIT:
         raise RuntimeError("conformance checkout does not match the exact current commit")
-    if _git_head(sdk_root) != PYTHON_SDK_COMMIT:
-        raise RuntimeError("Python SDK checkout does not match v2.1.1")
-    sdk_identity = _sdk_identity(sdk_python, sdk_root)
     package = json.loads((conformance_root / "package.json").read_text())
     if package.get("version") != CONFORMANCE_VERSION:
         raise RuntimeError("conformance package version drifted")
@@ -170,8 +194,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         raise RuntimeError(f"frozen client conformance returned {client.returncode}")
 
     server_process = subprocess.Popen(
-        [str(sdk_server), "--port", str(args.port)],
-        cwd=sdk_root,
+        server_command,
+        cwd=server_cwd,
         stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -220,7 +244,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "python_sdk": {
             "artifact_digest": sdk_identity["artifact_digest"],
             "commit": sdk_identity["commit"],
-            "source_checkout_clean": True,
+            "source_checkout_clean": not args.installed_runtime,
+            "input_mode": "installed_runtime" if args.installed_runtime else "source_checkout",
             "version": sdk_identity["version"],
         },
         "client": {
@@ -246,7 +271,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--conformance-root", required=True, type=Path)
-    parser.add_argument("--python-sdk-root", required=True, type=Path)
+    parser.add_argument("--python-sdk-root", type=Path)
+    parser.add_argument("--installed-runtime", action="store_true")
     parser.add_argument("--node", required=True, type=Path)
     parser.add_argument("--output-root", required=True, type=Path)
     parser.add_argument("--summary", required=True, type=Path)

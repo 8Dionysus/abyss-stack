@@ -1,0 +1,12 @@
+{
+  "source_revision": "0921d94a74db900dccd2d534842aa7b6160542d2",
+  "sdk_version": "2.1.1",
+  "upstream": "https://github.com/modelcontextprotocol/python-sdk",
+  "files": {
+    "client.py": "1d18229f95b99f0bc6f54bb8247cda47481c3c783c593591d8b11026ddd2f93a",
+    "LICENSE": "5e13dbbc1d120fc2a03cecde7c91424ae2d7de11b63d58ded2f4431e261ee50d",
+    "mcp_everything_server/__init__.py": "4d82da2d32b970e5e3d5237e524731d2bda7b000f33279a3fb9bda02949518df",
+    "mcp_everything_server/__main__.py": "946c519b036559f7e02c029054bb7c55d78cff204aed1bbecbe3d628700849bb",
+    "mcp_everything_server/server.py": "d3a62d276997446baac44b3aa37363477d0adbcf5b2bdeaa91c8f2a7023dbe2b"
+  }
+}
